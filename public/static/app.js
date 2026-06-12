@@ -2597,6 +2597,30 @@ async function renderCart() {
   const listDiv = document.getElementById("cartItemsList");
   if (!listDiv) return;
 
+  const statusContainer = document.getElementById("sharedListStatusContainer");
+  if (statusContainer) {
+    if (state.sharedListId) {
+      statusContainer.innerHTML = `
+        <div class="shared-list-badge" style="display:flex; justify-content:space-between; align-items:center; background: rgba(34, 197, 94, 0.1); border: 1px solid rgb(34, 197, 94); border-radius: 8px; padding: 10px 16px; margin-bottom: 20px; font-size: 13px; color: var(--ink);">
+          <div style="display:flex; align-items:center; gap:8px; color: rgb(21, 128, 61);">
+            <span style="width:8px; height:8px; border-radius:50%; background: rgb(34, 197, 94); display:inline-block; animation: pulse 1s infinite alternate;"></span>
+            <strong>Canlı Ortak Liste Aktif</strong> (Kod: ${state.sharedListId})
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="text-button" onclick="shareCartList()" style="padding: 4px 8px; font-size: 12px; height: auto;">
+              <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Bağlantıyı Al
+            </button>
+            <button type="button" class="text-button btn-danger" onclick="leaveSharedList()" style="padding: 4px 8px; font-size: 12px; height: auto; color: var(--red);">
+              <i data-lucide="log-out" style="width: 12px; height: 12px;"></i> Ayrıl
+            </button>
+          </div>
+        </div>
+      `;
+    } else {
+      statusContainer.innerHTML = "";
+    }
+  }
+
   // 1. Render items list
   if (state.cart.length === 0) {
     listDiv.innerHTML = `<p class="empty-text">Henüz ürün eklenmedi.</p>`;
@@ -2902,6 +2926,70 @@ async function renderCart() {
 
 
 /* COLLABORATIVE REAL-TIME SHARING POLING */
+function showShareLinkDialog(shareUrl) {
+  const dialog = document.getElementById("productDialog");
+  const content = document.getElementById("dialogContent");
+  if (!dialog || !content) return;
+  
+  content.innerHTML = `
+    <div class="dialog-body auth-dialog">
+      <p class="eyebrow">ORTAK LİSTE</p>
+      <h2>Ailenizle Birlikte Düzenleyin.</h2>
+      <p class="auth-copy" style="margin-bottom: 16px; font-size: 13px; color: var(--ink-light);">Aşağıdaki bağlantıyı kopyalayarak ailenize veya arkadaşlarınıza gönderin. Herkes listeye eş zamanlı ürün ekleyip silebilir!</p>
+      <div class="manual-fields">
+        <label class="manual-field">
+          <span>Paylaşım Linki</span>
+          <input id="shareListUrlInput" type="text" value="${escapeHtml(shareUrl)}" readonly style="width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-hover); font-family: inherit; font-size: 14px; color: var(--ink);">
+        </label>
+      </div>
+      <div class="dialog-actions" style="margin-top: 20px;">
+        <button class="secondary-button" type="button" onclick="closeDialog()">Kapat</button>
+        <button class="primary-button" type="button" onclick="copyShareLinkInput()">
+          <i data-lucide="copy"></i>
+          Linki Kopyala
+        </button>
+      </div>
+    </div>
+  `;
+  dialog.showModal();
+  lucide.createIcons();
+}
+
+window.copyShareLinkInput = function() {
+  const input = document.getElementById("shareListUrlInput");
+  if (input) {
+    input.select();
+    input.setSelectionRange(0, 99999); // Mobil için
+    try {
+      document.execCommand("copy");
+      showToast("Bağlantı kopyalandı!");
+    } catch (err) {
+      showToast("Bağlantı kopyalanamadı, lütfen elle kopyalayın.");
+    }
+  }
+};
+
+function leaveSharedList() {
+  if (confirm("Ortak listeden ayrılmak istediğinize emin misiniz? Kendi yerel sepetinize geri döneceksiniz.")) {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+    state.sharedListId = null;
+    state.sharedListVersion = 0;
+    
+    // Remove query parameter from URL without page reload
+    const url = new URL(window.location.href);
+    url.searchParams.delete("list");
+    window.history.replaceState({}, document.title, url.toString());
+    
+    // Load cart back from local storage
+    state.cart = JSON.parse(localStorage.getItem("almadan_cart") || "[]");
+    renderCart();
+    showToast("Ortak listeden ayrılındı. Yerel sepetinize geçildi.");
+  }
+}
+
 async function shareCartList() {
   if (state.cart.length === 0) {
     showToast("Sepetiniz boş, paylaşmak için önce ürün ekleyin.");
@@ -2919,9 +3007,25 @@ async function shareCartList() {
     state.sharedListVersion = res.version || 1;
     const shareUrl = `${window.location.origin}/?list=${res.id}`;
     
-    // Copy link to clipboard
-    await navigator.clipboard.writeText(shareUrl);
-    showToast("Bağlantı kopyalandı! SMS/E-posta ile ailenize gönderebilirsiniz.");
+    // Attempt automatic clipboard copy
+    let copied = false;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        copied = true;
+      } catch (e) {
+        console.warn("Navigator clipboard failed, falling back", e);
+      }
+    }
+    
+    // Show copy result toast if auto-copied
+    if (copied) {
+      showToast("Bağlantı panoya kopyalandı!");
+    }
+    
+    // Always open share dialog so user can see the link and copy manually if needed
+    showShareLinkDialog(shareUrl);
+    renderCart(); // Update UI to show active status
     
     // Start Polling loop if not active
     startPolling();
@@ -2943,6 +3047,7 @@ async function checkSharedListUrl() {
       state.sharedListVersion = res.version || 1;
       saveCartToLocalStorage();
       switchView("cart");
+      renderCart(); // Make sure cart items are instantly drawn on screen!
       
       startPolling();
     } catch (error) {
