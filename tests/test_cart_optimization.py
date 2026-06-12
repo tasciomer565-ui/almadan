@@ -86,6 +86,33 @@ class CartOptimizationTests(unittest.TestCase):
         self.assertEqual(best["title"], "Disk B 1 TB")
         self.assertIn("Birim Fiyat Avantajı", best["labels"])
 
+    def test_optimize_basket_with_distance_filtering(self) -> None:
+        from app.shopping import optimize_market_basket
+        
+        items = [
+            {
+                "name": "Süt 1 L",
+                "quantity": 1,
+                "offers": {
+                    "bim": 5.0,
+                    "metro": 2.0,
+                    "migros": 99.0,
+                    "a101": 99.0,
+                    "sok": 99.0,
+                    "file": 99.0,
+                    "carrefoursa": 99.0,
+                }
+            }
+        ]
+        
+        res_no_filter = optimize_market_basket(items, location_name="besiktas")
+        self.assertEqual(res_no_filter["single_store"]["store"], "metro")
+        self.assertEqual(res_no_filter["store_distances"]["metro"], 3.80)
+        self.assertEqual(res_no_filter["store_distances"]["bim"], 0.10)
+        
+        res_filtered = optimize_market_basket(items, location_name="besiktas", max_distance=1.0)
+        self.assertEqual(res_filtered["single_store"]["store"], "bim")
+
     def test_barcode_lookup_utility(self) -> None:
         # Valid Barcode
         match = lookup_barcode("8690506390074")

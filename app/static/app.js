@@ -12,6 +12,9 @@ const state = {
   sharedListId: null,
   sharedListVersion: 0,
   optimizerMode: "single",
+  userLocation: "default",
+  userCoords: null,
+  maxDistance: 99999,
   theme: localStorage.getItem("almadan_theme") || "light",
   charts: {},
 };
@@ -1018,6 +1021,25 @@ function showSearchResults(response) {
     `
     : "";
 
+  // Dynamic search refinement chips for generic products
+  const queryLower = originalQuery.toLowerCase().trim();
+  let matchingKey = Object.keys(genericProductSizes).find(key => queryLower === key || queryLower === key + "sı" || queryLower === key + "su" || queryLower === key + "yu");
+  
+  let sizeChipsHtml = "";
+  if (matchingKey) {
+    const chips = genericProductSizes[matchingKey];
+    sizeChipsHtml = `
+      <div class="search-refinement-chips" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; background: rgba(40, 122, 80, 0.05); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(40, 122, 80, 0.15);">
+        <span style="font-size: 11px; font-weight: 700; color: var(--green); margin-right: 4px;">EBAT HIZLI FİLTRE:</span>
+        ${chips.map(sz => `
+          <button type="button" class="secondary-button" style="padding: 4px 10px; border-radius: 12px; font-size: 10px; font-weight: 700; height: auto;" onclick="event.preventDefault(); triggerSuggestionSearch('${escapeHtml(matchingKey)} ${escapeHtml(sz)}');">
+            ${escapeHtml(sz)}
+          </button>
+        `).join("")}
+      </div>
+    `;
+  }
+
   content.innerHTML = `
     <style>
       .search-result-card {
@@ -1032,6 +1054,7 @@ function showSearchResults(response) {
     <div class="dialog-body" style="max-width: 600px; width: 100%;">
       <p class="eyebrow" style="color: var(--green); font-weight: 700;">ARAMA SONUÇLARI</p>
       <h2 style="margin-bottom: 16px;">En Mantıklı Seçenekler</h2>
+      ${sizeChipsHtml}
       ${fallbackNoticeHtml}
       <div style="display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto; padding-right: 4px; margin-bottom: 24px;">
         ${products.map((item, index) => {
@@ -1042,6 +1065,8 @@ function showSearchResults(response) {
             if (lbl === "Hızlı Kargo") colorClass = "bg-blue";
             if (lbl === "En İyi Puan") colorClass = "bg-yellow";
             if (lbl === "Şüpheli Fiyat") colorClass = "bg-red";
+            if (lbl === "Birim Fiyat Riski") colorClass = "bg-red";
+            if (lbl === "Birim Fiyat Avantajı") colorClass = "bg-green";
             return `<span class="analysis-status-badge ${colorClass}" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase;">${escapeHtml(lbl)}</span>`;
           }).join(" ");
 
@@ -2159,6 +2184,12 @@ window.runBarcodeScan = runBarcodeScan;
 window.runOcrScan = runOcrScan;
 window.switchOptimizerMode = switchOptimizerMode;
 window.startVoiceSearch = startVoiceSearch;
+window.closeSizeSelectorDialog = closeSizeSelectorDialog;
+window.addGenericCartItemWithSize = addGenericCartItemWithSize;
+window.addGenericCartItemWithCustomSize = addGenericCartItemWithCustomSize;
+window.addGenericCartItemWithoutSize = addGenericCartItemWithoutSize;
+window.updateUserLocation = updateUserLocation;
+window.updateMaxDistance = updateMaxDistance;
 
 
 /* PREMIUM KOYU TEMA */
@@ -2187,16 +2218,27 @@ function addQuickCartItem() {
   const val = input.value.trim();
   if (!val) return;
 
+  const hasSize = /\d+\s*(ml|l|g|gr|kg|li|'lu|'li|'lü|'lu|'lü|adet|porsiyon|servis)/i.test(val);
+  const lowerVal = val.toLowerCase();
+  const isGeneric = Object.keys(genericProductSizes).some(key => lowerVal === key || lowerVal.includes(key));
+  
+  input.value = "";
+  
+  if (isGeneric && !hasSize) {
+    showSizeSelectorDialog(val);
+    return;
+  }
+
   const newItem = {
     id: "cart-" + Date.now(),
     name: val,
     checked: false,
+    quantity: 1,
     updated_at: new Date().toISOString(),
   };
 
   state.cart.push(newItem);
   saveCartToLocalStorage();
-  input.value = "";
   renderCart();
   
   if (state.sharedListId) {
@@ -2540,13 +2582,25 @@ function renderBackendOptimization(result, mode) {
   const resultsDiv = document.getElementById("optimizerResults");
   if (!resultsDiv || !result?.single_store || !result?.split_basket) return false;
 
+  const fallbackWarningHtml = result.distance_fallback_applied
+    ? `<div style="font-size: 11px; color: var(--red); font-weight: 700; margin-bottom: 10px; background: rgba(196, 82, 67, 0.08); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(196, 82, 67, 0.2); display: flex; align-items: center; gap: 4px;">
+         <i data-lucide="shield-alert" style="width:14px; height:14px;"></i> Limit dahilinde mağaza bulunamadı! En yakın mağazaya yönlendirildiniz.
+       </div>`
+    : "";
+
   if (mode === "single") {
     const option = result.single_store;
+    const distVal = result.store_distances ? result.store_distances[option.store] : undefined;
+    const distanceText = distVal !== undefined && state.userLocation !== "default"
+      ? `<span style="font-size: 11px; font-weight: 700; color: var(--muted); margin-left: 6px;">(${distVal >= 1 ? `${distVal.toFixed(2)} km` : `${Math.round(distVal * 1000)} m`})</span>`
+      : "";
+
     resultsDiv.innerHTML = `
+      ${fallbackWarningHtml}
       <div class="optimizer-summary">
         <span class="optimizer-kicker">EN UCUZ TEK MARKET</span>
         <h4>${currency.format(option.total)}</h4>
-        <p><strong>${escapeHtml(option.store.toUpperCase())}</strong> ile
+        <p><strong>${escapeHtml(option.store.toUpperCase())}</strong>${distanceText} ile
           ${currency.format(option.savings)} tasarruf.</p>
         ${option.coupon ? `<p class="coupon-applied">${escapeHtml(option.coupon.code)} kuponu: -${currency.format(option.coupon.discount)}</p>` : ""}
       </div>
@@ -2559,37 +2613,46 @@ function renderBackendOptimization(result, mode) {
         `).join("")}
       </div>
     `;
+    lucide.createIcons();
     return true;
   }
 
   const split = result.split_basket;
   resultsDiv.innerHTML = `
+    ${fallbackWarningHtml}
     <div class="optimizer-summary">
       <span class="optimizer-kicker">BÖLÜNMÜŞ SEPET</span>
       <h4>${currency.format(split.total)}</h4>
       <p>En ucuz tek markete göre ek ${currency.format(split.savings)} tasarruf.</p>
     </div>
     <div class="optimizer-store-list">
-      ${split.stores.map(group => `
-        <div class="opt-store-card">
-          <div class="opt-store-header">
-            <span class="opt-store-name">${escapeHtml(group.store.toUpperCase())}</span>
-            <span class="opt-store-total">${currency.format(group.total)}</span>
-          </div>
-          ${group.coupon ? `<p class="coupon-applied">${escapeHtml(group.coupon.code)}: -${currency.format(group.coupon.discount)}</p>` : ""}
-          ${group.items.map(item => `
-            <div class="opt-item-row">
-              <span>
-                ${escapeHtml(item.name)}
-                ${item.unit_analysis ? `<small>${currency.format(item.unit_analysis.unit_price)} / ${escapeHtml(item.unit_analysis.unit)}</small>` : ""}
-              </span>
-              <span class="opt-item-price">${currency.format(item.line_total)}</span>
+      ${split.stores.map(group => {
+        const distVal = result.store_distances ? result.store_distances[group.store] : undefined;
+        const distanceText = distVal !== undefined && state.userLocation !== "default"
+          ? `<span style="font-size: 11px; font-weight: 700; color: var(--muted); margin-left: 6px;">(${distVal >= 1 ? `${distVal.toFixed(2)} km` : `${Math.round(distVal * 1000)} m`})</span>`
+          : "";
+        return `
+          <div class="opt-store-card">
+            <div class="opt-store-header">
+              <span class="opt-store-name">${escapeHtml(group.store.toUpperCase())}${distanceText}</span>
+              <span class="opt-store-total">${currency.format(group.total)}</span>
             </div>
-          `).join("")}
-        </div>
-      `).join("")}
+            ${group.coupon ? `<p class="coupon-applied">${escapeHtml(group.coupon.code)}: -${currency.format(group.coupon.discount)}</p>` : ""}
+            ${group.items.map(item => `
+              <div class="opt-item-row">
+                <span>
+                  ${escapeHtml(item.name)}
+                  ${item.unit_analysis ? `<small>${currency.format(item.unit_analysis.unit_price)} / ${escapeHtml(item.unit_analysis.unit)}</small>` : ""}
+                </span>
+                <span class="opt-item-price">${currency.format(item.line_total)}</span>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }).join("")}
     </div>
   `;
+  lucide.createIcons();
   return true;
 }
 
@@ -2702,6 +2765,10 @@ async function renderCart() {
             quantity: Number.parseInt(item.quantity, 10) || 1,
             offers: item.offers || null,
           })),
+          location_name: state.userLocation !== "gps" ? state.userLocation : null,
+          lat: state.userCoords ? state.userCoords.lat : null,
+          lng: state.userCoords ? state.userCoords.lng : null,
+          max_distance: state.maxDistance < 99999 ? state.maxDistance : null,
         }),
       });
       localStorage.setItem("almadan_last_optimizer_result", JSON.stringify(optimized));
@@ -3385,4 +3452,189 @@ function askAiColorSuitability() {
     
     answerBox.innerHTML = comment;
   }, 1000);
+}
+
+/* EN YAKIN MAĞAZA VE EBAT SEÇİMİ BİLEŞENLERİ */
+const genericProductSizes = {
+  "süt": ["200 ml", "1 L", "2 L"],
+  "yağ": ["1 L", "2 L", "5 L"],
+  "ayçiçek yağı": ["1 L", "2 L", "5 L"],
+  "zeytinyağı": ["1 L", "2 L", "5 L"],
+  "sıvı yağ": ["1 L", "2 L", "5 L"],
+  "salça": ["400 gr", "830 gr", "1.5 kg", "5 kg"],
+  "domates salçası": ["400 gr", "830 gr", "1.5 kg", "5 kg"],
+  "biber salçası": ["400 gr", "830 gr", "1.5 kg", "5 kg"],
+  "yoğurt": ["500 gr", "1 kg", "2 kg", "3 kg"],
+  "peynir": ["500 gr", "700 gr", "1 kg"],
+  "süzme peynir": ["500 gr", "700 gr", "1 kg"],
+  "kaşar peyniri": ["500 gr", "700 gr", "1 kg"],
+  "un": ["1 kg", "2 kg", "5 kg"],
+  "şeker": ["1 kg", "3 kg", "5 kg"],
+  "çay": ["500 gr", "1 kg"],
+  "yumurta": ["10'lu", "15'li", "30'lu"]
+};
+
+const STORE_BRANCHES_JS = {
+  besiktas: { bim: 0.10, a101: 0.11, sok: 0.13, file: 0.44, carrefoursa: 0.38, migros: 0.22, metro: 3.80 },
+  kadikoy: { bim: 0.10, a101: 0.14, sok: 0.15, file: 0.90, carrefoursa: 0.60, migros: 0.24, metro: 8.10 },
+  cankaya: { bim: 0.10, a101: 0.15, sok: 0.12, file: 1.20, carrefoursa: 0.80, migros: 0.25, metro: 5.50 },
+  karsiyaka: { bim: 0.10, a101: 0.15, sok: 0.13, file: 999.00, carrefoursa: 0.70, migros: 0.23, metro: 7.50 },
+  bodrum: { bim: 0.20, a101: 0.23, sok: 0.32, file: 999.00, carrefoursa: 1.20, migros: 0.45, metro: 6.50 }
+};
+
+function getLocalStoreDistance(store, locName, coords) {
+  if (locName in STORE_BRANCHES_JS) return STORE_BRANCHES_JS[locName][store] || 999;
+  if (coords) {
+    const offsets = {
+      bim: [0.001, -0.001],
+      a101: [-0.0015, 0.001],
+      sok: [0.002, 0.002],
+      file: [-0.005, -0.004],
+      carrefoursa: [0.008, 0.006],
+      migros: [-0.003, 0.004],
+      metro: [0.045, -0.035]
+    };
+    if (offsets[store]) {
+      const [dlat, dlng] = offsets[store];
+      const lat2 = coords.lat + dlat;
+      const lng2 = coords.lng + dlng;
+      
+      const R = 6371;
+      const dLat = dlat * Math.PI / 180;
+      const dLon = dlng * Math.PI / 180;
+      const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(coords.lat * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return Math.round(R * c * 100) / 100;
+    }
+  }
+  return 0;
+}
+
+function showSizeSelectorDialog(itemName) {
+  const dialog = document.getElementById("sizeSelectorDialog");
+  const content = document.getElementById("sizeSelectorContent");
+  if (!dialog || !content) return;
+  
+  const lowerName = itemName.trim().toLowerCase();
+  let matchKey = Object.keys(genericProductSizes).find(key => lowerName === key || lowerName.includes(key));
+  const sizes = matchKey ? genericProductSizes[matchKey] : ["1 L", "1 kg", "500 gr"];
+  
+  content.innerHTML = `
+    <h3 style="margin-bottom: 12px; font-weight: 700; color: var(--ink);">Ebat/Miktar Seçin</h3>
+    <p style="color: var(--muted); font-size: 13px; margin-bottom: 16px;">
+      "${escapeHtml(itemName)}" için daha doğru birim fiyat karşılaştırması yapılabilmesi için bir ebat seçin:
+    </p>
+    
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;">
+      ${sizes.map(sz => `
+        <button type="button" class="secondary-button" style="padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; height: auto;" onclick="addGenericCartItemWithSize('${escapeHtml(itemName)}', '${escapeHtml(sz)}')">
+          ${escapeHtml(sz)}
+        </button>
+      `).join("")}
+    </div>
+    
+    <div style="border-top: 1px solid var(--line); padding-top: 16px; margin-bottom: 16px;">
+      <label style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--muted);">Özel Ebat Girin:</label>
+      <div style="display: flex; gap: 8px;">
+        <input type="text" id="customSizeInput" placeholder="Örn: 1.5 L, 800 gr, 250 ml" style="flex: 1; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px;">
+        <button type="button" class="primary-button" style="width: auto; height: auto; padding: 8px 16px;" onclick="addGenericCartItemWithCustomSize('${escapeHtml(itemName)}')">Ekle</button>
+      </div>
+    </div>
+    
+    <div style="display: flex; gap: 8px;">
+      <button type="button" class="text-button" style="flex: 1; text-align: center; color: var(--muted);" onclick="addGenericCartItemWithoutSize('${escapeHtml(itemName)}')">
+        Belirtmeden Ekle
+      </button>
+      <button type="button" class="text-button" style="flex: 1; text-align: center; color: var(--red);" onclick="closeSizeSelectorDialog()">
+        İptal
+      </button>
+    </div>
+  `;
+  
+  if (!dialog.open) dialog.showModal();
+}
+
+function closeSizeSelectorDialog() {
+  const dialog = document.getElementById("sizeSelectorDialog");
+  if (dialog && dialog.open) dialog.close();
+}
+
+function addGenericCartItemWithSize(name, size) {
+  const finalName = `${name} ${size}`;
+  const newItem = {
+    id: "cart-" + Date.now(),
+    name: finalName,
+    checked: false,
+    quantity: 1,
+    updated_at: new Date().toISOString(),
+  };
+  state.cart.push(newItem);
+  saveCartToLocalStorage();
+  renderCart();
+  closeSizeSelectorDialog();
+  if (state.sharedListId) syncSharedListWithServer();
+}
+
+function addGenericCartItemWithCustomSize(name) {
+  const input = document.getElementById("customSizeInput");
+  const size = input ? input.value.trim() : "";
+  if (!size) return;
+  addGenericCartItemWithSize(name, size);
+}
+
+function addGenericCartItemWithoutSize(name) {
+  const newItem = {
+    id: "cart-" + Date.now(),
+    name: name,
+    checked: false,
+    quantity: 1,
+    updated_at: new Date().toISOString(),
+  };
+  state.cart.push(newItem);
+  saveCartToLocalStorage();
+  renderCart();
+  closeSizeSelectorDialog();
+  if (state.sharedListId) syncSharedListWithServer();
+}
+
+async function updateUserLocation(val) {
+  state.userLocation = val;
+  if (val === "gps") {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          state.userCoords = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          showToast("GPS konumu alındı.");
+          renderCart();
+        },
+        (error) => {
+          showToast("GPS konumu alınamadı: " + error.message);
+          document.getElementById("userLocationSelector").value = "default";
+          state.userLocation = "default";
+          state.userCoords = null;
+          renderCart();
+        }
+      );
+    } else {
+      showToast("Tarayıcınız konum servisini desteklemiyor.");
+      document.getElementById("userLocationSelector").value = "default";
+      state.userLocation = "default";
+      state.userCoords = null;
+      renderCart();
+    }
+  } else {
+    state.userCoords = null;
+    renderCart();
+  }
+}
+
+function updateMaxDistance(val) {
+  state.maxDistance = Number(val);
+  renderCart();
 }

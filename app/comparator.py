@@ -614,7 +614,7 @@ def search_products_by_name(query: str) -> list[dict]:
                 p["extra_info"]["unit"] = unit
                 p["extra_info"]["volume_val"] = val
 
-    # Label the best unit price product
+    # Label the best unit price product and identify price risks
     for unit_type in ("L", "kg", "GB", "servis", "adet"):
         same_unit_products = [
             p for p in output 
@@ -629,6 +629,14 @@ def search_products_by_name(query: str) -> list[dict]:
                 best_p["labels"].append("Birim Fiyat Avantajı")
                 if "Önerilen" in best_p["labels"] and len(best_p["labels"]) > 1:
                     best_p["labels"].remove("Önerilen")
+            
+            best_unit_price = best_p["extra_info"]["unit_price"]
+            for p in same_unit_products:
+                if p["extra_info"]["unit_price"] / best_unit_price >= 1.5:
+                    if "Birim Fiyat Riski" not in p["labels"]:
+                        p["labels"].append("Birim Fiyat Riski")
+                        if "Önerilen" in p["labels"] and len(p["labels"]) > 1:
+                            p["labels"].remove("Önerilen")
 
     if not output:
         popular_fallbacks = [
@@ -717,6 +725,16 @@ def search_products_by_name(query: str) -> list[dict]:
             best["extra_info"]["best_unit_price"] = True
             if "Birim Fiyat Avantajı" not in best["labels"]:
                 best["labels"].append("Birim Fiyat Avantajı")
+                if "Önerilen" in best["labels"] and len(best["labels"]) > 1:
+                    best["labels"].remove("Önerilen")
+            
+            best_unit_price = best["extra_info"]["unit_price"]
+            for p in comparable:
+                if p["extra_info"]["unit_price"] / best_unit_price >= 1.5:
+                    if "Birim Fiyat Riski" not in p["labels"]:
+                        p["labels"].append("Birim Fiyat Riski")
+                        if "Önerilen" in p["labels"] and len(p["labels"]) > 1:
+                            p["labels"].remove("Önerilen")
 
     return output
 

@@ -16,6 +16,91 @@ MARKET_STORES = (
     "migros",
 )
 
+STORE_BRANCHES = {
+    "besiktas": {
+        "bim": 0.10,
+        "a101": 0.11,
+        "sok": 0.13,
+        "file": 0.44,
+        "carrefoursa": 0.38,
+        "migros": 0.22,
+        "metro": 3.80,
+    },
+    "kadikoy": {
+        "bim": 0.10,
+        "a101": 0.14,
+        "sok": 0.15,
+        "file": 0.90,
+        "carrefoursa": 0.60,
+        "migros": 0.24,
+        "metro": 8.10,
+    },
+    "cankaya": {
+        "bim": 0.10,
+        "a101": 0.15,
+        "sok": 0.12,
+        "file": 1.20,
+        "carrefoursa": 0.80,
+        "migros": 0.25,
+        "metro": 5.50,
+    },
+    "karsiyaka": {
+        "bim": 0.10,
+        "a101": 0.15,
+        "sok": 0.13,
+        "file": 999.00,
+        "carrefoursa": 0.70,
+        "migros": 0.23,
+        "metro": 7.50,
+    },
+    "bodrum": {
+        "bim": 0.20,
+        "a101": 0.23,
+        "sok": 0.32,
+        "file": 999.00,
+        "carrefoursa": 1.20,
+        "migros": 0.45,
+        "metro": 6.50,
+    }
+}
+
+def get_store_distance(
+    store: str,
+    lat: float | None = None,
+    lng: float | None = None,
+    location_name: str | None = None,
+) -> float:
+    if location_name in STORE_BRANCHES:
+        return STORE_BRANCHES[location_name].get(store, 999.00)
+    
+    if lat is not None and lng is not None:
+        # Define fixed offsets for each store brand to simulate branch coordinates
+        offsets = {
+            "bim": (0.001, -0.001), # ~150m
+            "a101": (-0.0015, 0.001), # ~200m
+            "sok": (0.002, 0.002), # ~300m
+            "file": (-0.005, -0.004), # ~700m
+            "carrefoursa": (0.008, 0.006), # ~1.1km
+            "migros": (-0.003, 0.004), # ~500m
+            "metro": (0.045, -0.035), # ~6.5km
+        }
+        if store in offsets:
+            dlat, dlng = offsets[store]
+            import math
+            R = 6371.0
+            lat2 = lat + dlat
+            lng2 = lng + dlng
+            
+            d_lat_rad = math.radians(lat2 - lat)
+            d_lng_rad = math.radians(lng2 - lng)
+            a = (math.sin(d_lat_rad / 2) ** 2 +
+                 math.cos(math.radians(lat)) * math.cos(math.radians(lat2)) *
+                 math.sin(d_lng_rad / 2) ** 2)
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+            return round(R * c, 2)
+            
+    return 0.0
+
 
 def _base_price(name: str) -> float:
     lower = name.casefold()
@@ -110,9 +195,31 @@ def _apply_coupon(
 def optimize_market_basket(
     items: list[dict[str, Any]],
     coupons: list[dict[str, Any]] | None = None,
+    lat: float | None = None,
+    lng: float | None = None,
+    location_name: str | None = None,
+    max_distance: float | None = None,
 ) -> dict[str, Any]:
     coupons = coupons or []
     normalized_items: list[dict[str, Any]] = []
+
+    # Calculate store distances
+    store_distances = {}
+    for store in MARKET_STORES:
+        store_distances[store] = get_store_distance(store, lat, lng, location_name)
+
+    # Filter allowed stores based on max_distance
+    allowed_stores = list(MARKET_STORES)
+    distance_fallback_applied = False
+    
+    if max_distance is not None:
+        filtered = [s for s in MARKET_STORES if store_distances[s] <= max_distance]
+        if filtered:
+            allowed_stores = filtered
+        else:
+            closest_store = min(MARKET_STORES, key=lambda s: store_distances[s])
+            allowed_stores = [closest_store]
+            distance_fallback_applied = True
 
     for index, item in enumerate(items):
         name = str(item.get("name") or item.get("title") or "").strip()
@@ -135,10 +242,12 @@ def optimize_market_basket(
             "single_store": None,
             "split_basket": None,
             "baseline_total": 0.0,
+            "store_distances": store_distances,
+            "distance_fallback_applied": distance_fallback_applied,
         }
 
     single_options: list[dict[str, Any]] = []
-    for store in MARKET_STORES:
+    for store in allowed_stores:
         breakdown = []
         subtotal = 0.0
         for item in normalized_items:
@@ -171,7 +280,8 @@ def optimize_market_basket(
 
     split_groups: dict[str, dict[str, Any]] = {}
     for item in normalized_items:
-        store, unit_price = min(item["offers"].items(), key=lambda offer: offer[1])
+        allowed_offers = {s: item["offers"][s] for s in allowed_stores}
+        store, unit_price = min(allowed_offers.items(), key=lambda offer: offer[1])
         group = split_groups.setdefault(
             store,
             {"store": store, "subtotal": 0.0, "items": []},
@@ -218,4 +328,6 @@ def optimize_market_basket(
             "coupons": applied_coupons,
         },
         "baseline_total": round(baseline_total, 2),
+        "store_distances": store_distances,
+        "distance_fallback_applied": distance_fallback_applied,
     }

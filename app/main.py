@@ -1287,6 +1287,10 @@ class BasketItemPayload(BaseModel):
 
 class BasketOptimizePayload(BaseModel):
     items: list[BasketItemPayload]
+    location_name: str | None = None
+    lat: float | None = None
+    lng: float | None = None
+    max_distance: float | None = None
 
 
 class ReceiptOcrRequest(BaseModel):
@@ -1356,6 +1360,10 @@ def optimize_cart(payload: BasketOptimizePayload) -> dict:
     return optimize_market_basket(
         [item.model_dump() for item in payload.items],
         db.get("coupons", []),
+        lat=payload.lat,
+        lng=payload.lng,
+        location_name=payload.location_name,
+        max_distance=payload.max_distance,
     )
 
 
