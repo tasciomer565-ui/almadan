@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#121412">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Almadan">
+    <link rel="manifest" href="/static/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    <title>Almadan - Alışveriş Karar Asistanı</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=20260612-cosmetics2">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Almadan ana sayfa">
+        <span class="brand-mark">A</span>
+        <span>almadan</span>
+      </a>
+      <nav class="desktop-nav" aria-label="Ana menü">
+        <button class="nav-item active" data-view="discover">Keşfet</button>
+        <button class="nav-item" data-view="tracking">Takiptekiler</button>
+        <button class="nav-item" data-view="cart">Sepetim & Listelerim</button>
+        <button class="nav-item" data-view="savings">Tasarrufum</button>
+      </nav>
+      <div class="topbar-actions">
+        <span class="network-status" id="networkStatus" role="status" aria-live="polite">
+          <i data-lucide="wifi"></i>
+          <span>Çevrimiçi</span>
+        </span>
+        <button class="icon-button" id="themeToggleButton" aria-label="Tema Değiştir" title="Tema Değiştir">
+          <i data-lucide="moon"></i>
+        </button>
+        <button class="account-button" id="accountButton" type="button" aria-label="Hesap" title="Hesap">
+          <i data-lucide="user-round"></i>
+          <span id="accountButtonLabel">Giriş</span>
+        </button>
+        <button class="icon-button" id="notificationButton" aria-label="Bildirimler" title="Bildirimler">
+          <i data-lucide="bell"></i>
+          <span class="notification-dot"></span>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro-band">
+        <div class="intro-content">
+          <p class="eyebrow">ALIŞVERİŞ KARAR ASİSTANI</p>
+          <h1>Satın almadan önce kontrol et.</h1>
+          <p class="intro-copy">Ürün adı ara veya linkini yapıştır. Fiyatı gerçekten iyi mi, beklemeli misin görelim.</p>          <form class="url-form" id="urlForm">
+            <div class="url-field">
+              <i data-lucide="search"></i>
+              <select id="searchCategorySelector" class="search-category-select">
+                <option value="general">Genel / Hepsi</option>
+                <option value="grocery">Market & Gıda</option>
+                <option value="electronics">Elektronik</option>
+                <option value="fashion">Giyim & Moda</option>
+                <option value="cosmetics">Kozmetik & Bakım</option>
+                <option value="home">Züccaciye & Ev</option>
+              </select>
+              <input id="productUrl" type="text" placeholder="Ürün adı ara veya link yapıştır..." required>
+              <button class="mic-button" id="micButton" type="button" aria-label="Sesle ara" title="Sesle ara">
+                <i data-lucide="mic"></i>
+              </button>
+              <button class="paste-button" id="pasteButton" type="button" aria-label="Panodan yapıştır" title="Panodan yapıştır">
+                <i data-lucide="clipboard"></i>
+              </button>
+            </div>
+            <button class="primary-button" type="submit">
+              <i data-lucide="scan-search"></i>
+              Kontrol et
+            </button>
+          </form>
+
+          <div class="supported">
+            <span>Desteklenen mağazalar:</span>
+            <div class="store-list">
+              <span>Trendyol</span>
+              <span>Hepsiburada</span>
+              <span>Amazon</span>
+              <span>n11</span>
+              <span>Migros</span>
+              <span>BİM</span>
+              <span>A101</span>
+              <span>Şok</span>
+              <span>File Market</span>
+              <span>Metro</span>
+              <span>CarrefourSA</span>
+              <span>Vatan</span>
+              <span>İtopya</span>
+              <span>MediaMarkt</span>
+              <span>Teknosa</span>
+              <span>Gratis</span>
+              <span>Rossmann</span>
+              <span>LC Waikiki</span>
+              <span>Defacto</span>
+              <span>Zara</span>
+              <span>Boyner</span>
+              <span>Koton</span>
+              <span>Mavi</span>
+              <span>Supplementler</span>
+              <span>Proteinocean</span>
+              <span>Karaca</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- YAPAY ZEKA CİLT VE MAKYAJ ANALİSTİ (Sadece Kozmetik Seçildiğinde Görünür) -->
+      <section class="content-section hidden" id="aiCosmeticsSection">
+        <div class="glass-card" style="padding: 20px; border-radius: 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 24px;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <div style="background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 10px rgba(255,117,140,0.3);">
+              <i data-lucide="sparkles" style="width: 20px; height: 20px;"></i>
+            </div>
+            <div>
+              <h3 style="margin: 0; font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 18px; color: var(--green-dark);">Yapay Zeka Cilt & Makyaj Analisti</h3>
+              <p style="margin: 2px 0 0 0; font-size: 12px; color: var(--ink-light);">Selfie fotoğrafınızı analiz ederek en uyumlu makyaj renk paletini belirleyin.</p>
+            </div>
+          </div>
+          
+          <div class="ai-analyst-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            <!-- Sol Panel: Fotoğraf Yükleme/Seçme -->
+            <div style="border: 2px dashed var(--line); border-radius: 12px; padding: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 220px; position: relative; background: var(--bg-card); transition: all 0.2s;" id="aiPhotoDropzone">
+              <i data-lucide="camera" style="width: 48px; height: 48px; color: var(--ink-light); margin-bottom: 12px;" id="aiCameraIcon"></i>
+              <p style="font-size: 13px; font-weight: 700; margin-bottom: 4px; color: var(--ink);" id="aiUploadStatus">Selfie Fotoğrafı Yükle</p>
+              <p style="font-size: 11px; color: var(--ink-light); margin-bottom: 16px; text-align: center;">veya test etmek için aşağıdaki hazır örnek modellerden birini seçin:</p>
+              
+              <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;" id="aiSampleSelfies">
+                <button type="button" class="tag-button" id="btnSelfieLight" style="font-size: 11px; background: #fdf5e6; color: #8b5a2b; border: 1px solid #e5c158; cursor: pointer; padding: 6px 12px; border-radius: 6px; font-weight: 700;">Açık Tenli Model</button>
+                <button type="button" class="tag-button" id="btnSelfieMedium" style="font-size: 11px; background: #f5deb3; color: #8b5a2b; border: 1px solid #cd9b1d; cursor: pointer; padding: 6px 12px; border-radius: 6px; font-weight: 700;">Buğday Tenli Model</button>
+                <button type="button" class="tag-button" id="btnSelfieDark" style="font-size: 11px; background: #cd853f; color: white; border: 1px solid #8b4513; cursor: pointer; padding: 6px 12px; border-radius: 6px; font-weight: 700;">Esmer Model</button>
+              </div>
+              
+              <input type="file" id="aiPhotoFileInput" accept="image/*" class="hidden">
+              
+              <!-- Scan Laser Animation Overlay (initially hidden) -->
+              <div id="aiScanLaser" class="hidden" style="position: absolute; left: 0; right: 0; height: 3px; background: #ff7eb3; box-shadow: 0 0 10px #ff7eb3, 0 0 20px #ff7eb3; pointer-events: none; z-index: 10;"></div>
+            </div>
+            
+            <!-- Sağ Panel: Analiz Sonucu -->
+            <div id="aiAnalysisResultCard" class="hidden" style="background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
+                <span style="font-weight: 800; font-size: 14px; color: var(--green-dark);">Cilt Analiz Sonucu</span>
+                <span id="aiSkinToneTag" style="font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; background: rgba(40,122,80,0.1); color: var(--green-dark);">Nötr Alt Ton</span>
+              </div>
+              
+              <div style="display: flex; align-items: center; gap: 10px; font-size: 13px;">
+                <span>Algılanan Cilt Tipi:</span>
+                <span id="aiSkinToneColorIndicator" style="width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--line); display: inline-block; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);"></span>
+                <strong id="aiSkinToneName" style="color: var(--ink); font-size: 14px;">Açık/Fildişi</strong>
+              </div>
+              
+              <!-- Palet Önerileri -->
+              <div>
+                <span style="font-size: 12px; font-weight: 800; color: var(--ink-light); display: block; margin-bottom: 8px;">Önerilen Renk Paletiniz:</span>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;" id="aiPaletteColors">
+                  <!-- Ruj, Allık, Göz Farı renk daireleri -->
+                </div>
+              </div>
+              
+              <!-- Akıllı Ürün Uyumluluğu Soru Cevap Kutusu -->
+              <div style="border-top: 1px solid var(--line); padding-top: 14px; margin-top: 4px;">
+                <label style="display: block; font-size: 12px; font-weight: 800; color: var(--ink); margin-bottom: 8px;">Bu Ürün/Renk Tenime Uyar Mı?</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" id="aiColorQuestionInput" class="form-input" style="flex: 1; padding: 8px 12px; font-size: 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg-app); color: var(--ink);" placeholder="Örn: Şeftali tonu allık, kiremit kırmızısı ruj...">
+                  <button type="button" class="primary-button" id="askAiColorBtn" style="padding: 0 16px; font-size: 12px; height: 34px; border-radius: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; color: white; font-weight: 800; cursor: pointer;">Sor</button>
+                </div>
+                <div id="aiColorAnswerBox" class="hidden" style="margin-top: 10px; padding: 12px; background: rgba(255,117,140,0.04); border-left: 3px solid #ff7eb3; border-radius: 0 8px 8px 0; font-size: 12px; line-height: 1.5; color: var(--ink);">
+                  <!-- AI Yorumu gelecek -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section" id="discoverView">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">SANA ÖZEL</p>
+            <h2>Bugün alınır</h2>
+          </div>
+          <button class="text-button" id="refreshButton">
+            <i data-lucide="scan-line"></i>
+            Fiyatları kontrol et
+          </button>
+        </div>
+
+        <div class="deal-grid" id="dealGrid">
+          <div class="loading-state">
+            <span class="spinner"></span>
+            Fırsatlar hazırlanıyor
+          </div>
+        </div>
+
+        <aside class="sponsor-strip">
+          <div>
+            <span class="sponsor-label">SPONSORLU</span>
+            <strong>Akıllı bütçe, daha iyi seçim.</strong>
+            <p>Burada kullanıcıyla ilgili, sade ve güvenli reklamlar gösterilebilir.</p>
+          </div>
+          <button class="icon-button light" aria-label="Sponsorlu içeriği aç" title="İncele">
+            <i data-lucide="arrow-up-right"></i>
+          </button>
+        </aside>
+      </section>
+
+      <section class="content-section hidden" id="trackingView">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">FİYAT RADARIN</p>
+            <h2>Takip ettiklerin</h2>
+          </div>
+          <span class="count-badge" id="trackingCount">0 ürün</span>
+        </div>
+        <div class="tracking-list" id="trackingList"></div>
+      </section>
+
+      <section class="content-section hidden" id="savingsView">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">AYLIK ÖZET</p>
+            <h2>Tasarrufun</h2>
+          </div>
+        </div>
+        <div class="savings-layout">
+          <div class="savings-highlight">
+            <span>Yakalanan fiyat farkı</span>
+            <strong id="totalSavings">0 TL</strong>
+            <p>Takip ettiğin ürünlerin ilk görülen fiyatına göre hesaplandı.</p>
+          </div>
+          <div class="savings-stats">
+            <div><span>Takip edilen</span><strong id="trackedStat">0</strong></div>
+            <div><span>Al sinyali</span><strong id="buyStat">0</strong></div>
+            <div><span>En iyi skor</span><strong id="bestScoreStat">0</strong></div>
+          </div>
+        </div>
+        <div class="analytics-grid">
+          <article class="glassmorphic-card analytics-card">
+            <div class="analytics-heading">
+              <div>
+                <span>ÜRÜN BAZINDA</span>
+                <h3>En çok tasarruf edilenler</h3>
+              </div>
+              <i data-lucide="chart-no-axes-column-increasing"></i>
+            </div>
+            <div class="analytics-canvas"><canvas id="savingsProductChart"></canvas></div>
+          </article>
+          <article class="glassmorphic-card analytics-card">
+            <div class="analytics-heading">
+              <div>
+                <span>HARCAMA DAĞILIMI</span>
+                <h3>Kategorilere göre takip değeri</h3>
+              </div>
+              <i data-lucide="chart-pie"></i>
+            </div>
+            <div class="analytics-canvas"><canvas id="spendingCategoryChart"></canvas></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="content-section hidden" id="cartView">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">SEPETİM VE ORTAK LİSTELERİM</p>
+            <h2>Sepetim & Listem</h2>
+          </div>
+          <div class="cart-header-actions">
+            <button class="text-button" id="shareListBtn">
+              <i data-lucide="share-2"></i> Paylaş
+            </button>
+            <button class="text-button btn-danger" id="clearCartBtn">
+              <i data-lucide="trash-2"></i> Temizle
+            </button>
+          </div>
+        </div>
+
+        <div class="cart-split-layout">
+          <!-- Sol Kısım: Ürün Ekleme, Barkod ve Fiş OCR ve Ürün Listesi -->
+          <div class="cart-panel-left">
+            <div class="quick-add-box glassmorphic-card">
+              <h3>Hızlı Ürün Ekle</h3>
+              <div class="quick-add-form">
+                <input type="text" id="quickCartInput" placeholder="Örn: Süt, Yumurta, Yağ...">
+                <button class="primary-button" id="quickCartAddBtn">Ekle</button>
+              </div>
+              <div class="quick-scan-actions">
+                <button class="icon-text-button" id="simulateBarcodeBtn">
+                  <i data-lucide="barcode"></i> Barkod Tara
+                </button>
+                <button class="icon-text-button" id="simulateOcrBtn">
+                  <i data-lucide="file-text"></i> Fiş Tarayıcı (OCR)
+                </button>
+              </div>
+              <div id="barcodeOcrInputArea" class="hidden">
+                <div id="barcodeScannerArea" class="hidden">
+                  <label class="scanner-upload">
+                    <i data-lucide="camera"></i>
+                    <span>Kamera veya barkod fotoğrafı seç</span>
+                    <input id="barcodeImageInput" type="file" accept="image/*" capture="environment">
+                  </label>
+                  <p class="scanner-divider"><span>veya demo barkod</span></p>
+                  <select id="barcodeSelector" class="form-select">
+                    <option value="">-- Barkod Seçin --</option>
+                    <option value="8690506390074">Yudum Ayçiçek Yağı 5 L (8690506390074)</option>
+                    <option value="8690506390081">Yudum Ayçiçek Yağı 2 L (8690506390081)</option>
+                    <option value="8690632034071">Hardline Whey 3 Matrix 2300 Gr (8690632034071)</option>
+                    <option value="8690506000010">Migros Süt 1 L (8690506000010)</option>
+                    <option value="8690605061033">İpana 3D White Diş Macunu 75 ml (8690605061033)</option>
+                    <option value="8696001002003">Samsung T7 Portable SSD 1 TB (8696001002003)</option>
+                    <option value="8697001003004">Defacto Erkek Çorap 3'lü Paket (8697001003004)</option>
+                  </select>
+                  <button class="primary-button" id="runBarcodeScanBtn">Taramayı Simüle Et</button>
+                </div>
+                <div id="receiptOcrUploadArea" class="hidden">
+                  <p class="ocr-info">Fiş fotoğrafını seç. OCR motoru ürünleri tanıyıp listeye eklesin.</p>
+                  <label class="scanner-upload">
+                    <i data-lucide="file-image"></i>
+                    <span>Fiş fotoğrafı seç</span>
+                    <input id="receiptImageInput" type="file" accept="image/*" capture="environment">
+                  </label>
+                  <select id="ocrReceiptCategorySelector" class="form-select" style="margin-bottom: 10px;">
+                    <option value="grocery">Market Fişi (Migros)</option>
+                    <option value="cosmetics">Kozmetik Fişi (Gratis)</option>
+                    <option value="electronics">Elektronik Fişi (Vatan Bilgisayar)</option>
+                  </select>
+                  <button class="primary-button" id="runOcrScanBtn">Fiş Fotoğrafı Yükle</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="cart-items-list-box glassmorphic-card">
+              <h3>Alışveriş Listem</h3>
+              <div id="cartItemsList" class="cart-items-list">
+                <!-- Dinamik eklenecek -->
+                <p class="empty-text">Henüz ürün eklenmedi.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sağ Kısım: Market Karşılaştırması ve Sepet Optimizasyonu -->
+          <div class="cart-panel-right">
+            <div class="optimizer-box glassmorphic-card">
+              <h3>Sepet En İyileştirici (Optimizer)</h3>
+              <div class="optimizer-modes">
+                <button class="mode-tab active" id="optModeSingle">Tek Market</button>
+                <button class="mode-tab" id="optModeSplit">Bölünmüş Market (Split)</button>
+              </div>
+              
+              <div id="optimizerResults" class="optimizer-results">
+                <!-- Optimizasyon sonuçları dinamik doldurulacak -->
+                <p class="empty-text">Listeye ürün ekleyerek karşılaştırın.</p>
+              </div>
+
+              <div class="active-coupons-section">
+                <h4>Kuponların</h4>
+                <form id="couponForm" class="coupon-form">
+                  <select id="couponStore" aria-label="Kupon mağazası" required>
+                    <option value="bim">BİM</option>
+                    <option value="a101">A101</option>
+                    <option value="sok">Şok</option>
+                    <option value="file">File</option>
+                    <option value="metro">Metro</option>
+                    <option value="carrefoursa">CarrefourSA</option>
+                    <option value="migros">Migros</option>
+                  </select>
+                  <input id="couponCode" placeholder="Kupon kodu" required>
+                  <input id="couponMinAmount" type="number" min="0" step="1" placeholder="Min. sepet">
+                  <input id="couponDiscount" type="number" min="1" step="1" placeholder="İndirim (TL)" required>
+                  <button class="icon-text-button" type="submit">
+                    <i data-lucide="ticket-plus"></i> Kupon ekle
+                  </button>
+                </form>
+                <div id="cartCouponsList" class="coupons-list">
+                  <!-- Kuponlar -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <nav class="mobile-nav" aria-label="Mobil menü">
+      <button class="mobile-nav-item active" data-view="discover">
+        <i data-lucide="compass"></i>
+        <span>Keşfet</span>
+      </button>
+      <button class="mobile-nav-item" data-view="tracking">
+        <i data-lucide="radar"></i>
+        <span>Takip</span>
+      </button>
+      <button class="mobile-nav-item" data-view="cart">
+        <i data-lucide="shopping-cart"></i>
+        <span>Sepet</span>
+      </button>
+      <button class="mobile-nav-item" data-view="savings">
+        <i data-lucide="wallet-cards"></i>
+        <span>Tasarruf</span>
+      </button>
+    </nav>
+
+    <dialog class="product-dialog" id="productDialog">
+      <button class="dialog-close icon-button" id="dialogClose" aria-label="Pencereyi kapat" title="Kapat">
+        <i data-lucide="x"></i>
+      </button>
+      <div id="dialogContent"></div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="/static/app.js?v=20260612-cosmetics2"></script>
+  </body>
+</html>

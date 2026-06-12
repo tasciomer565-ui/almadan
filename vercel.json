@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "fastapi",
+  "regions": ["fra1"],
+  "crons": [
+    {
+      "path": "/cron/refresh-all",
+      "schedule": "0 5 * * *"
+    }
+  ]
+}

@@ -1,0 +1,747 @@
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass
+from typing import Any
+from urllib.parse import urlparse
+
+import requests
+from bs4 import BeautifulSoup
+
+
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/126.0 Safari/537.36"
+)
+
+
+@dataclass
+class ParsedProduct:
+    title: str | None
+    price: float | None
+    image_url: str | None
+    source: str
+    canonical_url: str
+    confidence: int
+    warnings: list[str]
+    original_price: float | None = None
+    extra_info: dict = None
+
+def translate_deep_link(url: str) -> str:
+    try:
+        parsed = urlparse(url)
+        scheme = parsed.scheme.lower()
+        
+        if scheme in {"http", "https"}:
+            return url
+            
+        query_params = {}
+        if parsed.query:
+            from urllib.parse import parse_qsl
+            query_params = dict(parse_qsl(parsed.query))
+            
+        query_params = {k.lower(): v for k, v in query_params.items()}
+        
+        if scheme == "trendyol":
+            content_id = query_params.get("contentid")
+            if content_id:
+                return f"https://www.trendyol.com/p-{content_id}"
+                
+        elif scheme == "hepsiburada":
+            product_id = query_params.get("productid")
+            if product_id:
+                return f"https://www.hepsiburada.com/p-{product_id}"
+                
+        elif scheme == "n11":
+            product_id = query_params.get("productid")
+            if product_id:
+                return f"https://www.n11.com/p-{product_id}"
+    except Exception:
+        pass
+    return url
+
+
+def resolve_short_url(url: str) -> str:
+    if not url.lower().startswith(("http://", "https://")):
+        return url
+        
+    try:
+        host = urlparse(url).netloc.lower()
+        short_domains = {
+            "ty.gl", "amzn.to", "amzn.eu", "bit.ly", "tinyurl.com", 
+            "rebrand.ly", "hepsiburada.ly", "hb.gl", "n11.co", "n11.ly"
+        }
+        
+        is_short = host in short_domains or any(host.endswith("." + d) for d in short_domains)
+        if is_short or (len(urlparse(url).path) < 15 and host not in {"www.trendyol.com", "www.hepsiburada.com", "www.amazon.com.tr", "www.n11.com"}):
+            headers = {"User-Agent": USER_AGENT}
+            response = requests.head(url, headers=headers, allow_redirects=True, timeout=8)
+            if response.status_code >= 400 or response.url == url:
+                response = requests.get(url, headers=headers, allow_redirects=True, stream=True, timeout=8)
+            return response.url
+    except Exception:
+        pass
+    return url
+
+
+def detect_source(url: str) -> str:
+    host = urlparse(url).netloc.lower()
+
+    if "trendyol" in host:
+        return "trendyol"
+    if "hepsiburada" in host:
+        return "hepsiburada"
+    if "amazon" in host:
+        return "amazon"
+    if "n11" in host:
+        return "n11"
+    if "gratis" in host:
+        return "gratis"
+    if "rossmann" in host:
+        return "rossmann"
+    if "supplementler" in host:
+        return "supplementler"
+    if "proteinocean" in host:
+        return "proteinocean"
+    if "vatanbilgisayar" in host:
+        return "vatanbilgisayar"
+    if "itopya" in host:
+        return "itopya"
+    if "karaca" in host:
+        return "karaca"
+    if "lcwaikiki" in host or "lcw" in host:
+        return "lcwaikiki"
+    if "defacto" in host:
+        return "defacto"
+    if "mediamarkt" in host:
+        return "mediamarkt"
+    if "teknosa" in host:
+        return "teknosa"
+    if "zara" in host:
+        return "zara"
+    if "migros" in host:
+        return "migros"
+    if "boyner" in host:
+        return "boyner"
+    if "koton" in host:
+        return "koton"
+    if "mavi" in host:
+        return "mavi"
+    if "bim.com" in host:
+        return "bim"
+    if "a101" in host:
+        return "a101"
+    if "sokmarket" in host:
+        return "sok"
+    if "file.com" in host:
+        return "file"
+    if "metro" in host:
+        return "metro"
+    if "carrefoursa" in host:
+        return "carrefoursa"
+
+    return "manual"
+
+
+def parse_price(value: Any) -> float | None:
+    if value is None:
+        return None
+
+    if isinstance(value, int | float):
+        return float(value)
+
+    text = str(value)
+    text = text.replace("\xa0", " ")
+    text = re.sub(r"[^\d,\.]", "", text)
+
+    if not text:
+        return None
+
+    if "," in text and "." in text:
+        if text.rfind(",") > text.rfind("."):
+            text = text.replace(".", "").replace(",", ".")
+        else:
+            text = text.replace(",", "")
+    elif "," in text:
+        text = text.replace(".", "").replace(",", ".")
+    else:
+        parts = text.split(".")
+        if len(parts) > 2:
+            text = "".join(parts)
+        elif len(parts) == 2 and len(parts[1]) == 3:
+            text = "".join(parts)
+
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def first_meta(soup: BeautifulSoup, names: list[str]) -> str | None:
+    for name in names:
+        selectors = [
+            f"meta[property='{name}']",
+            f"meta[name='{name}']",
+            f"meta[itemprop='{name}']",
+        ]
+
+        for selector in selectors:
+            tag = soup.select_one(selector)
+            if tag and tag.get("content"):
+                return tag["content"].strip()
+
+    return None
+
+
+def iter_json_ld(soup: BeautifulSoup) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+
+    for script in soup.select("script[type='application/ld+json']"):
+        raw = script.string or script.get_text(strip=True)
+        if not raw:
+            continue
+
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+
+        if isinstance(data, list):
+            items.extend(item for item in data if isinstance(item, dict))
+        elif isinstance(data, dict):
+            graph = data.get("@graph")
+            if isinstance(graph, list):
+                items.extend(item for item in graph if isinstance(item, dict))
+            items.append(data)
+
+    return items
+
+
+def extract_from_json_ld(soup: BeautifulSoup) -> tuple[str | None, float | None, str | None]:
+    for item in iter_json_ld(soup):
+        item_type = item.get("@type")
+        if isinstance(item_type, list):
+            is_product = any(str(value).lower() == "product" for value in item_type)
+        else:
+            is_product = str(item_type).lower() == "product"
+
+        if not is_product:
+            continue
+
+        title = item.get("name")
+        image = item.get("image")
+        if isinstance(image, list):
+            image = image[0] if image else None
+        if isinstance(image, dict):
+            image = image.get("url") or image.get("contentUrl") or image.get("@id")
+
+        offers = item.get("offers")
+        if isinstance(offers, list):
+            offers = offers[0] if offers else None
+
+        price = None
+        if isinstance(offers, dict):
+            price = parse_price(offers.get("price") or offers.get("lowPrice"))
+
+        return title, price, image
+
+    return None, None, None
+
+
+def walk_json(value: Any):
+    if isinstance(value, dict):
+        yield value
+        for child in value.values():
+            yield from walk_json(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from walk_json(child)
+
+
+def extract_from_embedded_json(soup: BeautifulSoup) -> tuple[str | None, float | None, str | None]:
+    price_keys = (
+        "discountedPrice",
+        "salePrice",
+        "sellingPrice",
+        "currentPrice",
+        "price",
+    )
+    title_keys = ("name", "title", "productName")
+    image_keys = ("image", "imageUrl", "imageURL")
+
+    for script in soup.select("script"):
+        raw = script.string or script.get_text(strip=True)
+        if not raw or len(raw) > 5_000_000:
+            continue
+
+        data = None
+        if script.get("type") == "application/json" or script.get("id") in {
+            "__NEXT_DATA__",
+            "__NUXT_DATA__",
+        }:
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                pass
+
+        if data is not None:
+            for item in walk_json(data):
+                price = next(
+                    (parse_price(item.get(key)) for key in price_keys if item.get(key) is not None),
+                    None,
+                )
+                if not price:
+                    continue
+
+                title = next(
+                    (str(item.get(key)).strip() for key in title_keys if item.get(key)),
+                    None,
+                )
+                image = next(
+                    (item.get(key) for key in image_keys if item.get(key)),
+                    None,
+                )
+                if isinstance(image, list):
+                    image = image[0] if image else None
+                if isinstance(image, dict):
+                    image = image.get("url")
+
+                return title, price, image
+
+        for key in price_keys:
+            match = re.search(
+                rf'["\']{re.escape(key)}["\']\s*:\s*["\']?([\d.,]+)',
+                raw,
+                flags=re.IGNORECASE,
+            )
+            if match:
+                price = parse_price(match.group(1))
+                if price:
+                    return None, price, None
+
+    return None, None, None
+
+
+def extract_visible_price(soup: BeautifulSoup, source: str) -> float | None:
+    selectors = {
+        "trendyol": [
+            ".prc-dsc",
+            ".prc-slg",
+            "[data-testid='price-current-price']",
+            "[class*='product-price']",
+        ],
+        "hepsiburada": [
+            "[data-test-id='price-current-price']",
+            "[data-test-id='price']",
+            "[class*='price']",
+        ],
+        "amazon": [
+            "#corePrice_feature_div .a-offscreen",
+            ".a-price .a-offscreen",
+            "#priceblock_ourprice",
+            "#priceblock_dealprice",
+        ],
+        "n11": [
+            ".newPrice ins",
+            ".priceContainer ins",
+            "[class*='newPrice']",
+        ],
+        "gratis": [
+            ".price",
+            "[class*='price']",
+            ".product-price",
+        ],
+        "rossmann": [
+            ".price",
+            "[class*='price']",
+            ".product-price",
+        ],
+        "supplementler": [
+            ".price",
+            ".product-price",
+            "[class*='price']",
+        ],
+        "proteinocean": [
+            ".price",
+            ".product-price",
+            "[class*='price']",
+        ],
+        "vatanbilgisayar": [
+            ".product-list__price",
+            "[class*='price']",
+            ".price",
+        ],
+        "itopya": [
+            ".price",
+            "#productPrice",
+            "[class*='price']",
+        ],
+        "karaca": [
+            ".current-price",
+            "span.price",
+            ".product-price",
+            ".price",
+        ],
+        "lcwaikiki": [
+            ".advanced-price",
+            "span.price",
+            ".price",
+        ],
+        "defacto": [
+            ".product-card__price",
+            ".product-card__price--new",
+            ".product-price",
+            ".price",
+        ],
+        "mediamarkt": [
+            "[class*='Price']",
+            "span.price",
+            ".price",
+        ],
+        "teknosa": [
+            ".prc-dsc",
+            ".price",
+            ".current-price",
+        ],
+        "zara": [
+            ".price__amount",
+            ".price",
+        ],
+        "migros": [
+            "fe-product-price",
+            ".price",
+        ],
+        "boyner": [
+            ".product-price",
+            ".price",
+        ],
+        "koton": [
+            ".normalPrice",
+            ".price",
+        ],
+        "mavi": [
+            ".price-current",
+            ".price",
+        ],
+    }
+
+    for selector in selectors.get(source, []):
+        element = soup.select_one(selector)
+        if not element:
+            continue
+
+        price = parse_price(element.get("content") or element.get_text(" ", strip=True))
+        if price:
+            return price
+
+    return None
+
+
+def extract_original_price(soup: BeautifulSoup, source: str) -> float | None:
+    selectors = {
+        "trendyol": [".prc-org"],
+        "hepsiburada": ["[data-test-id='price-prev-price']", ".price-prev"],
+        "amazon": [".a-text-strike", "span.a-price.a-text-price span.a-offscreen"],
+        "n11": [".oldPrice", ".old-price"],
+        "gratis": [".price-crossed", ".original-price"],
+        "rossmann": [".original-price", ".old-price"],
+        "supplementler": [".old-price", ".strike"],
+        "proteinocean": [".old-price"],
+        "vatanbilgisayar": [".product-list__price-crossed"],
+        "itopya": [".old-price", ".oldPrice"],
+        "karaca": [".old-price", "span.old-price", "span.strike"],
+        "lcwaikiki": [".raw-price", ".old-price"],
+        "defacto": [".product-card__price--old", ".old-price"],
+        "mediamarkt": ["span.old-price"],
+        "teknosa": [".prc-org", ".old-price"],
+        "boyner": [".old-price", ".strike"],
+        "koton": [".old-price", ".crossed-price"],
+        "mavi": [".price-old", ".old-price"],
+    }
+    
+    for selector in selectors.get(source, []):
+        element = soup.select_one(selector)
+        if not element:
+            continue
+        price = parse_price(element.get("content") or element.get_text(" ", strip=True))
+        if price:
+            return price
+            
+    return None
+
+
+def extract_servings_from_soup(soup: BeautifulSoup, source: str) -> int | None:
+    if not soup:
+        return None
+        
+    try:
+        if source == "supplementler":
+            # 1. spec-service-size class'ını dene
+            el = soup.select_one(".spec-service-size")
+            if el:
+                txt = el.get_text(strip=True)
+                match = re.search(r"(\d+)", txt)
+                if match:
+                    return int(match.group(1))
+                    
+            # 2. Porsiyon sayısı içeren metinleri ara
+            for tag in soup.find_all(string=re.compile("porsiyon sayısı", re.IGNORECASE)):
+                parent = tag.parent
+                if parent:
+                    curr = parent
+                    for _ in range(3):
+                        txt = curr.get_text(" ", strip=True)
+                        match = re.search(r"(?:porsiyon sayısı|porsiyon sayısı\s*:)\s*(\d+)", txt, re.IGNORECASE)
+                        if match:
+                            return int(match.group(1))
+                        if not curr.parent:
+                            break
+                        curr = curr.parent
+                        
+        elif source == "proteinocean":
+            text = soup.get_text(" ", strip=True)
+            matches = re.findall(r"(\d+)\s*(?:servis|porsiyon|ölçek|paket)", text, re.IGNORECASE)
+            if matches:
+                return int(matches[0])
+    except Exception:
+        pass
+    return None
+
+
+def estimate_servings_from_title(title: str) -> int | None:
+    if not title:
+        return None
+    title_lower = title.lower()
+    
+    # 1. Gramajı bul (Gr veya G)
+    weight_g = None
+    match_gr = re.search(r"(\d+(?:[\.,]\d+)?)\s*(?:gr|g|gram)\b", title_lower)
+    if match_gr:
+        try:
+            val_str = match_gr.group(1).replace(",", ".")
+            weight_g = float(val_str)
+        except ValueError:
+            pass
+            
+    # 2. Kilogram bul (Kg, kilo, kilogram)
+    if not weight_g:
+        match_kg = re.search(r"(\d+(?:[\.,]\d+)?)\s*(?:kg|kilogram|kilo)\b", title_lower)
+        if match_kg:
+            try:
+                val_str = match_kg.group(1).replace(",", ".")
+                weight_g = float(val_str) * 1000
+            except ValueError:
+                pass
+                
+    if not weight_g:
+        return None
+        
+    # 3. Kategoriye göre standart porsiyon boyutu (gram cinsinden)
+    serving_size = 30 # Varsayılan: Protein tozu porsiyon boyutu (30 gr)
+    
+    if "creatine" in title_lower or "kreatin" in title_lower:
+        serving_size = 5
+    elif "glutamine" in title_lower or "glutamin" in title_lower:
+        serving_size = 5
+    elif "bcaa" in title_lower:
+        serving_size = 10
+    elif "pre-workout" in title_lower or "preworkout" in title_lower or "nox" in title_lower:
+        serving_size = 10
+    elif "gainer" in title_lower or "karbonhidrat" in title_lower or "mass" in title_lower:
+        serving_size = 100
+    elif "arjinin" in title_lower or "arginine" in title_lower:
+        serving_size = 5
+    elif "carnitine" in title_lower or "karnitin" in title_lower:
+        serving_size = 3
+        
+    servings = round(weight_g / serving_size)
+    return servings if servings > 0 else None
+
+
+def extract_extra_info(title: str, source: str, soup: BeautifulSoup = None) -> dict:
+    info = {}
+    if not title:
+        return info
+    title_lower = title.lower()
+    
+    # 1. Supplement porsiyon ayıklama
+    if source in {"supplementler", "proteinocean"}:
+        info["category"] = "supplement"
+        
+        # Önce başlıktan dene
+        match = re.search(r"(\d+)\s*(servis|ölçek|kapsül|tablet|porsiyon|şase|paket|adet|ad|tb|kp)", title_lower)
+        if match:
+            info["servings"] = int(match.group(1))
+        else:
+            servings = None
+            if soup:
+                # Başlıkta yoksa HTML'den çek
+                servings = extract_servings_from_soup(soup, source)
+            
+            # HTML'de de bulunamazsa gramaja göre tahmini porsiyon hesapla
+            if not servings:
+                servings = estimate_servings_from_title(title)
+                
+            if servings:
+                info["servings"] = servings
+            
+    # 2. PC donanım uyumluluk ayıklama (Vatan, Itopya)
+    elif source in {"vatanbilgisayar", "itopya"}:
+        info["category"] = "pc_component"
+        if "am5" in title_lower or "b650" in title_lower or "x670" in title_lower or "a620" in title_lower:
+            info["socket"] = "AM5"
+            info["ram_type"] = "DDR5"
+            info["compatibility_info"] = "AM5 Soket İşlemciler (Ryzen 7000/8000/9000) ve DDR5 Bellekler ile uyumludur."
+        elif "am4" in title_lower or "b450" in title_lower or "b550" in title_lower or "x570" in title_lower or "a320" in title_lower:
+            info["socket"] = "AM4"
+            info["ram_type"] = "DDR4"
+            info["compatibility_info"] = "AM4 Soket İşlemciler (Ryzen 3000/4000/5000) ve DDR4 Bellekler ile uyumludur."
+        elif "lga1700" in title_lower or "h610" in title_lower or "b760" in title_lower or "z790" in title_lower or "z690" in title_lower:
+            info["socket"] = "LGA1700"
+            info["compatibility_info"] = "Intel 12./13./14. Nesil İşlemciler (LGA1700) ile uyumludur."
+            if "ddr5" in title_lower:
+                info["ram_type"] = "DDR5"
+            elif "ddr4" in title_lower:
+                info["ram_type"] = "DDR4"
+        elif "ddr5" in title_lower:
+            info["ram_type"] = "DDR5"
+            info["compatibility_info"] = "DDR5 destekli anakartlar ve DDR5 uyumlu işlemciler ile kullanılmalıdır."
+        elif "ddr4" in title_lower:
+            info["ram_type"] = "DDR4"
+            info["compatibility_info"] = "DDR4 destekli anakartlar ve DDR4 uyumlu işlemciler ile kullanılmalıdır."
+            
+    return info
+
+
+def is_challenge_page(soup: BeautifulSoup) -> bool:
+    text = soup.get_text(" ", strip=True).lower()
+    signals = (
+        "captcha",
+        "access denied",
+        "robot olmadığınızı",
+        "güvenlik doğrulaması",
+        "verify you are human",
+    )
+    return any(signal in text for signal in signals)
+
+
+def parse_product_url(url: str) -> ParsedProduct:
+    url = translate_deep_link(url.strip())
+    url = resolve_short_url(url)
+    
+    warnings: list[str] = []
+    source = detect_source(url)
+
+    try:
+        response = requests.get(
+            url,
+            headers={"User-Agent": USER_AGENT, "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8"},
+            timeout=20,
+        )
+        response.raise_for_status()
+        try:
+            with open("last_parsed.html", "w", encoding="utf-8") as f:
+                f.write(response.text)
+        except Exception:
+            pass
+    except requests.RequestException as e:
+        return ParsedProduct(
+            title=None,
+            price=None,
+            image_url=None,
+            source=source,
+            canonical_url=url,
+            confidence=0,
+            warnings=[f"Sayfa alınamadı: {e}"],
+            original_price=None,
+            extra_info={},
+        )
+
+    soup = BeautifulSoup(response.text, "lxml")
+    canonical_url = first_meta(soup, ["og:url"]) or url
+
+    title, price, image_url = extract_from_json_ld(soup)
+    embedded_title, embedded_price, embedded_image = extract_from_embedded_json(soup)
+
+    title = title or embedded_title or first_meta(soup, ["og:title", "twitter:title", "title"])
+    price = price or parse_price(
+        first_meta(
+            soup,
+            [
+                "product:price:amount",
+                "price",
+                "og:price:amount",
+                "twitter:data1",
+            ],
+        )
+    )
+    price = price or embedded_price or extract_visible_price(soup, source)
+    image_url = (
+        image_url
+        or embedded_image
+        or first_meta(soup, ["og:image", "twitter:image", "image"])
+    )
+
+    if not title and soup.title:
+        title = soup.title.get_text(" ", strip=True)
+
+    # Orijinal üstü çizili fiyatı çek
+    original_price = extract_original_price(soup, source)
+    # Eğer orijinal fiyat satış fiyatından düşük veya eşitse, yok say (hatalı veri önleme)
+    if original_price and price and original_price <= price:
+        original_price = None
+
+    confidence = 20
+    if title:
+        confidence += 30
+    else:
+        warnings.append("Başlık bulunamadı.")
+
+    if price:
+        confidence += 35
+    else:
+        if is_challenge_page(soup):
+            warnings.append("Mağaza otomatik erişimi engelledi. Fiyatı elle yazabilirsin.")
+        else:
+            warnings.append("Fiyat otomatik bulunamadı. Fiyatı elle yazabilirsin.")
+
+    if image_url:
+        confidence += 15
+
+    # Çıkış tiplerini Pydantic doğrulama hatalarını önlemek için temizle ve garantiye al
+    if isinstance(image_url, dict):
+        image_url = image_url.get("url") or image_url.get("contentUrl") or image_url.get("@id")
+    elif isinstance(image_url, list):
+        image_url = image_url[0] if image_url else None
+    
+    if image_url is not None:
+        image_url = str(image_url).strip()
+        if not image_url.startswith(("http://", "https://")):
+            image_url = None
+
+    if title is not None:
+        title = str(title).strip()
+
+    if isinstance(canonical_url, dict):
+        canonical_url = canonical_url.get("url") or url
+    elif isinstance(canonical_url, list):
+        canonical_url = canonical_url[0] if canonical_url else url
+
+    if not isinstance(canonical_url, str):
+        canonical_url = str(canonical_url or url)
+
+    extra_info = extract_extra_info(title, source, soup)
+
+    return ParsedProduct(
+        title=title,
+        price=price,
+        image_url=image_url,
+        source=source,
+        canonical_url=canonical_url,
+        confidence=min(confidence, 100),
+        warnings=warnings,
+        original_price=original_price,
+        extra_info=extra_info,
+    )

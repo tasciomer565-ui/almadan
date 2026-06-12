@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.env
+.venv/
+venv/
+tests/ui-*.png
+data/db.json
+test-output/
+*.pid
+last_parsed.html
+n11_test.html
+n11_typo.html

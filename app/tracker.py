@@ -1,0 +1,827 @@
+from __future__ import annotations
+
+from typing import Any
+from uuid import uuid4
+
+from app.parser import parse_product_url
+from app.push import send_push_to_owner
+from app.storage import current_price, load_db, save_db, utc_now
+
+
+DROP_THRESHOLD = 0.05
+
+
+def find_product(db: dict[str, Any], product_id: str) -> dict[str, Any] | None:
+    return next(
+        (product for product in db["products"] if product["id"] == product_id),
+        None,
+    )
+
+
+def notification_payload(product: dict, notification: dict) -> dict[str, str]:
+    return {
+        "title": notification["title"],
+        "body": notification["message"],
+        "url": f"/?product={product['id']}",
+        "tag": notification["id"],
+    }
+
+
+import json
+
+# Production provider templates:
+#
+# def send_netgsm_sms(phone: str, message: str) -> None:
+#     requests.post(
+#         "https://api.netgsm.com.tr/sms/send/get",
+#         data={"usercode": "...", "password": "...", "gsmno": phone,
+#               "message": message, "msgheader": "..."},
+#         timeout=15,
+#     ).raise_for_status()
+#
+# def send_twilio_sms(phone: str, message: str) -> None:
+#     requests.post(
+#         f"https://api.twilio.com/2010-04-01/Accounts/{ACCOUNT_SID}/Messages.json",
+#         auth=(ACCOUNT_SID, AUTH_TOKEN),
+#         data={"From": TWILIO_PHONE, "To": phone, "Body": message},
+#         timeout=15,
+#     ).raise_for_status()
+#
+# def send_smtp_email(recipient: str, subject: str, message: str) -> None:
+#     import smtplib
+#     from email.message import EmailMessage
+#     mail = EmailMessage()
+#     mail["From"], mail["To"], mail["Subject"] = SMTP_FROM, recipient, subject
+#     mail.set_content(message)
+#     with smtplib.SMTP_SSL(SMTP_HOST, 465) as smtp:
+#         smtp.login(SMTP_USER, SMTP_PASSWORD)
+#         smtp.send_message(mail)
+
+def log_sms_notification(owner_id: str | None, title: str, message: str) -> None:
+    if not owner_id or not owner_id.startswith("user:"):
+        return
+    
+    db = load_db()
+    user_info = db.get("users", {}).get(owner_id, {})
+    pref = user_info.get("notification_pref", "both")
+    phone = user_info.get("phone")
+    
+    if pref not in ("sms", "both") or not phone:
+        return
+        
+    from app.storage import DATA_DIR, utc_now
+    sms_file = DATA_DIR / "sms_logs.json"
+    
+    logs = []
+    if sms_file.exists():
+        try:
+            with open(sms_file, "r", encoding="utf-8") as f:
+                logs = json.load(f)
+                if not isinstance(logs, list):
+                    logs = []
+        except Exception:
+            logs = []
+            
+    logs.append({
+        "owner_id": owner_id,
+        "phone": phone,
+        "title": title,
+        "message": message,
+        "sent_at": utc_now()
+    })
+    
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with open(sms_file, "w", encoding="utf-8") as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def log_email_notification(owner_id: str | None, title: str, message: str) -> None:
+    if not owner_id or not owner_id.startswith("user:"):
+        return
+        
+    db = load_db()
+    user_info = db.get("users", {}).get(owner_id, {})
+    pref = user_info.get("notification_pref", "both")
+    email = user_info.get("email")
+    
+    if pref not in ("email", "both") or not email:
+        return
+        
+    from app.storage import DATA_DIR, utc_now
+    email_file = DATA_DIR / "email_logs.json"
+    
+    logs = []
+    if email_file.exists():
+        try:
+            with open(email_file, "r", encoding="utf-8") as f:
+                logs = json.load(f)
+                if not isinstance(logs, list):
+                    logs = []
+        except Exception:
+            logs = []
+            
+    logs.append({
+        "owner_id": owner_id,
+        "email": email,
+        "title": title,
+        "message": message,
+        "sent_at": utc_now()
+    })
+    
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with open(email_file, "w", encoding="utf-8") as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def is_in_silence_hours(owner_id: str | None) -> bool:
+    if not owner_id or not owner_id.startswith("user:"):
+        return False
+    
+    db = load_db()
+    user_info = db.get("users", {}).get(owner_id, {})
+    silence_hours = user_info.get("silence_hours")
+    if not silence_hours:
+        return False
+        
+    try:
+        start_h = int(silence_hours.get("start", 22))
+        end_h = int(silence_hours.get("end", 8))
+        
+        from datetime import datetime, timezone, timedelta
+        tz_tr = timezone(timedelta(hours=3))
+        current_hour = datetime.now(tz_tr).hour
+        
+        if start_h > end_h:
+            return current_hour >= start_h or current_hour < end_h
+        else:
+            return start_h <= current_hour < end_h
+    except Exception:
+        return False
+
+
+def queue_or_dispatch_notification(db: dict, product: dict, notification: dict) -> None:
+    owner_id = product.get("owner_id")
+    if is_in_silence_hours(owner_id):
+        db.setdefault("queued_notifications", []).append({
+            "product_id": product.get("id"),
+            "owner_id": owner_id,
+            "notification": notification
+        })
+        save_db(db)
+    else:
+        try:
+            send_push_to_owner(owner_id, notification_payload(product, notification))
+        except Exception:
+            pass
+        log_sms_notification(owner_id, notification["title"], notification["message"])
+        log_email_notification(owner_id, notification["title"], notification["message"])
+
+
+def queue_or_dispatch_catalog_notification(db: dict, owner_id: str, notification: dict) -> None:
+    if is_in_silence_hours(owner_id):
+        db.setdefault("queued_notifications", []).append({
+            "owner_id": owner_id,
+            "notification": notification
+        })
+        save_db(db)
+    else:
+        log_sms_notification(owner_id, notification["title"], notification["message"])
+        log_email_notification(owner_id, notification["title"], notification["message"])
+        try:
+            payload = {
+                "title": notification["title"],
+                "body": notification["message"],
+                "url": "/?tab=notifications",
+                "tag": notification["id"],
+            }
+            send_push_to_owner(owner_id, payload)
+        except Exception:
+            pass
+
+
+def flush_queued_notifications() -> None:
+    db = load_db()
+    queued = db.get("queued_notifications", [])
+    if not queued:
+        return
+        
+    remaining = []
+    changed = False
+    for item in queued:
+        owner_id = item.get("owner_id")
+        if is_in_silence_hours(owner_id):
+            remaining.append(item)
+        else:
+            notification = item.get("notification")
+            log_sms_notification(owner_id, notification["title"], notification["message"])
+            log_email_notification(owner_id, notification["title"], notification["message"])
+            
+            product_id = item.get("product_id")
+            product = next((p for p in db["products"] if p["id"] == product_id), None) if product_id else None
+            try:
+                payload = notification_payload(product, notification) if product else {
+                    "title": notification["title"],
+                    "body": notification["message"],
+                    "url": "/?tab=notifications",
+                    "tag": notification["id"],
+                }
+                send_push_to_owner(owner_id, payload)
+            except Exception:
+                pass
+            changed = True
+            
+    if changed:
+        db["queued_notifications"] = remaining
+        save_db(db)
+
+
+def check_restock_alerts() -> None:
+    db = load_db()
+    checked_at = utc_now()
+    from datetime import datetime, timezone, timedelta
+    
+    def parse_iso(dt_str):
+        try:
+            if dt_str.endswith('Z'):
+                dt_str = dt_str[:-1] + '+00:00'
+            return datetime.fromisoformat(dt_str)
+        except Exception:
+            return None
+            
+    now_dt = datetime.now(timezone.utc)
+    notifications_added = False
+    
+    for p in db.get("products", []):
+        extra = p.get("extra_info", {})
+        period = extra.get("restock_period_days")
+        last_purchased_str = extra.get("last_purchased_date")
+        
+        if period and last_purchased_str:
+            last_purchased = parse_iso(last_purchased_str)
+            if not last_purchased:
+                continue
+                
+            try:
+                period_days = int(period)
+                last_alerted_str = extra.get("last_restock_alerted_date")
+                if last_alerted_str:
+                    last_alerted = parse_iso(last_alerted_str)
+                    if last_alerted and last_alerted > last_purchased:
+                        continue
+                        
+                due_date = last_purchased + timedelta(days=period_days)
+                alert_date = due_date - timedelta(days=5)
+                
+                if now_dt >= alert_date:
+                    cheapest_price_msg = ""
+                    try:
+                        from app.comparator import search_products_by_name
+                        res = search_products_by_name(p["title"])
+                        if res:
+                            in_stock = [x for x in res if not x["extra_info"].get("out_of_stock")]
+                            if in_stock:
+                                cheapest = min(in_stock, key=lambda x: x["price"])
+                                cheapest_price_msg = f" En ucuz fırsat şu an {cheapest['source'].upper()} mağazasında: {cheapest['price']:.2f} TL."
+                    except Exception:
+                        pass
+                        
+                    notification = {
+                        "id": str(uuid4()),
+                        "product_id": p["id"],
+                        "owner_id": p.get("owner_id"),
+                        "title": "Ev İhtiyacı Alarmı!",
+                        "message": f"Evdeki '{p['title']}' bitmek üzere!{cheapest_price_msg} Stok tazelemek ister misin?",
+                        "created_at": checked_at,
+                        "read": False,
+                        "type": "restock_alert"
+                    }
+                    db["notifications"].insert(0, notification)
+                    notifications_added = True
+                    p.setdefault("extra_info", {})["last_restock_alerted_date"] = checked_at
+                    
+                    queue_or_dispatch_notification(db, p, notification)
+            except Exception:
+                pass
+                
+    if notifications_added:
+        save_db(db)
+
+
+def _trigger_weekly_catalogs_legacy() -> None:
+    db = load_db()
+    checked_at = utc_now()
+    
+    unique_users = set()
+    for product in db.get("products", []):
+        owner = product.get("owner_id")
+        if owner and owner.startswith("user:"):
+            unique_users.add(owner)
+    for sub in db.get("push_subscriptions", []):
+        owner = sub.get("owner_id")
+        if owner and owner.startswith("user:"):
+            unique_users.add(owner)
+    for notif in db.get("notifications", []):
+        owner = notif.get("owner_id")
+        if owner and owner.startswith("user:"):
+            unique_users.add(owner)
+
+    if not unique_users:
+        return
+        
+    from datetime import datetime, timezone
+    
+    def parse_iso(dt_str):
+        try:
+            if dt_str.endswith('Z'):
+                dt_str = dt_str[:-1] + '+00:00'
+            return datetime.fromisoformat(dt_str)
+        except Exception:
+            return datetime.now(timezone.utc)
+
+    now_dt = datetime.now(timezone.utc)
+    
+    catalogs = [
+        {
+            "type": "catalog_bim",
+            "title": "BİM Cuma Fırsatları",
+            "message": "BİM Cuma Aktüel ürünleri yayınlandı! Bu haftaki indirimli ürünleri kaçırmayın.",
+            "keywords": ["yağ", "yag", "seker", "şeker", "un", "bakliyat", "makarna", "pirinc", "pirinç", "sut", "süt", "peynir"]
+        },
+        {
+            "type": "catalog_a101",
+            "title": "A101 Haftanın Yıldızları",
+            "message": "A101 haftalık aktüel kataloğu yayınlandı! Yeni indirimler sizi bekliyor.",
+            "keywords": ["deterjan", "sabun", "temizlik", "kagit", "kağıt", "su", "cay", "çay", "kahve"]
+        },
+        {
+            "type": "catalog_sok",
+            "title": "Şok Haftanın Fırsatları",
+            "message": "Şok haftalık katalog fırsatları yayınlandı.",
+            "keywords": ["yağ", "süt", "peynir", "yumurta", "deterjan", "makarna", "kahve"]
+        },
+        {
+            "type": "catalog_file",
+            "title": "File Market Kataloğu",
+            "message": "File Market haftalık katalog ürünleri yayınlandı.",
+            "keywords": ["et", "tavuk", "süt", "peynir", "zeytin", "kahvaltı", "temizlik"]
+        },
+        {
+            "type": "catalog_metro",
+            "title": "Metro Fırsat Kataloğu",
+            "message": "Metro toplu alışveriş fırsatları güncellendi.",
+            "keywords": ["kg", "litre", "paket", "koli", "deterjan", "kahve", "içecek"]
+        },
+        {
+            "type": "catalog_carrefoursa",
+            "title": "CarrefourSA İndirim Kataloğu",
+            "message": "CarrefourSA haftalık indirim kataloğu yayınlandı.",
+            "keywords": ["meyve", "sebze", "et", "süt", "peynir", "atıştırmalık", "temizlik"]
+        },
+        {
+            "type": "catalog_migros",
+            "title": "Migroskop Fırsatları",
+            "message": "Migroskop haftalık fırsatları yayınlandı.",
+            "keywords": ["money", "yağ", "şeker", "kahve", "çay", "deterjan", "kişisel bakım"]
+        },
+        {
+            "type": "catalog_gratis",
+            "title": "Gratis Haftalık Kampanya",
+            "message": "Gratis haftalık indirim kataloğu ve 1 hafta sonra başlayacak özel indirimler yayınlandı!",
+            "keywords": ["sampuan", "şampuan", "krem", "parfum", "parfüm", "makyaj", "ruj", "maskara", "sac", "saç", "bakim", "bakım"]
+        },
+        {
+            "type": "catalog_mediamarkt",
+            "title": "MediaMarkt Gece Uçuran Kampanyası",
+            "message": "MediaMarkt gece fırsatları kataloğu yayınlandı! İndirimli elektronikler sizi bekliyor.",
+            "keywords": ["ssd", "gb", "tb", "laptop", "bilgisayar", "kulaklık", "telefon", "tablet", "mouse", "klavye"]
+        },
+        {
+            "type": "catalog_boyner",
+            "title": "Boyner Büyük Kelebek İndirimi",
+            "message": "Boyner sezon sonu giyim kataloğu yayınlandı! Yeni indirimli moda ürünlerini kaçırmayın.",
+            "keywords": ["tişört", "corap", "çorap", "ceket", "pantolon", "hırka", "kazak", "gömlek", "kaban", "ayakkabı"]
+        }
+    ]
+    
+    notifications_added = False
+    
+    for owner_id in unique_users:
+        owner_notifs = [n for n in db.get("notifications", []) if n.get("owner_id") == owner_id]
+        owner_products = [p for p in db.get("products", []) if p.get("owner_id") == owner_id]
+        
+        for cat in catalogs:
+            sent_recently = False
+            for n in owner_notifs:
+                if n.get("type") == cat["type"]:
+                    created_at_str = n.get("created_at")
+                    if created_at_str:
+                        created_dt = parse_iso(created_at_str)
+                        if (now_dt - created_dt).total_seconds() < 24 * 3600:
+                            sent_recently = True
+                            break
+            
+            if not sent_recently:
+                notification = {
+                    "id": str(uuid4()),
+                    "owner_id": owner_id,
+                    "title": cat["title"],
+                    "message": cat["message"],
+                    "created_at": checked_at,
+                    "read": False,
+                    "type": cat["type"],
+                }
+                db["notifications"].insert(0, notification)
+                notifications_added = True
+                
+                queue_or_dispatch_catalog_notification(db, owner_id, notification)
+                
+                # Check for keyword matches with user's tracked products
+                for p in owner_products:
+                    p_title = p.get("title")
+                    if not p_title:
+                        continue
+                    title_lower = p_title.lower()
+                    if any(k in title_lower for k in cat["keywords"]):
+                        match_notification = {
+                            "id": str(uuid4()),
+                            "product_id": p["id"],
+                            "owner_id": owner_id,
+                            "title": "Kataloğa Düştü!",
+                            "message": f"Takip ettiğin '{p_title}' ürünü bu haftaki {cat['title']} kataloğunda indirimde!",
+                            "created_at": checked_at,
+                            "read": False,
+                            "type": "catalog_match"
+                        }
+                        db["notifications"].insert(0, match_notification)
+                        queue_or_dispatch_notification(db, p, match_notification)
+
+    if notifications_added:
+        save_db(db)
+
+
+def trigger_weekly_catalogs() -> None:
+    from app.catalogs import catalog_matches_product, fetch_all_catalogs
+
+    db = load_db()
+    checked_at = utc_now()
+    unique_users = {
+        item.get("owner_id")
+        for collection in ("products", "push_subscriptions", "notifications")
+        for item in db.get(collection, [])
+        if str(item.get("owner_id", "")).startswith("user:")
+    }
+    if not unique_users:
+        return
+
+    fetched = fetch_all_catalogs()
+    stored_snapshots = db.setdefault("catalog_snapshots", {})
+    changed_catalogs = []
+
+    for snapshot in fetched:
+        store = snapshot["store"]
+        previous = stored_snapshots.get(store, {})
+        if not snapshot.get("ok"):
+            if previous:
+                previous["last_error"] = snapshot.get("error")
+                previous["last_checked_at"] = snapshot.get("checked_at")
+            continue
+
+        snapshot["last_checked_at"] = snapshot["checked_at"]
+        snapshot["changed"] = snapshot.get("fingerprint") != previous.get("fingerprint")
+        stored_snapshots[store] = snapshot
+        if snapshot["changed"]:
+            changed_catalogs.append(snapshot)
+
+    notifications_added = False
+    for owner_id in unique_users:
+        owner_products = [
+            product
+            for product in db.get("products", [])
+            if product.get("owner_id") == owner_id
+        ]
+        for catalog in changed_catalogs:
+            notification = {
+                "id": str(uuid4()),
+                "owner_id": owner_id,
+                "title": catalog["title"],
+                "message": (
+                    f"{catalog['title']} resmî kaynağında güncellendi. "
+                    f"{len(catalog.get('items', []))} katalog başlığı tarandı."
+                ),
+                "url": catalog["url"],
+                "created_at": checked_at,
+                "read": False,
+                "type": f"catalog_{catalog['store']}",
+            }
+            db["notifications"].insert(0, notification)
+            notifications_added = True
+            queue_or_dispatch_catalog_notification(db, owner_id, notification)
+
+            for product in owner_products:
+                product_title = product.get("title", "")
+                if not product_title or not catalog_matches_product(catalog, product_title):
+                    continue
+                match_notification = {
+                    "id": str(uuid4()),
+                    "product_id": product["id"],
+                    "owner_id": owner_id,
+                    "title": "Kataloğa Düştü!",
+                    "message": (
+                        f"Takip ettiğin '{product_title}' ürünü "
+                        f"{catalog['title']} içeriğiyle eşleşti."
+                    ),
+                    "url": catalog["url"],
+                    "created_at": checked_at,
+                    "read": False,
+                    "type": "catalog_match",
+                }
+                db["notifications"].insert(0, match_notification)
+                notifications_added = True
+                queue_or_dispatch_notification(db, product, match_notification)
+
+    if notifications_added or fetched:
+        save_db(db)
+
+
+def refresh_product(product_id: str) -> dict[str, Any]:
+    db = load_db()
+    product = find_product(db, product_id)
+
+    if not product:
+        raise KeyError("Ürün bulunamadı")
+
+    checked_at = utc_now()
+    old_price = current_price(product)
+    parsed = parse_product_url(product["url"])
+
+    product["last_checked_at"] = checked_at
+    was_out_of_stock = product.get("extra_info", {}).get("out_of_stock", False)
+
+    if not parsed.price:
+        product["last_check_status"] = "failed"
+        product["last_check_message"] = (
+            parsed.warnings[0] if parsed.warnings else "Güncel fiyat bulunamadı."
+        )
+        product["updated_at"] = checked_at
+        save_db(db)
+        return {
+            "status": "failed",
+            "price_changed": False,
+            "old_price": old_price,
+            "new_price": None,
+            "message": product["last_check_message"],
+            "product": product,
+        }
+
+    new_price = parsed.price
+    product["last_check_status"] = "success"
+    product["last_check_message"] = "Fiyat başarıyla kontrol edildi."
+    product["updated_at"] = checked_at
+
+    if parsed.title:
+        product["title"] = parsed.title
+    if parsed.image_url:
+        product["image_url"] = parsed.image_url
+
+    price_changed = abs(new_price - old_price) > 0.001
+    drop_rate = (old_price - new_price) / old_price if old_price > 0 else 0
+    push_notifications = []
+
+    if was_out_of_stock and new_price > 0:
+        product["extra_info"]["out_of_stock"] = False
+        notification = {
+            "id": str(uuid4()),
+            "product_id": product["id"],
+            "owner_id": product.get("owner_id"),
+            "title": "Stok Geldi!",
+            "message": f"{product['title']} tekrar stoklara girdi! Güncel Fiyat: {new_price:.2f} TL",
+            "created_at": checked_at,
+            "read": False,
+            "type": "stock_back",
+        }
+        db["notifications"].insert(0, notification)
+        push_notifications.append(notification)
+        price_changed = True
+
+    if price_changed:
+        product["price_history"].append(
+            {
+                "price": new_price,
+                "seen_at": checked_at,
+                "source": "automatic",
+            }
+        )
+
+    # Calculate custom threshold
+    drop_threshold = DROP_THRESHOLD
+    try:
+        custom_thresh = product.get("extra_info", {}).get("alert_threshold")
+        if custom_thresh is not None:
+            custom_thresh = float(custom_thresh)
+            if custom_thresh >= 1.0:
+                drop_threshold = custom_thresh / 100.0
+            elif custom_thresh > 0:
+                drop_threshold = custom_thresh
+    except (ValueError, TypeError):
+        pass
+
+    if not was_out_of_stock and drop_rate >= drop_threshold:
+        notification = {
+            "id": str(uuid4()),
+            "product_id": product["id"],
+            "owner_id": product.get("owner_id"),
+            "title": "Fiyat düştü",
+            "message": (
+                f"{product['title']} fiyatı %{drop_rate * 100:.0f} düştü: "
+                f"{old_price:.2f} TL → {new_price:.2f} TL"
+            ),
+            "created_at": checked_at,
+            "read": False,
+            "type": "price_drop",
+        }
+        db["notifications"].insert(0, notification)
+        push_notifications.append(notification)
+
+    target_price = product.get("extra_info", {}).get("target_price")
+    if target_price:
+        try:
+            target_price = float(target_price)
+            crossed_target = (
+                new_price <= target_price
+                and (not old_price or old_price > target_price)
+            )
+            if crossed_target:
+                notification = {
+                    "id": str(uuid4()),
+                    "product_id": product["id"],
+                    "owner_id": product.get("owner_id"),
+                    "title": "Hedef fiyata ulaşıldı",
+                    "message": (
+                        f"{product['title']} hedeflediğin fiyata "
+                        f"({target_price:.2f} TL) ulaştı: "
+                        f"Şu anki fiyat {new_price:.2f} TL!"
+                    ),
+                    "created_at": checked_at,
+                    "read": False,
+                    "type": "target_price_alert",
+                }
+                db["notifications"].insert(0, notification)
+                push_notifications.append(notification)
+        except (ValueError, TypeError):
+            pass
+
+    save_db(db)
+
+    # Queue or dispatch each notification
+    for notification in push_notifications:
+        queue_or_dispatch_notification(db, product, notification)
+
+    return {
+        "status": "success",
+        "price_changed": price_changed,
+        "old_price": old_price,
+        "new_price": new_price,
+        "drop_rate": drop_rate,
+        "message": product["last_check_message"],
+        "product": product,
+    }
+
+
+def refresh_all_products() -> dict[str, Any]:
+    db = load_db()
+    product_ids = [product["id"] for product in db["products"]]
+    results = []
+
+    for product_id in product_ids:
+        try:
+            results.append(refresh_product(product_id))
+        except Exception as exc:
+            results.append(
+                {
+                    "status": "failed",
+                    "product_id": product_id,
+                    "message": str(exc),
+                }
+            )
+
+    try:
+        trigger_weekly_catalogs()
+    except Exception:
+        pass
+
+    try:
+        check_restock_alerts()
+    except Exception:
+        pass
+
+    try:
+        check_cosmetics_expiration()
+    except Exception:
+        pass
+
+    try:
+        flush_queued_notifications()
+    except Exception:
+        pass
+
+    return {
+        "checked": len(results),
+        "successful": sum(result["status"] == "success" for result in results),
+        "failed": sum(result["status"] == "failed" for result in results),
+        "results": results,
+    }
+
+
+def refresh_owner_products(owner_id: str) -> dict[str, Any]:
+    db = load_db()
+    product_ids = [
+        product["id"]
+        for product in db["products"]
+        if product.get("owner_id") == owner_id
+    ]
+    results = []
+
+    for product_id in product_ids:
+        try:
+            results.append(refresh_product(product_id))
+        except Exception as exc:
+            results.append(
+                {
+                    "status": "failed",
+                    "product_id": product_id,
+                    "message": str(exc),
+                }
+            )
+
+    return {
+        "checked": len(results),
+        "successful": sum(result["status"] == "success" for result in results),
+        "failed": sum(result["status"] == "failed" for result in results),
+        "results": results,
+    }
+
+
+def check_cosmetics_expiration() -> None:
+    db = load_db()
+    checked_at = utc_now()
+    from datetime import datetime, timezone, timedelta
+    
+    def parse_iso(dt_str):
+        try:
+            if dt_str.endswith('Z'):
+                dt_str = dt_str[:-1] + '+00:00'
+            return datetime.fromisoformat(dt_str)
+        except Exception:
+            return None
+            
+    now_dt = datetime.now(timezone.utc)
+    notifications_added = False
+    
+    for p in db.get("products", []):
+        extra = p.get("extra_info", {})
+        opening_date_str = extra.get("opening_date")
+        shelf_life = extra.get("shelf_life_months")
+        
+        if opening_date_str and shelf_life:
+            opening_date = parse_iso(opening_date_str)
+            if not opening_date:
+                continue
+                
+            try:
+                shelf_months = int(shelf_life)
+                last_alerted_str = extra.get("last_expiration_alerted_date")
+                if last_alerted_str:
+                    last_alerted = parse_iso(last_alerted_str)
+                    if last_alerted and last_alerted > opening_date:
+                        continue
+                        
+                exp_date = opening_date + timedelta(days=shelf_months * 30)
+                alert_date = exp_date - timedelta(days=15)
+                
+                if now_dt >= alert_date:
+                    notification = {
+                        "id": str(uuid4()),
+                        "product_id": p["id"],
+                        "owner_id": p.get("owner_id"),
+                        "title": "Kozmetik Son Kullanma Uyarısı!",
+                        "message": f"Açtığın '{p['title']}' kozmetik ürününün kullanım ömrü dolmak üzere! Güvenli kullanım için yenisiyle değiştirebilirsin.",
+                        "created_at": checked_at,
+                        "read": False,
+                        "type": "cosmetic_expiration_alert"
+                    }
+                    db["notifications"].insert(0, notification)
+                    notifications_added = True
+                    p.setdefault("extra_info", {})["last_expiration_alerted_date"] = checked_at
+                    
+                    queue_or_dispatch_notification(db, p, notification)
+            except Exception:
+                pass
+                
+    if notifications_added:
+        save_db(db)
