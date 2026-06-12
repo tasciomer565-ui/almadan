@@ -55,6 +55,132 @@ const productFallbackIcons = {
   manual: "package-search",
 };
 
+function md5(str) {
+  const RotateLeft = (lValue, iShiftBits) => (lValue << iShiftBits) | (lValue >>> (32 - iShiftBits));
+  const AddUnsigned = (lX, lY) => {
+    const lX8 = lX & 0x80000000;
+    const lY8 = lY & 0x80000000;
+    const lX4 = lX & 0x40000000;
+    const lY4 = lY & 0x40000000;
+    const lResult = (lX & 0x3FFFFFFF) + (lY & 0x3FFFFFFF);
+    if (lX4 & lY4) return lResult ^ 0x80000000 ^ lX8 ^ lY8;
+    if (lX4 | lY4) {
+      if (lResult & 0x40000000) return lResult ^ 0xC0000000 ^ lX8 ^ lY8;
+      return lResult ^ 0x40000000 ^ lX8 ^ lY8;
+    }
+    return lResult ^ lX8 ^ lY8;
+  };
+  const F = (x, y, z) => (x & y) | (~x & z);
+  const G = (x, y, z) => (x & z) | (y & ~z);
+  const H = (x, y, z) => x ^ y ^ z;
+  const I = (x, y, z) => y ^ (x | ~z);
+  const FF = (a, b, c, d, x, s, ac) => AddUnsigned(RotateLeft(AddUnsigned(a, AddUnsigned(AddUnsigned(F(b, c, d), x), ac)), s), b);
+  const GG = (a, b, c, d, x, s, ac) => AddUnsigned(RotateLeft(AddUnsigned(a, AddUnsigned(AddUnsigned(G(b, c, d), x), ac)), s), b);
+  const HH = (a, b, c, d, x, s, ac) => AddUnsigned(RotateLeft(AddUnsigned(a, AddUnsigned(AddUnsigned(H(b, c, d), x), ac)), s), b);
+  const II = (a, b, c, d, x, s, ac) => AddUnsigned(RotateLeft(AddUnsigned(a, AddUnsigned(AddUnsigned(I(b, c, d), x), ac)), s), b);
+  
+  const ConvertToWordArray = (string) => {
+    const lMessageLength = string.length;
+    const lNumberOfWords_temp1 = lMessageLength + 8;
+    const lNumberOfWords_temp2 = (lNumberOfWords_temp1 - (lNumberOfWords_temp1 % 64)) / 64;
+    const lNumberOfWords = (lNumberOfWords_temp2 + 1) * 16;
+    const lWordArray = Array(lNumberOfWords).fill(0);
+    let lByteCount = 0;
+    while (lByteCount < lMessageLength) {
+      const lWordCount = (lByteCount - (lByteCount % 4)) / 4;
+      const lBytePosition = (lByteCount % 4) * 8;
+      lWordArray[lWordCount] = lWordArray[lWordCount] | (string.charCodeAt(lByteCount) << lBytePosition);
+      lByteCount++;
+    }
+    const lWordCount = (lByteCount - (lByteCount % 4)) / 4;
+    const lBytePosition = (lByteCount % 4) * 8;
+    lWordArray[lWordCount] = lWordArray[lWordCount] | (0x80 << lBytePosition);
+    lWordArray[lNumberOfWords - 2] = lMessageLength << 3;
+    lWordArray[lNumberOfWords - 1] = lMessageLength >>> 29;
+    return lWordArray;
+  };
+  const WordToHex = (lValue) => {
+    let WordToHexValue = "";
+    for (let lCount = 0; lCount <= 3; lCount++) {
+      const lByte = (lValue >>> (lCount * 8)) & 255;
+      const WordToHexValue_temp = "0" + lByte.toString(16);
+      WordToHexValue = WordToHexValue + WordToHexValue_temp.substring(WordToHexValue_temp.length - 2);
+    }
+    return WordToHexValue;
+  };
+  const Utf8Encode = (string) => {
+    string = string.replace(/\r\n/g, "\n");
+    let utftext = "";
+    for (let n = 0; n < string.length; n++) {
+      const c = string.charCodeAt(n);
+      if (c < 128) {
+        utftext += String.fromCharCode(c);
+      } else if (c > 127 && c < 2048) {
+        utftext += String.fromCharCode((c >> 6) | 192);
+        utftext += String.fromCharCode((c & 63) | 128);
+      } else {
+        utftext += String.fromCharCode((c >> 12) | 224);
+        utftext += String.fromCharCode(((c >> 6) & 63) | 128);
+        utftext += String.fromCharCode((c & 63) | 128);
+      }
+    }
+    return utftext;
+  };
+
+  const x = ConvertToWordArray(Utf8Encode(str));
+  let a = 0x67452301;
+  let b = 0xEFCDAB89;
+  let c = 0x98BADCFE;
+  let d = 0x10325476;
+  const S11 = 7; const S12 = 12; const S13 = 17; const S14 = 22;
+  const S21 = 5; const S22 = 9; const S23 = 14; const S24 = 20;
+  const S31 = 4; const S32 = 11; const S33 = 16; const S34 = 23;
+  const S41 = 6; const S42 = 10; const S43 = 15; const S44 = 21;
+
+  for (let k = 0; k < x.length; k += 16) {
+    const AA = a; const BB = b; const CC = c; const DD = d;
+    a = FF(a, b, c, d, x[k + 0], S11, 0xD76AA478); d = FF(d, a, b, c, x[k + 1], S12, 0xE8C7B756); c = FF(c, d, a, b, x[k + 2], S13, 0x242070DB); b = FF(b, c, d, a, x[k + 3], S14, 0xC1BDCEEE);
+    a = FF(a, b, c, d, x[k + 4], S11, 0xF57C0FAF); d = FF(d, a, b, c, x[k + 5], S12, 0x4787C62A); c = FF(c, d, a, b, x[k + 6], S13, 0xA8304613); b = FF(b, c, d, a, x[k + 7], S14, 0xFD469501);
+    a = FF(a, b, c, d, x[k + 8], S11, 0x698098D8); d = FF(d, a, b, c, x[k + 9], S12, 0x8B44F7AF); c = FF(c, d, a, b, x[k + 10], S13, 0xFFFF5BB1); b = FF(b, c, d, a, x[k + 11], S14, 0x895CD7BE);
+    a = FF(a, b, c, d, x[k + 12], S11, 0x6B901122); d = FF(d, a, b, c, x[k + 13], S12, 0xFD987193); c = FF(c, d, a, b, x[k + 14], S13, 0xA679438E); b = FF(b, c, d, a, x[k + 15], S14, 0x49B40821);
+
+    a = GG(a, b, c, d, x[k + 1], S21, 0xF61E2562); d = GG(d, a, b, c, x[k + 6], S22, 0xC040B340); c = GG(c, d, a, b, x[k + 11], S23, 0x265E5A51); b = GG(b, c, d, a, x[k + 0], S24, 0xE9B6C7AA);
+    a = GG(a, b, c, d, x[k + 5], S21, 0xD62F105D); d = GG(d, a, b, c, x[k + 10], S22, 0x02441453); c = GG(c, d, a, b, x[k + 15], S23, 0xD8A1E681); b = GG(b, c, d, a, x[k + 4], S24, 0xE7D3FBC8);
+    a = GG(a, b, c, d, x[k + 9], S21, 0x21E1CDE6); d = GG(d, a, b, c, x[k + 14], S22, 0xC33707D6); c = GG(c, d, a, b, x[k + 3], S23, 0xF4D50D87); b = GG(b, c, d, a, x[k + 8], S24, 0x455A14ED);
+    a = GG(a, b, c, d, x[k + 13], S21, 0xA9E3E905); d = GG(d, a, b, c, x[k + 2], S22, 0xFCEFA3F8); c = GG(c, d, a, b, x[k + 7], S23, 0x676F02D9); b = GG(b, c, d, a, x[k + 12], S24, 0x8D2A4C8A);
+
+    a = HH(a, b, c, d, x[k + 5], S31, 0xFFFA3942); d = HH(d, a, b, c, x[k + 8], S32, 0x8771F681); c = HH(c, d, a, b, x[k + 11], S33, 0x6D9D6122); b = HH(b, c, d, a, x[k + 14], S34, 0xFDE5380C);
+    a = HH(a, b, c, d, x[k + 1], S31, 0xA4BEEA44); d = HH(d, a, b, c, x[k + 4], S32, 0x4BDECFA9); c = HH(c, d, a, b, x[k + 7], S33, 0xF6BB4B60); b = HH(b, c, d, a, x[k + 10], S34, 0xBEBFBC70);
+    a = HH(a, b, c, d, x[k + 13], S31, 0x289B7EC6); d = HH(d, a, b, c, x[k + 0], S32, 0xEAA127FA); c = HH(c, d, a, b, x[k + 3], S33, 0xD4EF3085); b = HH(b, c, d, a, x[k + 6], S34, 0x04881D05);
+    a = HH(a, b, c, d, x[k + 9], S31, 0xD9D4D039); d = HH(d, a, b, c, x[k + 12], S32, 0xE6DB99E5); c = HH(c, d, a, b, x[k + 15], S33, 0x1FA27CF8); b = HH(b, c, d, a, x[k + 2], S34, 0xC4AC5665);
+
+    a = II(a, b, c, d, x[k + 0], S41, 0xF4292244); d = II(d, a, b, c, x[k + 7], S42, 0x432AFF97); c = II(c, d, a, b, x[k + 14], S43, 0xAB9423A7); b = II(b, c, d, a, x[k + 5], S44, 0xFC93A039);
+    a = II(a, b, c, d, x[k + 12], S41, 0x655B59C3); d = II(d, a, b, c, x[k + 3], S42, 0x8F0CCC92); c = II(c, d, a, b, x[k + 10], S43, 0xFFEFF47D); b = II(b, c, d, a, x[k + 1], S44, 0x85845DD1);
+    a = II(a, b, c, d, x[k + 8], S41, 0x6FA87E4F); d = II(d, a, b, c, x[k + 15], S42, 0xFE2CE6E0); c = II(c, d, a, b, x[k + 6], S43, 0xA3014314); b = II(b, c, d, a, x[k + 13], S44, 0x4E0811A1);
+    a = II(a, b, c, d, x[k + 4], S41, 0xF7537E82); d = II(d, a, b, c, x[k + 11], S42, 0xBD3AF235); c = II(c, d, a, b, x[k + 2], S43, 0x2AD7D2BB); b = II(b, c, d, a, x[k + 9], S44, 0xEB86D391);
+
+    a = AddUnsigned(a, AA); b = AddUnsigned(b, BB); c = AddUnsigned(c, CC); d = AddUnsigned(d, DD);
+  }
+  return (WordToHex(a) + WordToHex(b) + WordToHex(c) + WordToHex(d)).toLowerCase();
+}
+
+function getStoreIcon(store, title) {
+  if (store && productFallbackIcons[store]) {
+    return productFallbackIcons[store];
+  }
+  const category = getItemCategory(title || "");
+  switch (category) {
+    case "supplement": return "dumbbell";
+    case "electronics": return "cpu";
+    case "cosmetics": return "flower";
+    case "fashion": return "shirt";
+    case "health": return "heart-pulse";
+    case "home": return "home";
+    case "grocery": return "shopping-cart";
+    default: return "package-search";
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   applyTheme();
   lucide.createIcons();
@@ -1102,8 +1228,8 @@ function showSearchResults(response) {
             <div class="search-result-card" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: white; transition: all 0.2s;">
               <div style="width: 50px; height: 50px; flex-shrink: 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; justify-content: center;">
                 ${item.image_url 
-                  ? `<img src="${escapeHtml(proxiedImageUrl(item.image_url))}" alt="${escapeHtml(item.title)}" style="width: 100%; height: 100%; object-fit: contain;" onerror="imageFallback(this, '${productFallbackIcons[item.source] || "package-search"}')">`
-                  : `<span class="product-placeholder" style="width:100%; height:100%; display:grid; place-items:center;"><i data-lucide="${productFallbackIcons[item.source] || "package-search"}" style="width:18px; height:18px;"></i></span>`}
+                  ? `<img src="${escapeHtml(proxiedImageUrl(item.image_url))}" alt="${escapeHtml(item.title)}" style="width: 100%; height: 100%; object-fit: contain;" onerror="imageFallback(this, '${getStoreIcon(item.source, item.title)}')">`
+                  : `<span class="product-placeholder" style="width:100%; height:100%; display:grid; place-items:center;"><i data-lucide="${getStoreIcon(item.source, item.title)}" style="width:18px; height:18px;"></i></span>`}
               </div>
               <div style="flex: 1; min-width: 0;">
                 <p class="source-name" style="margin: 0 0 2px 0; font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--muted);">${escapeHtml(item.source)}</p>
@@ -1207,8 +1333,8 @@ function showParsedProduct(parsed) {
     <div class="dialog-product-image">
       ${parsed.image_url
         ? `<img src="${escapeHtml(proxiedImageUrl(parsed.image_url))}" alt="${escapeHtml(title)}"
-            onerror="imageFallback(this, '${productFallbackIcons[parsed.source] || "package-search"}')">`
-        : `<span class="product-placeholder"><i data-lucide="${productFallbackIcons[parsed.source] || "package-search"}"></i></span>`}
+            onerror="imageFallback(this, '${getStoreIcon(parsed.source, title)}')">`
+        : `<span class="product-placeholder"><i data-lucide="${getStoreIcon(parsed.source, title)}"></i></span>`}
     </div>
     <div class="dialog-body">
       <p class="source-name">${escapeHtml(parsed.source)}</p>
@@ -2038,9 +2164,9 @@ function formatDate(value) {
 function productImage(product) {
   if (product.image_url) {
     return `<img src="${escapeHtml(proxiedImageUrl(product.image_url))}" alt="${escapeHtml(product.title)}"
-      loading="lazy" onerror="imageFallback(this, '${productFallbackIcons[product.source] || "package-search"}')">`;
+      loading="lazy" onerror="imageFallback(this, '${getStoreIcon(product.source, product.title)}')">`;
   }
-  const icon = productFallbackIcons[product.source] || "package-search";
+  const icon = getStoreIcon(product.source, product.title);
   return `<span class="product-placeholder"><i data-lucide="${icon}"></i></span>`;
 }
 
@@ -2461,22 +2587,28 @@ function getItemCategory(name) {
   const fashionKeywords = ["elbise", "pantolon", "gomlek", "gömlek", "tshirt", "tişört", "ceket", "mont", "kaban", "hırka", "hirka", "kazak", "yelek", "ayakkabi", "ayakkabı", "bot", "çizme", "terlik", "corap", "çorap", "etek", "sort", "şort", "takim", "takım", "bluz", "sweatshirt", "sweat", "kemer", "cüzdan", "aksesuar"];
   const supplementKeywords = ["whey", "protein", "creatine", "kreatin", "gainer", "bcaa", "arginine", "arjinin", "supplement", "takviye", "karbonhidrat", "glutamine", "glutamin", "aminoasit", "preworkout", "vitamin", "kolajen", "collagen"];
   const cosmeticsKeywords = ["şampuan", "sampuan", "krem", "parfüm", "parfum", "ruj", "maskara", "fondöten", "oje", "far", "allık", "liner", "eyeliner", "saç kremi", "saç boyası", "tonik", "serum", "nemlendirici", "losyon", "gratis", "rossmann", "deodorant", "roll-on", "diş macunu", "dis macunu", "diş fırçası", "makyaj"];
-  
+  const healthKeywords = ["optik", "gözlük", "lens", "ebebek", "bebek", "mama", "bez", "medikal", "vitamin", "gnc", "takviye", "emzik", "biberon", "sağlık", "saglik", "joker", "babymall"];
+  const homeKeywords = ["tencere", "tabak", "çatal", "kaşık", "bıçak", "mutfak", "züccaciye", "karaca", "ikea", "koçtaş", "koctas", "english home", "madame coco", "nevresim", "yastık", "yorgan", "perde", "mobilya", "dolap", "matkap", "boya", "yapı market", "yapi market", "bahçe", "bahce", "linens", "tekzen", "bauhaus", "bella maison", "jumbo", "korkmaz", "schafer", "porland", "pasabahce", "paşabahçe", "bernardo"];
+
   if (supplementKeywords.some(kw => lower.includes(kw))) return "supplement";
   if (electronicsKeywords.some(kw => lower.includes(kw))) return "electronics";
   if (cosmeticsKeywords.some(kw => lower.includes(kw))) return "cosmetics";
   if (fashionKeywords.some(kw => lower.includes(kw))) return "fashion";
+  if (healthKeywords.some(kw => lower.includes(kw))) return "health";
+  if (homeKeywords.some(kw => lower.includes(kw))) return "home";
   if (groceryKeywords.some(kw => lower.includes(kw))) return "grocery";
   
   return "grocery";
 }
 
 const CATEGORY_STORES = {
-  grocery: ["bim", "a101", "sok", "file", "metro", "carrefoursa", "migros", "trendyol", "hepsiburada", "amazon", "n11"],
-  electronics: ["vatanbilgisayar", "itopya", "mediamarkt", "teknosa", "trendyol", "hepsiburada", "amazon", "n11"],
-  fashion: ["lcwaikiki", "defacto", "zara", "boyner", "koton", "mavi", "trendyol", "hepsiburada", "amazon", "n11"],
-  cosmetics: ["gratis", "rossmann", "trendyol", "hepsiburada", "amazon", "n11"],
-  supplement: ["supplementler", "proteinocean", "trendyol", "hepsiburada", "amazon", "n11"]
+  grocery: ["bim", "a101", "sok", "hakmarekspres", "migros", "5mmigros", "migrosjet", "carrefoursa", "carrefoursagurme", "tarimkredi", "file", "macrocenter", "happycenter", "onurmarket", "mopas", "hakmar", "cagrimarket", "bizimtoptan", "metro", "secmarket", "trendyol", "hepsiburada", "amazon", "n11"],
+  electronics: ["teknosa", "mediamarkt", "vatanbilgisayar", "troy", "gurgencer", "pozitifteknoloji", "samsung", "huawei", "mistore", "evkur", "cetmen", "yigitavm", "ozsanal", "itopya", "trendyol", "hepsiburada", "amazon", "n11"],
+  fashion: ["lcwaikiki", "defacto", "koton", "mavi", "ltb", "colins", "boyner", "ozdilek", "beymen", "vakko", "altinyildiz", "kigili", "sarar", "suvari", "hatemoglu", "tudors", "ipekyol", "twist", "machka", "penti", "zara", "bershka", "pullandbear", "stradivarius", "massimodutti", "hm", "mango", "flo", "instreet", "deichmann", "ayakkabidunyasi", "superstep", "sportive", "decathlon", "trendyol", "hepsiburada", "amazon", "n11"],
+  cosmetics: ["gratis", "watsons", "rossmann", "eveshop", "sephora", "sevil", "yvesrocher", "flormar", "goldenrose", "mac", "kikomilano", "boyner", "beymen", "trendyol", "hepsiburada", "amazon", "n11"],
+  supplement: ["supplementler", "proteinocean", "gnc", "trendyol", "hepsiburada", "amazon", "n11"],
+  health: ["atasunoptik", "opmaroptik", "eleganceoptik", "mertoptik", "ebebek", "babymall", "joker", "gnc"],
+  home: ["karaca", "pasabahce", "bernardo", "jumbo", "korkmaz", "schafer", "porland", "hisar", "englishhome", "madamecoco", "linens", "bellamaison", "karacahome", "ikea", "koctas", "koctasfix", "bauhaus", "tekzen", "trendyol", "hepsiburada", "amazon", "n11"]
 };
 
 function getPricesForOptimizerItem(name) {
@@ -2504,6 +2636,16 @@ function getPricesForOptimizerItem(name) {
     basePrice = 180.00;
     if (lower.includes("parfüm") || lower.includes("parfum")) {
       basePrice = 950.00;
+    }
+  } else if (category === "health") {
+    basePrice = 150.00;
+    if (lower.includes("gözlük") || lower.includes("lens") || lower.includes("optik")) {
+      basePrice = 850.00;
+    }
+  } else if (category === "home") {
+    basePrice = 300.00;
+    if (lower.includes("matkap") || lower.includes("mobilya") || lower.includes("ikea")) {
+      basePrice = 1200.00;
     }
   } else {
     if (lower.includes("yağ") || lower.includes("yag") || lower.includes("yudum")) {
@@ -2836,7 +2978,9 @@ async function renderCart() {
       electronics: "Elektronik",
       fashion: "Giyim & Moda",
       cosmetics: "Kozmetik & Kişisel Bakım",
-      supplement: "Sporcu Takviyeleri"
+      supplement: "Sporcu Takviyeleri",
+      health: "Sağlık & Optik & Anne-Bebek",
+      home: "Ev Yaşam & Yapı Market"
     };
 
     resultsDiv.innerHTML = `
@@ -3483,7 +3627,17 @@ const STORE_BRANCHES_JS = {
 };
 
 function getLocalStoreDistance(store, locName, coords) {
-  if (locName in STORE_BRANCHES_JS) return STORE_BRANCHES_JS[locName][store] || 999;
+  if (locName in STORE_BRANCHES_JS) {
+    if (store in STORE_BRANCHES_JS[locName]) {
+      return STORE_BRANCHES_JS[locName][store];
+    }
+    // MD5 Hash stable fallback (stable distance between 0.1km and 3.1km)
+    const md5Hex = md5(store);
+    const h = BigInt("0x" + md5Hex);
+    const dist = 0.1 + Number(h % 30n) / 10;
+    return Math.round(dist * 100) / 100;
+  }
+  
   if (coords) {
     const offsets = {
       bim: [0.001, -0.001],
@@ -3494,21 +3648,30 @@ function getLocalStoreDistance(store, locName, coords) {
       migros: [-0.003, 0.004],
       metro: [0.045, -0.035]
     };
+    
+    let dlat, dlng;
     if (offsets[store]) {
-      const [dlat, dlng] = offsets[store];
-      const lat2 = coords.lat + dlat;
-      const lng2 = coords.lng + dlng;
-      
-      const R = 6371;
-      const dLat = dlat * Math.PI / 180;
-      const dLon = dlng * Math.PI / 180;
-      const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(coords.lat * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-        Math.sin(dLon/2) * Math.sin(dLon/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return Math.round(R * c * 100) / 100;
+      [dlat, dlng] = offsets[store];
+    } else {
+      // MD5 Hash stable offset fallback
+      const md5Hex = md5(store);
+      const h = BigInt("0x" + md5Hex);
+      dlat = Number((h % 50n) - 25n) / 10000.0;
+      dlng = Number(((h >> 8n) % 50n) - 25n) / 10000.0;
     }
+    
+    const lat2 = coords.lat + dlat;
+    const lng2 = coords.lng + dlng;
+    
+    const R = 6371;
+    const dLat = (lat2 - coords.lat) * Math.PI / 180;
+    const dLon = (lng2 - coords.lng) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(coords.lat * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return Math.round(R * c * 100) / 100;
   }
   return 0;
 }

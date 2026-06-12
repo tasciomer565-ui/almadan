@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 from app.shopping import (
     MARKET_STORES,
@@ -32,6 +33,15 @@ class ShoppingFeatureTests(unittest.TestCase):
             {"amount": 60.0, "unit": "servis", "unit_price": 20.0},
         )
 
+    @patch("app.shopping.MARKET_STORES", (
+        "bim",
+        "a101",
+        "sok",
+        "file",
+        "metro",
+        "carrefoursa",
+        "migros",
+    ))
     def test_single_and_split_basket_apply_coupons(self) -> None:
         items = [
             {

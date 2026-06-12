@@ -7,13 +7,32 @@ from app.comparator import extract_volume_info
 
 
 MARKET_STORES = (
-    "bim",
-    "a101",
-    "sok",
-    "file",
-    "metro",
-    "carrefoursa",
-    "migros",
+    # 1. Zincir Marketler
+    "bim", "a101", "sok", "hakmarekspres",
+    "migros", "5mmigros", "migrosjet", "carrefoursa", "carrefoursagurme", "tarimkredi",
+    "file", "macrocenter",
+    "happycenter", "onurmarket", "mopas", "hakmar", "cagrimarket",
+    "bizimtoptan", "metro", "secmarket",
+    # 2. Teknoloji & Elektronik
+    "teknosa", "mediamarkt", "vatanbilgisayar", "troy", "gurgencer", "pozitifteknoloji",
+    "samsung", "huawei", "mistore", "evkur", "cetmen", "yigitavm", "ozsanal", "itopya",
+    # 3. Kozmetik & Kişisel Bakım
+    "gratis", "watsons", "rossmann", "eveshop", "sephora", "sevil", "yvesrocher",
+    "flormar", "goldenrose", "mac", "kikomilano",
+    # 4. Giyim, Ayakkabı & Moda
+    "lcwaikiki", "defacto", "koton", "mavi", "ltb", "colins", "boyner", "ozdilek", "beymen", "vakko",
+    "altinyildiz", "kigili", "sarar", "suvari", "hatemoglu", "tudors",
+    "ipekyol", "twist", "machka", "penti",
+    "zara", "bershka", "pullandbear", "stradivarius", "massimodutti", "hm", "mango",
+    "flo", "instreet", "deichmann", "ayakkabidunyasi", "superstep", "sportive", "decathlon",
+    # 5. Sağlık, Medikal & Optik
+    "atasunoptik", "opmaroptik", "eleganceoptik", "mertoptik", "ebebek", "babymall", "joker", "gnc",
+    # 6. Züccaciye, Ev Tekstili & Ev Yaşam
+    "karaca", "pasabahce", "bernardo", "jumbo", "korkmaz", "schafer", "porland", "hisar",
+    "englishhome", "madamecoco", "linens", "bellamaison", "karacahome",
+    "ikea", "koctas", "koctasfix", "bauhaus", "tekzen",
+    # E-Ticaret / Pazaryeri Ortakları (Arayüz uyumu için)
+    "trendyol", "hepsiburada", "amazon", "n11", "supplementler", "proteinocean"
 )
 
 STORE_BRANCHES = {
@@ -71,7 +90,11 @@ def get_store_distance(
     location_name: str | None = None,
 ) -> float:
     if location_name in STORE_BRANCHES:
-        return STORE_BRANCHES[location_name].get(store, 999.00)
+        if store in STORE_BRANCHES[location_name]:
+            return STORE_BRANCHES[location_name][store]
+        # MD5 Hash stable fallback (stable distance between 0.1km and 3.1km)
+        h = int(hashlib.md5(store.encode("utf-8")).hexdigest(), 16)
+        return round(0.1 + (h % 30) / 10, 2)
     
     if lat is not None and lng is not None:
         # Define fixed offsets for each store brand to simulate branch coordinates
@@ -86,18 +109,24 @@ def get_store_distance(
         }
         if store in offsets:
             dlat, dlng = offsets[store]
-            import math
-            R = 6371.0
-            lat2 = lat + dlat
-            lng2 = lng + dlng
+        else:
+            # MD5 Hash stable offset fallback
+            h = int(hashlib.md5(store.encode("utf-8")).hexdigest(), 16)
+            dlat = ((h % 50) - 25) / 10000.0  # -0.0025 to +0.0025
+            dlng = (((h >> 8) % 50) - 25) / 10000.0
             
-            d_lat_rad = math.radians(lat2 - lat)
-            d_lng_rad = math.radians(lng2 - lng)
-            a = (math.sin(d_lat_rad / 2) ** 2 +
-                 math.cos(math.radians(lat)) * math.cos(math.radians(lat2)) *
-                 math.sin(d_lng_rad / 2) ** 2)
-            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-            return round(R * c, 2)
+        import math
+        R = 6371.0
+        lat2 = lat + dlat
+        lng2 = lng + dlng
+        
+        d_lat_rad = math.radians(lat2 - lat)
+        d_lng_rad = math.radians(lng2 - lng)
+        a = (math.sin(d_lat_rad / 2) ** 2 +
+             math.cos(math.radians(lat)) * math.cos(math.radians(lat2)) *
+             math.sin(d_lng_rad / 2) ** 2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        return round(R * c, 2)
             
     return 0.0
 
@@ -127,7 +156,7 @@ def simulated_market_prices(name: str) -> dict[str, float]:
     digest = hashlib.sha256(name.casefold().encode("utf-8")).digest()
     prices: dict[str, float] = {}
     for index, store in enumerate(MARKET_STORES):
-        variance = 0.84 + ((digest[index] % 32) / 100)
+        variance = 0.84 + ((digest[index % len(digest)] % 32) / 100)
         prices[store] = round(base * variance, 2)
     return prices
 
