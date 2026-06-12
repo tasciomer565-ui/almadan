@@ -307,6 +307,29 @@ def is_logical_product(query: str, product_title: str) -> bool:
     query_lower = query.lower()
     title_lower = product_title.lower()
     
+    # Prevent cooking oils and motor oils from mismatching
+    cooking_oil_terms = {
+        "yudum", "biryağ", "biryag", "komili", "orkide", "evin", "abalı", "abali", 
+        "salat", "safya", "sole", "vera", "ayçiçek", "aycicek", "zeytinyağı", 
+        "zeytinyagi", "mısırözü", "misirozu", "kırlangıç", "kirlangic", "sıvı yağ", "sivi yag"
+    }
+    motor_oil_terms = {
+        "motor yağı", "motor yagi", "şanzıman", "sanziman", "sentetik", "5w-30", 
+        "5w30", "10w-40", "10w40", "5w-40", "5w40", "castrol", "motul", "mobil 1", 
+        "shell helix", "liqui moly", "lubex"
+    }
+    
+    has_cooking_query = any(t in query_lower for t in cooking_oil_terms)
+    has_motor_query = any(t in query_lower for t in motor_oil_terms)
+    
+    if has_cooking_query:
+        if any(t in title_lower for t in motor_oil_terms) and not has_motor_query:
+            return False
+            
+    if has_motor_query:
+        if any(t in title_lower for t in cooking_oil_terms) and not has_cooking_query:
+            return False
+
     irrelevant_terms = [
         "bezi", "spreyi", "solüsyonu", "temizleme",
         "kılıfı", "kutusu", "kabı", "kılıf", "kapak",
