@@ -193,65 +193,23 @@ function renderAccountButton() {
   }
 }
 
-function showAccount() {
-  const dialog = document.getElementById("productDialog");
-  const content = document.getElementById("dialogContent");
+let activeAuthMethod = "email"; // "email" or "sms"
+let smsCodeSent = false;
 
-  if (state.auth.authenticated) {
-    content.innerHTML = `
-      <div class="dialog-body auth-dialog">
-        <p class="eyebrow">HESABIN</p>
-        <h2>Takiplerin seninle gelsin.</h2>
-        <div class="account-summary">
-          <span class="account-avatar"><i data-lucide="user-round"></i></span>
-          <div>
-            <strong>${escapeHtml(state.auth.user?.email || "Almadan kullanıcısı")}</strong>
-            <p>Takiplerin bu hesapla farklı cihazlarda eşitlenir.</p>
-          </div>
-        </div>
-        <div class="manual-fields">
-          <label class="manual-field">
-            <span>Cinsiyet</span>
-            <select id="profileGender">
-              <option value="belirtilmemiş">Belirtilmemiş</option>
-              <option value="erkek" ${state.auth.user?.gender === "erkek" ? "selected" : ""}>Erkek</option>
-              <option value="kadın" ${state.auth.user?.gender === "kadın" ? "selected" : ""}>Kadın</option>
-            </select>
-          </label>
-          <label class="manual-field">
-            <span>Bildirim Tercihi</span>
-            <select id="profileNotificationPref" onchange="toggleProfilePhoneField()">
-              <option value="both" ${state.auth.user?.notification_pref === "both" ? "selected" : ""}>Hem SMS hem E-posta</option>
-              <option value="email" ${state.auth.user?.notification_pref === "email" ? "selected" : ""}>Sadece E-posta</option>
-              <option value="sms" ${state.auth.user?.notification_pref === "sms" ? "selected" : ""}>Sadece SMS</option>
-            </select>
-          </label>
-          <label class="manual-field" id="profilePhoneField">
-            <span>Telefon Numarası</span>
-            <input id="profilePhone" type="tel" value="${escapeHtml(state.auth.user?.phone || "")}" placeholder="05XXXXXXXXX">
-          </label>
-          <label class="profile-checkbox">
-            <input id="profileSilenceEnabled" type="checkbox" ${state.auth.user?.silence_hours ? "checked" : ""}>
-            <span>22:00-08:00 arasında bildirimleri sabaha ertele</span>
-          </label>
-        </div>
-        <p class="dialog-error" id="authError" hidden></p>
-        <button class="primary-button auth-submit-button" type="button" onclick="saveProfileSettings()">
-          <i data-lucide="save"></i>
-          Ayarları kaydet
-        </button>
-        <button class="danger-button" type="button" onclick="logoutAccount()">
-          <i data-lucide="log-out"></i>
-          Çıkış yap
-        </button>
-      </div>
-    `;
-  } else {
+function renderUnauthenticatedAuth(content) {
+  if (activeAuthMethod === "email") {
     content.innerHTML = `
       <div class="dialog-body auth-dialog">
         <p class="eyebrow">ALMADAN HESABI</p>
         <h2>Takiplerini kaybetme.</h2>
-        <p class="auth-copy">E-posta ile giriş yap. Bu cihazdaki ürünlerin hesabına otomatik taşınsın.</p>
+        
+        <div class="auth-tabs" style="display: flex; gap: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 10px; width: 100%;">
+          <button type="button" onclick="switchAuthMethod('email')" style="background: none; border: none; font-weight: bold; cursor: pointer; color: var(--green-dark); border-bottom: 2px solid var(--green-dark); padding-bottom: 8px; font-family: inherit; font-size: 14px;">E-posta ile Giriş</button>
+          <button type="button" onclick="switchAuthMethod('sms')" style="background: none; border: none; cursor: pointer; color: var(--ink-light); padding-bottom: 8px; font-family: inherit; font-size: 14px;">SMS ile Giriş</button>
+        </div>
+        
+        <p class="auth-copy" style="margin-bottom: 16px; font-size: 13px; color: var(--ink-light);">E-posta ile giriş yap. Bu cihazdaki ürünlerin hesabına otomatik taşınsın.</p>
+        
         <div class="manual-fields">
           <label class="manual-field">
             <span>E-posta</span>
@@ -299,11 +257,196 @@ function showAccount() {
         `}
       </div>
     `;
+  } else {
+    content.innerHTML = `
+      <div class="dialog-body auth-dialog">
+        <p class="eyebrow">ALMADAN HESABI</p>
+        <h2>SMS ile Hızlı Giriş.</h2>
+        
+        <div class="auth-tabs" style="display: flex; gap: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 10px; width: 100%;">
+          <button type="button" onclick="switchAuthMethod('email')" style="background: none; border: none; cursor: pointer; color: var(--ink-light); padding-bottom: 8px; font-family: inherit; font-size: 14px;">E-posta ile Giriş</button>
+          <button type="button" onclick="switchAuthMethod('sms')" style="background: none; border: none; font-weight: bold; cursor: pointer; color: var(--green-dark); border-bottom: 2px solid var(--green-dark); padding-bottom: 8px; font-family: inherit; font-size: 14px;">SMS ile Giriş</button>
+        </div>
+        
+        <p class="auth-copy" style="margin-bottom: 16px; font-size: 13px; color: var(--ink-light);">Şifresiz giriş yap. Telefonuna gelecek tek kullanımlık SMS koduyla hesabına anında ulaş.</p>
+        
+        <div class="manual-fields">
+          <label class="manual-field">
+            <span>Telefon Numarası</span>
+            <input id="authSmsPhone" type="tel" placeholder="05XXXXXXXXX" ${smsCodeSent ? 'disabled' : ''}>
+          </label>
+          ${smsCodeSent ? `
+            <label class="manual-field">
+              <span>6 Haneli Doğrulama Kodu</span>
+              <input id="authSmsCode" type="text" pattern="[0-9]*" inputmode="numeric" maxlength="6" placeholder="******">
+            </label>
+          ` : ''}
+        </div>
+        
+        <p class="dialog-error" id="authError" hidden></p>
+        
+        ${state.auth.enabled ? `
+          <div class="dialog-actions" style="margin-top: 20px;">
+            ${smsCodeSent ? `
+              <button class="secondary-button" type="button" onclick="resetSmsFlow()">Telefonu Değiştir</button>
+              <button class="primary-button" type="button" onclick="verifySmsCode()">
+                <i data-lucide="check"></i>
+                Doğrula ve Giriş Yap
+              </button>
+            ` : `
+              <button class="primary-button" type="button" onclick="sendSmsCode()" style="width: 100%;">
+                <i data-lucide="send"></i>
+                Kod Gönder
+              </button>
+            `}
+          </div>
+        ` : `
+          <p class="dialog-error">Hesap sistemi henüz sunucuda etkinleştirilmedi.</p>
+        `}
+      </div>
+    `;
+  }
+  lucide.createIcons();
+  if (typeof togglePhoneField === "function" && activeAuthMethod === "email") togglePhoneField();
+}
+
+function switchAuthMethod(method) {
+  activeAuthMethod = method;
+  const content = document.getElementById("dialogContent");
+  if (content) {
+    renderUnauthenticatedAuth(content);
+  }
+}
+
+function resetSmsFlow() {
+  smsCodeSent = false;
+  const content = document.getElementById("dialogContent");
+  if (content) {
+    renderUnauthenticatedAuth(content);
+  }
+}
+
+async function sendSmsCode() {
+  const phone = document.getElementById("authSmsPhone")?.value.trim();
+  if (!phone || phone.length < 10) {
+    showAuthError("Lütfen geçerli bir telefon numarası girin.");
+    return;
+  }
+  
+  try {
+    const errorBox = document.getElementById("authError");
+    if (errorBox) errorBox.hidden = true;
+    
+    await api("/auth/otp/send", {
+      method: "POST",
+      body: JSON.stringify({ phone }),
+    });
+    
+    smsCodeSent = true;
+    const content = document.getElementById("dialogContent");
+    if (content) {
+      renderUnauthenticatedAuth(content);
+    }
+    showToast("Doğrulama kodu gönderildi.");
+  } catch (error) {
+    showAuthError(error.message);
+  }
+}
+
+async function verifySmsCode() {
+  const phone = document.getElementById("authSmsPhone")?.value.trim();
+  const code = document.getElementById("authSmsCode")?.value.trim();
+  
+  if (!phone || !code || code.length !== 6) {
+    showAuthError("Lütfen 6 haneli doğrulama kodunu girin.");
+    return;
+  }
+  
+  try {
+    const errorBox = document.getElementById("authError");
+    if (errorBox) errorBox.hidden = true;
+    
+    const result = await api("/auth/otp/verify", {
+      method: "POST",
+      body: JSON.stringify({ phone, code }),
+    });
+    
+    state.auth = {
+      enabled: true,
+      authenticated: true,
+      user: result.user,
+    };
+    renderAccountButton();
+    handleCategoryChange();
+    closeDialog();
+    await loadProducts();
+    showToast("Giriş yapıldı.");
+  } catch (error) {
+    showAuthError(error.message);
+  }
+}
+
+function showAccount() {
+  const dialog = document.getElementById("productDialog");
+  const content = document.getElementById("dialogContent");
+
+  if (state.auth.authenticated) {
+    content.innerHTML = `
+      <div class="dialog-body auth-dialog">
+        <p class="eyebrow">HESABIN</p>
+        <h2>Takiplerin seninle gelsin.</h2>
+        <div class="account-summary">
+          <span class="account-avatar"><i data-lucide="user-round"></i></span>
+          <div>
+            <strong>${escapeHtml(state.auth.user?.email || state.auth.user?.phone || "Almadan kullanıcısı")}</strong>
+            <p>Takiplerin bu hesapla farklı cihazlarda eşitlenir.</p>
+          </div>
+        </div>
+        <div class="manual-fields">
+          <label class="manual-field">
+            <span>Cinsiyet</span>
+            <select id="profileGender">
+              <option value="belirtilmemiş">Belirtilmemiş</option>
+              <option value="erkek" ${state.auth.user?.gender === "erkek" ? "selected" : ""}>Erkek</option>
+              <option value="kadın" ${state.auth.user?.gender === "kadın" ? "selected" : ""}>Kadın</option>
+            </select>
+          </label>
+          <label class="manual-field">
+            <span>Bildirim Tercihi</span>
+            <select id="profileNotificationPref" onchange="toggleProfilePhoneField()">
+              <option value="both" ${state.auth.user?.notification_pref === "both" ? "selected" : ""}>Hem SMS hem E-posta</option>
+              <option value="email" ${state.auth.user?.notification_pref === "email" ? "selected" : ""}>Sadece E-posta</option>
+              <option value="sms" ${state.auth.user?.notification_pref === "sms" ? "selected" : ""}>Sadece SMS</option>
+            </select>
+          </label>
+          <label class="manual-field" id="profilePhoneField">
+            <span>Telefon Numarası</span>
+            <input id="profilePhone" type="tel" value="${escapeHtml(state.auth.user?.phone || "")}" placeholder="05XXXXXXXXX">
+          </label>
+          <label class="profile-checkbox">
+            <input id="profileSilenceEnabled" type="checkbox" ${state.auth.user?.silence_hours ? "checked" : ""}>
+            <span>22:00-08:00 arasında bildirimleri sabaha ertele</span>
+          </label>
+        </div>
+        <p class="dialog-error" id="authError" hidden></p>
+        <button class="primary-button auth-submit-button" type="button" onclick="saveProfileSettings()">
+          <i data-lucide="save"></i>
+          Ayarları kaydet
+        </button>
+        <button class="danger-button" type="button" onclick="logoutAccount()">
+          <i data-lucide="log-out"></i>
+          Çıkış yap
+        </button>
+      </div>
+    `;
+  } else {
+    smsCodeSent = false;
+    renderUnauthenticatedAuth(content);
   }
 
   dialog.showModal();
   lucide.createIcons();
-  if (typeof togglePhoneField === "function") togglePhoneField();
+  if (typeof togglePhoneField === "function" && activeAuthMethod === "email") togglePhoneField();
   if (typeof toggleProfilePhoneField === "function") toggleProfilePhoneField();
 }
 

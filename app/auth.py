@@ -147,3 +147,19 @@ def update_user_metadata(access_token: str, metadata: dict[str, Any]) -> dict[st
         payload={"data": metadata},
         access_token=access_token,
     )
+
+
+def send_otp(phone: str) -> dict[str, Any]:
+    return auth_request(
+        "POST",
+        "otp",
+        payload={"phone": phone},
+    )
+
+
+def verify_otp(phone: str, token: str) -> dict[str, Any]:
+    return auth_request(
+        "POST",
+        "verify",
+        payload={"phone": phone, "token": token, "type": "sms"},
+    )

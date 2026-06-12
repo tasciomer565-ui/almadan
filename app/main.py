@@ -28,6 +28,8 @@ from app.auth import (
     sign_up,
     update_password,
     update_user_metadata,
+    send_otp,
+    verify_otp,
 )
 from app.parser import parse_product_url
 from app.forecast import calculate_discount_forecast
@@ -387,6 +389,31 @@ class ProfileUpdateRequest(BaseModel):
     skin_type: Literal["light", "medium", "dark"] | None = None
 
 
+class OtpSendRequest(BaseModel):
+    phone: str = Field(min_length=10, max_length=20)
+
+
+class OtpVerifyRequest(BaseModel):
+    phone: str = Field(min_length=10, max_length=20)
+    code: str = Field(min_length=6, max_length=6)
+
+
+def normalize_phone(phone: str) -> str:
+    cleaned = "".join(c for c in phone if c.isdigit() or c == "+")
+    if cleaned.startswith("0090"):
+        cleaned = "+" + cleaned[2:]
+    elif cleaned.startswith("05"):
+        cleaned = "+90" + cleaned[1:]
+    elif cleaned.startswith("5") and len(cleaned) == 10:
+        cleaned = "+90" + cleaned
+    elif cleaned.startswith("905") and len(cleaned) == 12:
+        cleaned = "+" + cleaned
+    elif not cleaned.startswith("+"):
+        if len(cleaned) == 10 and cleaned.startswith("5"):
+            cleaned = "+90" + cleaned
+    return cleaned
+
+
 class PushSubscriptionKeys(BaseModel):
     p256dh: str = Field(min_length=20, max_length=512)
     auth: str = Field(min_length=8, max_length=256)
@@ -624,6 +651,60 @@ def auth_login(
             "email": user.get("email") or payload.email,
             "gender": user.get("user_metadata", {}).get("gender") if user else None,
             "phone": user.get("user_metadata", {}).get("phone") if user else None,
+            "notification_pref": user.get("user_metadata", {}).get("notification_pref") if user else None,
+            "skin_type": user.get("user_metadata", {}).get("skin_type") if user else None,
+        },
+    }
+
+
+@app.post("/auth/otp/send")
+def auth_otp_send(payload: OtpSendRequest) -> dict:
+    normalized_phone = normalize_phone(payload.phone)
+    try:
+        send_otp(normalized_phone)
+        return {"status": "ok", "phone": normalized_phone}
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.args[0])
+
+
+@app.post("/auth/otp/verify")
+def auth_otp_verify(
+    payload: OtpVerifyRequest,
+    response: Response,
+    x_device_id: str | None = Header(default=None),
+) -> dict:
+    normalized_phone = normalize_phone(payload.phone)
+    try:
+        session = verify_otp(normalized_phone, payload.code)
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.args[0])
+
+    user = session.get("user") or {}
+    set_auth_cookies(response, session)
+ 
+    if user.get("id") and x_device_id:
+        claim_device_data(x_device_id, user["id"])
+ 
+    user_id = user.get("id")
+    if user_id:
+        user_owner = f"user:{user_id}"
+        db = load_db()
+        db.setdefault("users", {})[user_owner] = {
+            "email": user.get("email") or "",
+            "gender": user.get("user_metadata", {}).get("gender") if user else None,
+            "phone": normalized_phone,
+            "notification_pref": user.get("user_metadata", {}).get("notification_pref") if user else None,
+            "skin_type": user.get("user_metadata", {}).get("skin_type") if user else None,
+        }
+        save_db(db)
+
+    return {
+        "authenticated": True,
+        "user": {
+            "id": user.get("id"),
+            "email": user.get("email") or "",
+            "gender": user.get("user_metadata", {}).get("gender") if user else None,
+            "phone": normalized_phone,
             "notification_pref": user.get("user_metadata", {}).get("notification_pref") if user else None,
             "skin_type": user.get("user_metadata", {}).get("skin_type") if user else None,
         },
