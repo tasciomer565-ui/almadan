@@ -2675,12 +2675,7 @@ function getPricesForOptimizerItem(name) {
   return prices;
 }
 
-const OFFLINE_COUPONS = [
-  { store: "migros", code: "MIGR50", description: "500 TL üzeri 50 TL", discount: 50, min_amount: 500 },
-  { store: "metro", code: "METRO150", description: "1500 TL üzeri 150 TL", discount: 150, min_amount: 1500 },
-  { store: "carrefoursa", code: "CRF75", description: "750 TL üzeri 75 TL", discount: 75, min_amount: 750 },
-  { store: "gratis", code: "GRATIS30", description: "300 TL üzeri 30 TL", discount: 30, min_amount: 300 },
-];
+const OFFLINE_COUPONS = [];
 
 let couponsCached = null;
 

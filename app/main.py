@@ -1300,22 +1300,7 @@ class ReceiptOcrRequest(BaseModel):
 @app.get("/api/coupons")
 def list_coupons() -> list[dict]:
     db = load_db()
-    coupons = db.get("coupons", [])
-    if not coupons:
-        coupons = [
-            {"id": "c1", "store": "migros", "code": "MIGR50", "description": "50 TL Migros İndirimi", "discount": 50.0, "min_amount": 500.0},
-            {"id": "c2", "store": "hepsiburada", "code": "HB100", "description": "100 TL Hepsiburada İndirimi", "discount": 100.0, "min_amount": 1000.0},
-            {"id": "c3", "store": "trendyol", "code": "TY200", "description": "200 TL Trendyol İndirimi", "discount": 200.0, "min_amount": 2000.0},
-            {"id": "c4", "store": "metro", "code": "METRO150", "description": "150 TL Metro İndirimi", "discount": 150.0, "min_amount": 1500.0},
-            {"id": "c5", "store": "carrefoursa", "code": "CRF75", "description": "75 TL CarrefourSA İndirimi", "discount": 75.0, "min_amount": 750.0},
-            {"id": "c6", "store": "gratis", "code": "GRATIS30", "description": "30 TL Gratis İndirimi", "discount": 30.0, "min_amount": 300.0},
-            {"id": "c7", "store": "rossmann", "code": "ROSS50", "description": "50 TL Rossmann İndirimi", "discount": 50.0, "min_amount": 500.0},
-            {"id": "c8", "store": "vatanbilgisayar", "code": "VATAN200", "description": "200 TL Vatan Bilgisayar İndirimi", "discount": 200.0, "min_amount": 3000.0},
-            {"id": "c9", "store": "mediamarkt", "code": "MM300", "description": "300 TL MediaMarkt İndirimi", "discount": 300.0, "min_amount": 4000.0}
-        ]
-        db["coupons"] = coupons
-        save_db(db)
-    return coupons
+    return db.get("coupons", [])
 
 
 @app.post("/api/coupons")
