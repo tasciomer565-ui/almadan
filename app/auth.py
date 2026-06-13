@@ -84,6 +84,55 @@ def sign_up(
     phone: str | None = None,
     notification_pref: str | None = None,
 ) -> dict[str, Any]:
+    from app.storage import SUPABASE_KEY
+
+    # If service_role key is available, use GoTrue Admin API to create and auto-confirm user
+    if SUPABASE_KEY:
+        admin_payload = {
+            "email": email,
+            "password": password,
+            "email_confirm": True,
+            "phone_confirm": True if phone else False,
+            "user_metadata": {}
+        }
+        if gender:
+            admin_payload["user_metadata"]["gender"] = gender
+        if phone:
+            admin_payload["user_metadata"]["phone"] = phone
+            admin_payload["phone"] = phone
+        if notification_pref:
+            admin_payload["user_metadata"]["notification_pref"] = notification_pref
+
+        try:
+            headers = {
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json",
+                "User-Agent": "Almadan-Backend/1.0",
+            }
+            response = requests.post(
+                f"{supabase_base_url()}/auth/v1/admin/users",
+                headers=headers,
+                json=admin_payload,
+                timeout=20,
+            )
+            if response.status_code == 201:
+                # User created and auto-confirmed! Immediately sign them in to return session tokens
+                return sign_in(email, password)
+            elif response.status_code in {400, 422}:
+                try:
+                    body = response.json()
+                    msg = body.get("msg") or body.get("message") or body.get("error_description")
+                except ValueError:
+                    msg = None
+                if msg:
+                    raise AuthError(msg, response.status_code)
+        except AuthError:
+            raise
+        except Exception as exc:
+            print(f"Admin signup failed, falling back to standard signup: {exc}")
+
+    # Fallback to standard signup
     payload = {"email": email, "password": password}
     metadata = {}
     if gender:

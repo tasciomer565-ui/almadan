@@ -373,6 +373,7 @@ function renderUnauthenticatedAuth(content) {
           Şifremi unuttum
         </button>
         <p class="dialog-error" id="authError" hidden></p>
+        <p class="dialog-success" id="authSuccess" hidden></p>
         ${state.auth.enabled ? `
           <div class="dialog-actions">
             <button class="secondary-button" type="button" onclick="submitAuth('signup')">Hesap oluştur</button>
@@ -413,6 +414,7 @@ function renderUnauthenticatedAuth(content) {
         </div>
         
         <p class="dialog-error" id="authError" hidden></p>
+        <p class="dialog-success" id="authSuccess" hidden></p>
         
         ${state.auth.enabled ? `
           <div class="dialog-actions" style="margin-top: 20px;">
@@ -787,7 +789,7 @@ async function submitAuth(mode) {
     });
 
     if (result.requires_email_confirmation) {
-      showAuthError("Onay bağlantısı e-postana gönderildi. Onayladıktan sonra giriş yap.");
+      showAuthSuccess("Kullanıcı kaydı başarıyla oluşturuldu! E-posta adresinize bir onay bağlantısı gönderildi. Giriş yapmadan önce lütfen e-postanızı onaylayın.");
       return;
     }
 
@@ -807,10 +809,23 @@ async function submitAuth(mode) {
 }
 
 function showAuthError(message) {
+  const successBox = document.getElementById("authSuccess");
+  if (successBox) successBox.hidden = true;
+
   const errorBox = document.getElementById("authError");
   if (!errorBox) return;
   errorBox.textContent = message;
   errorBox.hidden = false;
+}
+
+function showAuthSuccess(message) {
+  const errorBox = document.getElementById("authError");
+  if (errorBox) errorBox.hidden = true;
+
+  const successBox = document.getElementById("authSuccess");
+  if (!successBox) return;
+  successBox.textContent = message;
+  successBox.hidden = false;
 }
 
 async function logoutAccount() {
