@@ -63,8 +63,24 @@ async def automatic_refresh_loop() -> None:
         await asyncio.to_thread(refresh_all_products)
 
 
+def cleanup_default_coupons() -> None:
+    try:
+        from app.storage import load_db, save_db
+        db = load_db()
+        coupons = db.get("coupons", [])
+        if coupons:
+            default_ids = {"c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9"}
+            new_coupons = [c for c in coupons if c.get("id") not in default_ids]
+            if len(new_coupons) != len(coupons):
+                db["coupons"] = new_coupons
+                save_db(db)
+    except Exception as e:
+        print(f"Error cleaning up default coupons: {e}")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    cleanup_default_coupons()
     refresh_task = None
     if not os.getenv("VERCEL"):
         refresh_task = asyncio.create_task(automatic_refresh_loop())
