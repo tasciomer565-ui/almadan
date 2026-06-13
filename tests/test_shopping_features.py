@@ -7,17 +7,15 @@ from app.shopping import (
     MARKET_STORES,
     calculate_unit_price,
     optimize_market_basket,
-    simulated_market_prices,
 )
 
 
 class ShoppingFeatureTests(unittest.TestCase):
-    def test_simulated_prices_are_stable_and_cover_markets(self) -> None:
-        first = simulated_market_prices("Sut 1 L")
-        second = simulated_market_prices("Sut 1 L")
-        self.assertEqual(first, second)
-        self.assertEqual(set(first), set(MARKET_STORES))
-        self.assertTrue(all(price > 0 for price in first.values()))
+    def test_products_without_verified_offers_do_not_get_fake_prices(self) -> None:
+        result = optimize_market_basket([{"name": "Sut 1 L"}])
+        self.assertFalse(result["available"])
+        self.assertEqual(result["price_source"], "unavailable")
+        self.assertEqual(result["missing_items"][0]["name"], "Sut 1 L")
 
     def test_unit_price_analysis(self) -> None:
         self.assertEqual(

@@ -349,6 +349,57 @@
             <div class="analytics-canvas"><canvas id="spendingCategoryChart"></canvas></div>
           </article>
         </div>
+        <div class="receipt-analytics-section">
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="eyebrow">FİŞ HAFIZASI</p>
+              <h2>Harcamalarım</h2>
+            </div>
+            <input id="receiptMonthFilter" type="month" aria-label="Harcama ayı">
+          </div>
+          <div class="receipt-summary-grid">
+            <article class="receipt-summary-card">
+              <span>Bu ay toplam</span>
+              <strong id="receiptMonthTotal">₺0,00</strong>
+              <small id="receiptMonthChange">Önceki ay verisi yok</small>
+            </article>
+            <article class="receipt-summary-card">
+              <span>Kaydedilen fiş</span>
+              <strong id="receiptCountStat">0</strong>
+              <small>Onaylanmış alışveriş</small>
+            </article>
+            <article class="receipt-summary-card">
+              <span>En çok harcanan mağaza</span>
+              <strong id="receiptTopStore">-</strong>
+              <small id="receiptTopStoreAmount">Henüz veri yok</small>
+            </article>
+          </div>
+          <div class="analytics-grid">
+            <article class="glassmorphic-card analytics-card">
+              <div class="analytics-heading">
+                <div>
+                  <span>AYLIK HARCAMA</span>
+                  <h3>Son 6 ay</h3>
+                </div>
+                <i data-lucide="chart-column"></i>
+              </div>
+              <div class="analytics-canvas"><canvas id="receiptMonthlyChart"></canvas></div>
+            </article>
+            <article class="glassmorphic-card analytics-card">
+              <div class="analytics-heading">
+                <div>
+                  <span>MAĞAZA DAĞILIMI</span>
+                  <h3>Paran nereye gitti?</h3>
+                </div>
+                <i data-lucide="store"></i>
+              </div>
+              <div class="analytics-canvas"><canvas id="receiptStoreChart"></canvas></div>
+            </article>
+          </div>
+          <div id="receiptHistoryList" class="receipt-history-list">
+            <p class="empty-text">Henüz kaydedilmiş fiş yok.</p>
+          </div>
+        </div>
       </section>
 
       <section class="content-section hidden" id="cartView">
@@ -407,7 +458,7 @@
                   <button class="primary-button" id="runBarcodeScanBtn">Taramayı Simüle Et</button>
                 </div>
                 <div id="receiptOcrUploadArea" class="hidden">
-                  <p class="ocr-info">Fiş fotoğrafını seç. OCR motoru ürünleri tanıyıp listeye eklesin.</p>
+                  <p class="ocr-info">Fiş fotoğrafını seç. Ürünleri kontrol edip harcama geçmişine kaydet.</p>
                   <label class="scanner-upload">
                     <i data-lucide="file-image"></i>
                     <span>Fiş fotoğrafı seç</span>
@@ -419,6 +470,7 @@
                     <option value="electronics">Elektronik Fişi (Vatan Bilgisayar)</option>
                   </select>
                   <button class="primary-button" id="runOcrScanBtn">Fiş Fotoğrafı Yükle</button>
+                  <div id="receiptReviewPanel" class="receipt-review-panel hidden"></div>
                 </div>
               </div>
             </div>

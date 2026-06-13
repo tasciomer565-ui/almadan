@@ -294,7 +294,12 @@ def claim_device_data(device_id: str, user_id: str) -> None:
     user_owner = f"user:{user_id}"
     changed = False
 
-    for collection in ("products", "notifications", "push_subscriptions"):
+    for collection in (
+        "products",
+        "notifications",
+        "push_subscriptions",
+        "receipts",
+    ):
         for item in db.get(collection, []):
             if item.get("owner_id") == device_id:
                 item["owner_id"] = user_owner
@@ -1312,6 +1317,34 @@ class BasketOptimizePayload(BaseModel):
 
 class ReceiptOcrRequest(BaseModel):
     image_base64: str | None = None
+    category_hint: Literal["grocery", "cosmetics", "electronics"] | None = None
+
+
+class ReceiptItemPayload(BaseModel):
+    title: str = Field(min_length=2, max_length=240)
+    price: float = Field(ge=0)
+    quantity: float = Field(default=1, gt=0, le=999)
+    category: Literal[
+        "grocery",
+        "cosmetics",
+        "electronics",
+        "fashion",
+        "supplement",
+        "health",
+        "home",
+        "other",
+    ] = "other"
+
+
+class ReceiptCreateRequest(BaseModel):
+    store: str = Field(min_length=2, max_length=80)
+    purchased_at: str
+    payment_method: Literal[
+        "unknown", "cash", "card", "meal_card", "other"
+    ] = "unknown"
+    items: list[ReceiptItemPayload] = Field(min_length=1, max_length=250)
+    total: float | None = Field(default=None, ge=0)
+    note: str | None = Field(default=None, max_length=500)
 
 
 @app.post("/api/cart/optimize")
@@ -1377,49 +1410,194 @@ def parse_receipt_text(text: str) -> list[dict]:
     return detected_items
 
 
+def receipt_store_from_text(text: str, category_hint: str | None = None) -> str:
+    normalized = text.casefold()
+    stores = (
+        "migros",
+        "carrefoursa",
+        "a101",
+        "bim",
+        "şok",
+        "sok",
+        "file",
+        "metro",
+        "gratis",
+        "rossmann",
+        "watsons",
+        "vatan bilgisayar",
+        "mediamarkt",
+        "teknosa",
+    )
+    for store in stores:
+        if store in normalized:
+            return store.replace("şok", "sok").replace(" ", "")
+    return {
+        "cosmetics": "gratis",
+        "electronics": "vatanbilgisayar",
+    }.get(category_hint or "", "migros")
+
+
+def receipt_total(items: list[dict]) -> float:
+    return round(
+        sum(
+            float(item.get("price") or 0) * float(item.get("quantity") or 1)
+            for item in items
+        ),
+        2,
+    )
+
+
+def normalize_receipt_date(value: str) -> str:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Fiş tarihi geçersiz.")
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
+def receipt_summary(receipts: list[dict], month: str | None = None) -> dict:
+    now = datetime.now(timezone.utc)
+    selected_month = month or now.strftime("%Y-%m")
+    try:
+        month_start = datetime.strptime(selected_month, "%Y-%m").replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Ay YYYY-AA biçiminde olmalı.")
+
+    if month_start.month == 1:
+        previous_start = month_start.replace(
+            year=month_start.year - 1, month=12
+        )
+    else:
+        previous_start = month_start.replace(month=month_start.month - 1)
+
+    def receipt_month(receipt: dict) -> str:
+        return str(receipt.get("purchased_at") or "")[:7]
+
+    selected = [
+        receipt for receipt in receipts
+        if receipt_month(receipt) == selected_month
+    ]
+    previous_key = previous_start.strftime("%Y-%m")
+    previous = [
+        receipt for receipt in receipts
+        if receipt_month(receipt) == previous_key
+    ]
+
+    store_totals: dict[str, float] = {}
+    category_totals: dict[str, float] = {}
+    item_totals: dict[str, dict] = {}
+    for receipt in selected:
+        total = float(receipt.get("total") or 0)
+        store = str(receipt.get("store") or "Bilinmeyen")
+        store_totals[store] = round(store_totals.get(store, 0) + total, 2)
+        for item in receipt.get("items", []):
+            item_total = round(
+                float(item.get("price") or 0) *
+                float(item.get("quantity") or 1),
+                2,
+            )
+            category = str(item.get("category") or "other")
+            category_totals[category] = round(
+                category_totals.get(category, 0) + item_total,
+                2,
+            )
+            title = str(item.get("title") or "Ürün")
+            aggregate = item_totals.setdefault(
+                title.casefold(),
+                {"title": title, "total": 0.0, "quantity": 0.0},
+            )
+            aggregate["total"] = round(aggregate["total"] + item_total, 2)
+            aggregate["quantity"] += float(item.get("quantity") or 1)
+
+    total = round(sum(float(item.get("total") or 0) for item in selected), 2)
+    previous_total = round(
+        sum(float(item.get("total") or 0) for item in previous),
+        2,
+    )
+    change_percent = None
+    if previous_total > 0:
+        change_percent = round(((total - previous_total) / previous_total) * 100, 1)
+
+    monthly_totals: dict[str, float] = {}
+    for receipt in receipts:
+        key = receipt_month(receipt)
+        if len(key) == 7:
+            monthly_totals[key] = round(
+                monthly_totals.get(key, 0) +
+                float(receipt.get("total") or 0),
+                2,
+            )
+
+    return {
+        "month": selected_month,
+        "total": total,
+        "previous_total": previous_total,
+        "change_percent": change_percent,
+        "receipt_count": len(selected),
+        "store_totals": dict(
+            sorted(store_totals.items(), key=lambda item: item[1], reverse=True)
+        ),
+        "category_totals": category_totals,
+        "top_items": sorted(
+            item_totals.values(),
+            key=lambda item: item["total"],
+            reverse=True,
+        )[:8],
+        "monthly_totals": dict(sorted(monthly_totals.items())[-6:]),
+    }
+
+
 @app.post("/api/ocr/receipt")
 def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
     img = payload.image_base64 or ""
-    
-    # Check for unit test mock values
-    if img == "mock_data":
+    default_date = datetime.now(timezone.utc).date().isoformat()
+
+    demo_items = {
+        "grocery": [
+            {"title": "Yudum Ayçiçek Yağı 5 L", "price": 189.90},
+            {"title": "Sütaş Peynir 500 gr", "price": 89.50},
+            {"title": "Eriş Un 5 Kg", "price": 72.90},
+            {"title": "Doğuş Filiz Çay 1 Kg", "price": 145.00},
+        ],
+        "cosmetics": [
+            {"title": "İpana 3D White Diş Macunu 75 ml", "price": 45.90},
+            {"title": "Loreal Paris Nemlendirici Krem 50 ml", "price": 189.90},
+            {"title": "Elidor Şampuan 400 ml", "price": 79.90},
+        ],
+        "electronics": [
+            {"title": "Samsung T7 Portable SSD 1 TB", "price": 2899.00},
+            {"title": "Logitech G305 Mouse", "price": 1099.00},
+        ],
+    }
+    category_hint = payload.category_hint or "grocery"
+
+    if img == "mock_data" or img in {"grocery", "cosmetics", "electronics"}:
+        items = demo_items[category_hint if img == "mock_data" else img]
         return {
-            "store": "migros",
-            "detected_items": [
-                {"title": "Yudum Ayçiçek Yağı 5 L", "price": 189.90},
-                {"title": "Sütaş Peynir 500 gr", "price": 89.50},
-                {"title": "Eriş Un 5 Kg", "price": 72.90},
-                {"title": "Doğuş Filiz Çay 1 Kg", "price": 145.00}
-            ]
+            "store": receipt_store_from_text("", category_hint),
+            "purchased_at": default_date,
+            "total": receipt_total(items),
+            "detected_items": items,
         }
-    elif img == "cosmetics" or "cosmetics" in img:
+    if "cosmetics_receipt" in img or "electronics_receipt" in img:
+        category_hint = "cosmetics" if "cosmetics_receipt" in img else "electronics"
+        items = demo_items[category_hint]
         return {
-            "store": "gratis",
-            "detected_items": [
-                {"title": "İpana 3D White Diş Macunu 75 ml", "price": 45.90},
-                {"title": "Loreal Paris Nemlendirici Krem 50 ml", "price": 189.90},
-                {"title": "Elidor Şampuan 400 ml", "price": 79.90}
-            ]
+            "store": receipt_store_from_text("", category_hint),
+            "purchased_at": default_date,
+            "total": receipt_total(items),
+            "detected_items": items,
         }
-    elif img == "electronics" or "electronics" in img:
-        return {
-            "store": "vatanbilgisayar",
-            "detected_items": [
-                {"title": "Samsung T7 Portable SSD 1 TB", "price": 2899.00},
-                {"title": "Logitech G305 Mouse", "price": 1099.00}
-            ]
-        }
-        
+
     try:
-        if not img.startswith("data:image/"):
-            img_data = f"data:image/png;base64,{img}"
-        else:
-            img_data = img
-            
-        import requests
+        img_data = img if img.startswith("data:image/") else f"data:image/png;base64,{img}"
         response = requests.post(
             "https://api.ocr.space/parse/image",
-            headers={"apikey": "helloworld"},
+            headers={"apikey": os.getenv("OCR_SPACE_API_KEY", "helloworld")},
             data={
                 "base64Image": img_data,
                 "language": "tur",
@@ -1428,29 +1606,107 @@ def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
             timeout=15,
         )
         response.raise_for_status()
-        res_data = response.json()
-        
-        parsed_results = res_data.get("ParsedResults", [])
+        parsed_results = response.json().get("ParsedResults", [])
         if parsed_results:
             text = parsed_results[0].get("ParsedText", "")
             detected = parse_receipt_text(text)
             if detected:
                 return {
-                    "store": "migros",
-                    "detected_items": detected
+                    "store": receipt_store_from_text(text, category_hint),
+                    "purchased_at": default_date,
+                    "total": receipt_total(detected),
+                    "detected_items": detected,
                 }
-    except Exception as e:
-        print(f"OCR.space API error: {e}")
-        
+    except Exception as exc:
+        print(f"OCR.space API error: {exc}")
+
+    items = demo_items[category_hint]
     return {
-        "store": "migros",
-        "detected_items": [
-            {"title": "Yudum Ayçiçek Yağı 5 L", "price": 189.90},
-            {"title": "Sütaş Süzme Peynir 500 gr", "price": 89.50},
-            {"title": "Eriş Un 5 Kg", "price": 72.90},
-            {"title": "Doğuş Filiz Çay 1 Kg", "price": 145.00}
-        ]
+        "store": receipt_store_from_text("", category_hint),
+        "purchased_at": default_date,
+        "total": receipt_total(items),
+        "detected_items": items,
+        "warning": "OCR sonucu alınamadığı için örnek veriler gösteriliyor.",
     }
+
+
+@app.get("/api/receipts")
+def list_receipts(
+    request: Request,
+    month: str | None = None,
+    x_device_id: str | None = Header(default=None),
+) -> dict:
+    owner_id = request_owner_id(request, x_device_id)
+    db = load_db()
+    receipts = [
+        receipt for receipt in db.get("receipts", [])
+        if receipt.get("owner_id") == owner_id
+    ]
+    receipts.sort(
+        key=lambda receipt: receipt.get("purchased_at") or "",
+        reverse=True,
+    )
+    filtered = receipts
+    if month:
+        filtered = [
+            receipt for receipt in receipts
+            if str(receipt.get("purchased_at") or "").startswith(month)
+        ]
+    return {"receipts": filtered, "summary": receipt_summary(receipts, month)}
+
+
+@app.post("/api/receipts")
+def create_receipt(
+    payload: ReceiptCreateRequest,
+    request: Request,
+    x_device_id: str | None = Header(default=None),
+) -> dict:
+    owner_id = request_owner_id(request, x_device_id)
+    db = load_db()
+    items = [item.model_dump() for item in payload.items]
+    calculated_total = receipt_total(items)
+    total = (
+        round(float(payload.total), 2)
+        if payload.total is not None
+        else calculated_total
+    )
+    receipt = {
+        "id": str(uuid4()),
+        "owner_id": owner_id,
+        "store": payload.store.strip(),
+        "purchased_at": normalize_receipt_date(payload.purchased_at),
+        "payment_method": payload.payment_method,
+        "items": items,
+        "subtotal": calculated_total,
+        "total": total,
+        "note": payload.note,
+        "created_at": utc_now(),
+    }
+    db.setdefault("receipts", []).append(receipt)
+    save_db(db)
+    return receipt
+
+
+@app.delete("/api/receipts/{receipt_id}")
+def delete_receipt(
+    receipt_id: str,
+    request: Request,
+    x_device_id: str | None = Header(default=None),
+) -> dict:
+    owner_id = request_owner_id(request, x_device_id)
+    db = load_db()
+    before = len(db.get("receipts", []))
+    db["receipts"] = [
+        receipt for receipt in db.get("receipts", [])
+        if not (
+            receipt.get("id") == receipt_id
+            and receipt.get("owner_id") == owner_id
+        )
+    ]
+    if len(db["receipts"]) == before:
+        raise HTTPException(status_code=404, detail="Fiş bulunamadı.")
+    save_db(db)
+    return {"status": "deleted", "id": receipt_id}
 
 
 @app.post("/api/lists")

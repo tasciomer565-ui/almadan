@@ -1,4 +1,4 @@
-const CACHE_VERSION = "almadan-v5";
+const CACHE_VERSION = "almadan-v6";
 const APP_SHELL = [
   "/",
   "/index.html",

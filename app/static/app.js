@@ -16,6 +16,9 @@ const state = {
   userCoords: null,
   maxDistance: 99999,
   theme: localStorage.getItem("almadan_theme") || "light",
+  receipts: [],
+  receiptSummary: null,
+  pendingReceipt: null,
   charts: {},
 };
 
@@ -193,6 +196,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   loadSession();
   loadProducts();
+  loadReceipts();
   checkSharedListUrl();
 });
 
@@ -221,6 +225,9 @@ function bindEvents() {
   document.getElementById("runOcrScanBtn").addEventListener("click", runOcrScan);
   document.getElementById("barcodeImageInput").addEventListener("change", scanBarcodeImage);
   document.getElementById("receiptImageInput").addEventListener("change", previewReceiptFile);
+  document.getElementById("receiptMonthFilter")?.addEventListener("change", (event) => {
+    loadReceipts(event.target.value);
+  });
   document.getElementById("optModeSingle").addEventListener("click", () => switchOptimizerMode("single"));
   document.getElementById("optModeSplit").addEventListener("click", () => switchOptimizerMode("split"));
   document.getElementById("micButton").addEventListener("click", startVoiceSearch);
@@ -1198,6 +1205,161 @@ function renderSavingsCharts() {
       },
     },
   });
+}
+
+async function loadReceipts(month = "") {
+  const monthFilter = document.getElementById("receiptMonthFilter");
+  if (monthFilter && !monthFilter.value) {
+    monthFilter.value = new Date().toISOString().slice(0, 7);
+  }
+  const selectedMonth = month || monthFilter?.value || "";
+  try {
+    const result = await api(
+      `/api/receipts${selectedMonth ? `?month=${encodeURIComponent(selectedMonth)}` : ""}`,
+    );
+    state.receipts = result.receipts || [];
+    state.receiptSummary = result.summary || null;
+    renderReceiptAnalytics();
+  } catch (error) {
+    console.warn("Fiş geçmişi yüklenemedi:", error);
+  }
+}
+
+function renderReceiptAnalytics() {
+  const summary = state.receiptSummary || {};
+  const totalElement = document.getElementById("receiptMonthTotal");
+  if (!totalElement) return;
+
+  totalElement.textContent = currency.format(Number(summary.total || 0));
+  document.getElementById("receiptCountStat").textContent = summary.receipt_count || 0;
+
+  const change = document.getElementById("receiptMonthChange");
+  if (summary.change_percent === null || summary.change_percent === undefined) {
+    change.textContent = "Önceki ay verisi yok";
+  } else {
+    const direction = summary.change_percent > 0 ? "arttı" : "azaldı";
+    change.textContent = `Önceki aya göre %${Math.abs(summary.change_percent)} ${direction}`;
+  }
+
+  const stores = Object.entries(summary.store_totals || {});
+  document.getElementById("receiptTopStore").textContent = stores[0]?.[0] || "-";
+  document.getElementById("receiptTopStoreAmount").textContent = stores[0]
+    ? currency.format(stores[0][1])
+    : "Henüz veri yok";
+
+  renderReceiptHistory();
+  renderReceiptCharts();
+  lucide.createIcons();
+}
+
+function renderReceiptHistory() {
+  const container = document.getElementById("receiptHistoryList");
+  if (!container) return;
+  if (!state.receipts.length) {
+    container.innerHTML = `<p class="empty-text">Bu ay için kaydedilmiş fiş yok.</p>`;
+    return;
+  }
+  const paymentLabels = {
+    unknown: "Ödeme belirtilmedi",
+    card: "Kart",
+    cash: "Nakit",
+    meal_card: "Yemek kartı",
+    other: "Diğer",
+  };
+  container.innerHTML = state.receipts.map((receipt) => `
+    <article class="receipt-history-item">
+      <div>
+        <h4>${escapeHtml(receipt.store)}</h4>
+        <p>${formatReceiptDate(receipt.purchased_at)} · ${receipt.items?.length || 0} ürün ·
+          ${paymentLabels[receipt.payment_method] || "Ödeme belirtilmedi"}</p>
+      </div>
+      <strong class="receipt-history-total">${currency.format(receipt.total || 0)}</strong>
+      <button type="button" class="icon-button light" onclick="deleteReceipt('${receipt.id}')"
+        title="Fişi sil" aria-label="Fişi sil"><i data-lucide="trash-2"></i></button>
+    </article>
+  `).join("");
+}
+
+function formatReceiptDate(value) {
+  if (!value) return "Tarih yok";
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function renderReceiptCharts() {
+  if (typeof Chart === "undefined") return;
+  const summary = state.receiptSummary || {};
+  const monthlyCanvas = document.getElementById("receiptMonthlyChart");
+  const storeCanvas = document.getElementById("receiptStoreChart");
+  if (!monthlyCanvas || !storeCanvas) return;
+
+  const monthlyEntries = Object.entries(summary.monthly_totals || {});
+  const storeEntries = Object.entries(summary.store_totals || {}).slice(0, 7);
+  const chartText = state.theme === "dark" ? "#c8cec8" : "#687068";
+  const chartGrid = state.theme === "dark" ? "#2b3036" : "#e2e6df";
+
+  destroyChart("receiptMonthly");
+  destroyChart("receiptStores");
+
+  state.charts.receiptMonthly = new Chart(monthlyCanvas, {
+    type: "bar",
+    data: {
+      labels: monthlyEntries.length
+        ? monthlyEntries.map(([key]) => key)
+        : ["Henüz veri yok"],
+      datasets: [{
+        data: monthlyEntries.length ? monthlyEntries.map(([, value]) => value) : [0],
+        backgroundColor: "#287a50",
+        borderRadius: 6,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: chartText }, grid: { display: false } },
+        y: { ticks: { color: chartText }, grid: { color: chartGrid } },
+      },
+    },
+  });
+
+  state.charts.receiptStores = new Chart(storeCanvas, {
+    type: "doughnut",
+    data: {
+      labels: storeEntries.length ? storeEntries.map(([store]) => store) : ["Henüz veri yok"],
+      datasets: [{
+        data: storeEntries.length ? storeEntries.map(([, value]) => value) : [1],
+        backgroundColor: ["#287a50", "#3979a8", "#d39a32", "#c45243", "#8e5fa2", "#4d9b8f", "#7b846f"],
+        borderWidth: 0,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "64%",
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: { color: chartText, boxWidth: 10 },
+        },
+      },
+    },
+  });
+}
+
+async function deleteReceipt(receiptId) {
+  if (!window.confirm("Bu fişi harcama geçmişinden silmek istiyor musun?")) return;
+  try {
+    await api(`/api/receipts/${receiptId}`, { method: "DELETE" });
+    showToast("Fiş silindi.");
+    await loadReceipts(document.getElementById("receiptMonthFilter")?.value || "");
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
 function isUrl(string) {
@@ -2441,6 +2603,9 @@ function switchView(view) {
   if (view === "cart") {
     renderCart();
   }
+  if (view === "savings") {
+    loadReceipts(document.getElementById("receiptMonthFilter")?.value || "");
+  }
 
   window.scrollTo({ top: view === "discover" ? 0 : 180, behavior: "smooth" });
 }
@@ -2567,6 +2732,10 @@ window.addGenericCartItemWithCustomSize = addGenericCartItemWithCustomSize;
 window.addGenericCartItemWithoutSize = addGenericCartItemWithoutSize;
 window.updateUserLocation = updateUserLocation;
 window.updateMaxDistance = updateMaxDistance;
+window.removePendingReceiptItem = removePendingReceiptItem;
+window.cancelReceiptReview = cancelReceiptReview;
+window.savePendingReceipt = savePendingReceipt;
+window.deleteReceipt = deleteReceipt;
 
 
 /* PREMIUM KOYU TEMA */
@@ -2586,6 +2755,7 @@ function toggleTheme() {
   localStorage.setItem("almadan_theme", state.theme);
   applyTheme();
   renderSavingsCharts();
+  renderReceiptCharts();
 }
 
 
@@ -2778,45 +2948,182 @@ function previewReceiptFile(event) {
 async function runOcrScan() {
   const cat = document.getElementById("ocrReceiptCategorySelector").value || "grocery";
   const receiptFile = document.getElementById("receiptImageInput")?.files?.[0];
-  showToast("Fiş fotoğrafı işleniyor (OCR)...");
+  showToast("Fiş fotoğrafı işleniyor...");
   try {
+    const imageBase64 = receiptFile
+      ? await readFileAsDataUrl(receiptFile)
+      : cat;
     const res = await api("/api/ocr/receipt", {
       method: "POST",
       body: JSON.stringify({
-        image_base64: receiptFile ? `${cat}:${receiptFile.name}` : cat,
+        image_base64: imageBase64,
+        category_hint: cat,
       })
     });
-    
+
     if (res.detected_items && res.detected_items.length > 0) {
-      const summary = res.detected_items
-        .map(item => `${item.title} - ${currency.format(item.price)}`)
-        .join("\n");
-      const confirmed = window.confirm(
-        `${res.store.toUpperCase()} fişinde şu ürünler bulundu:\n\n${summary}\n\nListeye eklensin mi?`
-      );
-      if (!confirmed) {
-        showToast("Fiş ürünleri listeye eklenmedi.");
-        return;
-      }
-      res.detected_items.forEach((item, index) => {
-        state.cart.push({
-          id: "cart-" + Date.now() + "-" + index,
-          name: item.title,
-          checked: false,
-          receipt_price: item.price,
-          updated_at: new Date().toISOString(),
-        });
-      });
-      saveCartToLocalStorage();
-      renderCart();
-      showToast(`OCR Başarılı! ${res.detected_items.length} ürün listenize eklendi.`);
-      
-      if (state.sharedListId) {
-        syncSharedListWithServer();
-      }
-      const receiptInput = document.getElementById("receiptImageInput");
-      if (receiptInput) receiptInput.value = "";
+      state.pendingReceipt = {
+        store: res.store || "Bilinmeyen mağaza",
+        purchased_at: res.purchased_at || new Date().toISOString().slice(0, 10),
+        payment_method: "unknown",
+        total: res.total,
+        category: cat,
+        items: res.detected_items.map((item) => ({
+          title: item.title,
+          price: Number(item.price || 0),
+          quantity: Number(item.quantity || 1),
+          category: cat,
+        })),
+      };
+      renderReceiptReview();
+      showToast(`${res.detected_items.length} ürün bulundu. Kaydetmeden önce kontrol et.`);
     }
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function readFileAsDataUrl(file) {
+  if (!("createImageBitmap" in window)) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Fiş görseli okunamadı."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const bitmap = await createImageBitmap(file);
+  const maxSide = 1600;
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d");
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return canvas.toDataURL("image/jpeg", 0.82);
+}
+
+function renderReceiptReview() {
+  const panel = document.getElementById("receiptReviewPanel");
+  const receipt = state.pendingReceipt;
+  if (!panel || !receipt) return;
+  panel.classList.remove("hidden");
+  panel.innerHTML = `
+    <div class="receipt-review-meta">
+      <label>Mağaza
+        <input id="receiptReviewStore" value="${escapeHtml(receipt.store)}">
+      </label>
+      <label>Alışveriş tarihi
+        <input id="receiptReviewDate" type="date" value="${escapeHtml(receipt.purchased_at.slice(0, 10))}">
+      </label>
+      <label>Ödeme yöntemi
+        <select id="receiptReviewPayment">
+          <option value="unknown">Belirtilmedi</option>
+          <option value="card">Kart</option>
+          <option value="cash">Nakit</option>
+          <option value="meal_card">Yemek kartı</option>
+          <option value="other">Diğer</option>
+        </select>
+      </label>
+      <label>Fiş toplamı
+        <input id="receiptReviewTotal" type="number" min="0" step="0.01"
+          value="${Number(receipt.total || calculatePendingReceiptTotal()).toFixed(2)}">
+      </label>
+    </div>
+    <div class="receipt-review-items">
+      ${receipt.items.map((item, index) => `
+        <div class="receipt-review-row" data-receipt-item="${index}">
+          <input class="receipt-item-title" value="${escapeHtml(item.title)}" aria-label="Ürün adı">
+          <input class="receipt-item-price" type="number" min="0" step="0.01"
+            value="${Number(item.price).toFixed(2)}" aria-label="Fiyat">
+          <select class="receipt-item-category" aria-label="Kategori">
+            ${receiptCategoryOptions(item.category)}
+          </select>
+          <button type="button" class="icon-button light" onclick="removePendingReceiptItem(${index})"
+            title="Ürünü çıkar" aria-label="Ürünü çıkar"><i data-lucide="x"></i></button>
+        </div>
+      `).join("")}
+    </div>
+    <div class="receipt-review-actions">
+      <button type="button" class="secondary-button" onclick="cancelReceiptReview()">Vazgeç</button>
+      <button type="button" class="primary-button" onclick="savePendingReceipt()">
+        <i data-lucide="receipt-text"></i> Harcamaya kaydet
+      </button>
+    </div>
+  `;
+  lucide.createIcons();
+}
+
+function receiptCategoryOptions(selected) {
+  const labels = {
+    grocery: "Market",
+    cosmetics: "Kozmetik",
+    electronics: "Elektronik",
+    fashion: "Giyim",
+    supplement: "Takviye",
+    health: "Sağlık",
+    home: "Ev",
+    other: "Diğer",
+  };
+  return Object.entries(labels).map(([value, label]) => (
+    `<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`
+  )).join("");
+}
+
+function calculatePendingReceiptTotal() {
+  return (state.pendingReceipt?.items || []).reduce(
+    (total, item) => total + Number(item.price || 0) * Number(item.quantity || 1),
+    0,
+  );
+}
+
+function removePendingReceiptItem(index) {
+  if (!state.pendingReceipt) return;
+  state.pendingReceipt.items.splice(index, 1);
+  renderReceiptReview();
+}
+
+function cancelReceiptReview() {
+  state.pendingReceipt = null;
+  const panel = document.getElementById("receiptReviewPanel");
+  if (panel) {
+    panel.classList.add("hidden");
+    panel.innerHTML = "";
+  }
+}
+
+async function savePendingReceipt() {
+  if (!state.pendingReceipt) return;
+  const rows = [...document.querySelectorAll("[data-receipt-item]")];
+  const items = rows.map((row) => ({
+    title: row.querySelector(".receipt-item-title").value.trim(),
+    price: Number(row.querySelector(".receipt-item-price").value || 0),
+    quantity: 1,
+    category: row.querySelector(".receipt-item-category").value,
+  })).filter((item) => item.title && item.price >= 0);
+  if (!items.length) {
+    showToast("Kaydedilecek en az bir ürün olmalı.");
+    return;
+  }
+
+  try {
+    await api("/api/receipts", {
+      method: "POST",
+      body: JSON.stringify({
+        store: document.getElementById("receiptReviewStore").value.trim(),
+        purchased_at: document.getElementById("receiptReviewDate").value,
+        payment_method: document.getElementById("receiptReviewPayment").value,
+        total: Number(document.getElementById("receiptReviewTotal").value || 0),
+        items,
+      }),
+    });
+    cancelReceiptReview();
+    const receiptInput = document.getElementById("receiptImageInput");
+    if (receiptInput) receiptInput.value = "";
+    showToast("Fiş harcama geçmişine kaydedildi.");
+    await loadReceipts();
   } catch (error) {
     showToast(error.message);
   }
@@ -3150,7 +3457,23 @@ function getShippingFee(store, subtotal) {
 
 function renderBackendOptimization(result, mode) {
   const resultsDiv = document.getElementById("optimizerResults");
-  if (!resultsDiv || !result?.single_store || !result?.split_basket) return false;
+  if (!resultsDiv) return false;
+  if (result?.available === false) {
+    const missingNames = (result.missing_items || [])
+      .map((item) => escapeHtml(item.name))
+      .join(", ");
+    resultsDiv.innerHTML = `
+      <div class="optimizer-summary optimizer-unavailable">
+        <span class="optimizer-kicker">CANLI FİYAT GEREKLİ</span>
+        <h4>Fiyat karşılaştırılamadı</h4>
+        <p>${escapeHtml(result.message || "Doğrulanmış mağaza fiyatı bulunamadı.")}</p>
+        ${missingNames ? `<p><strong>Eksik:</strong> ${missingNames}</p>` : ""}
+        <p class="optimizer-source-note">Almadan tahmini veya uydurma market fiyatı göstermez.</p>
+      </div>
+    `;
+    return true;
+  }
+  if (!result?.single_store || !result?.split_basket) return false;
 
   const fallbackWarningHtml = result.distance_fallback_applied
     ? `<div style="font-size: 11px; color: var(--red); font-weight: 700; margin-bottom: 10px; background: rgba(196, 82, 67, 0.08); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(196, 82, 67, 0.2); display: flex; align-items: center; gap: 4px;">
@@ -3314,14 +3637,15 @@ async function renderCart() {
           max_distance: state.maxDistance < 99999 ? state.maxDistance : null,
         }),
       });
-      localStorage.setItem("almadan_last_optimizer_result", JSON.stringify(optimized));
       if (renderBackendOptimization(optimized, state.optimizerMode)) return;
     } catch (error) {
+      resultsDiv.innerHTML = `<p class="empty-text">Canlı fiyat servisine ulaşılamadı. Tahmini fiyat gösterilmedi.</p>`;
+      return;
       console.warn("Sunucu optimizasyonu kullanılamadı, yerel motora dönülüyor:", error.message);
     }
   } else {
-    const cached = JSON.parse(localStorage.getItem("almadan_last_optimizer_result") || "null");
-    if (cached && renderBackendOptimization(cached, state.optimizerMode)) return;
+    resultsDiv.innerHTML = `<p class="empty-text">Market fiyatlarını karşılaştırmak için internet bağlantısı gerekiyor.</p>`;
+    return;
   }
 
   if (state.optimizerMode === "single") {

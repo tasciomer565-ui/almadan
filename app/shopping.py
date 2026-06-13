@@ -150,23 +150,11 @@ def _base_price(name: str) -> float:
     return 55.0
 
 
-def simulated_market_prices(name: str) -> dict[str, float]:
-    """Return stable demo prices until licensed market feeds are connected."""
-    base = _base_price(name)
-    digest = hashlib.sha256(name.casefold().encode("utf-8")).digest()
-    prices: dict[str, float] = {}
-    for index, store in enumerate(MARKET_STORES):
-        variance = 0.84 + ((digest[index % len(digest)] % 32) / 100)
-        prices[store] = round(base * variance, 2)
-    return prices
-
-
 def normalize_offers(name: str, offers: dict[str, float] | None) -> dict[str, float]:
-    generated = simulated_market_prices(name)
     if not offers:
-        return generated
+        return {}
 
-    normalized = generated.copy()
+    normalized: dict[str, float] = {}
     for store, value in offers.items():
         store_key = store.casefold().strip()
         if store_key in MARKET_STORES and value is not None and float(value) > 0:
@@ -233,6 +221,7 @@ def optimize_market_basket(
     max_distance: float | None = None,
 ) -> dict[str, Any]:
     normalized_items: list[dict[str, Any]] = []
+    missing_items: list[dict[str, Any]] = []
 
     # Calculate store distances
     store_distances = {}
@@ -258,6 +247,14 @@ def optimize_market_basket(
             continue
         quantity = max(1, int(item.get("quantity") or 1))
         offers = normalize_offers(name, item.get("offers"))
+        if not offers:
+            missing_items.append(
+                {
+                    "id": item.get("id") or f"item-{index + 1}",
+                    "name": name,
+                }
+            )
+            continue
         normalized_items.append(
             {
                 "id": item.get("id") or f"item-{index + 1}",
@@ -267,9 +264,49 @@ def optimize_market_basket(
             }
         )
 
+    if missing_items:
+        return {
+            "available": False,
+            "price_source": "unavailable",
+            "message": (
+                "Bu ürünler için doğrulanmış canlı mağaza fiyatı bulunamadı. "
+                "Tahmini fiyat gösterilmedi."
+            ),
+            "missing_items": missing_items,
+            "items": normalized_items,
+            "single_store": None,
+            "split_basket": None,
+            "baseline_total": 0.0,
+            "store_distances": store_distances,
+            "distance_fallback_applied": False,
+        }
+
     if not normalized_items:
         return {
+            "available": False,
+            "price_source": "unavailable",
+            "message": "Karşılaştırılacak ürün bulunamadı.",
+            "missing_items": [],
             "items": [],
+            "single_store": None,
+            "split_basket": None,
+            "baseline_total": 0.0,
+            "store_distances": store_distances,
+            "distance_fallback_applied": distance_fallback_applied,
+        }
+
+    common_stores = set(normalized_items[0]["offers"])
+    for item in normalized_items[1:]:
+        common_stores.intersection_update(item["offers"])
+    allowed_stores = [store for store in allowed_stores if store in common_stores]
+
+    if not allowed_stores:
+        return {
+            "available": False,
+            "price_source": "provided_offers",
+            "message": "Sepetteki tüm ürünleri birlikte satan ortak bir mağaza bulunamadı.",
+            "missing_items": [],
+            "items": normalized_items,
             "single_store": None,
             "split_basket": None,
             "baseline_total": 0.0,
@@ -374,6 +411,10 @@ def optimize_market_basket(
 
     split_total = round(split_total, 2)
     return {
+        "available": True,
+        "price_source": "provided_offers",
+        "message": None,
+        "missing_items": [],
         "items": normalized_items,
         "single_store": {
             **best_single,
