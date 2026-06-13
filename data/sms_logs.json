@@ -1,0 +1,9 @@
+[
+  {
+    "owner_id": "user:test",
+    "phone": "05555555555",
+    "title": "Kozmetik Son Kullanma Uyarısı!",
+    "message": "Açtığın 'İpana Diş Macunu' kozmetik ürününün kullanım ömrü dolmak üzere! Güvenli kullanım için yenisiyle değiştirebilirsin.",
+    "sent_at": "2026-06-13T10:22:47.385648+00:00"
+  }
+]

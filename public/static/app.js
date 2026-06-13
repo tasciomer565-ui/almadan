@@ -1268,12 +1268,24 @@ function renderReceiptHistory() {
   };
   container.innerHTML = state.receipts.map((receipt) => `
     <article class="receipt-history-item">
-      <div>
-        <h4>${escapeHtml(receipt.store)}</h4>
-        <p>${formatReceiptDate(receipt.purchased_at)} · ${receipt.items?.length || 0} ürün ·
-          ${paymentLabels[receipt.payment_method] || "Ödeme belirtilmedi"}</p>
+      <div class="receipt-history-main">
+        <div class="receipt-history-heading">
+          <div>
+            <h4>${escapeHtml(receipt.store)}</h4>
+            <p>${formatReceiptDate(receipt.purchased_at)} · ${receipt.items?.length || 0} ürün ·
+              ${paymentLabels[receipt.payment_method] || "Ödeme belirtilmedi"}</p>
+          </div>
+          <strong class="receipt-history-total">${currency.format(receipt.total || 0)}</strong>
+        </div>
+        <div class="receipt-history-products">
+          ${(receipt.items || []).map((item) => `
+            <div class="receipt-history-product">
+              <span>${escapeHtml(item.title)}${Number(item.quantity || 1) > 1 ? ` × ${item.quantity}` : ""}</span>
+              <strong>${currency.format(Number(item.price || 0) * Number(item.quantity || 1))}</strong>
+            </div>
+          `).join("")}
+        </div>
       </div>
-      <strong class="receipt-history-total">${currency.format(receipt.total || 0)}</strong>
       <button type="button" class="icon-button light" onclick="deleteReceipt('${receipt.id}')"
         title="Fişi sil" aria-label="Fişi sil"><i data-lucide="trash-2"></i></button>
     </article>
@@ -2735,6 +2747,8 @@ window.updateMaxDistance = updateMaxDistance;
 window.removePendingReceiptItem = removePendingReceiptItem;
 window.cancelReceiptReview = cancelReceiptReview;
 window.savePendingReceipt = savePendingReceipt;
+window.scanAnotherReceipt = scanAnotherReceipt;
+window.goToReceiptHistory = goToReceiptHistory;
 window.deleteReceipt = deleteReceipt;
 
 
@@ -2938,21 +2952,42 @@ async function scanBarcodeImage(event) {
   }
 }
 
-function previewReceiptFile(event) {
+async function previewReceiptFile(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   const info = document.querySelector("#receiptOcrUploadArea .ocr-info");
-  if (info) info.textContent = `${file.name} seçildi. OCR taramasını başlatabilirsin.`;
+  if (info) info.textContent = `${file.name} seçildi. Fiş şimdi okunuyor.`;
+  await runOcrScan();
 }
 
 async function runOcrScan() {
   const cat = document.getElementById("ocrReceiptCategorySelector").value || "grocery";
   const receiptFile = document.getElementById("receiptImageInput")?.files?.[0];
-  showToast("Fiş fotoğrafı işleniyor...");
+  const button = document.getElementById("runOcrScanBtn");
+  const status = document.getElementById("receiptUploadStatus");
+  const panel = document.getElementById("receiptReviewPanel");
+  if (!receiptFile) {
+    if (status) {
+      status.className = "receipt-upload-status error";
+      status.textContent = "Önce bir fiş fotoğrafı seç.";
+    }
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+    button.innerHTML = `<span class="spinner"></span> Fiş okunuyor`;
+  }
+  if (status) {
+    status.className = "receipt-upload-status loading";
+    status.textContent = "Fiş yükleniyor; mağaza, ürünler ve toplam tutar tespit ediliyor...";
+  }
+  if (panel) {
+    panel.classList.add("hidden");
+    panel.innerHTML = "";
+  }
   try {
-    const imageBase64 = receiptFile
-      ? await readFileAsDataUrl(receiptFile)
-      : cat;
+    const imageBase64 = await readFileAsDataUrl(receiptFile);
     const res = await api("/api/ocr/receipt", {
       method: "POST",
       body: JSON.stringify({
@@ -2976,10 +3011,26 @@ async function runOcrScan() {
         })),
       };
       renderReceiptReview();
+      if (status) {
+        status.className = "receipt-upload-status success";
+        status.textContent = `${res.store || "Mağaza"} fişi okundu: ${res.detected_items.length} ürün, ${currency.format(res.total || calculatePendingReceiptTotal())}. Bilgileri kontrol edip kaydet.`;
+      }
+      panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       showToast(`${res.detected_items.length} ürün bulundu. Kaydetmeden önce kontrol et.`);
+    } else {
+      throw new Error("Fişte okunabilir ürün bulunamadı. Daha net ve tamamı görünen bir fotoğraf dene.");
     }
   } catch (error) {
+    if (status) {
+      status.className = "receipt-upload-status error";
+      status.textContent = `Fiş okunamadı: ${error.message}`;
+    }
     showToast(error.message);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Fişi yeniden tara";
+    }
   }
 }
 
@@ -3109,24 +3160,74 @@ async function savePendingReceipt() {
   }
 
   try {
+    const savedStore = document.getElementById("receiptReviewStore").value.trim();
+    const savedTotal = Number(document.getElementById("receiptReviewTotal").value || 0);
     await api("/api/receipts", {
       method: "POST",
       body: JSON.stringify({
-        store: document.getElementById("receiptReviewStore").value.trim(),
+        store: savedStore,
         purchased_at: document.getElementById("receiptReviewDate").value,
         payment_method: document.getElementById("receiptReviewPayment").value,
-        total: Number(document.getElementById("receiptReviewTotal").value || 0),
+        total: savedTotal,
         items,
       }),
     });
-    cancelReceiptReview();
+    state.pendingReceipt = null;
     const receiptInput = document.getElementById("receiptImageInput");
     if (receiptInput) receiptInput.value = "";
+    showReceiptSavedConfirmation(savedStore, savedTotal, items.length);
     showToast("Fiş harcama geçmişine kaydedildi.");
     await loadReceipts();
   } catch (error) {
     showToast(error.message);
   }
+}
+
+function showReceiptSavedConfirmation(store, total, itemCount) {
+  const panel = document.getElementById("receiptReviewPanel");
+  const status = document.getElementById("receiptUploadStatus");
+  if (status) status.classList.add("hidden");
+  if (!panel) return;
+  panel.classList.remove("hidden");
+  panel.innerHTML = `
+    <div class="receipt-saved-card">
+      <i data-lucide="circle-check-big"></i>
+      <div>
+        <strong>Fiş harcama geçmişine kaydedildi</strong>
+        <p>${escapeHtml(store)} · ${itemCount} ürün · ${currency.format(total)}</p>
+      </div>
+    </div>
+    <div class="receipt-review-actions">
+      <button type="button" class="secondary-button" onclick="scanAnotherReceipt()">Başka fiş tara</button>
+      <button type="button" class="primary-button" onclick="goToReceiptHistory()">
+        <i data-lucide="wallet-cards"></i> Harcamalarıma git
+      </button>
+    </div>
+  `;
+  lucide.createIcons();
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function scanAnotherReceipt() {
+  const panel = document.getElementById("receiptReviewPanel");
+  const status = document.getElementById("receiptUploadStatus");
+  const info = document.querySelector("#receiptOcrUploadArea .ocr-info");
+  if (panel) {
+    panel.classList.add("hidden");
+    panel.innerHTML = "";
+  }
+  if (status) status.classList.add("hidden");
+  if (info) info.textContent = "Fiş fotoğrafını seç. Ürünleri kontrol edip harcama geçmişine kaydet.";
+  document.getElementById("receiptImageInput")?.click();
+}
+
+async function goToReceiptHistory() {
+  switchView("savings");
+  await loadReceipts(document.getElementById("receiptMonthFilter")?.value || "");
+  document.querySelector(".receipt-analytics-section")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
 }
 
 
@@ -3638,10 +3739,11 @@ async function renderCart() {
         }),
       });
       if (renderBackendOptimization(optimized, state.optimizerMode)) return;
+      resultsDiv.innerHTML = `<p class="empty-text">Doğrulanmış mağaza fiyatı bulunamadı. Tahmini fiyat gösterilmedi.</p>`;
+      return;
     } catch (error) {
       resultsDiv.innerHTML = `<p class="empty-text">Canlı fiyat servisine ulaşılamadı. Tahmini fiyat gösterilmedi.</p>`;
       return;
-      console.warn("Sunucu optimizasyonu kullanılamadı, yerel motora dönülüyor:", error.message);
     }
   } else {
     resultsDiv.innerHTML = `<p class="empty-text">Market fiyatlarını karşılaştırmak için internet bağlantısı gerekiyor.</p>`;

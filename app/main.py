@@ -1383,10 +1383,22 @@ def api_barcode_lookup(code: str) -> dict:
 def parse_receipt_text(text: str) -> list[dict]:
     import re
     detected_items = []
+    ignored_labels = (
+        "toplam",
+        "ara toplam",
+        "kdv",
+        "nakit",
+        "para üstü",
+        "kredi kart",
+        "ödenecek",
+        "tutar",
+    )
     lines = text.split("\n")
     for line in lines:
         line = line.strip()
         if not line:
+            continue
+        if any(label in line.casefold() for label in ignored_labels):
             continue
         matches = list(re.finditer(r"\b\d+([.,]\d{2})?\b", line))
         if not matches:
@@ -1431,10 +1443,7 @@ def receipt_store_from_text(text: str, category_hint: str | None = None) -> str:
     for store in stores:
         if store in normalized:
             return store.replace("şok", "sok").replace(" ", "")
-    return {
-        "cosmetics": "gratis",
-        "electronics": "vatanbilgisayar",
-    }.get(category_hint or "", "migros")
+    return "Bilinmeyen mağaza"
 
 
 def receipt_total(items: list[dict]) -> float:
@@ -1577,8 +1586,13 @@ def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
 
     if img == "mock_data" or img in {"grocery", "cosmetics", "electronics"}:
         items = demo_items[category_hint if img == "mock_data" else img]
+        demo_store = {
+            "grocery": "migros",
+            "cosmetics": "gratis",
+            "electronics": "vatanbilgisayar",
+        }[category_hint if img == "mock_data" else img]
         return {
-            "store": receipt_store_from_text("", category_hint),
+            "store": demo_store,
             "purchased_at": default_date,
             "total": receipt_total(items),
             "detected_items": items,
@@ -1587,7 +1601,7 @@ def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
         category_hint = "cosmetics" if "cosmetics_receipt" in img else "electronics"
         items = demo_items[category_hint]
         return {
-            "store": receipt_store_from_text("", category_hint),
+            "store": "gratis" if category_hint == "cosmetics" else "vatanbilgisayar",
             "purchased_at": default_date,
             "total": receipt_total(items),
             "detected_items": items,
@@ -1620,14 +1634,13 @@ def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
     except Exception as exc:
         print(f"OCR.space API error: {exc}")
 
-    items = demo_items[category_hint]
-    return {
-        "store": receipt_store_from_text("", category_hint),
-        "purchased_at": default_date,
-        "total": receipt_total(items),
-        "detected_items": items,
-        "warning": "OCR sonucu alınamadığı için örnek veriler gösteriliyor.",
-    }
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            "Fişten güvenilir ürün bilgisi okunamadı. "
+            "Fişin tamamının göründüğü, net ve aydınlık bir fotoğraf yükle."
+        ),
+    )
 
 
 @app.get("/api/receipts")

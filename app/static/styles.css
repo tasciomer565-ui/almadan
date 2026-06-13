@@ -2173,13 +2173,24 @@ body.dark-theme .opt-savings-tag {
 
 .receipt-history-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
-  align-items: center;
+  align-items: start;
   padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--bg-card);
+}
+
+.receipt-history-main {
+  min-width: 0;
+}
+
+.receipt-history-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
 }
 
 .receipt-history-item h4,
@@ -2196,6 +2207,88 @@ body.dark-theme .opt-savings-tag {
 .receipt-history-total {
   font-family: "Manrope", sans-serif;
   font-weight: 800;
+  white-space: nowrap;
+}
+
+.receipt-history-products {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.receipt-history-product {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.receipt-history-product span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.receipt-history-product strong {
+  white-space: nowrap;
+}
+
+.receipt-upload-status {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.receipt-upload-status.loading {
+  border-color: rgba(57, 121, 168, 0.35);
+  background: rgba(57, 121, 168, 0.08);
+  color: var(--ink);
+}
+
+.receipt-upload-status.success {
+  border-color: rgba(40, 122, 80, 0.35);
+  background: rgba(40, 122, 80, 0.08);
+  color: var(--green-dark);
+}
+
+.receipt-upload-status.error {
+  border-color: rgba(196, 82, 67, 0.35);
+  background: rgba(196, 82, 67, 0.08);
+  color: var(--red);
+}
+
+.receipt-saved-card {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(40, 122, 80, 0.3);
+  border-radius: 8px;
+  background: rgba(40, 122, 80, 0.08);
+}
+
+.receipt-saved-card > svg {
+  width: 28px;
+  height: 28px;
+  color: var(--green);
+  flex: 0 0 auto;
+}
+
+.receipt-saved-card strong,
+.receipt-saved-card p {
+  display: block;
+  margin: 0;
+}
+
+.receipt-saved-card p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .receipt-review-panel {
@@ -2251,6 +2344,14 @@ body.dark-theme .opt-savings-tag {
 
   .receipt-history-item {
     grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .receipt-history-heading {
+    gap: 8px;
+  }
+
+  .receipt-history-product {
+    font-size: 12px;
   }
 
   .receipt-history-item .icon-button {

@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 from uuid import uuid4
+from fastapi import HTTPException
 
 from app.comparator import extract_volume_info, lookup_barcode
 from app.main import (
@@ -14,6 +15,8 @@ from app.main import (
     SharedListPayload,
     SharedListItem,
     ReceiptOcrRequest,
+    parse_receipt_text,
+    receipt_store_from_text,
 )
 
 class CartOptimizationTests(unittest.TestCase):
@@ -136,6 +139,25 @@ class CartOptimizationTests(unittest.TestCase):
         response_elec = ocr_receipt(ReceiptOcrRequest(image_base64="data:image/png;base64,electronics_receipt"))
         self.assertEqual(response_elec["store"], "vatanbilgisayar")
         self.assertTrue(any("SSD" in x["title"] for x in response_elec["detected_items"]))
+
+    @patch("app.main.requests.post")
+    def test_real_ocr_failure_does_not_return_fake_products(self, post_mock) -> None:
+        post_mock.side_effect = RuntimeError("ocr unavailable")
+        with self.assertRaises(HTTPException) as raised:
+            ocr_receipt(
+                ReceiptOcrRequest(
+                    image_base64="data:image/jpeg;base64,real-photo",
+                    category_hint="grocery",
+                )
+            )
+        self.assertEqual(raised.exception.status_code, 422)
+
+    def test_receipt_parser_ignores_totals_and_detects_store(self) -> None:
+        items = parse_receipt_text(
+            "A101\nDOMATES 24,90\nSUT 1L 39,50\nTOPLAM 64,40\nKDV 5,85"
+        )
+        self.assertEqual([item["title"] for item in items], ["DOMATES", "SUT 1L"])
+        self.assertEqual(receipt_store_from_text("A101 MARKET"), "a101")
 
     @patch("app.tracker.load_db")
     @patch("app.tracker.save_db")
