@@ -223,8 +223,40 @@ function bindEvents() {
   document.getElementById("receiptImageInput").addEventListener("change", previewReceiptFile);
   document.getElementById("optModeSingle").addEventListener("click", () => switchOptimizerMode("single"));
   document.getElementById("optModeSplit").addEventListener("click", () => switchOptimizerMode("split"));
-  document.getElementById("couponForm")?.addEventListener("submit", createCoupon);
   document.getElementById("micButton").addEventListener("click", startVoiceSearch);
+
+  // AI Try-On buttons init
+  const btnModelMale = document.getElementById("btnModelMale");
+  const btnModelFemale = document.getElementById("btnModelFemale");
+  const btnTshirtBlue = document.getElementById("btnTshirtBlue");
+  const btnTshirtRed = document.getElementById("btnTshirtRed");
+  const btnStartTryOn = document.getElementById("btnStartTryOn");
+
+  if (btnModelMale) btnModelMale.addEventListener("click", () => {
+    window.selectedTryOnModel = "male";
+    btnModelMale.classList.add("active");
+    btnModelFemale.classList.remove("active");
+    window.drawTryOnScene();
+  });
+  if (btnModelFemale) btnModelFemale.addEventListener("click", () => {
+    window.selectedTryOnModel = "female";
+    btnModelFemale.classList.add("active");
+    btnModelMale.classList.remove("active");
+    window.drawTryOnScene();
+  });
+  if (btnTshirtBlue) btnTshirtBlue.addEventListener("click", () => {
+    window.selectedTryOnGarment = "blue";
+    btnTshirtBlue.classList.add("active");
+    btnTshirtRed.classList.remove("active");
+    window.drawTryOnScene();
+  });
+  if (btnTshirtRed) btnTshirtRed.addEventListener("click", () => {
+    window.selectedTryOnGarment = "red";
+    btnTshirtRed.classList.add("active");
+    btnTshirtBlue.classList.remove("active");
+    window.drawTryOnScene();
+  });
+  if (btnStartTryOn) btnStartTryOn.addEventListener("click", window.runFashionTryOnAnimation);
   window.addEventListener("online", () => {
     updateNetworkStatus();
     flushPendingSharedSync();
@@ -1181,6 +1213,51 @@ function showSearchResults(response) {
     `;
   }
 
+  const queryCategory = getItemCategory(originalQuery);
+  const isFashion = queryCategory === "fashion" || products.some(p => getItemCategory(p.title) === "fashion");
+  const isElectronics = queryCategory === "electronics" || products.some(p => getItemCategory(p.title) === "electronics");
+
+  let categoryHeaderHtml = "";
+  if (isFashion) {
+    const isShoe = ["ayakkabi", "ayakkabı", "bot", "çizme", "cizme", "terlik", "sneaker"].some(kw => originalQuery.toLowerCase().includes(kw)) ||
+                   products.some(p => ["ayakkabi", "ayakkabı", "bot", "çizme", "cizme", "terlik", "sneaker"].some(kw => p.title.toLowerCase().includes(kw)));
+    
+    categoryHeaderHtml = `
+      <div class="fashion-size-selector-container" style="margin-bottom: 16px; background: var(--bg-card); border: 1px solid var(--line); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="scissors" style="color: var(--green); width: 16px; height: 16px;"></i>
+          <span style="font-size: 13px; font-weight: 700; color: var(--ink);">Beden / Numara Seçimi:</span>
+        </div>
+        <select id="fashionSizeSelect" class="form-input" style="width: auto; padding: 4px 10px; font-size: 12px; height: auto;" onchange="window.updateFashionPrices(this.value)">
+          ${isShoe ? `
+            <option value="39">39 (Standart)</option>
+            <option value="40">40 (+15 TL)</option>
+            <option value="41">41 (+25 TL)</option>
+            <option value="42">42 (+35 TL)</option>
+          ` : `
+            <option value="S">S (Standart)</option>
+            <option value="M">M (%5 Ekstra)</option>
+            <option value="L">L (%10 Ekstra)</option>
+            <option value="XL">XL (%15 Ekstra)</option>
+          `}
+        </select>
+      </div>
+    `;
+  } else if (isElectronics) {
+    categoryHeaderHtml = `
+      <div class="electronics-warranty-filter-container" style="margin-bottom: 16px; background: var(--bg-card); border: 1px solid var(--line); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="shield-check" style="color: var(--green); width: 16px; height: 16px;"></i>
+          <span style="font-size: 13px; font-weight: 700; color: var(--ink);">Garanti Türü Filtresi:</span>
+        </div>
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 700; color: var(--ink);">
+          <input type="checkbox" id="warrantyFilterCheckbox" style="accent-color: var(--green); width: 16px; height: 16px; cursor: pointer;" onchange="window.updateWarrantyFilter(this.checked)">
+          Sadece Resmi Distribütör
+        </label>
+      </div>
+    `;
+  }
+
   content.innerHTML = `
     <style>
       .search-result-card {
@@ -1197,6 +1274,7 @@ function showSearchResults(response) {
       <h2 style="margin-bottom: 16px;">En Mantıklı Seçenekler</h2>
       ${sizeChipsHtml}
       ${fallbackNoticeHtml}
+      ${categoryHeaderHtml}
       <div style="display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto; padding-right: 4px; margin-bottom: 24px;">
         ${products.map((item, index) => {
           const badgesHtml = item.labels.map(lbl => {
@@ -1212,13 +1290,13 @@ function showSearchResults(response) {
           }).join(" ");
 
           const originalPriceHtml = item.original_price && item.original_price > item.price
-            ? `<span style="text-decoration: line-through; color: var(--muted); font-size: 11px; margin-right: 6px;">${currency.format(item.original_price)}</span>`
-            : "";
+            ? `<span style="text-decoration: line-through; color: var(--muted); font-size: 11px; margin-right: 6px;" class="price-display-original">${currency.format(item.original_price)}</span>`
+            : `<span style="text-decoration: line-through; color: var(--muted); font-size: 11px; margin-right: 6px; display: none;" class="price-display-original"></span>`;
 
           const isOutOfStock = item.extra_info?.out_of_stock;
           const priceDisplayHtml = isOutOfStock
             ? `<strong style="font-size: 14px; color: var(--muted); font-style: italic;">Stokta Yok</strong>`
-            : `<strong style="font-size: 14px; color: var(--ink);">${currency.format(item.price)}</strong>`;
+            : `<strong style="font-size: 14px; color: var(--ink);" class="price-display-strong">${currency.format(item.price)}</strong>`;
 
           const buttonHtml = isOutOfStock
             ? `<button class="primary-button" style="padding: 6px 12px; font-size: 11px; height: auto; width: auto; background-color: #687068; border-color: #687068;" onclick="trackSearchResultProduct(this, ${index})">
@@ -1239,8 +1317,21 @@ function showSearchResults(response) {
                </div>`
             : "";
 
+          let warrantyBadgeHtml = "";
+          let isImporter = false;
+          if (isElectronics) {
+            isImporter = index % 2 === 1;
+            const warrantyText = isImporter ? "İthalatçı Garantili" : "Resmi Distribütör";
+            const badgeColor = isImporter ? "rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245,158,11,0.2)" : "rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2)";
+            warrantyBadgeHtml = `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: ${badgeColor}; display: inline-block; margin-top: 4px;">${warrantyText}</span>`;
+          }
+
           return `
-            <div class="search-result-card" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: white; transition: all 0.2s;">
+            <div class="search-result-card" 
+                 data-base-price="${item.price}" 
+                 data-base-original-price="${item.original_price || 0}" 
+                 data-is-importer="${isImporter}"
+                 style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: white; transition: all 0.2s;">
               <div style="width: 50px; height: 50px; flex-shrink: 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; justify-content: center;">
                 ${item.image_url 
                   ? `<img src="${escapeHtml(proxiedImageUrl(item.image_url))}" alt="${escapeHtml(item.title)}" style="width: 100%; height: 100%; object-fit: contain;" onerror="imageFallback(this, '${getStoreIcon(item.source, item.title)}')">`
@@ -1252,6 +1343,7 @@ function showSearchResults(response) {
                 <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                   ${badgesHtml}
                 </div>
+                ${warrantyBadgeHtml}
                 ${suspiciousWarningHtml}
                 ${unitPriceHtml}
               </div>
@@ -1303,16 +1395,45 @@ async function trackSearchResultProduct(button, index) {
   button.disabled = true;
   button.innerHTML = `<span class="spinner"></span> Ekleniyor`;
 
+  let title = item.title;
+  let price = item.price;
+  let originalPrice = item.original_price;
+
+  const sizeSelect = document.getElementById("fashionSizeSelect");
+  if (sizeSelect && sizeSelect.value) {
+    const val = sizeSelect.value;
+    title = `${item.title} (${val})`;
+    if (val === "M") {
+      price = item.price * 1.05;
+      originalPrice = originalPrice ? originalPrice * 1.05 : null;
+    } else if (val === "L") {
+      price = item.price * 1.10;
+      originalPrice = originalPrice ? originalPrice * 1.10 : null;
+    } else if (val === "XL") {
+      price = item.price * 1.15;
+      originalPrice = originalPrice ? originalPrice * 1.15 : null;
+    } else if (val === "40") {
+      price = item.price + 15;
+      originalPrice = originalPrice ? originalPrice + 15 : null;
+    } else if (val === "41") {
+      price = item.price + 25;
+      originalPrice = originalPrice ? originalPrice + 25 : null;
+    } else if (val === "42") {
+      price = item.price + 35;
+      originalPrice = originalPrice ? originalPrice + 35 : null;
+    }
+  }
+
   try {
     await api("/products", {
       method: "POST",
       body: JSON.stringify({
-        title: item.title,
+        title: title,
         url: item.url,
-        price: item.price,
+        price: price,
         source: item.source,
         image_url: item.image_url,
-        original_price: item.original_price,
+        original_price: originalPrice,
         extra_info: item.extra_info || {}
       }),
     });
@@ -1821,6 +1942,27 @@ function openProduct(id) {
           <input id="newPriceInput" type="text" inputmode="decimal" placeholder="Örn. 1749,90">
         </label>
         <button class="secondary-button" onclick="updateProductPrice('${product.id}')">Fiyatı güncelle</button>
+      </div>
+
+      <!-- Tüketim & Bitme Takibi -->
+      <div class="manual-fields" style="margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px;">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 10px;">
+          <input type="checkbox" id="enableRestockTracking" style="accent-color: var(--green); width: 16px; height: 16px;" ${extraInfo.restock_period_days ? "checked" : ""} onchange="document.getElementById('restockFields').style.display = this.checked ? 'block' : 'none'">
+          Tüketim & Bitme Takibi Aktif
+        </label>
+        <div id="restockFields" style="display: ${extraInfo.restock_period_days ? "block" : "none"}; margin-bottom: 10px;">
+          <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <label class="manual-field" style="flex: 1; margin: 0;">
+              <span style="font-size: 11px;">Tüketim Süresi (Gün)</span>
+              <input id="restockPeriodInput" type="number" min="1" value="${extraInfo.restock_period_days || 30}" style="padding: 6px 10px; font-size: 12px;">
+            </label>
+            <label class="manual-field" style="flex: 1; margin: 0;">
+              <span style="font-size: 11px;">Son Satın Alım</span>
+              <input id="restockLastPurchasedInput" type="date" value="${extraInfo.last_purchased_date || new Date().toISOString().split('T')[0]}" style="padding: 6px 10px; font-size: 12px;">
+            </label>
+          </div>
+        </div>
+        <button class="secondary-button" style="width: 100%; font-size: 12px; height: 34px;" onclick="window.saveRestockTracking('${product.id}')">Takip Ayarlarını Kaydet</button>
       </div>
       <div class="dialog-actions">
         <button class="danger-button" type="button" onclick="removeTrackedProduct('${product.id}')">
@@ -2690,45 +2832,182 @@ function getPricesForOptimizerItem(name) {
   return prices;
 }
 
-const OFFLINE_COUPONS = [];
+window.selectedTryOnModel = "male";
+window.selectedTryOnGarment = "blue";
 
-let couponsCached = null;
+window.drawGarmentTransparent = function(ctx, img, x, y, w, h) {
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = w;
+  tempCanvas.height = h;
+  const tempCtx = tempCanvas.getContext("2d");
+  tempCtx.drawImage(img, 0, 0, w, h);
+  
+  const imgData = tempCtx.getImageData(0, 0, w, h);
+  const data = imgData.data;
+  
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i+1];
+    const b = data[i+2];
+    if (r > 240 && g > 240 && b > 240) {
+      data[i+3] = 0;
+    }
+  }
+  
+  tempCtx.putImageData(imgData, 0, 0);
+  ctx.drawImage(tempCanvas, x, y);
+};
 
-async function createCoupon(event) {
-  event.preventDefault();
-  const payload = {
-    store: document.getElementById("couponStore").value,
-    code: document.getElementById("couponCode").value.trim(),
-    min_amount: Number(document.getElementById("couponMinAmount").value || 0),
-    discount: Number(document.getElementById("couponDiscount").value || 0),
-    description: "",
-    active: true,
+window.drawTryOnScene = function() {
+  const canvas = document.getElementById("tryOnCanvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  
+  ctx.clearRect(0, 0, 300, 300);
+  ctx.fillStyle = "#eaeaea";
+  ctx.fillRect(0, 0, 300, 300);
+  
+  const modelImg = new Image();
+  modelImg.src = window.selectedTryOnModel === "male" ? "/static/fashion_male_model.png" : "/static/fashion_female_model.png";
+  
+  modelImg.onload = () => {
+    ctx.drawImage(modelImg, 0, 0, 300, 300);
+    
+    const garmentImg = new Image();
+    garmentImg.src = window.selectedTryOnGarment === "blue" ? "/static/fashion_tshirt_blue.png" : "/static/fashion_tshirt_red.png";
+    
+    garmentImg.onload = () => {
+      window.drawGarmentTransparent(ctx, garmentImg, 75, 120, 150, 150);
+    };
   };
-  if (!payload.code || payload.discount <= 0) return;
-  try {
-    await api("/api/coupons", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    couponsCached = null;
-    event.target.reset();
-    showToast("Kupon kaydedildi.");
-    renderCart();
-  } catch (error) {
-    showToast(`Kupon kaydedilemedi: ${error.message}`);
+};
+
+window.runFashionTryOnAnimation = function() {
+  const laserEl = document.getElementById("fashionScanLaser");
+  if (!laserEl) return;
+  
+  laserEl.classList.remove("hidden");
+  showToast("Yapay zeka prova işlemi başlatıldı...");
+  
+  setTimeout(() => {
+    laserEl.classList.add("hidden");
+    showToast("Prova tamamlandı! Manken kıyafeti başarıyla giydi.");
+    window.drawTryOnScene();
+  }, 2500);
+};
+
+window.saveRestockTracking = async function(productId) {
+  const enabled = document.getElementById("enableRestockTracking").checked;
+  const extra_info = {};
+  
+  if (enabled) {
+    const period = parseInt(document.getElementById("restockPeriodInput").value || 30, 10);
+    const lastPurchased = document.getElementById("restockLastPurchasedInput").value || new Date().toISOString().split('T')[0];
+    extra_info.restock_period_days = period;
+    extra_info.last_purchased_date = lastPurchased;
+  } else {
+    extra_info.restock_period_days = null;
+    extra_info.last_purchased_date = null;
   }
+  
+  try {
+    const updated = await api(`/products/${productId}/extra-info`, {
+      method: "POST",
+      body: JSON.stringify({ extra_info }),
+    });
+    
+    state.products = state.products.map((product) => (
+      product.id === productId ? updated : product
+    ));
+    renderAll();
+    showToast("Tüketim takip ayarları kaydedildi.");
+    openProduct(productId);
+  } catch (error) {
+    showToast(error.message);
+  }
+};
+
+window.updateFashionPrices = function(val) {
+  const cards = document.querySelectorAll(".search-result-card");
+  cards.forEach(card => {
+    const basePrice = parseFloat(card.getAttribute("data-base-price") || 0);
+    const baseOriginalPrice = parseFloat(card.getAttribute("data-base-original-price") || 0);
+    
+    let newPrice = basePrice;
+    let newOriginalPrice = baseOriginalPrice;
+    
+    if (val === "M") {
+      newPrice = basePrice * 1.05;
+      newOriginalPrice = baseOriginalPrice ? baseOriginalPrice * 1.05 : 0;
+    } else if (val === "L") {
+      newPrice = basePrice * 1.10;
+      newOriginalPrice = baseOriginalPrice ? baseOriginalPrice * 1.10 : 0;
+    } else if (val === "XL") {
+      newPrice = basePrice * 1.15;
+      newOriginalPrice = baseOriginalPrice ? baseOriginalPrice * 1.15 : 0;
+    } else if (val === "40") {
+      newPrice = basePrice + 15;
+      newOriginalPrice = baseOriginalPrice ? baseOriginalPrice + 15 : 0;
+    } else if (val === "41") {
+      newPrice = basePrice + 25;
+      newOriginalPrice = baseOriginalPrice ? baseOriginalPrice + 25 : 0;
+    } else if (val === "42") {
+      newPrice = basePrice + 35;
+      newOriginalPrice = baseOriginalPrice ? baseOriginalPrice + 35 : 0;
+    }
+    
+    const priceStrong = card.querySelector(".price-display-strong");
+    if (priceStrong) {
+      priceStrong.innerText = currency.format(newPrice);
+    }
+    const origSpan = card.querySelector(".price-display-original");
+    if (origSpan) {
+      if (newOriginalPrice > newPrice) {
+        origSpan.innerText = currency.format(newOriginalPrice);
+        origSpan.style.display = "";
+      } else {
+        origSpan.style.display = "none";
+      }
+    }
+  });
+};
+
+window.updateWarrantyFilter = function(checked) {
+  const cards = document.querySelectorAll(".search-result-card");
+  cards.forEach(card => {
+    const isImporter = card.getAttribute("data-is-importer") === "true";
+    if (checked && isImporter) {
+      card.style.display = "none";
+    } else {
+      card.style.display = "flex";
+    }
+  });
+};
+
+
+const SHIPPING_RULES = {
+  trendyol: [300, 40],
+  hepsiburada: [300, 40],
+  amazon: [0, 0],
+  n11: [200, 35],
+  supplementler: [250, 30],
+  proteinocean: [250, 30],
+  migros: [750, 50],
+  "5mmigros": [750, 50],
+  migrosjet: [750, 50],
+  carrefoursa: [500, 45],
+  carrefoursagurme: [500, 45]
+};
+
+function getShippingFee(store, subtotal) {
+  if (subtotal <= 0) return 0;
+  const rule = SHIPPING_RULES[store];
+  if (!rule) return 0;
+  const [limit, fee] = rule;
+  if (subtotal < limit) return fee;
+  return 0;
 }
 
-async function deleteCoupon(couponId) {
-  try {
-    await api(`/api/coupons/${couponId}`, { method: "DELETE" });
-    couponsCached = null;
-    showToast("Kupon silindi.");
-    renderCart();
-  } catch (error) {
-    showToast(`Kupon silinemedi: ${error.message}`);
-  }
-}
 
 function renderBackendOptimization(result, mode) {
   const resultsDiv = document.getElementById("optimizerResults");
@@ -2754,7 +3033,7 @@ function renderBackendOptimization(result, mode) {
         <h4>${currency.format(option.total)}</h4>
         <p><strong>${escapeHtml(option.store.toUpperCase())}</strong>${distanceText} ile
           ${currency.format(option.savings)} tasarruf.</p>
-        ${option.coupon ? `<p class="coupon-applied">${escapeHtml(option.coupon.code)} kuponu: -${currency.format(option.coupon.discount)}</p>` : ""}
+        ${option.shipping_fee > 0 ? `<p style="font-size:11px; color:var(--red); font-weight:600; margin-top:4px;">Kargo Ücreti: ${currency.format(option.shipping_fee)}</p>` : `<p style="font-size:11px; color:var(--green); font-weight:600; margin-top:4px;">Kargo Bedava!</p>`}
       </div>
       <div class="opt-store-card">
         ${option.items.map(item => `
@@ -2789,7 +3068,7 @@ function renderBackendOptimization(result, mode) {
               <span class="opt-store-name">${escapeHtml(group.store.toUpperCase())}${distanceText}</span>
               <span class="opt-store-total">${currency.format(group.total)}</span>
             </div>
-            ${group.coupon ? `<p class="coupon-applied">${escapeHtml(group.coupon.code)}: -${currency.format(group.coupon.discount)}</p>` : ""}
+            ${group.shipping_fee > 0 ? `<p style="font-size:11px; color:var(--red); font-weight:600; margin-top:4px;">Kargo Ücreti: ${currency.format(group.shipping_fee)}</p>` : `<p style="font-size:11px; color:var(--green); font-weight:600; margin-top:4px;">Kargo Bedava!</p>`}
             ${group.items.map(item => `
               <div class="opt-item-row">
                 <span>
@@ -2863,33 +3142,6 @@ async function renderCart() {
     lucide.createIcons();
   }
 
-  // 2. Render coupons
-  const couponsDiv = document.getElementById("cartCouponsList");
-  if (couponsDiv) {
-    if (!couponsCached) {
-      try {
-        couponsCached = await api("/api/coupons");
-      } catch {
-        couponsCached = OFFLINE_COUPONS;
-      }
-    }
-    if (couponsCached.length === 0) {
-      couponsDiv.innerHTML = `<p class="empty-text">Aktif kupon yok.</p>`;
-    } else {
-      couponsDiv.innerHTML = couponsCached.map(c => `
-        <div class="coupon-card">
-          <span class="coupon-code">${escapeHtml(c.code)}</span>
-          <p class="coupon-desc">${escapeHtml(c.description)}</p>
-          ${c.id ? `
-            <button class="coupon-delete" onclick="deleteCoupon('${c.id}')" title="Kuponu sil" aria-label="${escapeHtml(c.code)} kuponunu sil">
-              <i data-lucide="trash-2"></i>
-            </button>
-          ` : ""}
-        </div>
-      `).join("");
-      lucide.createIcons();
-    }
-  }
 
   // 3. Run and Render Optimization Results
   const resultsDiv = document.getElementById("optimizerResults");
@@ -2960,17 +3212,11 @@ async function renderCart() {
           breakdowns.push({ name: item.name, price });
         });
 
-        // Apply store-specific coupons
-        let couponDiscount = 0;
-        if (couponsCached) {
-          const coupon = couponsCached.find(c => c.store === store);
-          if (coupon && subtotal >= coupon.min_amount) {
-            couponDiscount = coupon.discount;
-            subtotal -= couponDiscount;
-          }
-        }
+        // Apply shipping rules
+        const shippingFee = getShippingFee(store, subtotal);
+        subtotal += shippingFee;
 
-        storeTotals.push({ store, subtotal, breakdowns, couponDiscount });
+        storeTotals.push({ store, subtotal, breakdowns, shippingFee });
       });
 
       storeTotals.sort((a, b) => a.subtotal - b.subtotal);
@@ -3071,15 +3317,11 @@ async function renderCart() {
     });
 
     let absoluteTotal = 0;
-    let totalCouponDiscounts = 0;
+    let totalShippingCost = 0;
     Object.keys(grouped).forEach(store => {
-      if (couponsCached) {
-        const coupon = couponsCached.find(c => c.store === store);
-        if (coupon && grouped[store].total >= coupon.min_amount) {
-          grouped[store].total -= coupon.discount;
-          totalCouponDiscounts += coupon.discount;
-        }
-      }
+      const shippingFee = getShippingFee(store, grouped[store].total);
+      grouped[store].total += shippingFee;
+      totalShippingCost += shippingFee;
       absoluteTotal += grouped[store].total;
     });
 
@@ -3101,10 +3343,8 @@ async function renderCart() {
           const prices = getPricesForOptimizerItem(item.name);
           sum += prices[store] || prices[stores[0]] || 50.00;
         });
-        if (couponsCached) {
-          const coupon = couponsCached.find(c => c.store === store);
-          if (coupon && sum >= coupon.min_amount) sum -= coupon.discount;
-        }
+        const shippingFee = getShippingFee(store, sum);
+        sum += shippingFee;
         storeSums.push(sum);
       });
       catTotalsSum += Math.min(...storeSums);

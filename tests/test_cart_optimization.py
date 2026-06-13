@@ -6,7 +6,6 @@ from uuid import uuid4
 
 from app.comparator import extract_volume_info, lookup_barcode
 from app.main import (
-    list_coupons,
     api_barcode_lookup,
     ocr_receipt,
     create_shared_list,
@@ -15,9 +14,6 @@ from app.main import (
     SharedListPayload,
     SharedListItem,
     ReceiptOcrRequest,
-    CouponPayload,
-    create_coupon,
-    delete_coupon,
 )
 
 class CartOptimizationTests(unittest.TestCase):
@@ -122,33 +118,7 @@ class CartOptimizationTests(unittest.TestCase):
         # Invalid Barcode
         self.assertIsNone(lookup_barcode("0000000000000"))
 
-    @patch("app.main.load_db")
-    def test_coupons_endpoint(self, mock_load_db) -> None:
-        db = {"coupons": [{"id": "c1", "store": "migros", "code": "MIGR50"}]}
-        mock_load_db.return_value = db
-        coupons = list_coupons()
-        self.assertEqual(len(coupons), 1)
-        self.assertEqual(coupons[0]["code"], "MIGR50")
 
-    @patch("app.main.save_db")
-    @patch("app.main.load_db")
-    def test_coupon_create_and_delete(self, mock_load_db, mock_save_db) -> None:
-        db = {"coupons": []}
-        mock_load_db.return_value = db
-        coupon = create_coupon(
-            CouponPayload(
-                store="migros",
-                code="TEST50",
-                min_amount=500,
-                discount=50,
-            )
-        )
-        self.assertEqual(coupon["store"], "migros")
-        self.assertEqual(len(db["coupons"]), 1)
-
-        result = delete_coupon(coupon["id"])
-        self.assertEqual(result["status"], "deleted")
-        self.assertEqual(db["coupons"], [])
 
     def test_ocr_receipt_simulation(self) -> None:
         response = ocr_receipt(ReceiptOcrRequest(image_base64="mock_data"))

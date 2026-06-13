@@ -37,10 +37,7 @@ self.addEventListener("fetch", (event) => {
   const isStatic = url.origin === self.location.origin
     && (url.pathname.startsWith("/static/") || url.pathname === "/sw.js");
   const isOfflineApi = url.origin === self.location.origin
-    && (
-      url.pathname === "/api/coupons"
-      || url.pathname.startsWith("/api/barcode/")
-    );
+    && url.pathname.startsWith("/api/barcode/");
 
   if (isNavigation) {
     event.respondWith(

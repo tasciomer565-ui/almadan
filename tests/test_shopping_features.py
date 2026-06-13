@@ -34,62 +34,48 @@ class ShoppingFeatureTests(unittest.TestCase):
         )
 
     @patch("app.shopping.MARKET_STORES", (
-        "bim",
-        "a101",
-        "sok",
-        "file",
-        "metro",
-        "carrefoursa",
-        "migros",
+        "trendyol",
+        "hepsiburada",
+        "amazon",
+        "n11",
     ))
-    def test_single_and_split_basket_apply_coupons(self) -> None:
+    def test_single_and_split_basket_apply_shipping(self) -> None:
         items = [
             {
-                "id": "milk",
-                "name": "Sut 1 L",
+                "id": "item1",
+                "name": "T-shirt",
                 "offers": {
-                    "bim": 35,
-                    "a101": 30,
-                    "sok": 33,
-                    "file": 36,
-                    "metro": 37,
-                    "carrefoursa": 38,
-                    "migros": 40,
+                    "trendyol": 100,
+                    "hepsiburada": 120,
+                    "amazon": 130,
+                    "n11": 90,
                 },
             },
             {
-                "id": "flour",
-                "name": "Un 5 kg",
+                "id": "item2",
+                "name": "Jeans",
                 "offers": {
-                    "bim": 80,
-                    "a101": 90,
-                    "sok": 84,
-                    "file": 82,
-                    "metro": 75,
-                    "carrefoursa": 92,
-                    "migros": 95,
+                    "trendyol": 250,
+                    "hepsiburada": 220,
+                    "amazon": 240,
+                    "n11": 210,
                 },
             },
         ]
-        coupons = [
-            {
-                "id": "a101-5",
-                "store": "a101",
-                "code": "A1015",
-                "min_amount": 100,
-                "discount": 5,
-                "active": True,
-            }
-        ]
 
-        result = optimize_market_basket(items, coupons)
+        # Single store option should find n11 as cheapest (subtotal 300, total 300, shipping 0)
+        # Hepsiburada would be: subtotal 340, total 340, shipping 0
+        # Trendyol would be: subtotal 350, total 350, shipping 0
+        # Amazon would be: subtotal 370, total 370, shipping 0
+        result = optimize_market_basket(items)
 
-        self.assertEqual(result["single_store"]["store"], "metro")
-        self.assertEqual(result["single_store"]["total"], 112.0)
-        self.assertEqual(result["split_basket"]["total"], 105.0)
-        self.assertEqual(result["split_basket"]["savings"], 7.0)
-        stores = {group["store"] for group in result["split_basket"]["stores"]}
-        self.assertEqual(stores, {"a101", "metro"})
+        self.assertEqual(result["single_store"]["store"], "n11")
+        self.assertEqual(result["single_store"]["total"], 300.0)
+        
+        # Split basket analysis:
+        # Cheapest offers: item1 -> n11 (90 TL), item2 -> n11 (210 TL)
+        # Since both are cheapest at n11, split total is 300.0
+        self.assertEqual(result["split_basket"]["total"], 300.0)
 
     def test_empty_basket(self) -> None:
         result = optimize_market_basket([])

@@ -2069,37 +2069,21 @@ body.dark-theme .opt-savings-tag {
   color: var(--ink);
 }
 
-/* Coupons */
-.coupons-list {
+/* AI Try-on Styles */
+.ai-fashion-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 10px;
-  margin-top: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
 }
 
-.coupon-card {
-  padding: 10px;
-  border: 1px dashed var(--green);
-  background: rgba(45, 85, 63, 0.03);
-  border-radius: 6px;
-  text-align: center;
+#fashionScanLaser {
+  animation: laserScan 2.5s ease-in-out infinite;
 }
 
-body.dark-theme .coupon-card {
-  background: rgba(45, 85, 63, 0.1);
-}
-
-.coupon-code {
-  font-family: monospace;
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--green);
-}
-
-.coupon-desc {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 4px;
+@keyframes laserScan {
+  0% { top: 12px; }
+  50% { top: calc(100% - 15px); }
+  100% { top: 12px; }
 }
 
 /* Micro-animations and mic */
@@ -2165,41 +2149,11 @@ body.dark-theme .coupon-card {
   flex-direction: column;
   gap: 10px;
 }
-
-.coupon-applied {
-  margin: 6px 0;
-  color: var(--green);
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .opt-item-row small {
   display: block;
   margin-top: 2px;
   color: var(--green);
   font-size: 11px;
-}
-
-.coupon-form {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin: 10px 0 14px;
-}
-
-.coupon-form input,
-.coupon-form select {
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--bg-card);
-  color: var(--ink);
-  padding: 9px 10px;
-}
-
-.coupon-form button {
-  grid-column: 1 / -1;
-  justify-content: center;
 }
 
 .cart-quantity {
@@ -2211,37 +2165,4 @@ body.dark-theme .coupon-card {
   color: var(--ink);
   padding: 5px;
   text-align: center;
-}
-
-.coupon-card {
-  position: relative;
-}
-
-.coupon-delete {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border: 0;
-  background: transparent;
-  color: var(--ink-light);
-  cursor: pointer;
-}
-
-.coupon-delete svg {
-  width: 15px;
-  height: 15px;
-}
-
-@media (max-width: 560px) {
-  .coupon-form {
-    grid-template-columns: 1fr;
-  }
-
-  .coupon-form button {
-    grid-column: auto;
-  }
 }

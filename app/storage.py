@@ -37,7 +37,6 @@ def default_db() -> dict[str, Any]:
         "push_subscriptions": [],
         "users": {},
         "shared_lists": {},
-        "coupons": [],
         "queued_notifications": [],
         "catalog_snapshots": {},
     }
@@ -58,8 +57,6 @@ def normalize_db(db: Any) -> dict[str, Any]:
         db["users"] = {}
     if not isinstance(db.get("shared_lists"), dict):
         db["shared_lists"] = {}
-    if not isinstance(db.get("coupons"), list):
-        db["coupons"] = []
     if not isinstance(db.get("queued_notifications"), list):
         db["queued_notifications"] = []
     if not isinstance(db.get("catalog_snapshots"), dict):

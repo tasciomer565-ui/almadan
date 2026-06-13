@@ -175,7 +175,10 @@ def normalize_offers(name: str, offers: dict[str, float] | None) -> dict[str, fl
 
 
 def calculate_unit_price(name: str, price: float) -> dict[str, Any] | None:
-    amount, unit = extract_volume_info(name)
+    res = extract_volume_info(name)
+    if not res:
+        return None
+    amount, unit = res
     if not amount or amount <= 0 or not unit:
         return None
     return {
@@ -185,51 +188,50 @@ def calculate_unit_price(name: str, price: float) -> dict[str, Any] | None:
     }
 
 
-def _best_coupon(
-    store: str,
-    subtotal: float,
-    coupons: list[dict[str, Any]],
-) -> dict[str, Any] | None:
-    eligible = [
-        coupon
-        for coupon in coupons
-        if coupon.get("active", True)
-        and str(coupon.get("store", "")).casefold() == store
-        and subtotal >= float(coupon.get("min_amount", 0) or 0)
-    ]
-    if not eligible:
-        return None
-    return max(eligible, key=lambda item: float(item.get("discount", 0) or 0))
+SHIPPING_RULES = {
+    "trendyol": (300.0, 40.0),
+    "hepsiburada": (300.0, 40.0),
+    "amazon": (0.0, 0.0),
+    "n11": (200.0, 35.0),
+    "supplementler": (250.0, 30.0),
+    "proteinocean": (250.0, 30.0),
+    "migros": (750.0, 50.0),
+    "5mmigros": (750.0, 50.0),
+    "migrosjet": (750.0, 50.0),
+    "carrefoursa": (500.0, 45.0),
+    "carrefoursagurme": (500.0, 45.0),
+}
 
 
-def _apply_coupon(
-    store: str,
-    subtotal: float,
-    coupons: list[dict[str, Any]],
-) -> tuple[float, dict[str, Any] | None]:
-    coupon = _best_coupon(store, subtotal, coupons)
-    if not coupon:
-        return round(subtotal, 2), None
-    discount = min(subtotal, float(coupon.get("discount", 0) or 0))
-    applied = {
-        "id": coupon.get("id"),
-        "store": store,
-        "code": coupon.get("code"),
-        "discount": round(discount, 2),
-        "min_amount": float(coupon.get("min_amount", 0) or 0),
-    }
-    return round(subtotal - discount, 2), applied
+def get_shipping_fee(store: str, subtotal: float) -> float:
+    if subtotal <= 0:
+        return 0.0
+    limit, fee = SHIPPING_RULES.get(store, (0.0, 0.0))
+    if subtotal < limit:
+        return fee
+    return 0.0
+
+
+def calculate_assignment_cost(assignment, normalized_items, allowed_stores):
+    subtotals = {store: 0.0 for store in allowed_stores}
+    for idx, item in enumerate(normalized_items):
+        store = assignment[idx]
+        subtotals[store] += item["offers"][store] * item["quantity"]
+    
+    total = 0.0
+    for store, sub in subtotals.items():
+        if sub > 0:
+            total += sub + get_shipping_fee(store, sub)
+    return total, subtotals
 
 
 def optimize_market_basket(
     items: list[dict[str, Any]],
-    coupons: list[dict[str, Any]] | None = None,
     lat: float | None = None,
     lng: float | None = None,
     location_name: str | None = None,
     max_distance: float | None = None,
 ) -> dict[str, Any]:
-    coupons = coupons or []
     normalized_items: list[dict[str, Any]] = []
 
     # Calculate store distances
@@ -291,13 +293,14 @@ def optimize_market_basket(
                     "line_total": round(line_total, 2),
                 }
             )
-        total, coupon = _apply_coupon(store, subtotal, coupons)
+        shipping_fee = get_shipping_fee(store, subtotal)
+        total = round(subtotal + shipping_fee, 2)
         single_options.append(
             {
                 "store": store,
                 "subtotal": round(subtotal, 2),
+                "shipping_fee": round(shipping_fee, 2),
                 "total": total,
-                "coupon": coupon,
                 "items": breakdown,
             }
         )
@@ -307,10 +310,38 @@ def optimize_market_basket(
     baseline_total = max(option["total"] for option in single_options)
     best_single["savings"] = round(baseline_total - best_single["total"], 2)
 
-    split_groups: dict[str, dict[str, Any]] = {}
+    # Hill-climbing assignment for split basket to minimize (subtotal + shipping)
+    assignment = []
     for item in normalized_items:
         allowed_offers = {s: item["offers"][s] for s in allowed_stores}
-        store, unit_price = min(allowed_offers.items(), key=lambda offer: offer[1])
+        best_store = min(allowed_offers.items(), key=lambda x: x[1])[0]
+        assignment.append(best_store)
+
+    improved = True
+    while improved:
+        improved = False
+        current_cost, _ = calculate_assignment_cost(assignment, normalized_items, allowed_stores)
+        for idx, item in enumerate(normalized_items):
+            current_store = assignment[idx]
+            for other_store in allowed_stores:
+                if other_store == current_store:
+                    continue
+                assignment[idx] = other_store
+                new_cost, _ = calculate_assignment_cost(assignment, normalized_items, allowed_stores)
+                if new_cost < current_cost - 0.01:
+                    current_cost = new_cost
+                    improved = True
+                    break
+                else:
+                    assignment[idx] = current_store
+            if improved:
+                break
+
+    # Construct split groups based on the optimized assignment
+    split_groups: dict[str, dict[str, Any]] = {}
+    for idx, item in enumerate(normalized_items):
+        store = assignment[idx]
+        unit_price = item["offers"][store]
         group = split_groups.setdefault(
             store,
             {"store": store, "subtotal": 0.0, "items": []},
@@ -329,19 +360,17 @@ def optimize_market_basket(
         )
 
     split_total = 0.0
-    applied_coupons = []
     groups = []
     for store in sorted(split_groups):
         group = split_groups[store]
         subtotal = round(group["subtotal"], 2)
-        total, coupon = _apply_coupon(store, subtotal, coupons)
+        shipping_fee = get_shipping_fee(store, subtotal)
+        total = round(subtotal + shipping_fee, 2)
         group["subtotal"] = subtotal
+        group["shipping_fee"] = round(shipping_fee, 2)
         group["total"] = total
-        group["coupon"] = coupon
         groups.append(group)
         split_total += total
-        if coupon:
-            applied_coupons.append(coupon)
 
     split_total = round(split_total, 2)
     return {
@@ -354,7 +383,6 @@ def optimize_market_basket(
             "stores": groups,
             "total": split_total,
             "savings": round(best_single["total"] - split_total, 2),
-            "coupons": applied_coupons,
         },
         "baseline_total": round(baseline_total, 2),
         "store_distances": store_distances,

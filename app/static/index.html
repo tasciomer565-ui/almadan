@@ -203,6 +203,56 @@
         </div>
       </section>
 
+      <!-- YAPAY ZEKA SANAL PROVA ODASI (Sadece Giyim & Moda Seçildiğinde Görünür) -->
+      <section class="content-section hidden" id="aiFashionSection">
+        <div class="glass-card" style="padding: 20px; border-radius: 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 24px;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 10px rgba(79,70,229,0.3);">
+              <i data-lucide="sparkles" style="width: 20px; height: 20px;"></i>
+            </div>
+            <div>
+              <h3 style="margin: 0; font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 18px; color: var(--green-dark);">Yapay Zeka Sanal Prova Odası</h3>
+              <p style="margin: 2px 0 0 0; font-size: 12px; color: var(--ink-light);">Modelinizi seçin ve tişörtü manken üstünde prova edin.</p>
+            </div>
+          </div>
+          
+          <div class="ai-fashion-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+            <!-- Sol Panel: Model ve Kıyafet Seçimi -->
+            <div style="background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+              <div>
+                <label style="display: block; font-size: 12px; font-weight: 800; color: var(--ink-light); margin-bottom: 8px;">1. Model Seçin</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button type="button" class="tag-button active" id="btnModelMale" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer;">Erkek Model</button>
+                  <button type="button" class="tag-button" id="btnModelFemale" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer;">Kadın Model</button>
+                </div>
+              </div>
+              
+              <div>
+                <label style="display: block; font-size: 12px; font-weight: 800; color: var(--ink-light); margin-bottom: 8px;">2. Kıyafet Seçin</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button type="button" class="tag-button active" id="btnTshirtBlue" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer;">Mavi Tişört</button>
+                  <button type="button" class="tag-button" id="btnTshirtRed" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer;">Kırmızı Tişört</button>
+                </div>
+              </div>
+
+              <div style="border-top: 1px solid var(--line); padding-top: 14px;">
+                <button type="button" class="primary-button" id="btnStartTryOn" style="width: 100%; font-size: 13px; height: 38px; border-radius: 8px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border: 0; color: white; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                  <i data-lucide="play" style="width: 16px; height: 16px;"></i> Prova Et
+                </button>
+              </div>
+            </div>
+            
+            <!-- Sağ Panel: Canvas Arayüzü ve Laser Efekti -->
+            <div style="border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; position: relative; background: var(--bg-card);">
+              <canvas id="tryOnCanvas" width="300" height="300" style="max-width: 100%; border-radius: 8px; display: block; background: #eaeaea;"></canvas>
+              
+              <!-- Scan Laser Animation Overlay (initially hidden) -->
+              <div id="fashionScanLaser" class="hidden" style="position: absolute; left: 12px; right: 12px; height: 3px; background: #7c3aed; box-shadow: 0 0 10px #7c3aed, 0 0 20px #7c3aed; pointer-events: none; z-index: 10;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="content-section" id="discoverView">
         <div class="section-heading">
           <div>
@@ -406,30 +456,6 @@
               <div id="optimizerResults" class="optimizer-results">
                 <!-- Optimizasyon sonuçları dinamik doldurulacak -->
                 <p class="empty-text">Listeye ürün ekleyerek karşılaştırın.</p>
-              </div>
-
-              <div class="active-coupons-section">
-                <h4>Kuponların</h4>
-                <form id="couponForm" class="coupon-form">
-                  <select id="couponStore" aria-label="Kupon mağazası" required>
-                    <option value="bim">BİM</option>
-                    <option value="a101">A101</option>
-                    <option value="sok">Şok</option>
-                    <option value="file">File</option>
-                    <option value="metro">Metro</option>
-                    <option value="carrefoursa">CarrefourSA</option>
-                    <option value="migros">Migros</option>
-                  </select>
-                  <input id="couponCode" placeholder="Kupon kodu" required>
-                  <input id="couponMinAmount" type="number" min="0" step="1" placeholder="Min. sepet">
-                  <input id="couponDiscount" type="number" min="1" step="1" placeholder="İndirim (TL)" required>
-                  <button class="icon-text-button" type="submit">
-                    <i data-lucide="ticket-plus"></i> Kupon ekle
-                  </button>
-                </form>
-                <div id="cartCouponsList" class="coupons-list">
-                  <!-- Kuponlar -->
-                </div>
               </div>
             </div>
           </div>
