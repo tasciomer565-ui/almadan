@@ -3798,7 +3798,7 @@ function updateMaxDistance(val) {
 }
 
 function toggleSupportedStores() {
-  const toggleBtn = document.querySelector(".supported-toggle");
+  const toggleBtn = document.querySelector(".supported-stores-toggle");
   const panel = document.getElementById("supportedStoresPanel");
   if (!panel || !toggleBtn) return;
   

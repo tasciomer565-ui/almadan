@@ -336,11 +336,13 @@ h1 {
   width: 19px;
 }
 
-.supported {
+.supported-stores-container {
   margin-top: 20px;
+  display: block;
+  text-align: left;
 }
 
-.supported-toggle {
+.supported-stores-toggle {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -356,29 +358,50 @@ h1 {
   user-select: none;
 }
 
-.supported-toggle:hover {
+body.dark-theme .supported-stores-toggle {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #c7ccc7;
+}
+
+.supported-stores-toggle:hover {
   background: var(--bg-hover, #f3f4f6);
   border-color: #d1d5db;
   color: var(--ink, #1f2937);
 }
 
-.supported-toggle svg {
+body.dark-theme .supported-stores-toggle:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.supported-stores-toggle svg {
   width: 14px;
   height: 14px;
   transition: transform 0.2s ease;
   color: var(--ink-muted, #4b5563);
 }
 
-.supported-toggle.active {
+body.dark-theme .supported-stores-toggle svg {
+  color: #c7ccc7;
+}
+
+.supported-stores-toggle.active {
   background: var(--bg-hover, #f3f4f6);
   color: var(--ink, #1f2937);
 }
 
-.supported-toggle.active svg {
+body.dark-theme .supported-stores-toggle.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.supported-stores-toggle.active svg {
   transform: rotate(180deg);
 }
 
-.supported-panel {
+.supported-stores-panel {
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.3s ease-out, opacity 0.2s ease-out, padding 0.3s ease-out;
@@ -390,50 +413,91 @@ h1 {
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
 }
 
-body.dark .supported-panel {
-  background: #1e201e;
-  border-color: #2e302e;
+body.dark-theme .supported-stores-panel {
+  background: #181a18;
+  border-color: #242624;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
-.supported-panel.open {
-  max-height: 1200px;
+.supported-stores-panel.open {
+  max-height: 2000px;
   opacity: 1;
-  padding: 20px;
+  padding: 24px;
   border: 1px solid var(--line, #e2e8f0);
 }
 
-.supported-categories-grid {
+body.dark-theme .supported-stores-panel.open {
+  border-color: #242624;
+}
+
+.supported-stores-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
   text-align: left;
 }
 
-.supported-cat-column {
+.supported-stores-cat {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
-.supported-cat-column h4 {
-  margin: 0 0 4px 0;
-  font-size: 11px;
+.supported-stores-cat h4 {
+  margin: 0;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
   color: var(--green, #059669);
   letter-spacing: 0.05em;
+  border-left: 3px solid var(--green, #059669);
+  padding-left: 8px;
 }
 
-.supported-cat-stores {
+body.dark-theme .supported-stores-cat h4 {
+  color: var(--green-dark, #10b981);
+  border-left-color: var(--green-dark, #10b981);
+}
+
+.supported-stores-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.supported-stores-list span {
+  display: inline-block;
   font-size: 11px;
-  color: var(--ink-muted, #4b5563);
-  line-height: 1.6;
+  font-weight: 500;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.15s ease;
+  user-select: none;
 }
 
-.supported-cat-stores span {
-  font-weight: 500;
-  color: var(--ink, #1f2937);
+body.dark-theme .supported-stores-list span {
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  border-color: rgba(255, 255, 255, 0.06);
 }
+
+.supported-stores-list span:hover {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #10b981;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(16, 185, 129, 0.1);
+}
+
+body.dark-theme .supported-stores-list span:hover {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: #34d399;
+}
+
 
 .content-section {
   padding: 42px 0 20px;
@@ -1323,14 +1387,10 @@ body.dark .supported-panel {
     grid-template-columns: 1fr;
   }
 
-  .supported {
+  .supported-stores-container {
     display: block;
   }
 
-  .store-list {
-    margin-top: 9px;
-    gap: 10px;
-  }
 
   .content-section {
     padding: 30px 18px 10px;
