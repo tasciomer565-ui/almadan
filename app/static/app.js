@@ -267,17 +267,39 @@ function bindEvents() {
     reader.readAsDataURL(file);
   });
 
+  const btnTshirtUser = document.getElementById("btnTshirtUser");
+  const userGarmentInput = document.getElementById("fashionUserGarmentInput");
+
   if (btnTshirtBlue) btnTshirtBlue.addEventListener("click", () => {
     window.selectedTryOnGarment = "blue";
     btnTshirtBlue.classList.add("active");
     btnTshirtRed.classList.remove("active");
+    if (btnTshirtUser) btnTshirtUser.classList.remove("active");
     window.drawTryOnScene();
   });
   if (btnTshirtRed) btnTshirtRed.addEventListener("click", () => {
     window.selectedTryOnGarment = "red";
     btnTshirtRed.classList.add("active");
     btnTshirtBlue.classList.remove("active");
+    if (btnTshirtUser) btnTshirtUser.classList.remove("active");
     window.drawTryOnScene();
+  });
+  if (btnTshirtUser) btnTshirtUser.addEventListener("click", () => {
+    if (userGarmentInput) userGarmentInput.click();
+  });
+  if (userGarmentInput) userGarmentInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      window.userTryOnGarment = event.target.result;
+      window.selectedTryOnGarment = "user";
+      if (btnTshirtUser) btnTshirtUser.classList.add("active");
+      if (btnTshirtBlue) btnTshirtBlue.classList.remove("active");
+      if (btnTshirtRed) btnTshirtRed.classList.remove("active");
+      window.drawTryOnScene();
+    };
+    reader.readAsDataURL(file);
   });
   if (btnStartTryOn) btnStartTryOn.addEventListener("click", window.runFashionTryOnAnimation);
 
@@ -2907,6 +2929,7 @@ function getPricesForOptimizerItem(name) {
 window.selectedTryOnModel = "male";
 window.selectedTryOnGarment = "blue";
 window.userTryOnPhoto = null;
+window.userTryOnGarment = null;
 window.tryOnGarmentX = 75;
 window.tryOnGarmentY = 100;
 window.tryOnGarmentW = 150;
@@ -2969,7 +2992,18 @@ window.drawTryOnScene = function() {
     ctx.drawImage(modelImg, 0, 0, 300, 300);
     
     const garmentImg = new Image();
-    garmentImg.src = window.selectedTryOnGarment === "blue" ? "/static/fashion_tshirt_blue.png" : "/static/fashion_tshirt_red.png";
+    if (window.selectedTryOnGarment === "user") {
+      if (!window.userTryOnGarment) {
+        ctx.fillStyle = "#666";
+        ctx.font = "14px 'Manrope', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Lütfen tişört yükleyin", 150, 150);
+        return;
+      }
+      garmentImg.src = window.userTryOnGarment;
+    } else {
+      garmentImg.src = window.selectedTryOnGarment === "blue" ? "/static/fashion_tshirt_blue.png" : "/static/fashion_tshirt_red.png";
+    }
     
     garmentImg.onload = () => {
       window.drawGarmentTransparent(ctx, garmentImg, window.tryOnGarmentX, window.tryOnGarmentY, window.tryOnGarmentW, window.tryOnGarmentH);
@@ -2984,9 +3018,19 @@ window.runFashionTryOnAnimation = function() {
   laserEl.classList.remove("hidden");
   showToast("Yapay zeka prova işlemi başlatıldı...");
   
+  // Auto positioning/fit for default models
+  if (window.selectedTryOnModel !== "user") {
+    window.tryOnGarmentX = 75;
+    window.tryOnGarmentY = 100;
+    window.tryOnGarmentW = 150;
+    window.tryOnGarmentH = 150;
+    const slider = document.getElementById("tryOnSizeSlider");
+    if (slider) slider.value = 150;
+  }
+  
   setTimeout(() => {
     laserEl.classList.add("hidden");
-    showToast("Prova tamamlandı! Manken kıyafeti başarıyla giydi.");
+    showToast("Prova tamamlandı! Yapay zeka kıyafeti başarıyla giydirdi.");
     window.drawTryOnScene();
   }, 2500);
 };
