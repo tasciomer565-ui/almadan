@@ -224,7 +224,11 @@
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                   <button type="button" class="tag-button active" id="btnModelMale" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer;">Erkek Model</button>
                   <button type="button" class="tag-button" id="btnModelFemale" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer;">Kadın Model</button>
+                  <button type="button" class="tag-button" id="btnModelUser" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                    <i data-lucide="upload" style="width: 12px; height: 12px;"></i> Fotoğraf Yükle
+                  </button>
                 </div>
+                <input type="file" id="fashionUserPhotoInput" accept="image/*" style="display: none;">
               </div>
               
               <div>
@@ -244,7 +248,12 @@
             
             <!-- Sağ Panel: Canvas Arayüzü ve Laser Efekti -->
             <div style="border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; position: relative; background: var(--bg-card);">
-              <canvas id="tryOnCanvas" width="300" height="300" style="max-width: 100%; border-radius: 8px; display: block; background: #eaeaea;"></canvas>
+              <canvas id="tryOnCanvas" width="300" height="300" style="max-width: 100%; border-radius: 8px; display: block; background: #eaeaea; cursor: move;"></canvas>
+              
+              <div style="width: 100%; max-width: 300px; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px;">
+                <span style="font-size: 11px; font-weight: 700; color: var(--ink-light); display: flex; align-items: center; gap: 4px;"><i data-lucide="move" style="width:12px; height:12px;"></i> Sürükle & Boyutlandır:</span>
+                <input type="range" id="tryOnSizeSlider" min="50" max="250" value="150" style="flex: 1; accent-color: var(--green); cursor: pointer;" oninput="window.updateTryOnGarmentSize(this.value)">
+              </div>
               
               <!-- Scan Laser Animation Overlay (initially hidden) -->
               <div id="fashionScanLaser" class="hidden" style="position: absolute; left: 12px; right: 12px; height: 3px; background: #7c3aed; box-shadow: 0 0 10px #7c3aed, 0 0 20px #7c3aed; pointer-events: none; z-index: 10;"></div>

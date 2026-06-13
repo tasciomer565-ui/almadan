@@ -232,18 +232,41 @@ function bindEvents() {
   const btnTshirtRed = document.getElementById("btnTshirtRed");
   const btnStartTryOn = document.getElementById("btnStartTryOn");
 
+  const btnModelUser = document.getElementById("btnModelUser");
+  const userPhotoInput = document.getElementById("fashionUserPhotoInput");
+
   if (btnModelMale) btnModelMale.addEventListener("click", () => {
     window.selectedTryOnModel = "male";
     btnModelMale.classList.add("active");
     btnModelFemale.classList.remove("active");
+    if (btnModelUser) btnModelUser.classList.remove("active");
     window.drawTryOnScene();
   });
   if (btnModelFemale) btnModelFemale.addEventListener("click", () => {
     window.selectedTryOnModel = "female";
     btnModelFemale.classList.add("active");
     btnModelMale.classList.remove("active");
+    if (btnModelUser) btnModelUser.classList.remove("active");
     window.drawTryOnScene();
   });
+  if (btnModelUser) btnModelUser.addEventListener("click", () => {
+    if (userPhotoInput) userPhotoInput.click();
+  });
+  if (userPhotoInput) userPhotoInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      window.userTryOnPhoto = event.target.result;
+      window.selectedTryOnModel = "user";
+      if (btnModelUser) btnModelUser.classList.add("active");
+      if (btnModelMale) btnModelMale.classList.remove("active");
+      if (btnModelFemale) btnModelFemale.classList.remove("active");
+      window.drawTryOnScene();
+    };
+    reader.readAsDataURL(file);
+  });
+
   if (btnTshirtBlue) btnTshirtBlue.addEventListener("click", () => {
     window.selectedTryOnGarment = "blue";
     btnTshirtBlue.classList.add("active");
@@ -257,6 +280,55 @@ function bindEvents() {
     window.drawTryOnScene();
   });
   if (btnStartTryOn) btnStartTryOn.addEventListener("click", window.runFashionTryOnAnimation);
+
+  const canvas = document.getElementById("tryOnCanvas");
+  if (canvas) {
+    let isDraggingGarment = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+
+    const getEventPos = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: (clientX - rect.left) * (canvas.width / rect.width),
+        y: (clientY - rect.top) * (canvas.height / rect.height)
+      };
+    };
+
+    const startDrag = (e) => {
+      const pos = getEventPos(e);
+      if (pos.x >= window.tryOnGarmentX && pos.x <= window.tryOnGarmentX + window.tryOnGarmentW &&
+          pos.y >= window.tryOnGarmentY && pos.y <= window.tryOnGarmentY + window.tryOnGarmentH) {
+        isDraggingGarment = true;
+        dragStartX = pos.x - window.tryOnGarmentX;
+        dragStartY = pos.y - window.tryOnGarmentY;
+        e.preventDefault();
+      }
+    };
+
+    const doDrag = (e) => {
+      if (!isDraggingGarment) return;
+      const pos = getEventPos(e);
+      window.tryOnGarmentX = pos.x - dragStartX;
+      window.tryOnGarmentY = pos.y - dragStartY;
+      window.drawTryOnScene();
+      e.preventDefault();
+    };
+
+    const stopDrag = () => {
+      isDraggingGarment = false;
+    };
+
+    canvas.addEventListener("mousedown", startDrag);
+    canvas.addEventListener("mousemove", doDrag);
+    window.addEventListener("mouseup", stopDrag);
+
+    canvas.addEventListener("touchstart", startDrag, { passive: false });
+    canvas.addEventListener("touchmove", doDrag, { passive: false });
+    window.addEventListener("touchend", stopDrag);
+  }
   window.addEventListener("online", () => {
     updateNetworkStatus();
     flushPendingSharedSync();
@@ -2834,6 +2906,18 @@ function getPricesForOptimizerItem(name) {
 
 window.selectedTryOnModel = "male";
 window.selectedTryOnGarment = "blue";
+window.userTryOnPhoto = null;
+window.tryOnGarmentX = 75;
+window.tryOnGarmentY = 100;
+window.tryOnGarmentW = 150;
+window.tryOnGarmentH = 150;
+
+window.updateTryOnGarmentSize = function(sizeVal) {
+  const parsed = parseInt(sizeVal, 10);
+  window.tryOnGarmentW = parsed;
+  window.tryOnGarmentH = parsed;
+  window.drawTryOnScene();
+};
 
 window.drawGarmentTransparent = function(ctx, img, x, y, w, h) {
   const tempCanvas = document.createElement("canvas");
@@ -2868,7 +2952,18 @@ window.drawTryOnScene = function() {
   ctx.fillRect(0, 0, 300, 300);
   
   const modelImg = new Image();
-  modelImg.src = window.selectedTryOnModel === "male" ? "/static/fashion_male_model.png" : "/static/fashion_female_model.png";
+  if (window.selectedTryOnModel === "user") {
+    if (!window.userTryOnPhoto) {
+      ctx.fillStyle = "#666";
+      ctx.font = "14px 'Manrope', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Lütfen fotoğraf yükleyin", 150, 150);
+      return;
+    }
+    modelImg.src = window.userTryOnPhoto;
+  } else {
+    modelImg.src = window.selectedTryOnModel === "male" ? "/static/fashion_male_model.png" : "/static/fashion_female_model.png";
+  }
   
   modelImg.onload = () => {
     ctx.drawImage(modelImg, 0, 0, 300, 300);
@@ -2877,7 +2972,7 @@ window.drawTryOnScene = function() {
     garmentImg.src = window.selectedTryOnGarment === "blue" ? "/static/fashion_tshirt_blue.png" : "/static/fashion_tshirt_red.png";
     
     garmentImg.onload = () => {
-      window.drawGarmentTransparent(ctx, garmentImg, 75, 120, 150, 150);
+      window.drawGarmentTransparent(ctx, garmentImg, window.tryOnGarmentX, window.tryOnGarmentY, window.tryOnGarmentW, window.tryOnGarmentH);
     };
   };
 };
