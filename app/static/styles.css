@@ -337,20 +337,102 @@ h1 {
 }
 
 .supported {
-  display: flex;
-  align-items: center;
-  gap: 18px;
   margin-top: 20px;
-  color: #7f887f;
-  font-size: 12px;
 }
 
-.store-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  color: #c7ccc7;
+.supported-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface, #f9fafb);
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 12px;
   font-weight: 600;
+  color: var(--ink-muted, #4b5563);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.supported-toggle:hover {
+  background: var(--bg-hover, #f3f4f6);
+  border-color: #d1d5db;
+  color: var(--ink, #1f2937);
+}
+
+.supported-toggle svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.2s ease;
+  color: var(--ink-muted, #4b5563);
+}
+
+.supported-toggle.active {
+  background: var(--bg-hover, #f3f4f6);
+  color: var(--ink, #1f2937);
+}
+
+.supported-toggle.active svg {
+  transform: rotate(180deg);
+}
+
+.supported-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out, opacity 0.2s ease-out, padding 0.3s ease-out;
+  opacity: 0;
+  margin-top: 12px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 0 solid transparent;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+}
+
+body.dark .supported-panel {
+  background: #1e201e;
+  border-color: #2e302e;
+}
+
+.supported-panel.open {
+  max-height: 1200px;
+  opacity: 1;
+  padding: 20px;
+  border: 1px solid var(--line, #e2e8f0);
+}
+
+.supported-categories-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+  text-align: left;
+}
+
+.supported-cat-column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.supported-cat-column h4 {
+  margin: 0 0 4px 0;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--green, #059669);
+  letter-spacing: 0.05em;
+}
+
+.supported-cat-stores {
+  font-size: 11px;
+  color: var(--ink-muted, #4b5563);
+  line-height: 1.6;
+}
+
+.supported-cat-stores span {
+  font-weight: 500;
+  color: var(--ink, #1f2937);
 }
 
 .content-section {

@@ -3796,3 +3796,13 @@ function updateMaxDistance(val) {
   state.maxDistance = Number(val);
   renderCart();
 }
+
+function toggleSupportedStores() {
+  const toggleBtn = document.querySelector(".supported-toggle");
+  const panel = document.getElementById("supportedStoresPanel");
+  if (!panel || !toggleBtn) return;
+  
+  const isOpen = panel.classList.toggle("open");
+  toggleBtn.classList.toggle("active", isOpen);
+}
+window.toggleSupportedStores = toggleSupportedStores;

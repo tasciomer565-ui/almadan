@@ -79,34 +79,55 @@
           </form>
 
           <div class="supported">
-            <span>Desteklenen mağazalar:</span>
-            <div class="store-list">
-              <span>Trendyol</span>
-              <span>Hepsiburada</span>
-              <span>Amazon</span>
-              <span>n11</span>
-              <span>Migros</span>
-              <span>BİM</span>
-              <span>A101</span>
-              <span>Şok</span>
-              <span>File Market</span>
-              <span>Metro</span>
-              <span>CarrefourSA</span>
-              <span>Vatan</span>
-              <span>İtopya</span>
-              <span>MediaMarkt</span>
-              <span>Teknosa</span>
-              <span>Gratis</span>
-              <span>Rossmann</span>
-              <span>LC Waikiki</span>
-              <span>Defacto</span>
-              <span>Zara</span>
-              <span>Boyner</span>
-              <span>Koton</span>
-              <span>Mavi</span>
-              <span>Supplementler</span>
-              <span>Proteinocean</span>
-              <span>Karaca</span>
+            <button type="button" class="supported-toggle" onclick="toggleSupportedStores()" aria-expanded="false" aria-controls="supportedStoresPanel">
+              <span>Desteklenen 100+ Mağaza & Zincir Market</span>
+              <i data-lucide="chevron-down"></i>
+            </button>
+            <div id="supportedStoresPanel" class="supported-panel">
+              <div class="supported-categories-grid">
+                <div class="supported-cat-column">
+                  <h4>Gıda & Süpermarket</h4>
+                  <div class="supported-cat-stores">
+                    BİM, A101, ŞOK, Migros, 5M Migros, Migros Jet, CarrefourSA, CarrefourSA Gurme, Tarım Kredi, FİLE, Macrocenter, Happy Center, Onur Market, Mopaş, Hakmar, Çağrı Market, Bizim Toptan, Metro, Seç Market, Hakmar Ekspres
+                  </div>
+                </div>
+                <div class="supported-cat-column">
+                  <h4>Teknoloji & Elektronik</h4>
+                  <div class="supported-cat-stores">
+                    Teknosa, MediaMarkt, Vatan Bilgisayar, Troy, Gürgençler, Pozitif Teknoloji, Samsung, Huawei, Mi Store, Evkur, Çetmen, Yiğit AVM, Özşanal, İtopya
+                  </div>
+                </div>
+                <div class="supported-cat-column">
+                  <h4>Kozmetik & Kişisel Bakım</h4>
+                  <div class="supported-cat-stores">
+                    Gratis, Watsons, Rossmann, Eve Shop, Sephora, Sevil, Yves Rocher, Flormar, Golden Rose, MAC, Kiko Milano
+                  </div>
+                </div>
+                <div class="supported-cat-column">
+                  <h4>Giyim, Ayakkabı & Moda</h4>
+                  <div class="supported-cat-stores">
+                    LC Waikiki, DeFacto, Koton, Mavi, LTB, Colin's, Boyner, Özdilek, Beymen, Vakko, Altınyıldız, Kiğılı, Sarar, Süvari, Hatemoğlu, Tudors, İpekyol, Twist, Machka, Penti, Zara, Bershka, Pull&Bear, Stradivarius, Massimo Dutti, H&M, Mango, FLO, In Street, Deichmann, Ayakkabı Dünyası, SuperStep, Sportive, Decathlon
+                  </div>
+                </div>
+                <div class="supported-cat-column">
+                  <h4>Sağlık & Anne-Bebek</h4>
+                  <div class="supported-cat-stores">
+                    Atasun Optik, Opmar Optik, Elegance Optik, Mert Optik, Ebebek, Babymall, Joker, GNC
+                  </div>
+                </div>
+                <div class="supported-cat-column">
+                  <h4>Züccaciye, Ev & Yapı Market</h4>
+                  <div class="supported-cat-stores">
+                    Karaca, Paşabahçe, Bernardo, Jumbo, Korkmaz, Schafer, Porland, Hisar, English Home, Madame Coco, Linens, Bella Maison, Karaca Home, IKEA, Koçtaş, Koçtaş Fix, Bauhaus, Tekzen
+                  </div>
+                </div>
+                <div class="supported-cat-column">
+                  <h4>E-Ticaret & Diğerleri</h4>
+                  <div class="supported-cat-stores">
+                    Trendyol, Hepsiburada, Amazon, n11, Supplementler, ProteinOcean
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

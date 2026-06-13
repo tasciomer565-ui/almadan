@@ -583,7 +583,7 @@ def search_products_by_name(query: str) -> list[dict]:
     output_in_stock = in_stock[:limit]
     output_out_of_stock = out_of_stock[:2] if limit == 15 else out_of_stock[:1]
     
-    output = output_in_stock + output_out_of_stock
+    output = (output_in_stock + output_out_of_stock)[:limit]
     
     # 9. Suspicious Price Warning Check (extreme low price drop alert)
     valid_prices = [p["price"] for p in output_in_stock if p["price"] > 0]
