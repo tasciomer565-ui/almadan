@@ -184,8 +184,28 @@ function getStoreIcon(store, title) {
   }
 }
 
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+window.SEARCH_TIMEOUT = 6000;
+
+function optimizeForMobile() {
+  if (isMobile) {
+    console.log("Mobil Mod: Optimizasyonlar devreye alındı.");
+    document.documentElement.style.setProperty('--animation-speed', '0s');
+    window.SEARCH_TIMEOUT = 3000;
+    
+    const svgWrapper = document.querySelector("#quantumScanOverlay div");
+    if (svgWrapper) {
+      svgWrapper.querySelectorAll("svg").forEach(svg => {
+        svg.style.opacity = "0";
+        svg.style.visibility = "hidden";
+      });
+    }
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   applyTheme();
+  optimizeForMobile();
   lucide.createIcons();
   bindEvents();
   registerServiceWorker();
@@ -1481,7 +1501,7 @@ async function parseProduct(event) {
   requestAnimationFrame(() => {
     setTimeout(async () => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 saniye kuralı
+      const timeoutId = setTimeout(() => controller.abort(), window.SEARCH_TIMEOUT || 6000); // 3-6 saniye kuralı
       
       var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Siber veri düğümlerinden canlı fiyatlar toplanıyor..."; }, 600);
       var t2 = setTimeout(() => { if (progressText) progressText.innerText = "Optimal kuantum frekansı hesaplanıyor..."; }, 1300);
@@ -1527,11 +1547,19 @@ async function parseProduct(event) {
           const header = overlay.querySelector("h3");
           if (header) {
             header.classList.add("glitch-active");
-            header.innerText = "SİSTEM KURTARMA AKTİF: LOKAL ANALİZ";
+            if (isMobile) {
+              header.innerText = "SİSTEM KURTARMA AKTİF: MOBİL AĞ OPTİMİZASYONU";
+            } else {
+              header.innerText = "SİSTEM KURTARMA AKTİF: LOKAL ANALİZ";
+            }
           }
-          progressText.innerText = "Kuantum düğümleri yanıt vermedi. Yerel çekirdekler üzerinden tarama sürdürülüyor...";
+          if (isMobile) {
+            progressText.innerText = "Mobil ağ optimizasyonu aktif. Yerel rezonans verileri kullanılıyor...";
+          } else {
+            progressText.innerText = "Kuantum düğümleri yanıt vermedi. Yerel çekirdekler üzerinden tarama sürdürülüyor...";
+          }
           
-          // 2. Lokal CPU simüsimilasyonu için 1.5 saniye bekle
+          // 2. Lokal CPU simülasyonu için 1.5 saniye bekle
           await new Promise(resolve => setTimeout(resolve, 1500));
           
           // 3. Lokal rezonans fallback sonuçlarını oluştur
