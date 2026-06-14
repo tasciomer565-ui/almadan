@@ -3358,11 +3358,24 @@ window.tryOnGarmentX = 75;
 window.tryOnGarmentY = 100;
 window.tryOnGarmentW = 150;
 window.tryOnGarmentH = 150;
+window.tryOnGarmentAngle = 0;
+window.tryOnChromaThreshold = 235;
+window.tryOnGarmentAspectRatio = 1.0;
 
 window.updateTryOnGarmentSize = function(sizeVal) {
   const parsed = parseInt(sizeVal, 10);
   window.tryOnGarmentW = parsed;
-  window.tryOnGarmentH = parsed;
+  window.tryOnGarmentH = Math.round(parsed / (window.tryOnGarmentAspectRatio || 1.0));
+  window.drawTryOnScene();
+};
+
+window.updateTryOnGarmentAngle = function(angleVal) {
+  window.tryOnGarmentAngle = (parseInt(angleVal, 10) * Math.PI) / 180;
+  window.drawTryOnScene();
+};
+
+window.updateTryOnChromaThreshold = function(thresholdVal) {
+  window.tryOnChromaThreshold = parseInt(thresholdVal, 10);
   window.drawTryOnScene();
 };
 
@@ -3375,13 +3388,71 @@ window.drawGarmentTransparent = function(ctx, img, x, y, w, h) {
   
   const imgData = tempCtx.getImageData(0, 0, w, h);
   const data = imgData.data;
+  const threshold = window.tryOnChromaThreshold || 235;
   
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i+1];
-    const b = data[i+2];
-    if (r > 240 && g > 240 && b > 240) {
-      data[i+3] = 0;
+  // Flood-fill border-connected white pixels
+  const visited = new Uint8Array(w * h);
+  const queue = [];
+  
+  const isWhite = (px, py) => {
+    const idx = (py * w + px) * 4;
+    const r = data[idx];
+    const g = data[idx + 1];
+    const b = data[idx + 2];
+    const a = data[idx + 3];
+    if (a < 50) return true;
+    return r > threshold && g > threshold && b > threshold;
+  };
+  
+  // Top and bottom borders
+  for (let px = 0; px < w; px++) {
+    if (isWhite(px, 0)) { queue.push(px, 0); visited[px] = 1; }
+    if (isWhite(px, h - 1)) { queue.push(px, h - 1); visited[(h - 1) * w + px] = 1; }
+  }
+  // Left and right borders
+  for (let py = 1; py < h - 1; py++) {
+    if (isWhite(0, py)) { queue.push(0, py); visited[py * w] = 1; }
+    if (isWhite(w - 1, py)) { queue.push(w - 1, py); visited[py * w + w - 1] = 1; }
+  }
+  
+  let head = 0;
+  const fillThreshold = Math.max(120, threshold - 20);
+  
+  while (head < queue.length) {
+    const cx = queue[head++];
+    const cy = queue[head++];
+    
+    const neighbors = [
+      cx - 1, cy,
+      cx + 1, cy,
+      cx, cy - 1,
+      cx, cy + 1
+    ];
+    
+    for (let j = 0; j < 8; j += 2) {
+      const nx = neighbors[j];
+      const ny = neighbors[j+1];
+      if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+        const nIdx = ny * w + nx;
+        if (!visited[nIdx]) {
+          const idx = nIdx * 4;
+          const r = data[idx];
+          const g = data[idx+1];
+          const b = data[idx+2];
+          const a = data[idx+3];
+          
+          if (a < 50 || (r > fillThreshold && g > fillThreshold && b > fillThreshold)) {
+            visited[nIdx] = 1;
+            queue.push(nx, ny);
+          }
+        }
+      }
+    }
+  }
+  
+  for (let i = 0; i < visited.length; i++) {
+    if (visited[i]) {
+      data[i * 4 + 3] = 0;
     }
   }
   
@@ -3430,7 +3501,28 @@ window.drawTryOnScene = function() {
     }
     
     garmentImg.onload = () => {
-      window.drawGarmentTransparent(ctx, garmentImg, window.tryOnGarmentX, window.tryOnGarmentY, window.tryOnGarmentW, window.tryOnGarmentH);
+      // Calculate aspect ratio dynamically
+      const aspect = garmentImg.naturalWidth / garmentImg.naturalHeight;
+      window.tryOnGarmentAspectRatio = aspect;
+      window.tryOnGarmentH = Math.round(window.tryOnGarmentW / aspect);
+      
+      ctx.save();
+      
+      // Shadow for realism
+      ctx.shadowColor = "rgba(0, 0, 0, 0.25)";
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 5;
+      
+      // Center and rotate
+      const centerX = window.tryOnGarmentX + window.tryOnGarmentW / 2;
+      const centerY = window.tryOnGarmentY + window.tryOnGarmentH / 2;
+      ctx.translate(centerX, centerY);
+      ctx.rotate(window.tryOnGarmentAngle || 0);
+      
+      window.drawGarmentTransparent(ctx, garmentImg, -window.tryOnGarmentW / 2, -window.tryOnGarmentH / 2, window.tryOnGarmentW, window.tryOnGarmentH);
+      
+      ctx.restore();
     };
   };
 };
@@ -3455,7 +3547,10 @@ window.autoFitGarmentOnUserPhoto = function() {
       window.tryOnGarmentX = 75;
       window.tryOnGarmentY = 110;
       window.tryOnGarmentW = 150;
-      window.tryOnGarmentH = 150;
+      window.tryOnGarmentH = Math.round(150 / (window.tryOnGarmentAspectRatio || 1.0));
+      window.tryOnGarmentAngle = 0;
+      const angleSlider = document.getElementById("tryOnAngleSlider");
+      if (angleSlider) angleSlider.value = 0;
       const slider = document.getElementById("tryOnSizeSlider");
       if (slider) slider.value = 150;
       window.drawTryOnScene();
@@ -3524,6 +3619,39 @@ window.autoFitGarmentOnUserPhoto = function() {
       if (avgW > 240) avgW = 160;
       if (avgC < 60 || avgC > 240) avgC = 150;
       
+      // Estimate shoulder points to find the tilt angle
+      // Sol omuz and sağ omuz are the leftmost and rightmost points in the shoulder region (Y=120 to Y=180)
+      let minX = 300, minXY = 140;
+      let maxX = 0, maxXY = 140;
+      
+      for (let i = 0; i < lefts.length; i++) {
+        const y = 100 + i * 4;
+        if (y >= 120 && y <= 180) {
+          if (lefts[i] < minX) {
+            minX = lefts[i];
+            minXY = y;
+          }
+          if (rights[i] > maxX) {
+            maxX = rights[i];
+            maxXY = y;
+          }
+        }
+      }
+      
+      let shoulderAngle = 0;
+      if (maxX > minX && Math.abs(maxXY - minXY) < 40) {
+        shoulderAngle = Math.atan2(maxXY - minXY, maxX - minX);
+        if (Math.abs(shoulderAngle) > 0.35) {
+          shoulderAngle = 0;
+        }
+      }
+      window.tryOnGarmentAngle = shoulderAngle;
+      
+      const angleSlider = document.getElementById("tryOnAngleSlider");
+      if (angleSlider) {
+        angleSlider.value = Math.round((shoulderAngle * 180) / Math.PI);
+      }
+      
       // Estimate Y: find the top of the body (shoulders / neck level)
       let detectedTopY = 110;
       for (let y = 50; y < 150; y += 2) {
@@ -3542,7 +3670,7 @@ window.autoFitGarmentOnUserPhoto = function() {
       detectedTopY = Math.max(90, Math.min(detectedTopY, 130));
       
       window.tryOnGarmentW = Math.round(avgW * 1.1);
-      window.tryOnGarmentH = window.tryOnGarmentW;
+      window.tryOnGarmentH = Math.round(window.tryOnGarmentW / (window.tryOnGarmentAspectRatio || 1.0));
       window.tryOnGarmentX = Math.round(avgC - window.tryOnGarmentW / 2);
       window.tryOnGarmentY = detectedTopY;
       
@@ -3552,7 +3680,10 @@ window.autoFitGarmentOnUserPhoto = function() {
       window.tryOnGarmentX = 75;
       window.tryOnGarmentY = 110;
       window.tryOnGarmentW = 150;
-      window.tryOnGarmentH = 150;
+      window.tryOnGarmentH = Math.round(150 / (window.tryOnGarmentAspectRatio || 1.0));
+      window.tryOnGarmentAngle = 0;
+      const angleSlider = document.getElementById("tryOnAngleSlider");
+      if (angleSlider) angleSlider.value = 0;
       const slider = document.getElementById("tryOnSizeSlider");
       if (slider) slider.value = 150;
     }
@@ -3581,7 +3712,10 @@ window.runFashionTryOnAnimation = function() {
     window.tryOnGarmentX = 75;
     window.tryOnGarmentY = 100;
     window.tryOnGarmentW = 150;
-    window.tryOnGarmentH = 150;
+    window.tryOnGarmentH = Math.round(150 / (window.tryOnGarmentAspectRatio || 1.0));
+    window.tryOnGarmentAngle = 0;
+    const angleSlider = document.getElementById("tryOnAngleSlider");
+    if (angleSlider) angleSlider.value = 0;
     const slider = document.getElementById("tryOnSizeSlider");
     if (slider) slider.value = 150;
   } else {

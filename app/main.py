@@ -204,10 +204,26 @@ async def auth_error_handler(_, exc: AuthError) -> JSONResponse:
     )
 
 
+proxy_cache = {}
+MAX_CACHE_SIZE = 50
+
 @app.get("/image-proxy")
 def image_proxy(url: str) -> Response:
     if not public_image_url(url):
         raise HTTPException(status_code=400, detail="Geçersiz görsel adresi.")
+
+    if url in proxy_cache:
+        # Move to end for LRU behavior
+        content, content_type = proxy_cache.pop(url)
+        proxy_cache[url] = (content, content_type)
+        return Response(
+            content=content,
+            media_type=content_type,
+            headers={
+                "Cache-Control": "public, max-age=86400",
+                "X-Cache": "HIT"
+            },
+        )
 
     try:
         image = requests.get(
@@ -229,10 +245,20 @@ def image_proxy(url: str) -> Response:
     if not content_type.startswith("image/") or len(image.content) > 5_000_000:
         raise HTTPException(status_code=415, detail="Geçersiz ürün görseli.")
 
+    # Save to cache
+    proxy_cache[url] = (image.content, content_type)
+    if len(proxy_cache) > MAX_CACHE_SIZE:
+        # Evict oldest key
+        first_key = next(iter(proxy_cache))
+        proxy_cache.pop(first_key)
+
     return Response(
         content=image.content,
         media_type=content_type,
-        headers={"Cache-Control": "public, max-age=86400"},
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "X-Cache": "MISS"
+        },
     )
 
 
