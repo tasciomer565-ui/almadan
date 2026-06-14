@@ -264,12 +264,38 @@ function bindEvents() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
-      window.userTryOnPhoto = event.target.result;
-      window.selectedTryOnModel = "user";
-      if (btnModelUser) btnModelUser.classList.add("active");
-      if (btnModelMale) btnModelMale.classList.remove("active");
-      if (btnModelFemale) btnModelFemale.classList.remove("active");
-      window.drawTryOnScene();
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const maxW = 600;
+        const maxH = 600;
+        let w = img.naturalWidth || img.width;
+        let h = img.naturalHeight || img.height;
+        if (w > maxW || h > maxH) {
+          if (w > h) {
+            h = Math.round(h * (maxW / w));
+            w = maxW;
+          } else {
+            w = Math.round(w * (maxH / h));
+            h = maxH;
+          }
+        }
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = w;
+        tempCanvas.height = h;
+        const tempCtx = tempCanvas.getContext("2d");
+        tempCtx.drawImage(img, 0, 0, w, h);
+        
+        window.userTryOnPhoto = tempCanvas.toDataURL("image/jpeg", 0.85);
+        window.selectedTryOnModel = "user";
+        if (btnModelUser) btnModelUser.classList.add("active");
+        if (btnModelMale) btnModelMale.classList.remove("active");
+        if (btnModelFemale) btnModelFemale.classList.remove("active");
+        window.poseDetected = false;
+        window.drawTryOnScene();
+        
+        window.detectPoseAndFitGarment(window.userTryOnPhoto);
+      };
     };
     reader.readAsDataURL(file);
   });
@@ -3372,6 +3398,54 @@ window.tryOnGarmentH = 150;
 window.tryOnGarmentAngle = 0;
 window.tryOnChromaThreshold = 235;
 window.tryOnGarmentAspectRatio = 1.0;
+window.poseDetected = false;
+
+window.detectPoseAndFitGarment = async function(photoBase64) {
+  try {
+    console.log("Starting backend AI pose detection...");
+    const response = await fetch("/api/detect-pose", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ image_base64: photoBase64 })
+    });
+    if (!response.ok) throw new Error("API response error");
+    const data = await response.json();
+    if (data.success) {
+      console.log("Backend AI pose detection successful:", data);
+      
+      const bodyW = data.body_width * 300;
+      const tiltAngle = data.tilt_angle;
+      const neckX = data.neck_anchor[0] * 300;
+      const neckY = data.neck_anchor[1] * 300;
+      
+      window.tryOnGarmentW = Math.round(bodyW * 1.1);
+      window.tryOnGarmentH = Math.round(window.tryOnGarmentW / (window.tryOnGarmentAspectRatio || 1.0));
+      window.tryOnGarmentX = Math.round(neckX - window.tryOnGarmentW / 2);
+      window.tryOnGarmentY = Math.round(neckY);
+      window.tryOnGarmentAngle = tiltAngle;
+      
+      const angleSlider = document.getElementById("tryOnAngleSlider");
+      if (angleSlider) {
+        angleSlider.value = Math.round((tiltAngle * 180) / Math.PI);
+      }
+      const slider = document.getElementById("tryOnSizeSlider");
+      if (slider) slider.value = window.tryOnGarmentW;
+      
+      window.poseDetected = true;
+      window.drawTryOnScene();
+    } else {
+      console.warn("Backend pose detection success=false:", data.error_message);
+      window.autoFitGarmentOnUserPhoto();
+      window.poseDetected = true;
+    }
+  } catch (err) {
+    console.warn("Backend pose detection call failed, using client scanning fallback:", err);
+    window.autoFitGarmentOnUserPhoto();
+    window.poseDetected = true;
+  }
+};
 
 window.updateTryOnGarmentSize = function(sizeVal) {
   const parsed = parseInt(sizeVal, 10);
@@ -3641,7 +3715,7 @@ window.drawTryOnScene = function() {
       ctx.save();
       
       // Floating / Bobbing logic
-      const bobOffset = Math.sin(Date.now() / 250) * 3.5;
+      const bobOffset = Math.sin(Date.now() / 300) * 2.5;
       
       // Holographic Neon blue drop-shadow glow
       ctx.shadowColor = "rgba(0, 150, 255, 0.45)";
@@ -3838,6 +3912,9 @@ window.runFashionTryOnAnimation = function() {
   const successBanner = document.getElementById("aiAnalysisSuccessBanner");
   if (successBanner) successBanner.classList.add("hidden");
   
+  const svgHud = document.getElementById("tryOnSvgHud");
+  if (svgHud) svgHud.classList.remove("hidden");
+  
   laserEl.classList.remove("hidden");
   showToast("Yapay zeka prova işlemi başlatıldı...");
   
@@ -3851,7 +3928,7 @@ window.runFashionTryOnAnimation = function() {
     if (angleSlider) angleSlider.value = 0;
     const slider = document.getElementById("tryOnSizeSlider");
     if (slider) slider.value = 150;
-  } else {
+  } else if (!window.poseDetected) {
     window.autoFitGarmentOnUserPhoto();
   }
   
@@ -3862,6 +3939,7 @@ window.runFashionTryOnAnimation = function() {
   
   setTimeout(() => {
     laserEl.classList.add("hidden");
+    if (svgHud) svgHud.classList.add("hidden");
     window.isScanningPose = false;
     window.initTryOnParticles();
     

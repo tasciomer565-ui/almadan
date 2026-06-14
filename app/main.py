@@ -262,6 +262,164 @@ def image_proxy(url: str) -> Response:
     )
 
 
+class PoseRequest(BaseModel):
+    image_base64: str
+
+
+@app.post("/api/detect-pose")
+def detect_pose(payload: PoseRequest) -> dict:
+    import base64
+    import io
+    import math
+    import numpy as np
+    from PIL import Image
+
+    try:
+        base64_data = payload.image_base64
+        if "," in base64_data:
+            _, base64_data = base64_data.split(",", 1)
+
+        img_bytes = base64.b64decode(base64_data)
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        img_rgb = np.array(img)
+        h, w, _ = img_rgb.shape
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Görsel çözümlenemedi: {str(exc)}")
+
+    # Try running MediaPipe Pose
+    try:
+        import mediapipe as mp
+        mp_pose = mp.solutions.pose
+        with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5) as pose:
+            results = pose.process(img_rgb)
+            if results.pose_landmarks:
+                landmarks = results.pose_landmarks.landmark
+                left_shoulder = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER]
+                right_shoulder = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER]
+
+                # Check visibility threshold (0.4 is reasonable)
+                if left_shoulder.visibility > 0.4 and right_shoulder.visibility > 0.4:
+                    dx = left_shoulder.x - right_shoulder.x
+                    dy = left_shoulder.y - right_shoulder.y
+                    tilt_angle = math.atan2(dy, dx)
+
+                    # Midpoint neck anchor
+                    neck_x = (left_shoulder.x + right_shoulder.x) / 2
+                    neck_y = (left_shoulder.y + right_shoulder.y) / 2
+
+                    # shoulder_left is the left side of the image (smaller X) which corresponds to RIGHT_SHOULDER
+                    # shoulder_right is the right side of the image (greater X) which corresponds to LEFT_SHOULDER
+                    return {
+                        "success": True,
+                        "shoulder_left": [right_shoulder.x, right_shoulder.y],
+                        "shoulder_right": [left_shoulder.x, left_shoulder.y],
+                        "tilt_angle": tilt_angle,
+                        "body_width": dx,
+                        "neck_anchor": [neck_x, neck_y],
+                        "source": "mediapipe"
+                    }
+    except Exception as mp_err:
+        print(f"MediaPipe failed, falling back to NumPy: {mp_err}")
+
+    # Fallback NumPy Contrast/Edge scan algorithm
+    try:
+        samples = [
+            img_rgb[min(5, h-1), min(5, w-1)],
+            img_rgb[min(5, h-1), w // 2],
+            img_rgb[min(5, h-1), max(0, w-6)],
+            img_rgb[h // 2, min(5, w-1)],
+            img_rgb[h // 2, max(0, w-6)],
+            img_rgb[max(0, h-6), min(5, w-1)],
+            img_rgb[max(0, h-6), max(0, w-6)]
+        ]
+        bg_color = np.mean(samples, axis=0)
+
+        def is_different(pixel):
+            diff = np.sqrt(np.sum((pixel - bg_color) ** 2))
+            return diff > 35.0
+
+        lefts = []
+        rights = []
+        y_step = max(2, h // 75)
+        for y in range(int(h * 0.33), int(h * 0.80), y_step):
+            first_x = -1
+            last_x = -1
+            for x in range(int(w * 0.03), int(w * 0.97)):
+                if is_different(img_rgb[y, x]):
+                    if first_x == -1:
+                        first_x = x
+                    last_x = x
+            if first_x != -1 and last_x != -1 and (last_x - first_x) > (w * 0.13):
+                lefts.append((first_x, y))
+                rights.append((last_x, y))
+
+        if len(lefts) >= 5:
+            widths = [r[0] - l[0] for l, r in zip(lefts, rights)]
+            centers = [(l[0] + r[0]) / 2 for l, r in zip(lefts, rights)]
+
+            avg_width = sum(widths) / len(widths)
+            avg_center = sum(centers) / len(centers)
+
+            if avg_width < w * 0.23: avg_width = w * 0.43
+            if avg_width > w * 0.8: avg_width = w * 0.53
+            if avg_center < w * 0.2 or avg_center > w * 0.8: avg_center = w * 0.5
+
+            min_x, min_x_y = w, h // 2
+            max_x, max_x_y = 0, h // 2
+
+            for l, r in zip(lefts, rights):
+                lx, ly = l
+                rx, ry = r
+                if int(h * 0.4) <= ly <= int(h * 0.6):
+                    if lx < min_x:
+                        min_x = lx
+                        min_x_y = ly
+                    if rx > max_x:
+                        max_x = rx
+                        max_x_y = ry
+
+            tilt_angle = 0.0
+            if max_x > min_x and abs(max_x_y - min_x_y) < h * 0.13:
+                tilt_angle = math.atan2(max_x_y - min_x_y, max_x - min_x)
+                if abs(tilt_angle) > 0.35:
+                    tilt_angle = 0.0
+
+            detected_top_y = int(h * 0.37)
+            for y in range(int(h * 0.16), int(h * 0.50), 2):
+                diff_count = 0
+                for x in range(int(w * 0.13), int(w * 0.87)):
+                    if is_different(img_rgb[y, x]):
+                        diff_count += 1
+                if diff_count > 15:
+                    detected_top_y = y + int(h * 0.13)
+                    break
+
+            detected_top_y = max(int(h * 0.3), min(detected_top_y, int(h * 0.43)))
+
+            return {
+                "success": True,
+                "shoulder_left": [min_x / w, min_x_y / h],
+                "shoulder_right": [max_x / w, max_x_y / h],
+                "tilt_angle": tilt_angle,
+                "body_width": avg_width / w,
+                "neck_anchor": [avg_center / w, detected_top_y / h],
+                "source": "contrast_fallback"
+            }
+    except Exception as fallback_err:
+        print(f"NumPy fallback failed: {fallback_err}")
+
+    return {
+        "success": False,
+        "shoulder_left": [0.25, 0.4],
+        "shoulder_right": [0.75, 0.4],
+        "tilt_angle": 0.0,
+        "body_width": 0.5,
+        "neck_anchor": [0.5, 0.37],
+        "source": "default_fallback",
+        "error_message": "Both MediaPipe and NumPy scan failed, using default values."
+    }
+
+
 def require_device_id(x_device_id: str | None) -> str:
     if not x_device_id or len(x_device_id) < 8:
         raise HTTPException(status_code=400, detail="Geçerli cihaz kimliği gerekli")

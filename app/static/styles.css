@@ -2437,3 +2437,14 @@ body.dark-theme .opt-savings-tag {
   padding: 5px;
   text-align: center;
 }
+
+.glass-ui {
+  position: relative;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
