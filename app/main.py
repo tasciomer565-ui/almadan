@@ -1301,7 +1301,7 @@ def search_products(
         else query
     )
     
-    products = search_products_by_name(gendered_query)
+    products = search_products_by_name(gendered_query, category=category)
     fallback_applied = any(p.get("extra_info", {}).get("fallback") for p in products)
     
     suggestion = None

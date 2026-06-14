@@ -498,51 +498,42 @@ def search_n11_direct(query: str) -> tuple[list[dict], str]:
         
     return parsed_results, corrected_query
 
-def search_products_by_name(query: str) -> list[dict]:
-    # 1. Fetch N11 products and corrected query (corrects typos like "gübeş" -> "güneş")
-    n11_products, corrected_query = search_n11_direct(query)
+def run_async(coro):
+    import asyncio
+    import threading
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
     
-    # 2. Fetch search URLs from AOL (Yahoo index) for multi-store products using corrected query
-    aol_urls = _fetch_aol_urls(corrected_query)
+    if loop.is_running():
+        result = [None]
+        err = [None]
+        def runner():
+            try:
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                result[0] = new_loop.run_until_complete(coro)
+            except Exception as e:
+                err[0] = e
+            finally:
+                new_loop.close()
+        t = threading.Thread(target=runner)
+        t.start()
+        t.join()
+        if err[0]:
+            raise err[0]
+        return result[0]
+    else:
+        return loop.run_until_complete(coro)
+
+def search_products_by_name(query: str, category: str = "general") -> list[dict]:
+    # 1. Run Kuantum Arama Orkestratörü
+    from app.search_orchestrator import master_search
+    all_products = run_async(master_search(query, selected_category=category))
+    corrected_query = query
     
-    # 3. Parse AOL product pages in parallel
-    aol_products = []
-    if aol_urls:
-        candidates = aol_urls[:8]
-        from concurrent.futures import ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = {executor.submit(parse_product_url, u): u for u in candidates}
-            for future in futures:
-                try:
-                    parsed = future.result()
-                    if parsed.title:
-                        is_out_of_stock = parsed.price is None or parsed.price == 0
-                        price_val = parsed.price if not is_out_of_stock else 0
-                        aol_products.append({
-                            "title": parsed.title,
-                            "price": price_val,
-                            "original_price": parsed.original_price,
-                            "image_url": parsed.image_url,
-                            "source": parsed.source,
-                            "url": parsed.canonical_url,
-                            "labels": ["Stokta Yok"] if is_out_of_stock else ["Önerilen"],
-                            "extra_info": {
-                                **(parsed.extra_info or {}),
-                                "out_of_stock": is_out_of_stock
-                            }
-                        })
-                except Exception:
-                    pass
-                    
-    # 4. Merge results (prioritize AOL products for store diversity)
-    all_products = []
-    seen_urls = set()
-    for p in aol_products + n11_products:
-        url_clean = p["url"].split("?")[0].strip()
-        if url_clean not in seen_urls:
-            seen_urls.add(url_clean)
-            all_products.append(p)
-            
     # 5. Filter out accessory/irrelevant products (like cloth, case, cables)
     filtered_products = [p for p in all_products if is_logical_product(corrected_query, p["title"])]
     

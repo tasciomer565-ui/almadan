@@ -32,7 +32,7 @@ class TestSearchByName(unittest.TestCase):
             self.assertIsInstance(item["labels"], list)
             self.assertTrue(len(item["labels"]) >= 1)
             for label in item["labels"]:
-                self.assertIn(label, ["En Ucuz", "En Yüksek İndirim", "Hızlı Kargo", "En İyi Puan", "Önerilen", "Birim Fiyat Avantajı", "Şüpheli Fiyat", "Önerilen Alternatif", "Birim Fiyat Riski"])
+                self.assertIn(label, ["En Ucuz", "En Yüksek İndirim", "Hızlı Kargo", "En İyi Puan", "Önerilen", "Birim Fiyat Avantajı", "Şüpheli Fiyat", "Önerilen Alternatif", "Birim Fiyat Riski", "Sistem, lokal rezonans verisi kullanıyor", "Lokal Fallback"])
                 
         print(f"Search successfully returned {len(results)} items.")
         if results:

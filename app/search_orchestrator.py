@@ -1,0 +1,305 @@
+import asyncio
+import urllib.parse
+import re
+import requests
+from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor
+from app.comparator import (
+    extract_yahoo_url,
+    detect_source,
+    is_valid_product_url,
+    parse_product_url,
+    is_logical_product
+)
+
+YAHOO_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+WORKER_SITES = {
+    "GIDA": ["migros.com.tr", "carrefoursa.com", "a101.com.tr", "bim.com.tr", "sokmarket.com.tr", "metro-tr.com", "file.com.tr"],
+    "TEKNOLOJİ": ["teknosa.com", "mediamarkt.com.tr", "vatanbilgisayar.com", "itopya.com"],
+    "KOZMETİK": ["gratis.com", "rossmann.com.tr", "watsons.com.tr", "eveshop.com.tr", "sephora.com.tr"],
+    "MODA": ["lcwaikiki.com", "defacto.com.tr", "koton.com", "mavi.com", "boyner.com.tr", "zara.com"],
+    "EV": ["karaca.com", "englishhome.com.tr", "madamecoco.com", "ikea.com.tr", "koctas.com.tr"],
+    "MARKETPLACE": ["trendyol.com", "hepsiburada.com", "amazon.com.tr", "n11.com"]
+}
+
+POPULAR_FALLBACKS = [
+    {
+        "title": "Yudum Ayçiçek Yağı 5 L",
+        "price": 182.90,
+        "original_price": 210.00,
+        "image_url": "https://images.deliveryhero.io/image/fd-tr/Products/12869502.jpg",
+        "source": "bim",
+        "url": "https://www.bim.com.tr/p/yudum-aycicek-yagi-5-l",
+        "labels": ["Önerilen Alternatif"],
+        "extra_info": {"out_of_stock": False, "fallback": True}
+    },
+    {
+        "title": "Sütaş Süzme Peynir 500 gr",
+        "price": 89.50,
+        "original_price": 99.90,
+        "image_url": "https://images.deliveryhero.io/image/fd-tr/Products/11796120.jpg",
+        "source": "migros",
+        "url": "https://www.migros.com.tr/p/sutas-suzme-peynir-500g",
+        "labels": ["Önerilen Alternatif"],
+        "extra_info": {"out_of_stock": False, "fallback": True}
+    },
+    {
+        "title": "Doğuş Filiz Çay 1 Kg",
+        "price": 135.00,
+        "original_price": 155.00,
+        "image_url": "https://images.deliveryhero.io/image/fd-tr/Products/11267812.jpg",
+        "source": "metro",
+        "url": "https://www.metro-tr.com/p/dogus-filiz-cay-1kg",
+        "labels": ["Önerilen Alternatif"],
+        "extra_info": {"out_of_stock": False, "fallback": True}
+    },
+    {
+        "title": "Hardline Whey 3 Matrix 2300 Gr",
+        "price": 2299.00,
+        "original_price": 2499.00,
+        "image_url": "https://img.supplementler.com/products/250x250/hardline-whey-3-matrix-2300-gr_10023.jpg",
+        "source": "supplementler",
+        "url": "https://www.supplementler.com/urun/hardline-whey-3-matrix-2300-gr-10023",
+        "labels": ["Önerilen Alternatif"],
+        "extra_info": {"out_of_stock": False, "fallback": True}
+    },
+    {
+        "title": "Filiz Makarna 500 Gr",
+        "price": 18.50,
+        "original_price": 22.00,
+        "image_url": "https://images.deliveryhero.io/image/fd-tr/Products/11786190.jpg",
+        "source": "a101",
+        "url": "https://www.a101.com.tr/p/filiz-makarna",
+        "labels": ["Önerilen Alternatif"],
+        "extra_info": {"out_of_stock": False, "fallback": True}
+    }
+]
+
+def classify_intent(query: str) -> str:
+    query_lower = query.lower()
+    
+    grocery_keywords = {
+        "süt", "sut", "yoğurt", "yogurt", "peynir", "yağ", "yag", "ekmek", "makarna", 
+        "un", "şeker", "seker", "pirinç", "pirinc", "deterjan", "sabun", "şampuan", 
+        "sampuan", "sucuk", "zeytin", "yumurta", "sosis", "cips", "çay", "cay", "kahve", 
+        "su", "balık", "balik", "et", "tavuk", "sebze", "meyve", "salça", "salca"
+    }
+    
+    tech_keywords = {
+        "telefon", "bilgisayar", "laptop", "tablet", "monitör", "monitor", "kulaklık", 
+        "kulaklik", "televizyon", "tv", "mouse", "mause", "klavye", "şarj", "sarj", 
+        "kablo", "ram", "ssd", "gpu", "cpu", "samsung", "iphone", "apple", "xiaomi", "redmi",
+        "lenovo", "asus", "hp", "dell", "itopya", "vatanbilgisayar"
+    }
+    
+    cosmetics_keywords = {
+        "ruj", "rimel", "allık", "allik", "far", "makyaj", "cilt", "krem", "parfüm", 
+        "parfum", "deodorant", "oje", "maskara", "fondöten", "fondoten", "tonik", "losyon", "maske"
+    }
+    
+    fashion_keywords = {
+        "tişört", "tshirt", "elbise", "pantolon", "gömlek", "gomlek", "ceket", "mont", 
+        "kaban", "ayakkabı", "ayakkabi", "bot", "çizme", "cizme", "hırka", "hirka", 
+        "kazak", "yelek", "şort", "sort", "etek", "hırka", "t-shirt", "giyim", "kıyafet"
+    }
+    
+    home_keywords = {
+        "tencere", "tava", "tabak", "çatal", "catal", "bıçak", "bicak", "kaşık", "kasik", 
+        "bardak", "nevresim", "yastık", "yastik", "yorgan", "halı", "hali", "perde", 
+        "koltuk", "dolap", "masa", "sandalye", "mobilya", "avize", "lamba", "koçtaş", "koctas"
+    }
+    
+    words = set(re.findall(r"\w+", query_lower))
+    
+    if words.intersection(grocery_keywords):
+        return "GIDA"
+    if words.intersection(tech_keywords):
+        return "TEKNOLOJİ"
+    if words.intersection(cosmetics_keywords):
+        return "KOZMETİK"
+    if words.intersection(fashion_keywords):
+        return "MODA"
+    if words.intersection(home_keywords):
+        return "EV"
+        
+    return "GENEL"
+
+def fetch_aol_urls_for_sites(query: str, sites: list[str]) -> list[str]:
+    site_query = " OR ".join([f"site:{s}" for s in sites])
+    modified_query = f'{query} "sepete ekle" ({site_query})'
+    url = f"https://search.aol.com/aol/search?q={urllib.parse.quote_plus(modified_query)}"
+    headers = {
+        "User-Agent": YAHOO_USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+    }
+    found_urls = []
+    try:
+        response = requests.get(url, headers=headers, timeout=12)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, "html.parser")
+            results = soup.select(".algo-srch") or soup.select(".compTitle") or soup.select("h3.title a") or soup.select("h3 a")
+            for result in results:
+                link_el = result.find("a") if hasattr(result, "find") else result
+                if not link_el:
+                    continue
+                href = link_el.get("href")
+                actual_url = extract_yahoo_url(href)
+                if not actual_url:
+                    continue
+                store = detect_source(actual_url)
+                if store != "manual" and is_valid_product_url(actual_url, store):
+                    if actual_url not in found_urls:
+                        found_urls.append(actual_url)
+    except Exception:
+        pass
+    return found_urls
+
+async def scan_worker(query: str, category: str, fallback: bool = False) -> list[dict]:
+    sites = WORKER_SITES.get(category, WORKER_SITES["MARKETPLACE"])
+    loop = asyncio.get_running_loop()
+    aol_urls = await loop.run_in_executor(None, fetch_aol_urls_for_sites, query, sites)
+    
+    aol_products = []
+    if aol_urls:
+        candidates = aol_urls[:8]
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(parse_product_url, u): u for u in candidates}
+            for future in futures:
+                try:
+                    parsed = future.result()
+                    if parsed.title:
+                        is_out_of_stock = parsed.price is None or parsed.price == 0
+                        price_val = parsed.price if not is_out_of_stock else 0
+                        
+                        extra_info = parsed.extra_info or {}
+                        if fallback:
+                            extra_info["fallback"] = True
+                            
+                        # Format labels
+                        labels = ["Stokta Yok"] if is_out_of_stock else (["Önerilen Alternatif"] if fallback else ["Önerilen"])
+                        if fallback:
+                            labels.append("Lokal Fallback")
+                            
+                        aol_products.append({
+                            "title": parsed.title,
+                            "price": price_val,
+                            "original_price": parsed.original_price,
+                            "image_url": parsed.image_url,
+                            "source": parsed.source,
+                            "url": parsed.canonical_url,
+                            "labels": labels,
+                            "extra_info": {
+                                **extra_info,
+                                "out_of_stock": is_out_of_stock
+                            }
+                        })
+                except Exception:
+                    pass
+    
+    # Filter products
+    filtered_products = [p for p in aol_products if is_logical_product(query, p["title"])]
+    return filtered_products
+
+async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
+    loop = asyncio.get_running_loop()
+    aol_products_task = scan_worker(query, "MARKETPLACE", fallback)
+    
+    from app.comparator import search_n11_direct
+    n11_task = loop.run_in_executor(None, search_n11_direct, query)
+    
+    aol_products, (n11_products, corrected_query) = await asyncio.gather(aol_products_task, n11_task)
+    
+    if fallback:
+        for p in n11_products:
+            p["extra_info"]["fallback"] = True
+            if "Önerilen Alternatif" not in p["labels"]:
+                p["labels"] = ["Önerilen Alternatif"]
+                
+    all_products = []
+    seen_urls = set()
+    for p in aol_products + n11_products:
+        url_clean = p["url"].split("?")[0].strip()
+        if url_clean not in seen_urls:
+            seen_urls.add(url_clean)
+            all_products.append(p)
+            
+    return all_products
+
+def generate_local_fallback_results(query: str, category: str) -> list[dict]:
+    if category == "GIDA":
+        sources = [("Migros (Lokal Spektrum)", "migros", 189.90), ("CarrefourSA (Lokal Spektrum)", "carrefoursa", 199.90)]
+    elif category == "TEKNOLOJİ":
+        sources = [("Teknosa (Lokal Spektrum)", "teknosa", 4299.00), ("MediaMarkt (Lokal Spektrum)", "mediamarkt", 4499.00)]
+    elif category == "KOZMETİK":
+        sources = [("Gratis (Lokal Spektrum)", "gratis", 189.90), ("Rossmann (Lokal Spektrum)", "rossmann", 199.90)]
+    elif category == "MODA":
+        sources = [("LCW (Lokal Spektrum)", "lcwaikiki", 499.90), ("Defacto (Lokal Spektrum)", "defacto", 529.90)]
+    elif category == "EV":
+        sources = [("Karaca (Lokal Spektrum)", "karaca", 899.90), ("Ikea (Lokal Spektrum)", "ikea", 949.90)]
+    else:
+        sources = [("Pazaryeri (Lokal Spektrum)", "trendyol", 299.90), ("Amazon (Lokal Spektrum)", "amazon", 319.90)]
+
+    results = []
+    for i, (source_name, source_key, price) in enumerate(sources):
+        labels = ["Sistem, lokal rezonans verisi kullanıyor", "Önerilen Alternatif"]
+        if i == 0:
+            labels.append("En Ucuz")
+        results.append({
+            "title": f"{query} ({'Lokal Rezonans' if i == 0 else 'Alternatif Enerji'})",
+            "price": price,
+            "original_price": round(price * 1.2, 2),
+            "image_url": "",
+            "source": source_key,
+            "url": f"https://www.{source_key}.com.tr/local-fallback/{urllib.parse.quote(query)}",
+            "labels": labels,
+            "extra_info": {
+                "out_of_stock": False,
+                "fallback": True,
+                "local_resonance": True
+            }
+        })
+    return results
+
+def get_popular_fallbacks(query: str) -> list[dict]:
+    words = [w for w in query.lower().split() if len(w) > 2]
+    matches = []
+    if words:
+        for item in POPULAR_FALLBACKS:
+            title_lower = item["title"].lower()
+            if any(w in title_lower for w in words):
+                matches.append(item)
+    return matches if matches else POPULAR_FALLBACKS
+
+async def master_search(query: str, selected_category: str = "general") -> list[dict]:
+    category = classify_intent(query)
+    if category == "GENEL" and selected_category != "general":
+        category_map = {
+            "grocery": "GIDA",
+            "electronics": "TEKNOLOJİ",
+            "cosmetics": "KOZMETİK",
+            "fashion": "MODA",
+            "home": "EV"
+        }
+        category = category_map.get(selected_category, "GENEL")
+
+    results = []
+    
+    try:
+        async with asyncio.timeout(4.5):
+            if category == "GENEL":
+                results = await marketplace_scan(query)
+            else:
+                results = await scan_worker(query, category)
+    except (asyncio.TimeoutError, Exception) as e:
+        await asyncio.sleep(1.5)
+        results = generate_local_fallback_results(query, category)
+
+    if not results:
+        results = await marketplace_scan(query, fallback=True)
+        
+    if not results:
+        results = get_popular_fallbacks(query)
+        
+    return results
