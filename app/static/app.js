@@ -213,6 +213,13 @@ function bindEvents() {
   document.getElementById("notificationButton").addEventListener("click", showNotifications);
   document.getElementById("accountButton").addEventListener("click", showAccount);
   
+  const gpsPill = document.getElementById("gpsStatusIndicator");
+  if (gpsPill) {
+    gpsPill.addEventListener("click", () => {
+      window.triggerGpsActivation();
+    });
+  }
+  
   document.getElementById("themeToggleButton").addEventListener("click", toggleTheme);
   document.getElementById("quickCartAddBtn").addEventListener("click", addQuickCartItem);
   document.getElementById("quickCartInput").addEventListener("keypress", (e) => {
