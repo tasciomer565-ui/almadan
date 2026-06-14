@@ -3399,10 +3399,21 @@ window.tryOnGarmentAngle = 0;
 window.tryOnChromaThreshold = 235;
 window.tryOnGarmentAspectRatio = 1.0;
 window.poseDetected = false;
+window.isBackendScanning = false;
 
 window.detectPoseAndFitGarment = async function(photoBase64) {
+  const svgHud = document.getElementById("tryOnSvgHud");
+  const scanlineAnim = document.getElementById("tryOnSvgScanline")?.querySelector("animate");
+  
+  if (svgHud) svgHud.classList.remove("hidden");
+  if (scanlineAnim) scanlineAnim.setAttribute("dur", "1s");
+  
+  window.isBackendScanning = true;
+  window.tryOnAnimationActive = true;
+  window.animateTryOnCanvas();
+  showToast("[AI STATUS: Landmark taraması aktif. Vücut taranıyor...]");
+  
   try {
-    console.log("Starting backend AI pose detection...");
     const response = await fetch("/api/detect-pose", {
       method: "POST",
       headers: {
@@ -3434,16 +3445,26 @@ window.detectPoseAndFitGarment = async function(photoBase64) {
       if (slider) slider.value = window.tryOnGarmentW;
       
       window.poseDetected = true;
-      window.drawTryOnScene();
+      showToast("[AI SUCCESS: Vücut hatları başarıyla çözümlendi.]");
     } else {
       console.warn("Backend pose detection success=false:", data.error_message);
       window.autoFitGarmentOnUserPhoto();
       window.poseDetected = true;
+      showToast("[AI ALERT: Pose saptanamadı. Lokal tarama aktif edildi.]");
     }
   } catch (err) {
     console.warn("Backend pose detection call failed, using client scanning fallback:", err);
     window.autoFitGarmentOnUserPhoto();
     window.poseDetected = true;
+    showToast("[AI ALERT: API bağlantı hatası. Lokal yedek tarama devrede.]");
+  } finally {
+    window.isBackendScanning = false;
+    if (!window.isScanningPose) {
+      window.tryOnAnimationActive = false;
+      if (svgHud) svgHud.classList.add("hidden");
+    }
+    if (scanlineAnim) scanlineAnim.setAttribute("dur", "3s");
+    window.drawTryOnScene();
   }
 };
 
@@ -3600,6 +3621,38 @@ window.drawTryOnScene = function() {
   
   modelImg.onload = () => {
     ctx.drawImage(modelImg, 0, 0, 300, 300);
+    
+    if (window.isBackendScanning) {
+      // 1. Neon grid lines
+      ctx.strokeStyle = "rgba(0, 255, 255, 0.07)";
+      ctx.lineWidth = 1;
+      for (let g = 20; g < 300; g += 20) {
+        ctx.beginPath();
+        ctx.moveTo(g, 0); ctx.lineTo(g, 300);
+        ctx.moveTo(0, g); ctx.lineTo(300, g);
+        ctx.stroke();
+      }
+      
+      // 2. Fast Neon sweep scanning line
+      const lineY = (Math.floor(Date.now() / 2.5) % 300);
+      ctx.strokeStyle = "rgba(0, 240, 255, 0.8)";
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = "rgba(0, 240, 255, 0.75)";
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(10, lineY);
+      ctx.lineTo(290, lineY);
+      ctx.stroke();
+      ctx.shadowBlur = 0; // reset
+      
+      // 3. Technical scanning text
+      ctx.fillStyle = "rgba(0, 255, 255, 0.85)";
+      ctx.font = "9px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("[AI POSE LANDMARK DETECTION: ACTIVE]", 150, 140);
+      ctx.fillText("[ANALYZING BODY COORDINATES...]", 150, 160);
+      return;
+    }
     
     if (window.isScanningPose) {
       const elapsed = Date.now() - window.scanStartTime;
