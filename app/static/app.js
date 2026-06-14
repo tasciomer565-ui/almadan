@@ -2635,6 +2635,17 @@ function switchView(view) {
     loadReceipts(document.getElementById("receiptMonthFilter")?.value || "");
   }
 
+  // Handle try-on animation loop state
+  if (view !== "discover") {
+    window.tryOnAnimationActive = false;
+  } else {
+    const selector = document.getElementById("searchCategorySelector");
+    if (selector && selector.value === "fashion" && window.tryOnParticles && window.tryOnParticles.length > 0) {
+      window.tryOnAnimationActive = true;
+      window.animateTryOnCanvas();
+    }
+  }
+
   window.scrollTo({ top: view === "discover" ? 0 : 180, behavior: "smooth" });
 }
 
@@ -3460,6 +3471,36 @@ window.drawGarmentTransparent = function(ctx, img, x, y, w, h) {
   ctx.drawImage(tempCanvas, x, y);
 };
 
+window.tryOnAnimationActive = false;
+window.isScanningPose = false;
+window.scanStartTime = 0;
+window.tryOnParticles = [];
+
+window.initTryOnParticles = function() {
+  window.tryOnParticles = [];
+  for (let i = 0; i < 15; i++) {
+    window.tryOnParticles.push({
+      x: window.tryOnGarmentX + Math.random() * window.tryOnGarmentW,
+      y: window.tryOnGarmentY + Math.random() * window.tryOnGarmentH,
+      size: 1 + Math.random() * 2.5,
+      speed: 0.4 + Math.random() * 1.2,
+      opacity: 0.2 + Math.random() * 0.7
+    });
+  }
+};
+
+window.animateTryOnCanvas = function() {
+  const canvas = document.getElementById("tryOnCanvas");
+  if (!canvas) {
+    window.tryOnAnimationActive = false;
+    return;
+  }
+  if (!window.tryOnAnimationActive) return;
+  
+  window.drawTryOnScene();
+  requestAnimationFrame(window.animateTryOnCanvas);
+};
+
 window.drawTryOnScene = function() {
   const canvas = document.getElementById("tryOnCanvas");
   if (!canvas) return;
@@ -3486,6 +3527,81 @@ window.drawTryOnScene = function() {
   modelImg.onload = () => {
     ctx.drawImage(modelImg, 0, 0, 300, 300);
     
+    if (window.isScanningPose) {
+      const elapsed = Date.now() - window.scanStartTime;
+      const scanPercent = Math.min(1.0, elapsed / 2500);
+      
+      // 1. Neon grid lines
+      ctx.strokeStyle = "rgba(0, 255, 255, 0.07)";
+      ctx.lineWidth = 1;
+      for (let g = 20; g < 300; g += 20) {
+        ctx.beginPath();
+        ctx.moveTo(g, 0); ctx.lineTo(g, 300);
+        ctx.moveTo(0, g); ctx.lineTo(300, g);
+        ctx.stroke();
+      }
+      
+      // 2. Neon sweep scanning line
+      const lineY = scanPercent * 300;
+      ctx.strokeStyle = "rgba(0, 150, 255, 0.85)";
+      ctx.lineWidth = 3;
+      ctx.shadowColor = "rgba(0, 150, 255, 0.8)";
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.moveTo(10, lineY);
+      ctx.lineTo(290, lineY);
+      ctx.stroke();
+      ctx.shadowBlur = 0; // reset
+      
+      // 3. Status text labels
+      ctx.fillStyle = "rgba(0, 255, 255, 0.85)";
+      ctx.font = "9px monospace";
+      ctx.textAlign = "left";
+      ctx.fillText(`[AI BODY SCANNING: ${Math.round(scanPercent * 100)}%]`, 15, 25);
+      ctx.fillText(`[OMUZ GENİŞLİĞİ: ${window.tryOnGarmentW}px]`, 15, 280);
+      
+      ctx.textAlign = "right";
+      ctx.fillText(`[AÇI: ${(window.tryOnGarmentAngle * 180 / Math.PI).toFixed(1)}°]`, 285, 25);
+      ctx.fillText(`[YAKA TESPİTİ: TAMAM]`, 285, 280);
+      
+      // 4. Detected target points
+      const leftS = { x: window.tryOnGarmentX, y: window.tryOnGarmentY + 15 };
+      const rightS = { x: window.tryOnGarmentX + window.tryOnGarmentW, y: window.tryOnGarmentY + 15 + Math.sin(window.tryOnGarmentAngle) * window.tryOnGarmentW };
+      const neckC = { x: window.tryOnGarmentX + window.tryOnGarmentW / 2, y: window.tryOnGarmentY };
+      
+      const drawReticle = (pt, label) => {
+        ctx.strokeStyle = "rgba(0, 255, 255, 0.75)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+        ctx.moveTo(pt.x - 10, pt.y); ctx.lineTo(pt.x + 10, pt.y);
+        ctx.moveTo(pt.x, pt.y - 10); ctx.lineTo(pt.x, pt.y + 10);
+        ctx.stroke();
+        
+        ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
+        ctx.font = "7px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(label, pt.x, pt.y - 12);
+      };
+      
+      drawReticle(leftS, "L_SHOULDER");
+      drawReticle(rightS, "R_SHOULDER");
+      drawReticle(neckC, "NECK_ANCHOR");
+      
+      // Bounding box skeleton line
+      ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(leftS.x, leftS.y);
+      ctx.lineTo(neckC.x, neckC.y);
+      ctx.lineTo(rightS.x, rightS.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      return;
+    }
+    
+    // Normal drawing mode
     const garmentImg = new Image();
     if (window.selectedTryOnGarment === "user") {
       if (!window.userTryOnGarment) {
@@ -3501,22 +3617,41 @@ window.drawTryOnScene = function() {
     }
     
     garmentImg.onload = () => {
-      // Calculate aspect ratio dynamically
       const aspect = garmentImg.naturalWidth / garmentImg.naturalHeight;
       window.tryOnGarmentAspectRatio = aspect;
       window.tryOnGarmentH = Math.round(window.tryOnGarmentW / aspect);
       
+      // Draw rising particles
+      if (window.tryOnParticles.length === 0) {
+        window.initTryOnParticles();
+      }
+      
+      ctx.fillStyle = "rgba(0, 150, 255, 0.45)";
+      window.tryOnParticles.forEach(p => {
+        p.y -= p.speed;
+        if (p.y < window.tryOnGarmentY - 20) {
+          p.y = window.tryOnGarmentY + window.tryOnGarmentH + 10;
+          p.x = window.tryOnGarmentX + Math.random() * window.tryOnGarmentW;
+        }
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      
       ctx.save();
       
-      // Shadow for realism
-      ctx.shadowColor = "rgba(0, 0, 0, 0.25)";
-      ctx.shadowBlur = 10;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 5;
+      // Floating / Bobbing logic
+      const bobOffset = Math.sin(Date.now() / 250) * 3.5;
       
-      // Center and rotate
+      // Holographic Neon blue drop-shadow glow
+      ctx.shadowColor = "rgba(0, 150, 255, 0.45)";
+      ctx.shadowBlur = 15;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 6;
+      
+      // Align, translate, and rotate around center
       const centerX = window.tryOnGarmentX + window.tryOnGarmentW / 2;
-      const centerY = window.tryOnGarmentY + window.tryOnGarmentH / 2;
+      const centerY = window.tryOnGarmentY - 6 + bobOffset + window.tryOnGarmentH / 2;
       ctx.translate(centerX, centerY);
       ctx.rotate(window.tryOnGarmentAngle || 0);
       
@@ -3569,7 +3704,6 @@ window.autoFitGarmentOnUserPhoto = function() {
       };
     };
     
-    // Sample background color from multiple spots on edges
     const bgSamples = [
       getPixel(5, 5), getPixel(150, 5), getPixel(295, 5),
       getPixel(5, 150), getPixel(295, 150),
@@ -3587,7 +3721,6 @@ window.autoFitGarmentOnUserPhoto = function() {
     let lefts = [];
     let rights = [];
     
-    // Torso is usually between Y=100 and Y=240
     for (let y = 100; y < 240; y += 4) {
       let firstX = -1;
       let lastX = -1;
@@ -3619,8 +3752,6 @@ window.autoFitGarmentOnUserPhoto = function() {
       if (avgW > 240) avgW = 160;
       if (avgC < 60 || avgC > 240) avgC = 150;
       
-      // Estimate shoulder points to find the tilt angle
-      // Sol omuz and sağ omuz are the leftmost and rightmost points in the shoulder region (Y=120 to Y=180)
       let minX = 300, minXY = 140;
       let maxX = 0, maxXY = 140;
       
@@ -3652,7 +3783,6 @@ window.autoFitGarmentOnUserPhoto = function() {
         angleSlider.value = Math.round((shoulderAngle * 180) / Math.PI);
       }
       
-      // Estimate Y: find the top of the body (shoulders / neck level)
       let detectedTopY = 110;
       for (let y = 50; y < 150; y += 2) {
         let countDiff = 0;
@@ -3705,6 +3835,9 @@ window.runFashionTryOnAnimation = function() {
   const laserEl = document.getElementById("fashionScanLaser");
   if (!laserEl) return;
   
+  const successBanner = document.getElementById("aiAnalysisSuccessBanner");
+  if (successBanner) successBanner.classList.add("hidden");
+  
   laserEl.classList.remove("hidden");
   showToast("Yapay zeka prova işlemi başlatıldı...");
   
@@ -3722,8 +3855,18 @@ window.runFashionTryOnAnimation = function() {
     window.autoFitGarmentOnUserPhoto();
   }
   
+  window.isScanningPose = true;
+  window.scanStartTime = Date.now();
+  window.tryOnAnimationActive = true;
+  window.animateTryOnCanvas();
+  
   setTimeout(() => {
     laserEl.classList.add("hidden");
+    window.isScanningPose = false;
+    window.initTryOnParticles();
+    
+    if (successBanner) successBanner.classList.remove("hidden");
+    
     showToast("Prova tamamlandı! Yapay zeka kıyafeti başarıyla giydirdi.");
     window.drawTryOnScene();
   }, 2500);
@@ -4606,8 +4749,16 @@ function handleCategoryChange() {
       aiFashionSection.classList.remove("hidden");
       lucide.createIcons();
       window.drawTryOnScene();
+      
+      if (window.tryOnParticles && window.tryOnParticles.length > 0) {
+        window.tryOnAnimationActive = true;
+        window.animateTryOnCanvas();
+      }
     } else {
       aiFashionSection.classList.add("hidden");
+      window.tryOnAnimationActive = false;
+      const successBanner = document.getElementById("aiAnalysisSuccessBanner");
+      if (successBanner) successBanner.classList.add("hidden");
     }
   }
 }

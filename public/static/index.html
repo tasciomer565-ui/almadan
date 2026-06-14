@@ -15,7 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=20260614-fashion-advanced">
+    <link rel="stylesheet" href="/static/styles.css?v=20260614-fashion-hologram">
   </head>
   <body>
     <header class="topbar">
@@ -258,18 +258,32 @@
             <div style="border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; position: relative; background: var(--bg-card);">
               <canvas id="tryOnCanvas" width="300" height="300" style="max-width: 100%; border-radius: 8px; display: block; background: #eaeaea; cursor: move;"></canvas>
               
-              <div style="width: 100%; max-width: 300px; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px;">
-                <span style="font-size: 11px; font-weight: 700; color: var(--ink-light); display: flex; align-items: center; gap: 4px;"><i data-lucide="move" style="width:12px; height:12px;"></i> Boyut:</span>
-                <input type="range" id="tryOnSizeSlider" min="50" max="250" value="150" style="flex: 1; accent-color: var(--green); cursor: pointer;" oninput="window.updateTryOnGarmentSize(this.value)">
+              <!-- Yapay Zeka Başarı Bannerı -->
+              <div id="aiAnalysisSuccessBanner" class="hidden" style="width: 100%; max-width: 300px; margin-top: 10px; padding: 10px; border-radius: 8px; background: rgba(0, 150, 255, 0.08); border: 1px solid rgba(0, 150, 255, 0.2); display: flex; align-items: center; gap: 8px; justify-content: center;">
+                <i data-lucide="shield-check" style="color: #0096ff; width: 16px; height: 16px;"></i>
+                <span style="font-size: 11px; font-weight: 700; color: #0096ff; font-family: 'Manrope', sans-serif;">Yapay Zeka Analizi Başarılı!</span>
               </div>
-              <div style="width: 100%; max-width: 300px; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px;">
-                <span style="font-size: 11px; font-weight: 700; color: var(--ink-light); display: flex; align-items: center; gap: 4px;"><i data-lucide="rotate-cw" style="width:12px; height:12px;"></i> Döndürme:</span>
-                <input type="range" id="tryOnAngleSlider" min="-45" max="45" value="0" style="flex: 1; accent-color: var(--green); cursor: pointer;" oninput="window.updateTryOnGarmentAngle(this.value)">
-              </div>
-              <div style="width: 100%; max-width: 300px; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px;">
-                <span style="font-size: 11px; font-weight: 700; color: var(--ink-light); display: flex; align-items: center; gap: 4px;"><i data-lucide="sliders" style="width:12px; height:12px;"></i> Hassasiyet:</span>
-                <input type="range" id="tryOnChromaThreshold" min="150" max="255" value="235" style="flex: 1; accent-color: var(--green); cursor: pointer;" oninput="window.updateTryOnChromaThreshold(this.value)">
-              </div>
+
+              <!-- Gelişmiş Ayarlar (Katlanabilir) -->
+              <details style="width: 100%; max-width: 300px; margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: rgba(255,255,255,0.02);" id="tryOnAdvancedDetails">
+                <summary style="font-size: 11px; font-weight: 800; color: var(--ink-light); cursor: pointer; outline: none; display: flex; align-items: center; gap: 4px;">
+                  <i data-lucide="settings-2" style="width: 12px; height: 12px;"></i> Gelişmiş Hizalama Ayarları
+                </summary>
+                <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span style="font-size: 11px; font-weight: 700; color: var(--ink-light); display: flex; align-items: center; gap: 4px;"><i data-lucide="move" style="width:12px; height:12px;"></i> Boyut:</span>
+                    <input type="range" id="tryOnSizeSlider" min="50" max="250" value="150" style="flex: 1; accent-color: var(--green); cursor: pointer;" oninput="window.updateTryOnGarmentSize(this.value)">
+                  </div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span style="font-size: 11px; font-weight: 700; color: var(--ink-light); display: flex; align-items: center; gap: 4px;"><i data-lucide="rotate-cw" style="width:12px; height:12px;"></i> Döndürme:</span>
+                    <input type="range" id="tryOnAngleSlider" min="-45" max="45" value="0" style="flex: 1; accent-color: var(--green); cursor: pointer;" oninput="window.updateTryOnGarmentAngle(this.value)">
+                  </div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span style="font-size: 11px; font-weight: 700; color: var(--ink-light); display: flex; align-items: center; gap: 4px;"><i data-lucide="sliders" style="width:12px; height:12px;"></i> Hassasiyet:</span>
+                    <input type="range" id="tryOnChromaThreshold" min="150" max="255" value="235" style="flex: 1; accent-color: var(--green); cursor: pointer;" oninput="window.updateTryOnChromaThreshold(this.value)">
+                  </div>
+                </div>
+              </details>
               
               <!-- Scan Laser Animation Overlay (initially hidden) -->
               <div id="fashionScanLaser" class="hidden" style="position: absolute; left: 12px; right: 12px; height: 3px; background: #7c3aed; box-shadow: 0 0 10px #7c3aed, 0 0 20px #7c3aed; pointer-events: none; z-index: 10;"></div>
@@ -576,6 +590,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="/static/app.js?v=20260614-fashion-advanced"></script>
+    <script src="/static/app.js?v=20260614-fashion-hologram"></script>
   </body>
 </html>
