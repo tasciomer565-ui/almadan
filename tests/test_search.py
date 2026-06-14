@@ -84,6 +84,23 @@ class TestSearchByName(unittest.TestCase):
         self.assertIn("Birim Fiyat Riski", item_200["labels"])
         self.assertNotIn("Önerilen", item_200["labels"])
 
+    def test_search_local_geographic_resonance(self):
+        # Search with coordinates and hybrid mode
+        results = search_products_by_name("süt", lat=41.0082, lon=28.9784, mode="hybrid")
+        self.assertIsInstance(results, list)
+        self.assertTrue(len(results) > 0)
+        
+        # Verify that geographic fields are present
+        for item in results:
+            self.assertIn("delivery_type", item)
+            self.assertIn("delivery_time", item)
+            self.assertIn("delivery_cost", item)
+            if item["delivery_type"] == "local":
+                self.assertIsNotNone(item["distance_km"])
+                self.assertIsNotNone(item["latitude"])
+                self.assertIsNotNone(item["longitude"])
+                self.assertTrue("Dakika" in item["delivery_time"])
+
 
 if __name__ == "__main__":
     from unittest.mock import patch

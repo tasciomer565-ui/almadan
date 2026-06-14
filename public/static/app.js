@@ -190,6 +190,7 @@ document.addEventListener("DOMContentLoaded", () => {
   bindEvents();
   registerServiceWorker();
   updateNetworkStatus();
+  updateGpsStatusUI();
   const recoverySession = readRecoverySession();
   if (recoverySession) {
     showPasswordReset(recoverySession);
@@ -1489,11 +1490,23 @@ async function parseProduct(event) {
           showParsedProduct(parsed);
         } else {
           const category = document.getElementById("searchCategorySelector")?.value || "general";
-          const results = await api(
-            "/api/search?query=" + encodeURIComponent(val)
-            + "&category=" + encodeURIComponent(category),
-            { signal: controller.signal }
-          );
+          const globalCheckbox = document.getElementById("globalModeCheckbox");
+          const isGlobalActive = globalCheckbox ? globalCheckbox.checked : false;
+          
+          let searchMode = "hybrid";
+          if (isGlobalActive) {
+            searchMode = "global";
+          }
+          
+          let searchUrl = "/api/search?query=" + encodeURIComponent(val)
+            + "&category=" + encodeURIComponent(category)
+            + "&mode=" + encodeURIComponent(searchMode);
+            
+          if (state.userCoords && searchMode !== "global") {
+            searchUrl += "&lat=" + state.userCoords.lat + "&lon=" + state.userCoords.lng;
+          }
+          
+          const results = await api(searchUrl, { signal: controller.signal });
           clearTimeout(timeoutId);
           showSearchResults(results);
         }
@@ -1742,18 +1755,23 @@ function showSearchResults(response) {
             isImporter = index % 2 === 1;
             const warrantyText = isImporter ? "İthalatçı Garantili" : "Resmi Distribütör";
             const badgeColor = isImporter ? "rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245,158,11,0.2)" : "rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2)";
-            warrantyBadgeHtml = `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: ${badgeColor}; display: inline-block; margin-top: 4px;">${warrantyText}</span>`;
+            warrantyBadgeHtml = `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: ${badgeColor}; display: inline-block;">${warrantyText}</span>`;
           }
 
           const isCheapestNode = !isOutOfStock && item.price === cheapestPrice;
           const nodeClasses = `quantum-node-card ${isCheapestNode ? 'cheapest-node-glow' : ''}`;
+
+          const isLocal = item.delivery_type === "local";
+          const borderStyle = isLocal
+            ? "border: 2px solid #00f3ff !important; box-shadow: 0 0 10px rgba(0, 243, 255, 0.15);"
+            : "border: 2px solid #10b981 !important; box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);";
 
           return `
             <div class="${nodeClasses} search-result-card" 
                  data-base-price="${item.price}" 
                  data-base-original-price="${item.original_price || 0}" 
                  data-is-importer="${isImporter}"
-                 style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: white; transition: all 0.2s;">
+                 style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; ${borderStyle} border-radius: 8px; background: white; transition: all 0.2s;">
               <div style="width: 50px; height: 50px; flex-shrink: 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; justify-content: center;">
                 ${item.image_url 
                   ? `<img src="${escapeHtml(proxiedImageUrl(item.image_url))}" alt="${escapeHtml(item.title)}" style="width: 100%; height: 100%; object-fit: contain;" onerror="imageFallback(this, '${getStoreIcon(item.source, item.title)}')">`
@@ -1762,10 +1780,16 @@ function showSearchResults(response) {
               <div style="flex: 1; min-width: 0;">
                 <p class="source-name" style="margin: 0 0 2px 0; font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--muted);">${escapeHtml(item.source)}</p>
                 <h4 style="margin: 0 0 6px 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</h4>
-                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px;">
                   ${badgesHtml}
                 </div>
-                ${warrantyBadgeHtml}
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                  ${isLocal 
+                    ? `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: rgba(0,243,255,0.1); color: #00d2ff; border: 1px solid rgba(0,243,255,0.2); display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="truck" style="width:11px; height:11px;"></i> ${escapeHtml(item.delivery_time || '30-60 Dakika')} ${item.distance_km ? `(${item.distance_km} km)` : ''}</span>`
+                    : `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: rgba(16,185,129,0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2); display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="globe" style="width:11px; height:11px;"></i> ${escapeHtml(item.delivery_time || '2 İş Günü')}</span>`
+                  }
+                  ${warrantyBadgeHtml}
+                </div>
                 ${suspiciousWarningHtml}
                 ${unitPriceHtml}
               </div>
@@ -5536,6 +5560,19 @@ function addGenericCartItemWithoutSize(name) {
   if (state.sharedListId) syncSharedListWithServer();
 }
 
+function updateGpsStatusUI() {
+  const indicator = document.getElementById("gpsStatusIndicator");
+  if (!indicator) return;
+  if (state.userCoords) {
+    indicator.innerHTML = `<i data-lucide="map-pin" style="width: 12px; height: 12px;"></i> GPS Konumu Aktif`;
+    indicator.style.color = "#00d2ff";
+  } else {
+    indicator.innerHTML = `<i data-lucide="map-pin-off" style="width: 12px; height: 12px;"></i> GPS Konumu Pasif`;
+    indicator.style.color = "var(--muted)";
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
 async function updateUserLocation(val) {
   state.userLocation = val;
   if (val === "gps") {
@@ -5547,6 +5584,7 @@ async function updateUserLocation(val) {
             lng: position.coords.longitude
           };
           showToast("GPS konumu alındı.");
+          updateGpsStatusUI();
           renderCart();
         },
         (error) => {
@@ -5554,6 +5592,7 @@ async function updateUserLocation(val) {
           document.getElementById("userLocationSelector").value = "default";
           state.userLocation = "default";
           state.userCoords = null;
+          updateGpsStatusUI();
           renderCart();
         }
       );
@@ -5562,10 +5601,12 @@ async function updateUserLocation(val) {
       document.getElementById("userLocationSelector").value = "default";
       state.userLocation = "default";
       state.userCoords = null;
+      updateGpsStatusUI();
       renderCart();
     }
   } else {
     state.userCoords = null;
+    updateGpsStatusUI();
     renderCart();
   }
 }

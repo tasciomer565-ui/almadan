@@ -528,10 +528,16 @@ def run_async(coro):
     else:
         return loop.run_until_complete(coro)
 
-def search_products_by_name(query: str, category: str = "general") -> list[dict]:
+def search_products_by_name(
+    query: str,
+    category: str = "general",
+    lat: float = None,
+    lon: float = None,
+    mode: str = "hybrid"
+) -> list[dict]:
     # 1. Run Kuantum Arama Orkestratörü
     from app.search_orchestrator import master_search
-    all_products = run_async(master_search(query, selected_category=category))
+    all_products = run_async(master_search(query, selected_category=category, lat=lat, lon=lon, mode=mode))
     corrected_query = query
     
     # 5. Filter out accessory/irrelevant products (like cloth, case, cables)

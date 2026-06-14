@@ -1286,6 +1286,9 @@ def search_products(
     category: Literal[
         "general", "grocery", "electronics", "fashion", "cosmetics", "home"
     ] = "general",
+    lat: float | None = None,
+    lon: float | None = None,
+    mode: Literal["hybrid", "local", "global"] = "hybrid",
 ) -> dict:
     if not query or len(query.strip()) < 2:
         raise HTTPException(status_code=400, detail="Arama sorgusu en az 2 karakter olmalıdır.")
@@ -1301,7 +1304,7 @@ def search_products(
         else query
     )
     
-    products = search_products_by_name(gendered_query, category=category)
+    products = search_products_by_name(gendered_query, category=category, lat=lat, lon=lon, mode=mode)
     fallback_applied = any(p.get("extra_info", {}).get("fallback") for p in products)
     
     suggestion = None

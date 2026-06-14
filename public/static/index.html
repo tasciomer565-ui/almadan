@@ -72,6 +72,15 @@
                 <i data-lucide="clipboard"></i>
               </button>
             </div>
+            <div class="search-options-row" style="display: flex; gap: 16px; margin: 10px 0 15px 4px; flex-wrap: wrap; align-items: center; justify-content: flex-start; width: 100%;">
+              <label class="global-mode-toggle" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; font-weight: 700; color: var(--ink); user-select: none;">
+                <input type="checkbox" id="globalModeCheckbox" style="accent-color: var(--green); width: 14px; height: 14px; cursor: pointer;">
+                <span>GLOBAL SPEKTRUM (KARGO)</span>
+              </label>
+              <span id="gpsStatusIndicator" style="font-size: 11px; font-weight: 700; color: var(--muted); display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="map-pin-off" style="width: 12px; height: 12px;"></i> GPS Konumu Pasif
+              </span>
+            </div>
             <button class="primary-button" type="submit">
               <i data-lucide="scan-search"></i>
               Kontrol et

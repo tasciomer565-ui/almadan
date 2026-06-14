@@ -2,6 +2,9 @@ import asyncio
 import urllib.parse
 import re
 import requests
+import math
+import hashlib
+import random
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
 from app.comparator import (
@@ -11,6 +14,8 @@ from app.comparator import (
     parse_product_url,
     is_logical_product
 )
+
+LOCAL_SOURCES = {"migros", "carrefoursa", "a101", "bim", "sokmarket", "file", "metro"}
 
 YAHOO_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
@@ -227,7 +232,33 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
             
     return all_products
 
-def generate_local_fallback_results(query: str, category: str) -> list[dict]:
+def get_simulated_location(title: str, source: str, lat: float, lon: float):
+    # Stabil tohumlama
+    seed_str = f"{title}_{source}"
+    h = int(hashlib.md5(seed_str.encode('utf-8')).hexdigest()[:8], 16)
+    r = random.Random(h)
+    
+    # 3 km içinde offset (yaklaşık 0.02 derece limit)
+    lat_offset = r.uniform(-0.015, 0.015)
+    lon_offset = r.uniform(-0.02, 0.02)
+    
+    branch_lat = lat + lat_offset
+    branch_lon = lon + lon_offset
+    
+    # Haversine mesafe hesabı
+    dlat = math.radians(branch_lat - lat)
+    dlon = math.radians(branch_lon - lon)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat)) * math.cos(math.radians(branch_lat)) * math.sin(dlon/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    distance_km = 6371.0 * c
+    
+    # Teslimat süresi: 30-60 dakika
+    delivery_time_mins = int(30 + distance_km * 10)
+    delivery_time_mins = max(30, min(60, delivery_time_mins))
+    
+    return branch_lat, branch_lon, distance_km, delivery_time_mins
+
+def generate_local_fallback_results(query: str, category: str, lat: float = None, lon: float = None) -> list[dict]:
     if category == "GIDA":
         sources = [("Migros (Lokal Spektrum)", "migros", 189.90), ("CarrefourSA (Lokal Spektrum)", "carrefoursa", 199.90)]
     elif category == "TEKNOLOJİ":
@@ -246,7 +277,8 @@ def generate_local_fallback_results(query: str, category: str) -> list[dict]:
         labels = ["Sistem, lokal rezonans verisi kullanıyor", "Önerilen Alternatif"]
         if i == 0:
             labels.append("En Ucuz")
-        results.append({
+            
+        res_item = {
             "title": f"{query} ({'Lokal Rezonans' if i == 0 else 'Alternatif Enerji'})",
             "price": price,
             "original_price": round(price * 1.2, 2),
@@ -259,7 +291,27 @@ def generate_local_fallback_results(query: str, category: str) -> list[dict]:
                 "fallback": True,
                 "local_resonance": True
             }
-        })
+        }
+        
+        # Coğrafi alanları zenginleştir
+        is_local = source_key in LOCAL_SOURCES
+        if is_local and lat is not None and lon is not None:
+            branch_lat, branch_lon, distance_km, delivery_time_mins = get_simulated_location(res_item["title"], source_key, lat, lon)
+            res_item["delivery_type"] = "local"
+            res_item["delivery_time"] = f"{delivery_time_mins} Dakika"
+            res_item["distance_km"] = round(distance_km, 2)
+            res_item["latitude"] = round(branch_lat, 6)
+            res_item["longitude"] = round(branch_lon, 6)
+            res_item["delivery_cost"] = "29.90 TL"
+        else:
+            res_item["delivery_type"] = "global"
+            res_item["delivery_time"] = "2 İş Günü"
+            res_item["distance_km"] = None
+            res_item["latitude"] = None
+            res_item["longitude"] = None
+            res_item["delivery_cost"] = "Ücretsiz Kargo"
+            
+        results.append(res_item)
     return results
 
 def get_popular_fallbacks(query: str) -> list[dict]:
@@ -272,7 +324,13 @@ def get_popular_fallbacks(query: str) -> list[dict]:
                 matches.append(item)
     return matches if matches else POPULAR_FALLBACKS
 
-async def master_search(query: str, selected_category: str = "general") -> list[dict]:
+async def master_search(
+    query: str,
+    selected_category: str = "general",
+    lat: float = None,
+    lon: float = None,
+    mode: str = "hybrid"
+) -> list[dict]:
     category = classify_intent(query)
     if category == "GENEL" and selected_category != "general":
         category_map = {
@@ -288,18 +346,83 @@ async def master_search(query: str, selected_category: str = "general") -> list[
     
     try:
         async with asyncio.timeout(4.5):
-            if category == "GENEL":
-                results = await marketplace_scan(query)
-            else:
-                results = await scan_worker(query, category)
+            if mode == "global" or lat is None or lon is None:
+                if category == "GENEL":
+                    results = await marketplace_scan(query)
+                else:
+                    results = await scan_worker(query, category)
+            elif mode == "local":
+                local_res = await scan_worker(query, category)
+                results = [r for r in local_res if r["source"] in LOCAL_SOURCES]
+            else:  # hybrid
+                if category == "GENEL":
+                    results = await marketplace_scan(query)
+                else:
+                    local_task = scan_worker(query, category)
+                    global_task = marketplace_scan(query)
+                    local_res, global_res = await asyncio.gather(local_task, global_task)
+                    
+                    # Merge unique results
+                    seen_urls = set()
+                    merged_res = []
+                    for r in local_res + global_res:
+                        url_clean = r["url"].split("?")[0].strip()
+                        if url_clean not in seen_urls:
+                            seen_urls.add(url_clean)
+                            merged_res.append(r)
+                    results = merged_res
     except (asyncio.TimeoutError, Exception) as e:
         await asyncio.sleep(1.5)
-        results = generate_local_fallback_results(query, category)
+        results = generate_local_fallback_results(query, category, lat, lon)
+
+    # 4. Boş Dönme Koruması (Zero-Fail Policy)
+    # Eğer local mod seçildiyse ve sonuç çıkmadıysa, otomatik global fallback'e geç
+    if not results and mode == "local":
+        global_res = await marketplace_scan(query, fallback=True)
+        for r in global_res:
+            r["delivery_type"] = "global"
+            r["delivery_time"] = "2 İş Günü"
+            r["distance_km"] = None
+            r["latitude"] = None
+            r["longitude"] = None
+            r["delivery_cost"] = "Ücretsiz Kargo"
+            if "Konum aralığı genişletiliyor..." not in r["labels"]:
+                r["labels"].append("Konum aralığı genişletiliyor...")
+        results = global_res
 
     if not results:
         results = await marketplace_scan(query, fallback=True)
         
     if not results:
         results = get_popular_fallbacks(query)
+        
+    # Coğrafi alanları ve teslimat bilgilerini her ürün için ekle/güncelle
+    for item in results:
+        is_local = item["source"] in LOCAL_SOURCES
+        if is_local and lat is not None and lon is not None:
+            branch_lat, branch_lon, distance_km, delivery_time_mins = get_simulated_location(item["title"], item["source"], lat, lon)
+            item["delivery_type"] = "local"
+            item["delivery_time"] = f"{delivery_time_mins} Dakika"
+            item["distance_km"] = round(distance_km, 2)
+            item["latitude"] = round(branch_lat, 6)
+            item["longitude"] = round(branch_lon, 6)
+            item["delivery_cost"] = "29.90 TL"
+        else:
+            item["delivery_type"] = "global"
+            item["delivery_time"] = "2 İş Günü"
+            item["distance_km"] = None
+            item["latitude"] = None
+            item["longitude"] = None
+            item["delivery_cost"] = "Ücretsiz Kargo"
+
+    # Sıralama: Yerel rezonans ürünleri (mesafeye göre artan) en üste, global ürünler (fiyata göre artan) alta
+    if lat is not None and lon is not None:
+        local_items = [r for r in results if r["delivery_type"] == "local"]
+        global_items = [r for r in results if r["delivery_type"] != "local"]
+        
+        local_items.sort(key=lambda x: x.get("distance_km", 999.0))
+        global_items.sort(key=lambda x: x.get("price", 999999.0))
+        
+        results = local_items + global_items
         
     return results
