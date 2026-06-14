@@ -15,7 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=20260613-fashion-tryon">
+    <link rel="stylesheet" href="/static/styles.css?v=20260614-fashion-autofit">
   </head>
   <body>
     <header class="topbar">
@@ -241,6 +241,10 @@
                   </button>
                 </div>
                 <input type="file" id="fashionUserGarmentInput" accept="image/*" style="display: none;">
+                <div style="margin-top: 8px;">
+                  <label style="display: block; font-size: 11px; font-weight: 700; color: var(--ink-light); margin-bottom: 4px;">Veya Kıyafet Görsel Linki:</label>
+                  <input type="url" id="fashionGarmentUrlInput" class="form-input" style="width: 100%; padding: 6px 10px; font-size: 12px; height: auto;" placeholder="https://example.com/tshirt.png">
+                </div>
               </div>
 
               <div style="border-top: 1px solid var(--line); padding-top: 14px;">
@@ -564,6 +568,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="/static/app.js?v=20260613-receipt-history"></script>
+    <script src="/static/app.js?v=20260614-fashion-autofit"></script>
   </body>
 </html>

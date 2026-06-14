@@ -276,12 +276,14 @@ function bindEvents() {
 
   const btnTshirtUser = document.getElementById("btnTshirtUser");
   const userGarmentInput = document.getElementById("fashionUserGarmentInput");
+  const garmentUrlInput = document.getElementById("fashionGarmentUrlInput");
 
   if (btnTshirtBlue) btnTshirtBlue.addEventListener("click", () => {
     window.selectedTryOnGarment = "blue";
     btnTshirtBlue.classList.add("active");
     btnTshirtRed.classList.remove("active");
     if (btnTshirtUser) btnTshirtUser.classList.remove("active");
+    if (garmentUrlInput) garmentUrlInput.value = "";
     window.drawTryOnScene();
   });
   if (btnTshirtRed) btnTshirtRed.addEventListener("click", () => {
@@ -289,6 +291,7 @@ function bindEvents() {
     btnTshirtRed.classList.add("active");
     btnTshirtBlue.classList.remove("active");
     if (btnTshirtUser) btnTshirtUser.classList.remove("active");
+    if (garmentUrlInput) garmentUrlInput.value = "";
     window.drawTryOnScene();
   });
   if (btnTshirtUser) btnTshirtUser.addEventListener("click", () => {
@@ -304,10 +307,23 @@ function bindEvents() {
       if (btnTshirtUser) btnTshirtUser.classList.add("active");
       if (btnTshirtBlue) btnTshirtBlue.classList.remove("active");
       if (btnTshirtRed) btnTshirtRed.classList.remove("active");
+      if (garmentUrlInput) garmentUrlInput.value = "";
       window.drawTryOnScene();
     };
     reader.readAsDataURL(file);
   });
+  if (garmentUrlInput) {
+    garmentUrlInput.addEventListener("input", () => {
+      const url = garmentUrlInput.value.trim();
+      if (!url) return;
+      window.userTryOnGarment = proxiedImageUrl(url);
+      window.selectedTryOnGarment = "user";
+      if (btnTshirtUser) btnTshirtUser.classList.remove("active");
+      if (btnTshirtBlue) btnTshirtBlue.classList.remove("active");
+      if (btnTshirtRed) btnTshirtRed.classList.remove("active");
+      window.drawTryOnScene();
+    });
+  }
   if (btnStartTryOn) btnStartTryOn.addEventListener("click", window.runFashionTryOnAnimation);
 
   const canvas = document.getElementById("tryOnCanvas");
@@ -3419,14 +3435,148 @@ window.drawTryOnScene = function() {
   };
 };
 
+window.autoFitGarmentOnUserPhoto = function() {
+  if (window.selectedTryOnModel !== "user" || !window.userTryOnPhoto) return;
+  
+  const img = new Image();
+  img.src = window.userTryOnPhoto;
+  img.onload = () => {
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = 300;
+    tempCanvas.height = 300;
+    const tempCtx = tempCanvas.getContext("2d");
+    tempCtx.drawImage(img, 0, 0, 300, 300);
+    
+    let imgData;
+    try {
+      imgData = tempCtx.getImageData(0, 0, 300, 300);
+    } catch (e) {
+      console.warn("CORS or tainted canvas while scanning user photo. Using default fit.", e);
+      window.tryOnGarmentX = 75;
+      window.tryOnGarmentY = 110;
+      window.tryOnGarmentW = 150;
+      window.tryOnGarmentH = 150;
+      const slider = document.getElementById("tryOnSizeSlider");
+      if (slider) slider.value = 150;
+      window.drawTryOnScene();
+      return;
+    }
+    
+    const data = imgData.data;
+    
+    const getPixel = (x, y) => {
+      const idx = (y * 300 + x) * 4;
+      return {
+        r: data[idx],
+        g: data[idx + 1],
+        b: data[idx + 2],
+        a: data[idx + 3]
+      };
+    };
+    
+    // Sample background color from multiple spots on edges
+    const bgSamples = [
+      getPixel(5, 5), getPixel(150, 5), getPixel(295, 5),
+      getPixel(5, 150), getPixel(295, 150),
+      getPixel(5, 295), getPixel(295, 295)
+    ];
+    
+    const bgR = bgSamples.reduce((sum, p) => sum + p.r, 0) / bgSamples.length;
+    const bgG = bgSamples.reduce((sum, p) => sum + p.g, 0) / bgSamples.length;
+    const bgB = bgSamples.reduce((sum, p) => sum + p.b, 0) / bgSamples.length;
+    
+    const colorDiff = (p1, r, g, b) => {
+      return Math.sqrt((p1.r - r) ** 2 + (p1.g - g) ** 2 + (p1.b - b) ** 2);
+    };
+    
+    let lefts = [];
+    let rights = [];
+    
+    // Torso is usually between Y=100 and Y=240
+    for (let y = 100; y < 240; y += 4) {
+      let firstX = -1;
+      let lastX = -1;
+      for (let x = 10; x < 290; x++) {
+        const p = getPixel(x, y);
+        if (colorDiff(p, bgR, bgG, bgB) > 35) {
+          if (firstX === -1) firstX = x;
+          lastX = x;
+        }
+      }
+      if (firstX !== -1 && lastX !== -1 && (lastX - firstX) > 40) {
+        lefts.push(firstX);
+        rights.push(lastX);
+      }
+    }
+    
+    if (lefts.length > 5) {
+      let totalW = 0;
+      let totalC = 0;
+      for (let i = 0; i < lefts.length; i++) {
+        totalW += (rights[i] - lefts[i]);
+        totalC += ((lefts[i] + rights[i]) / 2);
+      }
+      
+      let avgW = totalW / lefts.length;
+      let avgC = totalC / lefts.length;
+      
+      if (avgW < 70) avgW = 130;
+      if (avgW > 240) avgW = 160;
+      if (avgC < 60 || avgC > 240) avgC = 150;
+      
+      // Estimate Y: find the top of the body (shoulders / neck level)
+      let detectedTopY = 110;
+      for (let y = 50; y < 150; y += 2) {
+        let countDiff = 0;
+        for (let x = 40; x < 260; x++) {
+          if (colorDiff(getPixel(x, y), bgR, bgG, bgB) > 35) {
+            countDiff++;
+          }
+        }
+        if (countDiff > 15) {
+          detectedTopY = y + 40;
+          break;
+        }
+      }
+      
+      detectedTopY = Math.max(90, Math.min(detectedTopY, 130));
+      
+      window.tryOnGarmentW = Math.round(avgW * 1.1);
+      window.tryOnGarmentH = window.tryOnGarmentW;
+      window.tryOnGarmentX = Math.round(avgC - window.tryOnGarmentW / 2);
+      window.tryOnGarmentY = detectedTopY;
+      
+      const slider = document.getElementById("tryOnSizeSlider");
+      if (slider) slider.value = window.tryOnGarmentW;
+    } else {
+      window.tryOnGarmentX = 75;
+      window.tryOnGarmentY = 110;
+      window.tryOnGarmentW = 150;
+      window.tryOnGarmentH = 150;
+      const slider = document.getElementById("tryOnSizeSlider");
+      if (slider) slider.value = 150;
+    }
+    
+    window.drawTryOnScene();
+  };
+};
+
 window.runFashionTryOnAnimation = function() {
+  if (window.selectedTryOnModel === "user" && !window.userTryOnPhoto) {
+    showToast("Lütfen önce kendi fotoğrafınızı yükleyin.");
+    return;
+  }
+  if (window.selectedTryOnGarment === "user" && !window.userTryOnGarment) {
+    showToast("Lütfen önce bir kıyafet yükleyin veya linkini girin.");
+    return;
+  }
+
   const laserEl = document.getElementById("fashionScanLaser");
   if (!laserEl) return;
   
   laserEl.classList.remove("hidden");
   showToast("Yapay zeka prova işlemi başlatıldı...");
   
-  // Auto positioning/fit for default models
   if (window.selectedTryOnModel !== "user") {
     window.tryOnGarmentX = 75;
     window.tryOnGarmentY = 100;
@@ -3434,6 +3584,8 @@ window.runFashionTryOnAnimation = function() {
     window.tryOnGarmentH = 150;
     const slider = document.getElementById("tryOnSizeSlider");
     if (slider) slider.value = 150;
+  } else {
+    window.autoFitGarmentOnUserPhoto();
   }
   
   setTimeout(() => {
