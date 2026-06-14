@@ -1461,6 +1461,15 @@ async function parseProduct(event) {
   submit.disabled = true;
   submit.innerHTML = `<span class="spinner"></span> İnceleniyor`;
 
+  const overlay = document.getElementById("quantumScanOverlay");
+  const progressText = document.getElementById("quantumScanProgress");
+  if (overlay) overlay.classList.remove("hidden");
+  if (progressText) {
+    progressText.innerText = "Kuantum spektrum dalgası başlatıldı...";
+    var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Siber veri düğümlerinden canlı fiyatlar toplanıyor..."; }, 600);
+    var t2 = setTimeout(() => { if (progressText) progressText.innerText = "Optimal kuantum frekansı hesaplanıyor..."; }, 1300);
+  }
+
   try {
     if (isUrl(val)) {
       const parsed = await api("/parse-url", {
@@ -1479,6 +1488,9 @@ async function parseProduct(event) {
   } catch (error) {
     showToast(error.message);
   } finally {
+    clearTimeout(t1);
+    clearTimeout(t2);
+    if (overlay) overlay.classList.add("hidden");
     submit.disabled = false;
     submit.innerHTML = `<i data-lucide="scan-search"></i> Kontrol et`;
     lucide.createIcons();
@@ -1597,6 +1609,10 @@ function showSearchResults(response) {
     `;
   }
 
+  // Calculate cheapest valid price for nodes highlighting
+  const validPrices = products.filter(p => !p.extra_info?.out_of_stock).map(p => p.price);
+  const cheapestPrice = validPrices.length > 0 ? Math.min(...validPrices) : -1;
+
   content.innerHTML = `
     <style>
       .search-result-card {
@@ -1665,8 +1681,11 @@ function showSearchResults(response) {
             warrantyBadgeHtml = `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: ${badgeColor}; display: inline-block; margin-top: 4px;">${warrantyText}</span>`;
           }
 
+          const isCheapestNode = !isOutOfStock && item.price === cheapestPrice;
+          const nodeClasses = `quantum-node-card ${isCheapestNode ? 'cheapest-node-glow' : ''}`;
+
           return `
-            <div class="search-result-card" 
+            <div class="${nodeClasses} search-result-card" 
                  data-base-price="${item.price}" 
                  data-base-original-price="${item.original_price || 0}" 
                  data-is-importer="${isImporter}"
@@ -1707,6 +1726,11 @@ function showSearchResults(response) {
 
   if (!dialog.open) dialog.showModal();
   lucide.createIcons();
+  
+  // Register node cards for bobbing animation
+  dialog.querySelectorAll('.quantum-node-card').forEach(card => {
+    if (window.registerForBobbing) window.registerForBobbing(card);
+  });
 }
 
 window.triggerSuggestionSearch = function(query) {
@@ -4154,8 +4178,8 @@ function renderBackendOptimization(result, mode) {
       .join(", ");
     resultsDiv.innerHTML = `
       <div class="optimizer-summary optimizer-unavailable">
-        <span class="optimizer-kicker">CANLI FİYAT GEREKLİ</span>
-        <h4>Fiyat karşılaştırılamadı</h4>
+        <span class="optimizer-kicker">KUANTUM VERİ SİNYALİ GEREKLİ</span>
+        <h4>Fiyat spektrumu karşılaştırılamadı</h4>
         <p>${escapeHtml(result.message || "Doğrulanmış mağaza fiyatı bulunamadı.")}</p>
         ${missingNames ? `<p><strong>Eksik:</strong> ${missingNames}</p>` : ""}
         <p class="optimizer-source-note">Almadan tahmini veya uydurma market fiyatı göstermez.</p>
@@ -4180,54 +4204,58 @@ function renderBackendOptimization(result, mode) {
 
     resultsDiv.innerHTML = `
       ${fallbackWarningHtml}
-      <div class="optimizer-summary">
-        <span class="optimizer-kicker">EN UCUZ TEK MARKET</span>
-        <h4>${currency.format(option.total)}</h4>
-        <p><strong>${escapeHtml(option.store.toUpperCase())}</strong>${distanceText} ile
+      <div class="optimizer-summary quantum-node-card cheapest-node-glow" style="padding: 14px; margin-bottom: 14px; border: 1px solid var(--line);">
+        <span class="optimizer-kicker" style="color:#00f0ff;">OPTIMAL TEK MARKET SPEKTRUMU</span>
+        <h4 style="color: #00f0ff; text-shadow: 0 0 10px rgba(0,240,255,0.3);">${currency.format(option.total)}</h4>
+        <p><strong>${escapeHtml(option.store.toUpperCase())}</strong>${distanceText} veri düğümü ile
           ${currency.format(option.savings)} tasarruf.</p>
-        ${option.shipping_fee > 0 ? `<p style="font-size:11px; color:var(--red); font-weight:600; margin-top:4px;">Kargo Ücreti: ${currency.format(option.shipping_fee)}</p>` : `<p style="font-size:11px; color:var(--green); font-weight:600; margin-top:4px;">Kargo Bedava!</p>`}
+        ${option.shipping_fee > 0 ? `<p style="font-size:11px; color:var(--red); font-weight:600; margin-top:4px;">Kargo Ücreti: ${currency.format(option.shipping_fee)}</p>` : `<p style="font-size:11px; color:#00f0ff; font-weight:600; margin-top:4px;">Kargo Bedava!</p>`}
       </div>
-      <div class="opt-store-card">
+      <div class="opt-store-card quantum-node-card" style="padding:12px; border:1px solid var(--line);">
         ${option.items.map(item => `
-          <div class="opt-item-row">
+          <div class="opt-item-row" style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0;">
             <span>${escapeHtml(item.name)}${item.quantity > 1 ? ` x${item.quantity}` : ""}</span>
-            <span class="opt-item-price">${currency.format(item.line_total)}</span>
+            <span class="opt-item-price" style="font-weight:700;">${currency.format(item.line_total)}</span>
           </div>
         `).join("")}
       </div>
     `;
     lucide.createIcons();
+    
+    resultsDiv.querySelectorAll('.quantum-node-card').forEach(card => {
+      if (window.registerForBobbing) window.registerForBobbing(card);
+    });
     return true;
   }
 
   const split = result.split_basket;
   resultsDiv.innerHTML = `
     ${fallbackWarningHtml}
-    <div class="optimizer-summary">
-      <span class="optimizer-kicker">BÖLÜNMÜŞ SEPET</span>
-      <h4>${currency.format(split.total)}</h4>
-      <p>En ucuz tek markete göre ek ${currency.format(split.savings)} tasarruf.</p>
+    <div class="optimizer-summary quantum-node-card cheapest-node-glow" style="padding: 14px; margin-bottom: 14px; border: 1px solid var(--line);">
+      <span class="optimizer-kicker" style="color:#00f0ff;">KUANTUM KÜMÜLATİF OPTİMİZASYON</span>
+      <h4 style="color: #00f0ff; text-shadow: 0 0 10px rgba(0,240,255,0.3);">${currency.format(split.total)}</h4>
+      <p>En ucuz tek veri düğümüne göre ek ${currency.format(split.savings)} kuantum tasarrufu.</p>
     </div>
-    <div class="optimizer-store-list">
+    <div class="optimizer-store-list" style="display: flex; flex-direction: column; gap: 12px;">
       ${split.stores.map(group => {
         const distVal = result.store_distances ? result.store_distances[group.store] : undefined;
         const distanceText = distVal !== undefined && state.userLocation !== "default"
           ? `<span style="font-size: 11px; font-weight: 700; color: var(--muted); margin-left: 6px;">(${distVal >= 1 ? `${distVal.toFixed(2)} km` : `${Math.round(distVal * 1000)} m`})</span>`
           : "";
         return `
-          <div class="opt-store-card">
-            <div class="opt-store-header">
+          <div class="opt-store-card quantum-node-card" style="padding:12px; border: 1px solid var(--line); border-radius: 8px;">
+            <div class="opt-store-header" style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 6px; font-weight: 700;">
               <span class="opt-store-name">${escapeHtml(group.store.toUpperCase())}${distanceText}</span>
-              <span class="opt-store-total">${currency.format(group.total)}</span>
+              <span class="opt-store-total" style="color:#00f0ff;">${currency.format(group.total)}</span>
             </div>
-            ${group.shipping_fee > 0 ? `<p style="font-size:11px; color:var(--red); font-weight:600; margin-top:4px;">Kargo Ücreti: ${currency.format(group.shipping_fee)}</p>` : `<p style="font-size:11px; color:var(--green); font-weight:600; margin-top:4px;">Kargo Bedava!</p>`}
+            ${group.shipping_fee > 0 ? `<p style="font-size:11px; color:var(--red); font-weight:600; margin-top:4px;">Kargo Ücreti: ${currency.format(group.shipping_fee)}</p>` : `<p style="font-size:11px; color:#00f0ff; font-weight:600; margin-top:4px;">Kargo Bedava!</p>`}
             ${group.items.map(item => `
-              <div class="opt-item-row">
+              <div class="opt-item-row" style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0;">
                 <span>
                   ${escapeHtml(item.name)}
-                  ${item.unit_analysis ? `<small>${currency.format(item.unit_analysis.unit_price)} / ${escapeHtml(item.unit_analysis.unit)}</small>` : ""}
+                  ${item.unit_analysis ? `<small style="display:block; font-size:10px; color:var(--muted);">${currency.format(item.unit_analysis.unit_price)} / ${escapeHtml(item.unit_analysis.unit)}</small>` : ""}
                 </span>
-                <span class="opt-item-price">${currency.format(item.line_total)}</span>
+                <span class="opt-item-price" style="font-weight:700;">${currency.format(item.line_total)}</span>
               </div>
             `).join("")}
           </div>
@@ -4236,6 +4264,10 @@ function renderBackendOptimization(result, mode) {
     </div>
   `;
   lucide.createIcons();
+  
+  resultsDiv.querySelectorAll('.quantum-node-card').forEach(card => {
+    if (window.registerForBobbing) window.registerForBobbing(card);
+  });
   return true;
 }
 
@@ -4311,6 +4343,13 @@ async function renderCart() {
   }
 
   if (navigator.onLine) {
+    const overlay = document.getElementById("quantumScanOverlay");
+    const progressText = document.getElementById("quantumScanProgress");
+    if (overlay) overlay.classList.remove("hidden");
+    if (progressText) {
+      progressText.innerText = "Sepet veri spektrumu çözümleniyor...";
+      var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Optimal kuantum dağılımı hesaplanıyor..."; }, 600);
+    }
     try {
       const optimized = await api("/api/cart/optimize", {
         method: "POST",
@@ -4333,6 +4372,9 @@ async function renderCart() {
     } catch (error) {
       resultsDiv.innerHTML = `<p class="empty-text">Canlı fiyat servisine ulaşılamadı. Tahmini fiyat gösterilmedi.</p>`;
       return;
+    } finally {
+      clearTimeout(t1);
+      if (overlay) overlay.classList.add("hidden");
     }
   } else {
     resultsDiv.innerHTML = `<p class="empty-text">Market fiyatlarını karşılaştırmak için internet bağlantısı gerekiyor.</p>`;
@@ -4812,17 +4854,35 @@ function displaySkinAnalysis(type, showToastMsg = false) {
     colorName = "Açık / Porselen Fildişi";
     undertone = "Soğuk Alt Ton";
     paletteHtml = `
-      <div style="display:flex; flex-direction:column; align-items:center; font-size:10px;">
-        <span style="width:30px; height:30px; border-radius:50%; background:#e06666; border:1px solid var(--line); display:inline-block;"></span>
-        <span style="margin-top:4px;">Gül Kurusu Ruj</span>
+      <div class="floating-product-card" data-color="#e06666" data-type="lipstick" style="border-left: 4px solid #e06666 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
+        <div style="background: rgba(224, 102, 102, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #e06666;">
+          <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <strong style="font-size: 12px; color: var(--ink);">Gül Kurusu Kuantum Ruj</strong>
+          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 189,90 TL</span>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#e06666" data-type="lipstick">Bu Ruju Prova Et</button>
+        </div>
       </div>
-      <div style="display:flex; flex-direction:column; align-items:center; font-size:10px;">
-        <span style="width:30px; height:30px; border-radius:50%; background:#ea9999; border:1px solid var(--line); display:inline-block;"></span>
-        <span style="margin-top:4px;">Toz Pembe Allık</span>
+      <div class="floating-product-card" data-color="#ea9999" data-type="blush" style="border-left: 4px solid #ea9999 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
+        <div style="background: rgba(234, 153, 153, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #ea9999;">
+          <i data-lucide="smile" style="width: 18px; height: 18px;"></i>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <strong style="font-size: 12px; color: var(--ink);">Toz Pembe Foton Allığı</strong>
+          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 220,00 TL</span>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#ea9999" data-type="blush">Bu Allığı Prova Et</button>
+        </div>
       </div>
-      <div style="display:flex; flex-direction:column; align-items:center; font-size:10px;">
-        <span style="width:30px; height:30px; border-radius:50%; background:#d5a6bd; border:1px solid var(--line); display:inline-block;"></span>
-        <span style="margin-top:4px;">Eflatun Göz Farı</span>
+      <div class="floating-product-card" data-color="#d5a6bd" data-type="eyeshadow" style="border-left: 4px solid #d5a6bd !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
+        <div style="background: rgba(213, 166, 189, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #d5a6bd;">
+          <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <strong style="font-size: 12px; color: var(--ink);">Eflatun Spektral Göz Farı</strong>
+          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 145,50 TL</span>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#d5a6bd" data-type="eyeshadow">Bu Farı Prova Et</button>
+        </div>
       </div>
     `;
   } else if (type === "medium") {
@@ -4830,17 +4890,35 @@ function displaySkinAnalysis(type, showToastMsg = false) {
     colorName = "Buğday / Doğal Kumral";
     undertone = "Sıcak Alt Ton";
     paletteHtml = `
-      <div style="display:flex; flex-direction:column; align-items:center; font-size:10px;">
-        <span style="width:30px; height:30px; border-radius:50%; background:#c00000; border:1px solid var(--line); display:inline-block;"></span>
-        <span style="margin-top:4px;">Kiremit Kırmızısı</span>
+      <div class="floating-product-card" data-color="#c00000" data-type="lipstick" style="border-left: 4px solid #c00000 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
+        <div style="background: rgba(192, 0, 0, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #c00000;">
+          <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <strong style="font-size: 12px; color: var(--ink);">Kiremit Kırmızısı Kuantum Ruj</strong>
+          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 195,00 TL</span>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#c00000" data-type="lipstick">Bu Ruju Prova Et</button>
+        </div>
       </div>
-      <div style="display:flex; flex-direction:column; align-items:center; font-size:10px;">
-        <span style="width:30px; height:30px; border-radius:50%; background:#f6b26b; border:1px solid var(--line); display:inline-block;"></span>
-        <span style="margin-top:4px;">Şeftali Allık</span>
+      <div class="floating-product-card" data-color="#f6b26b" data-type="blush" style="border-left: 4px solid #f6b26b !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
+        <div style="background: rgba(246, 178, 107, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #f6b26b;">
+          <i data-lucide="smile" style="width: 18px; height: 18px;"></i>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <strong style="font-size: 12px; color: var(--ink);">Şeftali Işıltılı Neon Allık</strong>
+          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 180,00 TL</span>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#f6b26b" data-type="blush">Bu Allığı Prova Et</button>
+        </div>
       </div>
-      <div style="display:flex; flex-direction:column; align-items:center; font-size:10px;">
-        <span style="width:30px; height:30px; border-radius:50%; background:#b45f06; border:1px solid var(--line); display:inline-block;"></span>
-        <span style="margin-top:4px;">Bronz Far</span>
+      <div class="floating-product-card" data-color="#b45f06" data-type="eyeshadow" style="border-left: 4px solid #b45f06 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
+        <div style="background: rgba(180, 95, 6, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #b45f06;">
+          <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <strong style="font-size: 12px; color: var(--ink);">Bronz Optik Göz Farı</strong>
+          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 160,00 TL</span>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#b45f06" data-type="eyeshadow">Bu Farı Prova Et</button>
+        </div>
       </div>
     `;
   } else if (type === "dark") {
@@ -4848,17 +4926,35 @@ function displaySkinAnalysis(type, showToastMsg = false) {
     colorName = "Esmer / Karamel Kahve";
     undertone = "Nötr & Sıcak Alt Ton";
     paletteHtml = `
-      <div style="display:flex; flex-direction:column; align-items:center; font-size:10px;">
-        <span style="width:30px; height:30px; border-radius:50%; background:#741b47; border:1px solid var(--line); display:inline-block;"></span>
-        <span style="margin-top:4px;">Mürdüm Ruj</span>
+      <div class="floating-product-card" data-color="#741b47" data-type="lipstick" style="border-left: 4px solid #741b47 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
+        <div style="background: rgba(116, 27, 71, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #741b47;">
+          <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <strong style="font-size: 12px; color: var(--ink);">Mürdüm Kuantum Ruj</strong>
+          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 210,00 TL</span>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#741b47" data-type="lipstick">Bu Ruju Prova Et</button>
+        </div>
       </div>
-      <div style="display:flex; flex-direction:column; align-items:center; font-size:10px;">
-        <span style="width:30px; height:30px; border-radius:50%; background:#a64d79; border:1px solid var(--line); display:inline-block;"></span>
-        <span style="margin-top:4px;">Koyu Mürdüm Allık</span>
+      <div class="floating-product-card" data-color="#a64d79" data-type="blush" style="border-left: 4px solid #a64d79 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
+        <div style="background: rgba(166, 77, 121, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #a64d79;">
+          <i data-lucide="smile" style="width: 18px; height: 18px;"></i>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <strong style="font-size: 12px; color: var(--ink);">Koyu Mürdüm Foton Allığı</strong>
+          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 230,00 TL</span>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#a64d79" data-type="blush">Bu Allığı Prova Et</button>
+        </div>
       </div>
-      <div style="display:flex; flex-direction:column; align-items:center; font-size:10px;">
-        <span style="width:30px; height:30px; border-radius:50%; background:#783f04; border:1px solid var(--line); display:inline-block;"></span>
-        <span style="margin-top:4px;">Bakır Göz Farı</span>
+      <div class="floating-product-card" data-color="#783f04" data-type="eyeshadow" style="border-left: 4px solid #783f04 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
+        <div style="background: rgba(120, 63, 4, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #783f04;">
+          <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <strong style="font-size: 12px; color: var(--ink);">Bakır Spektral Göz Farı</strong>
+          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 175,00 TL</span>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#783f04" data-type="eyeshadow">Bu Farı Prova Et</button>
+        </div>
       </div>
     `;
   }
@@ -4866,7 +4962,29 @@ function displaySkinAnalysis(type, showToastMsg = false) {
   if (toneIndicator) toneIndicator.style.backgroundColor = colorHex;
   if (toneName) toneName.innerText = colorName;
   if (toneTag) toneTag.innerText = undertone;
-  if (paletteDiv) paletteDiv.innerHTML = paletteHtml;
+  if (paletteDiv) {
+    paletteDiv.innerHTML = `<div style="display: flex; flex-direction: column; gap: 12px; width: 100%;">${paletteHtml}</div>`;
+    
+    // Create icons for newly generated Lucide elements
+    lucide.createIcons();
+    
+    // Register floating cards for synchronized bobbing animation
+    paletteDiv.querySelectorAll('.floating-product-card').forEach(card => {
+      if (window.registerForBobbing) window.registerForBobbing(card);
+    });
+    
+    // Bind click handlers for try-on button actions
+    paletteDiv.querySelectorAll('.btn-makeup-tryon').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const color = btn.getAttribute('data-color');
+        const type = btn.getAttribute('data-type');
+        if (window.runMakeupTryOnAnimation) {
+          window.runMakeupTryOnAnimation(btn, color, type);
+        }
+      });
+    });
+  }
   
   if (resultCard) resultCard.classList.remove("hidden");
   
@@ -4933,14 +5051,38 @@ async function runAiSkinScan(type, base64Data = null) {
   laserEl.classList.remove("hidden");
   cameraIcon.style.animation = "pulse 1s infinite alternate";
   
+  // Set up preview container and clear makeup canvas
+  const faceContainer = document.getElementById("aiFaceContainer");
+  const facePreview = document.getElementById("aiFacePreview");
+  const makeupCanvas = document.getElementById("aiMakeupCanvas");
+  const aiScanLineRect = document.getElementById("aiScanLineRect");
+  
+  window.activeMakeup = {};
+  if (makeupCanvas) {
+    const ctx = makeupCanvas.getContext("2d");
+    ctx.clearRect(0, 0, makeupCanvas.width, makeupCanvas.height);
+  }
+  
   if (type === "uploaded") {
     statusEl.innerHTML = `<span style="color: var(--green);">Fotoğraf Yüklendi!</span> Analiz ediliyor...`;
+    if (faceContainer && facePreview && base64Data) {
+      facePreview.src = base64Data;
+      faceContainer.classList.remove("hidden");
+    }
   } else {
     const labels = { light: "Açık Tenli Model", medium: "Buğday Tenli Model", dark: "Esmer Model" };
     statusEl.innerHTML = `<strong style="color: var(--green-dark);">${labels[type]}</strong> analiz ediliyor...`;
+    if (faceContainer && facePreview) {
+      facePreview.src = `/static/cosmetic_model_${type}.png`;
+      faceContainer.classList.remove("hidden");
+    }
   }
   
   laserEl.style.animation = "scanLaserAnim 1.5s infinite ease-in-out";
+  if (aiScanLineRect) {
+    aiScanLineRect.classList.remove("hidden");
+    aiScanLineRect.style.animation = "laserSweep 1.5s infinite ease-in-out";
+  }
   
   try {
     if (type === "uploaded" && base64Data) {
@@ -5012,6 +5154,10 @@ async function runAiSkinScan(type, base64Data = null) {
     laserEl.classList.add("hidden");
     laserEl.style.animation = "none";
     cameraIcon.style.animation = "none";
+    if (aiScanLineRect) {
+      aiScanLineRect.classList.add("hidden");
+      aiScanLineRect.style.animation = "none";
+    }
   }
 }
 
@@ -5052,6 +5198,8 @@ async function askAiColorSuitability() {
       formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
       formatted = formatted.replace(/\n/g, '<br>');
       answerBox.innerHTML = formatted;
+      answerBox.classList.add("neon-glow-active");
+      setTimeout(() => answerBox.classList.remove("neon-glow-active"), 4000);
       showToast("[AI SUCCESS: Holografik öneriler yansıtıldı.]");
     } else {
       throw new Error("unsuccessful analysis");
@@ -5286,3 +5434,210 @@ function toggleSupportedStores() {
   toggleBtn.classList.toggle("active", isOpen);
 }
 window.toggleSupportedStores = toggleSupportedStores;
+
+// ============================================================================
+// ANTIGRAVITE & KUANTUM DİNAMİK ARAKAYNAK VE KONTROLCÜLERİ
+// ============================================================================
+
+// 1. Global Süzülme Kontrolcüsü (Global Bobbing Controller)
+window.bobbingElements = [];
+window.bobbingTime = 0;
+window.globalBobbingActive = false;
+
+window.registerForBobbing = function(element) {
+  if (element && !window.bobbingElements.includes(element)) {
+    window.bobbingElements.push(element);
+  }
+};
+
+window.unregisterForBobbing = function(element) {
+  window.bobbingElements = window.bobbingElements.filter(el => el !== element);
+};
+
+window.startGlobalBobbingController = function() {
+  if (window.globalBobbingActive) return;
+  window.globalBobbingActive = true;
+  
+  function step() {
+    window.bobbingTime += 0.025; // Süzülme hızı
+    const offset = Math.sin(window.bobbingTime) * 6; // +/- 6px salınım
+    
+    // Geçersiz/silinmiş DOM elemanlarını temizle
+    window.bobbingElements = window.bobbingElements.filter(el => document.body.contains(el));
+    
+    window.bobbingElements.forEach(el => {
+      // Senkronize dikey süzülme uyguluyoruz
+      el.style.transform = `translateY(${offset}px)`;
+    });
+    
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+};
+
+// 2. Makyaj Prova Küresi Uçuş Animasyonu (Antigravity Drift)
+window.runMakeupTryOnAnimation = function(button, color, type) {
+  const facePreview = document.getElementById("aiFacePreview");
+  const faceContainer = document.getElementById("aiFaceContainer");
+  if (!facePreview || !faceContainer || faceContainer.classList.contains("hidden")) {
+    showToast("Lütfen önce bir fotoğraf yükleyin veya örnek modellerden birini seçerek cilt analizi yapın.");
+    return;
+  }
+  
+  // Spawning coordinates
+  const btnRect = button.getBoundingClientRect();
+  const containerRect = faceContainer.getBoundingClientRect();
+  
+  // Create flying glowing siber-orb
+  const orb = document.createElement("div");
+  orb.style.position = "fixed";
+  orb.style.top = `${btnRect.top + btnRect.height / 2 - 12}px`;
+  orb.style.left = `${btnRect.left + btnRect.width / 2 - 12}px`;
+  orb.style.width = "24px";
+  orb.style.height = "24px";
+  orb.style.borderRadius = "50%";
+  orb.style.background = `radial-gradient(circle, #00f0ff 0%, ${color} 80%)`;
+  orb.style.boxShadow = `0 0 15px #00f0ff, 0 0 30px ${color}`;
+  orb.style.zIndex = "99999";
+  orb.style.pointerEvents = "none";
+  orb.style.transition = "all 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+  document.body.appendChild(orb);
+  
+  // Force reflow
+  orb.offsetHeight;
+  
+  // Fly towards center of face preview
+  const targetX = containerRect.left + containerRect.width / 2;
+  const targetY = containerRect.top + containerRect.height / 2;
+  
+  orb.style.transform = `translate(${targetX - (btnRect.left + btnRect.width / 2)}px, ${targetY - (btnRect.top + btnRect.height / 2)}px) scale(1.6)`;
+  orb.style.opacity = "0.7";
+  
+  setTimeout(() => {
+    orb.remove();
+    
+    // Trigger face laser scanner sweep inside face mesh SVG
+    const scanLine = document.getElementById("aiScanLineRect");
+    if (scanLine) {
+      scanLine.classList.remove("hidden");
+      scanLine.style.animation = "laserSweep 0.5s ease-in-out 2";
+      setTimeout(() => { scanLine.classList.add("hidden"); }, 1000);
+    }
+    
+    // Draw makeup pigments onto canvas
+    window.applyMakeupOnCanvas(color, type);
+    
+    // Interactive futuristic success notification
+    const typeLabels = { lipstick: "Kuantum Ruj", blush: "Neon Allık", eyeshadow: "Foton Farı" };
+    showToast(`[AI STATUS: ${typeLabels[type] || 'Pigment'} entegrasyonu tamamlandı. Foton saçılımı %30 arttı.]`);
+  }, 900);
+};
+
+// 3. Canvas Üzerine Yarı Saydam Makyaj Çizimi
+window.applyMakeupOnCanvas = function(color, type) {
+  const canvas = document.getElementById("aiMakeupCanvas");
+  if (!canvas) return;
+  
+  const ctx = canvas.getContext("2d");
+  
+  // Sync canvas size with displaysize
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width || 300;
+  canvas.height = rect.height || 300;
+  
+  const w = canvas.width;
+  const h = canvas.height;
+  
+  if (!window.activeMakeup) {
+    window.activeMakeup = {};
+  }
+  
+  // Save/overwrite active color for this type
+  window.activeMakeup[type] = color;
+  
+  // Clear previous drawings
+  ctx.clearRect(0, 0, w, h);
+  
+  // Redraw all active layers
+  Object.entries(window.activeMakeup).forEach(([mType, mColor]) => {
+    if (mType === "lipstick") {
+      // Lips region: center bottom (x: 50%, y: 68%)
+      const lipsX = w * 0.5;
+      const lipsY = h * 0.68;
+      const rx = w * 0.08;
+      const ry = h * 0.025;
+      
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(lipsX, lipsY, rx, ry, 0, 0, 2 * Math.PI);
+      ctx.fillStyle = mColor;
+      ctx.globalAlpha = 0.55;
+      ctx.filter = "blur(3px)";
+      ctx.fill();
+      ctx.restore();
+    } else if (mType === "blush") {
+      // Cheeks region: left (x: 34%, y: 55%), right (x: 66%, y: 55%)
+      const cheekLeftX = w * 0.34;
+      const cheekRightX = w * 0.66;
+      const cheekY = h * 0.55;
+      const rCheek = w * 0.09;
+      
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cheekLeftX, cheekY, rCheek, 0, 2 * Math.PI);
+      ctx.arc(cheekRightX, cheekY, rCheek, 0, 2 * Math.PI);
+      ctx.fillStyle = mColor;
+      ctx.globalAlpha = 0.28;
+      ctx.filter = "blur(7px)";
+      ctx.fill();
+      ctx.restore();
+    } else if (mType === "eyeshadow") {
+      // Eyes region: left (x: 38%, y: 44%), right (x: 62%, y: 44%)
+      const eyeLeftX = w * 0.38;
+      const eyeRightX = w * 0.62;
+      const eyeY = h * 0.44;
+      const rxEye = w * 0.06;
+      const ryEye = h * 0.02;
+      
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(eyeLeftX, eyeY - 2, rxEye, ryEye, 0, 0, 2 * Math.PI);
+      ctx.ellipse(eyeRightX, eyeY - 2, rxEye, ryEye, 0, 0, 2 * Math.PI);
+      ctx.fillStyle = mColor;
+      ctx.globalAlpha = 0.38;
+      ctx.filter = "blur(4px)";
+      ctx.fill();
+      ctx.restore();
+    }
+  });
+};
+
+// 4. Sıfırlama Butonu Tanımlaması ve Global Başlatıcılar
+function initMakeupHelpers() {
+  const btnResetSkin = document.getElementById("btnResetAiSkin");
+  if (btnResetSkin) {
+    btnResetSkin.addEventListener("click", () => {
+      const faceContainer = document.getElementById("aiFaceContainer");
+      if (faceContainer) faceContainer.classList.add("hidden");
+      
+      const fileInput = document.getElementById("aiPhotoFileInput");
+      if (fileInput) fileInput.value = "";
+      
+      const statusEl = document.getElementById("aiUploadStatus");
+      if (statusEl) statusEl.innerHTML = "Selfie Fotoğrafı Yükle";
+      
+      const canvas = document.getElementById("aiMakeupCanvas");
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      window.activeMakeup = {};
+    });
+  }
+  
+  // Start the global synchronized bobbing controller
+  window.startGlobalBobbingController();
+}
+
+// Run helper setup on file load
+initMakeupHelpers();

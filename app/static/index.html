@@ -162,6 +162,37 @@
               
               <input type="file" id="aiPhotoFileInput" accept="image/*" class="hidden">
               
+              <!-- Face Preview and Makeup Canvas Container -->
+              <div id="aiFaceContainer" class="hidden" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 8; background: var(--bg-card); display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 10px;">
+                <img id="aiFacePreview" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                <canvas id="aiMakeupCanvas" width="300" height="300" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></canvas>
+                
+                <!-- SVG AR HUD for face -->
+                <svg id="aiFaceSvgHud" viewBox="0 0 300 300" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9;">
+                  <defs>
+                    <linearGradient id="aiScanlineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="#ff7eb3" stop-opacity="0"></stop>
+                      <stop offset="50%" stop-color="#ff7eb3" stop-opacity="0.8"></stop>
+                      <stop offset="100%" stop-color="#ff7eb3" stop-opacity="0"></stop>
+                    </linearGradient>
+                  </defs>
+                  <!-- Face mesh simulation paths/reticles -->
+                  <circle cx="150" cy="150" r="80" stroke="#ff7eb3" stroke-width="1" stroke-dasharray="4, 4" fill="none" opacity="0.4" />
+                  <circle cx="150" cy="150" r="105" stroke="#ff7eb3" stroke-width="1.5" stroke-dasharray="8, 4" fill="none" opacity="0.6" />
+                  <line x1="150" y1="30" x2="150" y2="270" stroke="#ff7eb3" stroke-width="0.5" opacity="0.3" />
+                  <line x1="30" y1="150" x2="270" y2="150" stroke="#ff7eb3" stroke-width="0.5" opacity="0.3" />
+                  <path d="M 130 140 L 135 140 M 165 140 L 170 140 M 145 180 L 155 180" stroke="#ff7eb3" stroke-width="1.5" fill="none" opacity="0.7" />
+                  
+                  <!-- Scan line -->
+                  <rect id="aiScanLineRect" x="0" y="0" width="300" height="20" fill="url(#aiScanlineGrad)" class="hidden" />
+                </svg>
+                
+                <!-- Reset button to clear image -->
+                <button id="btnResetAiSkin" type="button" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; border: 0; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 12;" title="Temizle">
+                  <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                </button>
+              </div>
+              
               <!-- Scan Laser Animation Overlay (initially hidden) -->
               <div id="aiScanLaser" class="hidden" style="position: absolute; left: 0; right: 0; height: 3px; background: #ff7eb3; box-shadow: 0 0 10px #ff7eb3, 0 0 20px #ff7eb3; pointer-events: none; z-index: 10;"></div>
             </div>
@@ -541,7 +572,7 @@
           <!-- Sağ Kısım: Market Karşılaştırması ve Sepet Optimizasyonu -->
           <div class="cart-panel-right">
             <div class="optimizer-box glassmorphic-card">
-              <h3>Sepet En İyileştirici (Optimizer)</h3>
+              <h3>Kuantum Bütçe Optimizasyonu</h3>
               <div class="optimizer-modes">
                 <button class="mode-tab active" id="optModeSingle">Tek Market</button>
                 <button class="mode-tab" id="optModeSplit">Bölünmüş Market (Split)</button>
@@ -614,6 +645,32 @@
       </button>
       <div id="sizeSelectorContent" class="dialog-body" style="padding: 24px;"></div>
     </dialog>
+
+    <!-- Quantum Scan Overlay -->
+    <div id="quantumScanOverlay" class="hidden" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(10, 15, 24, 0.85); backdrop-filter: blur(8px); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white;">
+      <!-- SVG Particle Ring -->
+      <div style="position: relative; width: 150px; height: 150px; margin-bottom: 24px;">
+        <!-- Glowing inner circle -->
+        <div style="position: absolute; top: 25px; left: 25px; width: 100px; height: 100px; border-radius: 50%; background: radial-gradient(circle, rgba(0,240,255,0.2) 0%, rgba(0,240,255,0) 70%); box-shadow: 0 0 30px rgba(0,240,255,0.3); animation: pulse 1.5s infinite alternate;"></div>
+        <!-- SVG Rings -->
+        <svg width="150" height="150" viewBox="0 0 100 100" style="position: absolute; top: 0; left: 0; transform: rotate(0deg); animation: spin-clockwise 3s linear infinite;">
+          <circle cx="50" cy="50" r="40" stroke="#00f0ff" stroke-width="1.5" stroke-dasharray="10 30 50 30" fill="none" opacity="0.8" />
+          <circle cx="50" cy="50" r="35" stroke="#ff7eb3" stroke-width="1" stroke-dasharray="40 10 5 10" fill="none" opacity="0.6" />
+        </svg>
+        <svg width="150" height="150" viewBox="0 0 100 100" style="position: absolute; top: 0; left: 0; transform: rotate(0deg); animation: spin-counter-clockwise 2s linear infinite;">
+          <circle cx="50" cy="50" r="45" stroke="#00f0ff" stroke-width="0.75" stroke-dasharray="5 15 25 15" fill="none" opacity="0.5" />
+          <circle cx="20" cy="50" r="2" fill="#00f0ff" />
+          <circle cx="80" cy="50" r="2.5" fill="#00f0ff" />
+          <circle cx="50" cy="20" r="3" fill="#ff7eb3" />
+        </svg>
+      </div>
+      
+      <h3 style="margin: 0; font-family: 'Outfit', 'Manrope', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: 2px; color: #00f0ff; text-shadow: 0 0 10px rgba(0,240,255,0.5);">KUANTUM SPEKTRUMU TARANIYOR</h3>
+      <p style="margin: 8px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.7); font-family: monospace;" id="quantumScanProgress">Veri düğümleri üzerinden fiyat dalgaları analiz ediliyor...</p>
+      
+      <!-- Moving horizontal laser sweep -->
+      <div style="position: absolute; left: 0; width: 100%; height: 3px; background: linear-gradient(90deg, transparent, #00f0ff, transparent); box-shadow: 0 0 15px #00f0ff; animation: laserSweep 2s infinite ease-in-out; pointer-events: none;"></div>
+    </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 

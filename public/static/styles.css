@@ -2448,3 +2448,88 @@ body.dark-theme .opt-savings-tag {
   overflow: hidden;
 }
 
+/* Antigravite & Kuantum Temalı Animasyonlar ve Sınıflar */
+@keyframes spin-clockwise {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spin-counter-clockwise {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes laserSweep {
+  0% { top: 0%; }
+  50% { top: 100%; }
+  100% { top: 0%; }
+}
+
+@keyframes neon-glow-pulse-blue {
+  0% {
+    box-shadow: 0 0 5px rgba(0, 240, 255, 0.2), inset 0 0 5px rgba(0, 240, 255, 0.1);
+    border-color: rgba(0, 240, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.7), inset 0 0 8px rgba(0, 240, 255, 0.3);
+    border-color: rgba(0, 240, 255, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(0, 240, 255, 0.2), inset 0 0 5px rgba(0, 240, 255, 0.1);
+    border-color: rgba(0, 240, 255, 0.3);
+  }
+}
+
+.neon-glow-active {
+  animation: neon-glow-pulse-blue 2s infinite alternate !important;
+}
+
+/* Kuantum Veri Düğümleri (Quantum Node Cards) */
+.quantum-node-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.03) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+body.dark-theme .quantum-node-card {
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.quantum-node-card:hover {
+  transform: translateY(-4px) scale(1.01) !important;
+  border-color: rgba(0, 240, 255, 0.5) !important;
+  box-shadow: 0 10px 20px rgba(0, 240, 255, 0.15) !important;
+}
+
+/* En Ucuz Veri Düğümü Parıltısı */
+.cheapest-node-glow {
+  border-color: rgba(0, 240, 255, 0.8) !important;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.35), inset 0 0 10px rgba(0, 240, 255, 0.15) !important;
+  animation: neon-glow-pulse-blue 1.5s infinite alternate !important;
+}
+
+/* Süzülen Kozmetik Kartı */
+.floating-product-card {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  padding: 14px !important;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.floating-product-card:hover {
+  border-color: rgba(255, 117, 140, 0.5) !important;
+  box-shadow: 0 8px 20px rgba(255, 117, 140, 0.25) !important;
+  transform: scale(1.02);
+}
+
+
