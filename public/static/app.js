@@ -5566,15 +5566,56 @@ function updateGpsStatusUI() {
   if (state.userCoords) {
     indicator.innerHTML = `<i data-lucide="map-pin" style="width: 12px; height: 12px;"></i> GPS Konumu Aktif`;
     indicator.style.color = "#00d2ff";
+    indicator.style.borderColor = "rgba(0, 243, 255, 0.3)";
+    indicator.style.background = "rgba(0, 243, 255, 0.08)";
+    indicator.style.boxShadow = "0 0 8px rgba(0, 243, 255, 0.2)";
   } else {
     indicator.innerHTML = `<i data-lucide="map-pin-off" style="width: 12px; height: 12px;"></i> GPS Konumu Pasif`;
     indicator.style.color = "var(--muted)";
+    indicator.style.borderColor = "var(--line)";
+    indicator.style.background = "rgba(0,0,0,0.02)";
+    indicator.style.boxShadow = "none";
   }
   if (window.lucide) lucide.createIcons();
 }
 
+window.triggerGpsActivation = function() {
+  if (navigator.geolocation) {
+    showToast("GPS konumu sorgulanıyor...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        state.userCoords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        state.userLocation = "gps";
+        const selector = document.getElementById("userLocationSelector");
+        if (selector) selector.value = "gps";
+        showToast("GPS konumu aktif edildi!");
+        updateGpsStatusUI();
+        renderCart();
+      },
+      (error) => {
+        showToast("GPS konum izni alınamadı veya reddedildi: " + error.message);
+        state.userCoords = null;
+        updateGpsStatusUI();
+      }
+    );
+  } else {
+    showToast("Tarayıcınız konum servisini desteklemiyor.");
+  }
+};
+
 async function updateUserLocation(val) {
   state.userLocation = val;
+  const locationCoords = {
+    besiktas: { lat: 41.0428, lng: 29.0075 },
+    kadikoy: { lat: 40.9901, lng: 29.0292 },
+    cankaya: { lat: 39.9081, lng: 32.8597 },
+    karsiyaka: { lat: 38.4558, lng: 27.1147 },
+    bodrum: { lat: 37.0344, lng: 27.4305 }
+  };
+  
   if (val === "gps") {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -5604,6 +5645,10 @@ async function updateUserLocation(val) {
       updateGpsStatusUI();
       renderCart();
     }
+  } else if (locationCoords[val]) {
+    state.userCoords = locationCoords[val];
+    updateGpsStatusUI();
+    renderCart();
   } else {
     state.userCoords = null;
     updateGpsStatusUI();
@@ -5832,3 +5877,25 @@ function initMakeupHelpers() {
 
 // Run helper setup on file load
 initMakeupHelpers();
+
+window.addEventListener("load", () => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        state.userCoords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        state.userLocation = "gps";
+        const selector = document.getElementById("userLocationSelector");
+        if (selector) selector.value = "gps";
+        updateGpsStatusUI();
+        renderCart();
+      },
+      (error) => {
+        console.log("Açılışta otomatik konum izni alınamadı:", error.message);
+        updateGpsStatusUI();
+      }
+    );
+  }
+});
