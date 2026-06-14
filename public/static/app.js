@@ -439,7 +439,36 @@ function bindEvents() {
   if (aiPhotoFileInput) {
     aiPhotoFileInput.addEventListener("change", () => {
       if (aiPhotoFileInput.files && aiPhotoFileInput.files[0]) {
-        runAiSkinScan("uploaded");
+        const file = aiPhotoFileInput.files[0];
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target.result;
+          img.onload = () => {
+            const maxW = 600;
+            const maxH = 600;
+            let w = img.naturalWidth || img.width;
+            let h = img.naturalHeight || img.height;
+            if (w > maxW || h > maxH) {
+              if (w > h) {
+                h = Math.round(h * (maxW / w));
+                w = maxW;
+              } else {
+                w = Math.round(w * (maxH / h));
+                h = maxH;
+              }
+            }
+            const tempCanvas = document.createElement("canvas");
+            tempCanvas.width = w;
+            tempCanvas.height = h;
+            const tempCtx = tempCanvas.getContext("2d");
+            tempCtx.drawImage(img, 0, 0, w, h);
+            
+            const compressedBase64 = tempCanvas.toDataURL("image/jpeg", 0.85);
+            runAiSkinScan("uploaded", compressedBase64);
+          };
+        };
+        reader.readAsDataURL(file);
       }
     });
   }
@@ -4894,36 +4923,63 @@ function handleCategoryChange() {
   }
 }
 
-function runAiSkinScan(type) {
+async function runAiSkinScan(type, base64Data = null) {
   const statusEl = document.getElementById("aiUploadStatus");
   const laserEl = document.getElementById("aiScanLaser");
   const resultCard = document.getElementById("aiAnalysisResultCard");
   const cameraIcon = document.getElementById("aiCameraIcon");
   
-  // Reset previous result
   resultCard.classList.add("hidden");
   laserEl.classList.remove("hidden");
   cameraIcon.style.animation = "pulse 1s infinite alternate";
   
   if (type === "uploaded") {
     statusEl.innerHTML = `<span style="color: var(--green);">Fotoğraf Yüklendi!</span> Analiz ediliyor...`;
-    const types = ["light", "medium", "dark"];
-    currentSkinType = types[Math.floor(Math.random() * types.length)];
   } else {
-    currentSkinType = type;
     const labels = { light: "Açık Tenli Model", medium: "Buğday Tenli Model", dark: "Esmer Model" };
     statusEl.innerHTML = `<strong style="color: var(--green-dark);">${labels[type]}</strong> analiz ediliyor...`;
   }
   
-  // Simulate scan (laser line sweeps up and down using CSS keyframes)
   laserEl.style.animation = "scanLaserAnim 1.5s infinite ease-in-out";
   
-  setTimeout(() => {
-    // Show analysis details
-    displaySkinAnalysis(currentSkinType, true);
-    
-    // Save to localStorage
-    localStorage.setItem("almadan_skin_type", currentSkinType);
+  try {
+    if (type === "uploaded" && base64Data) {
+      showToast("[AI STATUS: Yüz/cilt analizi yapılıyor...]");
+      const response = await fetch("/api/analyze-skin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_base64: base64Data })
+      });
+      if (!response.ok) throw new Error("Skin analysis API failed");
+      const data = await response.json();
+      if (data.success) {
+        currentSkinType = data.skin_type;
+        displaySkinAnalysis(currentSkinType, true);
+        
+        // Show actual detected details in the result card
+        const toneTag = document.getElementById("aiSkinToneTag");
+        if (toneTag) toneTag.textContent = data.undertone;
+        const toneName = document.getElementById("aiSkinToneName");
+        if (toneName) {
+          const names = { light: "Açık / Fildişi", medium: "Buğday / Nötr", dark: "Esmer / Koyu" };
+          toneName.textContent = names[data.skin_type] || "Belirlenemedi";
+        }
+        const indicator = document.getElementById("aiSkinToneColorIndicator");
+        if (indicator) indicator.style.backgroundColor = data.skin_color_hex;
+        
+        // Save to localStorage
+        localStorage.setItem("almadan_skin_type", currentSkinType);
+        
+        showToast("[AI SUCCESS: Cilt tonu analizi tamamlandı.]");
+      } else {
+        throw new Error(data.error_message || "detection unsuccessful");
+      }
+    } else {
+      currentSkinType = type;
+      displaySkinAnalysis(currentSkinType, true);
+      localStorage.setItem("almadan_skin_type", currentSkinType);
+      showToast("[AI SUCCESS: Örnek model yüklendi.]");
+    }
     
     // Save to authenticated user profile
     if (state.auth.authenticated && state.auth.user) {
@@ -4933,7 +4989,6 @@ function runAiSkinScan(type) {
           gender: state.auth.user.gender || "belirtilmemiş",
           phone: state.auth.user.phone || "",
           notification_pref: state.auth.user.notification_pref || "both",
-          silence_enabled: !!state.auth.user.silence_hours,
           skin_type: currentSkinType
         })
       }).then(result => {
@@ -4942,11 +4997,26 @@ function runAiSkinScan(type) {
         console.error("Skin type could not be saved to profile:", err);
       });
     }
-  }, 2000);
+  } catch (err) {
+    console.warn("Backend skin analysis failed, using fallback simulation:", err);
+    if (type === "uploaded") {
+      const types = ["light", "medium", "dark"];
+      currentSkinType = types[Math.floor(Math.random() * types.length)];
+    } else {
+      currentSkinType = type;
+    }
+    displaySkinAnalysis(currentSkinType, true);
+    localStorage.setItem("almadan_skin_type", currentSkinType);
+    showToast("[AI ALERT: API hatası. Simüle cilt tonu yüklendi.]");
+  } finally {
+    laserEl.classList.add("hidden");
+    laserEl.style.animation = "none";
+    cameraIcon.style.animation = "none";
+  }
 }
 
-function askAiColorSuitability() {
-  const query = document.getElementById("aiColorQuestionInput").value.trim().toLowerCase();
+async function askAiColorSuitability() {
+  const query = document.getElementById("aiColorQuestionInput").value.trim();
   const answerBox = document.getElementById("aiColorAnswerBox");
   
   if (!query) {
@@ -4960,36 +5030,47 @@ function askAiColorSuitability() {
   }
   
   answerBox.classList.remove("hidden");
-  answerBox.innerHTML = `<em>Yapay zeka analiz ediyor...</em>`;
+  answerBox.innerHTML = `<em>Yapay zeka asistanı verileri süzüyor...</em>`;
   
-  setTimeout(() => {
-    let comment = "";
-    
-    if (currentSkinType === "light") {
-      if (query.includes("pembe") || query.includes("mor") || query.includes("eflatun") || query.includes("gül") || query.includes("berry") || query.includes("plum")) {
-        comment = "✨ **Mükemmel Uyum!** Pembe ve gül kurusu tonları soğuk alt tonlu açık teninizle harika bir kontrast oluşturacaktır. Canlılık ve tazelik katacaktır.";
-      } else if (query.includes("kiremit") || query.includes("bronz") || query.includes("turuncu") || query.includes("şeftali") || query.includes("seftali")) {
-        comment = "⚠️ **Uyumsuz Olabilir:** Sıcak kiremit, bronz veya turuncu tonları soğuk alt tonlu teninizde mat ve yorgun durabilir. Bunun yerine soğuk pembe veya mürdüm tonlarına yönelmenizi öneririz.";
-      } else {
-        comment = "ℹ️ **Nötr Etki:** Yazdığınız renk açık teniniz için kullanılabilir fakat gözlerinizi veya dudaklarınızı çok ön plana çıkarmayacaktır. Açık tenliler için pembe/mor yansımalı tonlar daha canlı duracaktır.";
-      }
-    } else if (currentSkinType === "medium") {
-      if (query.includes("şeftali") || query.includes("seftali") || query.includes("kiremit") || query.includes("bronz") || query.includes("turuncu") || query.includes("coral") || query.includes("mercan")) {
-        comment = "✨ **Harika Uyum!** Şeftali, mercan ve kiremit tonları sıcak alt tonlu buğday teninizi mükemmel şekilde ısıtacak ve doğal bir ışıltı katacaktır.";
-      } else if (query.includes("eflatun") || query.includes("toz pembe") || query.includes("soğuk pembe")) {
-        comment = "⚠️ **Uyumsuz Olabilir:** Soğuk alt tonlu eflatun ve toz pembe renkleri sıcak buğday teninizle çakışarak cildinizi solgun gösterebilir. Şeftali ve toprak tonları daha uygundur.";
-      } else {
-        comment = "ℹ️ **Nötr Etki:** Yazdığınız ton buğday teninizle uyumludur. Ancak altın ve bronz ışıltılı makyaj bazlarıyla desteklerseniz etkiyi ikiye katlayabilirsiniz.";
-      }
-    } else { // dark
-      comment = "ℹ️ **Uyum Analizi:** Esmer ten yapınız için toprak, mürdüm, bordo ve bakır tonları muazzam bir derinlik katacaktır. Açık pudra pembesi tonlar cildinizi gri gösterebileceğinden, sıcak alt tonlu kahve ve derin kırmızıları tercih edebilirsiniz.";
-      if (query.includes("mürdüm") || query.includes("bordo") || query.includes("bakır") || query.includes("bakir") || query.includes("kahve") || query.includes("bronze") || query.includes("altın")) {
-        comment = "✨ **Harika Uyum!** Derin mürdüm, bordo ve bakır yansımalı tonlar esmer teninizin asaletini ve sıcaklığını ön plana çıkaracaktır. Şiddetle tavsiye edilir.";
-      }
+  try {
+    const toneTag = document.getElementById("aiSkinToneTag")?.textContent || "Sıcak (Warm)";
+    const response = await fetch("/api/analyze-cosmetic-color", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        skin_type: currentSkinType,
+        undertone: toneTag,
+        query: query
+      })
+    });
+    if (!response.ok) throw new Error("API call failed");
+    const data = await response.json();
+    if (data.success) {
+      // Format response markdown to HTML
+      let formatted = data.comment;
+      formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+      formatted = formatted.replace(/\n/g, '<br>');
+      answerBox.innerHTML = formatted;
+      showToast("[AI SUCCESS: Holografik öneriler yansıtıldı.]");
+    } else {
+      throw new Error("unsuccessful analysis");
     }
-    
-    answerBox.innerHTML = comment;
-  }, 1000);
+  } catch (err) {
+    console.warn("Backend cosmetic analysis failed, using local fallback rules:", err);
+    // Simple local fallback matching old logic
+    let comment = "ℹ️ **[HOLOGRAFİK ANALİZ RAPORU]**\n\nCilt alt tonunuz analiz edildi. Belirttiğiniz ürün nötr spektrumda kalmaktadır.";
+    if (currentSkinType === "light" && (query.includes("pembe") || query.includes("mor"))) {
+      comment = "✨ **[HOLOGRAFİK ANALİZ RAPORU]**\n\nCilt tonunuzla uyumlu! Pembe tonları ışık yansımasını optimize eder.";
+    } else if (currentSkinType === "medium" && (query.includes("şeftali") || query.includes("mercan"))) {
+      comment = "✨ **[HOLOGRAFİK ANALİZ RAPORU]**\n\nHarika uyum! Şeftali tonları cildinize kuantum aurası kazandırır.";
+    }
+    let formatted = comment;
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    formatted = formatted.replace(/\n/g, '<br>');
+    answerBox.innerHTML = formatted;
+  }
 }
 
 /* EN YAKIN MAĞAZA VE EBAT SEÇİMİ BİLEŞENLERİ */

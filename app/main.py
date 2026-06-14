@@ -420,6 +420,201 @@ def detect_pose(payload: PoseRequest) -> dict:
     }
 
 
+class SkinRequest(BaseModel):
+    image_base64: str
+
+
+class CosmeticColorRequest(BaseModel):
+    skin_type: str
+    undertone: str
+    query: str
+
+
+@app.post("/api/analyze-skin")
+def analyze_skin(payload: SkinRequest) -> dict:
+    import base64
+    import io
+    import numpy as np
+    from PIL import Image
+
+    try:
+        base64_data = payload.image_base64
+        if "," in base64_data:
+            _, base64_data = base64_data.split(",", 1)
+
+        img_bytes = base64.b64decode(base64_data)
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        img_rgb = np.array(img)
+        h, w, _ = img_rgb.shape
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Görsel çözümlenemedi: {str(exc)}")
+
+    skin_type = "medium"
+    skin_color_hex = "#f5deb3"
+    undertone = "Warm (Sıcak)"
+    detected_rgb = [245, 222, 179]
+    source = "numpy_fallback"
+
+    try:
+        import mediapipe as mp
+        mp_face_mesh = mp.solutions.face_mesh
+        with mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=1, min_detection_confidence=0.5) as face_mesh:
+            results = face_mesh.process(img_rgb)
+            if results.multi_face_landmarks:
+                landmarks = results.multi_face_landmarks[0].landmark
+                xs = [lm.x for lm in landmarks]
+                ys = [lm.y for lm in landmarks]
+                min_x, max_x = int(min(xs) * w), int(max(xs) * w)
+                min_y, max_y = int(min(ys) * h), int(max(ys) * h)
+
+                min_x = max(0, min_x)
+                max_x = min(w - 1, max_x)
+                min_y = max(0, min_y)
+                max_y = min(h - 1, max_y)
+
+                face_w = max_x - min_x
+                face_h = max_y - min_y
+
+                sample_pts = [
+                    (min_x + face_w // 2, min_y + face_h // 2),
+                    (min_x + int(face_w * 0.3), min_y + int(face_h * 0.6)),
+                    (min_x + int(face_w * 0.7), min_y + int(face_h * 0.6)),
+                    (min_x + face_w // 2, min_y + int(face_h * 0.3))
+                ]
+
+                pixels = []
+                for cx, cy in sample_pts:
+                    if 0 <= cx < w and 0 <= cy < h:
+                        pixels.append(img_rgb[cy, cx])
+
+                if pixels:
+                    detected_rgb = np.mean(pixels, axis=0).astype(int).tolist()
+                    source = "mediapipe_face_mesh"
+    except Exception as mp_err:
+        print(f"MediaPipe Face Mesh failed, using NumPy fallback: {mp_err}")
+
+    if source == "numpy_fallback":
+        center_x_start = int(w * 0.35)
+        center_x_end = int(w * 0.65)
+        center_y_start = int(h * 0.35)
+        center_y_end = int(h * 0.65)
+        center_region = img_rgb[center_y_start:center_y_end, center_x_start:center_x_end]
+        detected_rgb = np.mean(center_region, axis=(0, 1)).astype(int).tolist()
+
+    r, g, b = detected_rgb
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+
+    if luminance > 195:
+        skin_type = "light"
+        skin_color_hex = f"#{r:02x}{g:02x}{b:02x}"
+        undertone = "Cool (Soğuk)"
+    elif luminance > 115:
+        skin_type = "medium"
+        skin_color_hex = f"#{r:02x}{g:02x}{b:02x}"
+        undertone = "Warm (Sıcak)"
+    else:
+        skin_type = "dark"
+        skin_color_hex = f"#{r:02x}{g:02x}{b:02x}"
+        undertone = "Neutral (Nötr)"
+
+    return {
+        "success": True,
+        "skin_type": skin_type,
+        "skin_color_hex": skin_color_hex,
+        "undertone": undertone,
+        "detected_rgb": detected_rgb,
+        "source": source
+    }
+
+
+@app.post("/api/analyze-cosmetic-color")
+def analyze_cosmetic_color(payload: CosmeticColorRequest) -> dict:
+    skin_type = payload.skin_type
+    undertone = payload.undertone
+    q = payload.query.strip().lower()
+
+    if skin_type == "light":
+        if any(w in q for w in ["pembe", "mor", "eflatun", "gül", "rose", "berry", "plum", "mürdüm"]):
+            comment = (
+                "✨ **[HOLOGRAFİK ANALİZ RAPORU]**\n\n"
+                "Cilt alt tonun derinlemesine tarandı ve veriler süzülerek havada belirdi. **Soğuk/Açık alt tonun**, "
+                "yerçekimsiz laboratuvarımızın gravitasyonel alanı ile %98 oranında mükemmel bir kuantum rezonansı yakaladı!\n\n"
+                "**Fiziksel Öneri:** Yazdığın bu ton, foton saçılım fiziğine göre cildindeki mavi ışık dalga boyunu yansıtarak "
+                "yüzeysel yansımayı %32 oranında artıracaktır. Havada asılı duran dijital vitrinimizdeki pembe pigment yoğunluğu yüksek "
+                "bu kozmetik ürün, sana yerçekimsiz bir parlaklık kazandıracak.\n\n"
+                "🔗 *[Holografik Satın Alma Köprüsü]*: Cilt tipinize en uyumlu pembe/gül kozmetik alternatifleri için fiyat karşılaştır."
+            )
+        elif any(w in q for w in ["kiremit", "bronz", "turuncu", "şeftali", "seftali", "kahve", "nude", "terracotta"]):
+            comment = (
+                "⚠️ **[GRAVİTASYONEL ALAN UYARISI]**\n\n"
+                "Analiz panellerimizden gelen veriler, **soğuk/açık teninle** sıcak kiremit/turuncu tonlarının kuantum frekansının çakıştığını gösteriyor! "
+                "Bu durum, cildindeki foton yansımasını soğurarak yorgun veya solgun bir görünüm oluşturabilir.\n\n"
+                "**Fiziksel Öneri:** Sıcak tonlar yerine, ışık yansımasını maksimize edecek soğuk pembe veya mürdüm tonlarına yönelmenizi öneririz. "
+                "Bu sayede yerçekimsiz alandaki aura canlılık katsayısı optimum düzeyde kalacaktır.\n\n"
+                "🔗 *[Holografik Satın Alma Köprüsü]*: Cilt tipinize özel daha uyumlu alternatif tonları listele."
+            )
+        else:
+            comment = (
+                "ℹ️ **[HOLOGRAFİK BİLGİ SEVİYESİ]**\n\n"
+                "Yüklediğin veriler doğrultusunda, belirttiğin ürünün açık tenin üzerindeki fotonik spektrum etkisi 'Nötr' olarak ölçülmüştür. "
+                "Bu ton gravitasyonel alanımızı bozmaz fakat yerçekimsiz ortamda üstün bir parlaklık da sağlamaz.\n\n"
+                "**Fiziksel Öneri:** Daha yüksek kontrast ve kuantum yansıması elde etmek için pembe/mor yansımalı soğuk tonları tercih edebilirsiniz.\n\n"
+                "🔗 *[Holografik Satın Alma Köprüsü]*: Cilt tipinize özel diğer alternatifleri karşılaştırın."
+            )
+    elif skin_type == "medium":
+        if any(w in q for w in ["şeftali", "seftali", "kiremit", "bronz", "turuncu", "coral", "mercan", "nude", "kahve", "terracotta"]):
+            comment = (
+                "✨ **[HOLOGRAFİK ANALİZ RAPORU]**\n\n"
+                "Cilt analiz verilerin süzülerek havada belirdi. **Sıcak alt tonlu buğday tenin**, "
+                "yerçekimsiz stüdyomuzdaki altın dalga boyundaki foton yansımalarıyle mükemmel bir uyum yakaladı.\n\n"
+                "**Fiziksel Öneri:** Şeftali, mercan ve bronz tonları, buğday teninin yaydığı sıcak spektrumu emerek doğal bir ışıltı katacak "
+                "ve yüzeydeki ışık kırılmasını %25 optimize edecektir. Havada asılı duran dijital vitrinimizdeki bu ürün, yüzüne kusursuz bir teknolojik aura verecektir.\n\n"
+                "🔗 *[Holografik Satın Alma Köprüsü]*: Buğday ten için en popüler şeftali/mercan alternatifleri karşılaştır."
+            )
+        elif any(w in q for w in ["eflatun", "pembe", "mor", "berry", "plum", "soğuk pembe"]):
+            comment = (
+                "⚠️ **[GRAVİTASYONEL ALAN UYARISI]**\n\n"
+                "Cilt analiz panellerimiz, soğuk eflatun/pembe tonlarının **sıcak buğday teninle** fotonik bir uyumsuzluk yarattığını tespit etti. "
+                "Bu tonlar ten renginizle çakışarak cildi solgun gösterebilir.\n\n"
+                "**Fiziksel Öneri:** Sıcak şeftali, terracotta ve mercan tonlarındaki allık ve rujları tercih etmeniz yerçekimsiz alandaki dengenizi koruyacaktır.\n\n"
+                "🔗 *[Holografik Satın Alma Köprüsü]*: Buğday teninizle en uyumlu sıcak tonlu makyaj alternatiflerine gözatın."
+            )
+        else:
+            comment = (
+                "ℹ️ **[HOLOGRAFİK BİLGİ SEVİYESİ]**\n\n"
+                "Buğday teniniz üzerinde bu rengin analiz değeri 'Nötr' seviyededir. Işık yansımasını ne artırır ne azaltır.\n\n"
+                "**Fiziksel Öneri:** Şeftali ve mercan yansımalı tonlar ile altın ışıltılı pigmentler tercih edilirse kuantum auranız daha dengeli duracaktır.\n\n"
+                "🔗 *[Holografik Satın Alma Köprüsü]*: Cildinize özel sıcak yansımalı diğer ürünleri inceleyin."
+            )
+    else:
+        if any(w in q for w in ["altın", "altin", "gold", "bronz", "mürdüm", "plum", "berry", "koyu kırmızı", "bordo", "kahve", "bakır", "bakir"]):
+            comment = (
+                "✨ **[HOLOGRAFİK ANALİZ RAPORU]**\n\n"
+                "Verilerin süzülerek havada belirdi. Derin **esmer tenin ve nötr/sıcak alt tonun**, yerçekimsiz stüdyomuzdaki yüksek dalga boylu ışık huzmeleriyle "
+                "tam uyum içinde rezonansa girdi.\n\n"
+                "**Fiziksel Öneri:** Bronz, altın ışıltıları, mürdüm ve derin bordo tonları, esmer teninizdeki ışık soğurmasını azaltarak yüzey yansımasını %35 oranında artıracaktır. "
+                "Havada asılı duran vitrinimizdeki bu pigmentler, yüzünüze fütüristik bir derinlik ve parlaklık kazandıracak.\n\n"
+                "🔗 *[Holografik Satın Alma Köprüsü]*: Esmer ten için en uyumlu altın/bordo makyaj ürünleri karşılaştır."
+            )
+        elif any(w in q for w in ["toz pembe", "açık pembe", "pastel", "beyaz", "eflatun"]):
+            comment = (
+                "⚠️ **[GRAVİTASYONEL ALAN UYARISI]**\n\n"
+                "Analizörlerimiz, çok açık pastel ve soğuk toz pembe tonlarının esmer teniniz üzerinde 'tebeşirimsi' ve mat bir yansıma kırılması yarattığını gösteriyor. "
+                "Bu durum yerçekimsiz estetiğimizi olumsuz etkileyebilir.\n\n"
+                "**Fiziksel Öneri:** Açık pastel tonlar yerine, derin mürdüm, bordo ve altın ışıltılı bakır tonlarına yönelmeniz daha kusursuz bir teknolojik görünüm sağlayacaktır.\n\n"
+                "🔗 *[Holografik Satın Alma Köprüsü]*: Esmer teninize özel derin pigmentli alternatifleri listele."
+            )
+        else:
+            comment = (
+                "ℹ️ **[HOLOGRAFİK BİLGİ SEVİYESİ]**\n\n"
+                "Esmer teniniz için bu ürünün yansıma etkisi 'Nötr' seviyesindedir. \n\n"
+                "**Fiziksel Öneri:** Derin mürdüm veya altın yansımalı tonları tercih etmeniz esmer teninizin asilliğini fütüristik aura ile birleştirecektir.\n\n"
+                "🔗 *[Holografik Satın Alma Köprüsü]*: Cilt tonunuz için özel önerilen diğer ürünleri karşılaştırın."
+            )
+
+    return {"success": True, "comment": comment}
+
+
 def require_device_id(x_device_id: str | None) -> str:
     if not x_device_id or len(x_device_id) < 8:
         raise HTTPException(status_code=400, detail="Geçerli cihaz kimliği gerekli")
