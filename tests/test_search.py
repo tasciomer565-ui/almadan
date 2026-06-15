@@ -51,7 +51,7 @@ class TestSearchByName(unittest.TestCase):
             self.assertTrue(item["extra_info"].get("fallback"))
 
     @patch("app.comparator.search_n11_direct")
-    @patch("app.comparator._fetch_aol_urls")
+    @patch("app.search_orchestrator.fetch_aol_urls_for_sites")
     def test_unit_price_risk_labeling(self, mock_fetch_urls, mock_n11):
         mock_fetch_urls.return_value = []
         mock_n11.return_value = (

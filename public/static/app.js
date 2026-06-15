@@ -237,8 +237,6 @@ document.addEventListener("DOMContentLoaded", () => {
     showPasswordReset(recoverySession);
   }
   loadSession();
-  loadProducts();
-  loadReceipts();
   checkSharedListUrl();
 });
 
@@ -1123,21 +1121,26 @@ function imageFallback(element, icon = "package-search") {
   lucide.createIcons();
 }
 
-async function loadProducts() {
+async function loadProducts(signal = null) {
   const grid = document.getElementById("dealGrid");
   if (grid) {
     grid.innerHTML = `<div class="loading-state"><span class="spinner"></span>Fırsatlar hazırlanıyor</div>`;
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 saniyelik timeout
+  let timeoutId = null;
+  let controller = null;
+  if (!signal) {
+    controller = new AbortController();
+    signal = controller.signal;
+    timeoutId = setTimeout(() => controller.abort(), 3000); // 3 saniyelik timeout
+  }
 
   try {
-    state.products = await api("/api/opportunities", { signal: controller.signal });
-    clearTimeout(timeoutId);
+    state.products = await api("/api/opportunities", { signal });
+    if (timeoutId) clearTimeout(timeoutId);
     renderAll();
   } catch (error) {
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
     console.warn("Mobil Fırsatlar timeout/hata, fallback tetikleniyor:", error);
     renderFallbackOpportunities();
   }
@@ -1402,7 +1405,7 @@ function renderSavingsCharts() {
   });
 }
 
-async function loadReceipts(month = "") {
+async function loadReceipts(month = "", signal = null) {
   const monthFilter = document.getElementById("receiptMonthFilter");
   if (monthFilter && !monthFilter.value) {
     monthFilter.value = new Date().toISOString().slice(0, 7);
@@ -1411,6 +1414,7 @@ async function loadReceipts(month = "") {
   try {
     const result = await api(
       `/api/receipts${selectedMonth ? `?month=${encodeURIComponent(selectedMonth)}` : ""}`,
+      { signal }
     );
     state.receipts = result.receipts || [];
     state.receiptSummary = result.summary || null;
@@ -6022,7 +6026,6 @@ window.addEventListener("load", () => {
   if (loader) loader.style.display = "none";
 
   // B. Hafızadan veriyi çek (Auto-Rehydrate)
-  let rehydrated = false;
   const savedState = localStorage.getItem("almadan_state");
   if (savedState) {
     try {
@@ -6044,7 +6047,6 @@ window.addEventListener("load", () => {
         // UI Güncellemesi: GPS Pill
         updateGpsStatusUI();
         
-        rehydrated = true;
         console.log("Kuantum Hafıza: Durum geri yüklendi.", data);
       }
     } catch (e) {
@@ -6053,24 +6055,80 @@ window.addEventListener("load", () => {
     }
   }
 
-  // C. Eğer hafızada durum yoksa varsayılan Geolocation talebini tetikle
-  if (!rehydrated && navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        state.userCoords = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        };
-        state.userLocation = "gps";
-        const selector = document.getElementById("userLocationSelector");
-        if (selector) selector.value = "gps";
-        updateGpsStatusUI();
-        renderCart();
-      },
-      (error) => {
-        console.log("Açılışta otomatik konum izni alınamadı:", error.message);
-        updateGpsStatusUI();
+  // Apple Privacy Bypass: Geolocation API'yi sayfa yüklenirken (load) asla otomatik çağırma.
+  // Otomatik konum izni isteklerini kaldırıyoruz. İzin sadece Kontrol Et veya GPS pill tıklandığında istenecek.
+
+  // C. Lazy-Boot ve Force-Stop Zamanlayıcısı
+  let initialLoadController = null;
+  
+  // 5 saniye içinde veriler gelmezse zorla durdur (Force-Stop Loading) ve yeşil glitch kurtarma moduna sok
+  const forceStopTimeout = setTimeout(() => {
+    if (initialLoadController) {
+      console.warn("Başlangıç veri yüklemesinde 5s sınırı aşıldı, abort ediliyor.");
+      initialLoadController.abort();
+      showInitialLoadFallback();
+    }
+  }, 5000);
+
+  const startLazyLoading = () => {
+    // DOM-First Rendering: Load event'inden 1 saniye sonra asenkron veri akışını başlat
+    setTimeout(async () => {
+      initialLoadController = new AbortController();
+      try {
+        await Promise.all([
+          loadProducts(initialLoadController.signal),
+          loadReceipts("", initialLoadController.signal)
+        ]);
+        clearTimeout(forceStopTimeout);
+      } catch (err) {
+        clearTimeout(forceStopTimeout);
+        if (err.name === "AbortError") {
+          console.log("Yükleme işlemi timeout nedeniyle iptal edildi (Abort).");
+        } else {
+          console.error("Başlangıç veri yüklemesinde hata:", err);
+          showInitialLoadFallback();
+        }
+      } finally {
+        initialLoadController = null;
       }
-    );
+    }, 1000);
+  };
+
+  // requestIdleCallback (desteklemiyorsa 500ms setTimeout fallback)
+  if (window.requestIdleCallback) {
+    requestIdleCallback(() => {
+      startLazyLoading();
+    });
+  } else {
+    setTimeout(() => {
+      startLazyLoading();
+    }, 500);
   }
 });
+
+function showInitialLoadFallback() {
+  const overlay = document.getElementById("quantumScanOverlay");
+  const progressText = document.getElementById("quantumScanProgress");
+  if (overlay && progressText) {
+    overlay.style.display = "flex";
+    overlay.classList.add("recovery-mode");
+    const header = overlay.querySelector("h3");
+    if (header) {
+      header.classList.add("glitch-active");
+      header.innerText = "SİSTEM KURTARMA AKTİF: MOBİL HATA KURTARMA";
+    }
+    progressText.innerText = "Veri akışında gecikme: Yerel önbelleğe geçiliyor...";
+    
+    setTimeout(() => {
+      overlay.style.display = "none";
+      overlay.classList.remove("recovery-mode");
+      if (header) {
+        header.classList.remove("glitch-active");
+        header.innerText = "KUANTUM SPEKTRUMU TARANIYOR";
+      }
+      renderFallbackOpportunities();
+    }, 1500);
+  } else {
+    renderFallbackOpportunities();
+  }
+}
