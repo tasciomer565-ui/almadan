@@ -109,7 +109,7 @@ function md5(str) {
   const GG = (a, b, c, d, x, s, ac) => AddUnsigned(RotateLeft(AddUnsigned(a, AddUnsigned(AddUnsigned(G(b, c, d), x), ac)), s), b);
   const HH = (a, b, c, d, x, s, ac) => AddUnsigned(RotateLeft(AddUnsigned(a, AddUnsigned(AddUnsigned(H(b, c, d), x), ac)), s), b);
   const II = (a, b, c, d, x, s, ac) => AddUnsigned(RotateLeft(AddUnsigned(a, AddUnsigned(AddUnsigned(I(b, c, d), x), ac)), s), b);
-  
+
   const ConvertToWordArray = (string) => {
     const lMessageLength = string.length;
     const lNumberOfWords_temp1 = lMessageLength + 8;
@@ -3687,6 +3687,122 @@ window.tryOnChromaThreshold = 235;
 window.tryOnGarmentAspectRatio = 1.0;
 window.poseDetected = false;
 window.isBackendScanning = false;
+window.tryOnOriginalSrc = null;
+window.aiFaceOriginalSrc = null;
+window.tryOnRenderState = {
+  loading: false,
+  modelDrawn: false,
+  garmentDrawn: false,
+  lastDrawnAt: 0,
+};
+
+window.ensureTryOnLayerVisible = function() {
+  const canvas = document.getElementById("tryOnCanvas");
+  if (canvas) {
+    canvas.style.display = "block";
+    canvas.style.visibility = "visible";
+    canvas.style.opacity = "1";
+    canvas.style.position = "relative";
+    canvas.style.zIndex = "2";
+  }
+
+  const faceContainer = document.getElementById("aiFaceContainer");
+  const facePreview = document.getElementById("aiFacePreview");
+  const makeupCanvas = document.getElementById("aiMakeupCanvas");
+  if (faceContainer && facePreview?.src) {
+    faceContainer.classList.remove("hidden");
+    faceContainer.style.display = "flex";
+    faceContainer.style.visibility = "visible";
+    faceContainer.style.opacity = "1";
+    faceContainer.style.zIndex = "8";
+    facePreview.style.display = "block";
+    facePreview.style.visibility = "visible";
+    facePreview.style.opacity = "1";
+    facePreview.style.zIndex = "1";
+  }
+  if (makeupCanvas) {
+    makeupCanvas.style.display = "block";
+    makeupCanvas.style.visibility = "visible";
+    makeupCanvas.style.opacity = "1";
+    makeupCanvas.style.zIndex = "2";
+  }
+};
+
+window.restoreOriginalFace = function(reason = "unknown") {
+  console.error("Virtual Try-On fallback devrede:", reason);
+  window.isBackendScanning = false;
+  window.isScanningPose = false;
+  window.tryOnAnimationActive = false;
+  window.tryOnRenderState.loading = false;
+
+  const laserEl = document.getElementById("fashionScanLaser");
+  const svgHud = document.getElementById("tryOnSvgHud");
+  if (laserEl) laserEl.classList.add("hidden");
+  if (svgHud) svgHud.classList.add("hidden");
+
+  const facePreview = document.getElementById("aiFacePreview");
+  const faceOriginalSrc = facePreview?.dataset.originalSrc || window.aiFaceOriginalSrc;
+  if (facePreview && !facePreview.getAttribute("src") && faceOriginalSrc) {
+    facePreview.src = faceOriginalSrc;
+  }
+
+  window.ensureTryOnLayerVisible();
+
+  const canvas = document.getElementById("tryOnCanvas");
+  if (!canvas) return false;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return false;
+
+  const originalSrc = window.tryOnOriginalSrc
+    || (window.selectedTryOnModel === "user" ? window.userTryOnPhoto : null)
+    || (window.selectedTryOnModel === "female" ? "/static/fashion_female_model.png" : "/static/fashion_male_model.png");
+  if (!originalSrc) return false;
+
+  const originalImage = new Image();
+  originalImage.onload = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#eaeaea";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+    canvas.style.opacity = "1";
+    window.tryOnRenderState.modelDrawn = true;
+    window.tryOnRenderState.garmentDrawn = false;
+    window.tryOnRenderState.lastDrawnAt = Date.now();
+    console.log("Virtual Try-On orijinal manken geri yüklendi:", window.tryOnRenderState);
+  };
+  originalImage.onerror = (error) => console.error("Orijinal manken görseli geri yüklenemedi:", error);
+  originalImage.src = originalSrc;
+  return true;
+};
+
+window.verifyTryOnVisual = function(context = "render", requireGarment = false) {
+  const canvas = document.getElementById("tryOnCanvas");
+  window.ensureTryOnLayerVisible();
+  const style = canvas ? window.getComputedStyle(canvas) : null;
+  const visible = Boolean(canvas)
+    && style.display !== "none"
+    && style.visibility !== "hidden"
+    && Number.parseFloat(style.opacity || "1") > 0;
+  const drawn = window.tryOnRenderState.modelDrawn
+    && (!requireGarment || window.tryOnRenderState.garmentDrawn);
+
+  console.log("Virtual Try-On DOM kontrolü:", {
+    context,
+    visible,
+    requireGarment,
+    state: { ...window.tryOnRenderState },
+    canvasDisplay: style?.display,
+    canvasVisibility: style?.visibility,
+    canvasOpacity: style?.opacity,
+  });
+
+  if (!visible || !drawn) {
+    window.restoreOriginalFace(`${context}: görsel DOM'a çizilemedi`);
+    return false;
+  }
+  canvas.style.opacity = "1";
+  return true;
+};
 
 window.detectPoseAndFitGarment = async function(photoBase64) {
   const svgHud = document.getElementById("tryOnSvgHud");
@@ -3885,7 +4001,14 @@ window.animateTryOnCanvas = function() {
 
 window.drawTryOnScene = function() {
   const canvas = document.getElementById("tryOnCanvas");
-  if (!canvas) return;
+  if (!canvas) {
+    window.restoreOriginalFace("tryOnCanvas bulunamadı");
+    return;
+  }
+  window.ensureTryOnLayerVisible();
+  window.tryOnRenderState.loading = true;
+  window.tryOnRenderState.modelDrawn = false;
+  window.tryOnRenderState.garmentDrawn = false;
   const ctx = canvas.getContext("2d");
   
   ctx.clearRect(0, 0, 300, 300);
@@ -3905,9 +4028,13 @@ window.drawTryOnScene = function() {
   } else {
     modelImg.src = window.selectedTryOnModel === "male" ? "/static/fashion_male_model.png" : "/static/fashion_female_model.png";
   }
+  window.tryOnOriginalSrc = modelImg.src;
   
   modelImg.onload = () => {
     ctx.drawImage(modelImg, 0, 0, 300, 300);
+    window.tryOnRenderState.modelDrawn = true;
+    window.tryOnRenderState.lastDrawnAt = Date.now();
+    canvas.style.opacity = "1";
     
     if (window.isBackendScanning) {
       // 1. Neon grid lines
@@ -4072,7 +4199,23 @@ window.drawTryOnScene = function() {
       window.drawGarmentTransparent(ctx, garmentImg, -window.tryOnGarmentW / 2, -window.tryOnGarmentH / 2, window.tryOnGarmentW, window.tryOnGarmentH);
       
       ctx.restore();
+      window.tryOnRenderState.loading = false;
+      window.tryOnRenderState.garmentDrawn = true;
+      window.tryOnRenderState.lastDrawnAt = Date.now();
+      canvas.style.opacity = "1";
+      window.ensureTryOnLayerVisible();
+      console.log("Virtual Try-On çizimi tamamlandı:", { ...window.tryOnRenderState });
     };
+    garmentImg.onerror = (error) => {
+      window.tryOnRenderState.loading = false;
+      console.error("Tişört görseli yüklenemedi:", garmentImg.src, error);
+      window.restoreOriginalFace("tişört görseli yüklenemedi");
+    };
+  };
+  modelImg.onerror = (error) => {
+    window.tryOnRenderState.loading = false;
+    console.error("Manken görseli yüklenemedi:", modelImg.src, error);
+    window.restoreOriginalFace("manken görseli yüklenemedi");
   };
 };
 
@@ -4283,10 +4426,17 @@ window.runFashionTryOnAnimation = function() {
     window.isScanningPose = false;
     window.initTryOnParticles();
     
-    if (successBanner) successBanner.classList.remove("hidden");
-    
-    showToast("Prova tamamlandı! Yapay zeka kıyafeti başarıyla giydirdi.");
     window.drawTryOnScene();
+    setTimeout(() => {
+      const renderSucceeded = window.verifyTryOnVisual("prova tamamlandı", true);
+      if (renderSucceeded) {
+        if (successBanner) successBanner.classList.remove("hidden");
+        showToast("Prova tamamlandı! Yapay zeka kıyafeti başarıyla giydirdi.");
+      } else {
+        if (successBanner) successBanner.classList.add("hidden");
+        showToast("Prova görseli oluşturulamadı. Orijinal manken geri getirildi.");
+      }
+    }, 350);
   }, 2500);
 };
 
@@ -5386,18 +5536,32 @@ async function runAiSkinScan(type, base64Data = null) {
   if (type === "uploaded") {
     statusEl.innerHTML = `<span style="color: var(--green);">Fotoğraf Yüklendi!</span> Analiz ediliyor...`;
     if (faceContainer && facePreview && base64Data) {
+      window.aiFaceOriginalSrc = base64Data;
+      facePreview.dataset.originalSrc = base64Data;
       facePreview.src = base64Data;
       faceContainer.classList.remove("hidden");
+      window.ensureTryOnLayerVisible();
     }
   } else {
     const labels = { light: "Açık Tenli Model", medium: "Buğday Tenli Model", dark: "Esmer Model" };
     statusEl.innerHTML = `<strong style="color: var(--green-dark);">${labels[type]}</strong> analiz ediliyor...`;
     if (faceContainer && facePreview) {
-      facePreview.src = `/static/cosmetic_model_${type}.png`;
+      const originalSrc = `/static/cosmetic_model_${type}.png`;
+      window.aiFaceOriginalSrc = originalSrc;
+      facePreview.dataset.originalSrc = originalSrc;
+      facePreview.src = originalSrc;
       faceContainer.classList.remove("hidden");
+      window.ensureTryOnLayerVisible();
     }
   }
   
+  if (facePreview) {
+    facePreview.onerror = (error) => {
+      console.error("Selfie/manken önizlemesi yüklenemedi:", facePreview.src, error);
+      window.restoreOriginalFace("selfie önizlemesi yüklenemedi");
+    };
+  }
+
   laserEl.style.animation = "scanLaserAnim 1.5s infinite ease-in-out";
   if (aiScanLineRect) {
     aiScanLineRect.classList.remove("hidden");
@@ -5868,6 +6032,11 @@ window.startGlobalBobbingController = function() {
 window.runMakeupTryOnAnimation = function(button, color, type) {
   const facePreview = document.getElementById("aiFacePreview");
   const faceContainer = document.getElementById("aiFaceContainer");
+  const originalSrc = facePreview?.dataset.originalSrc || window.aiFaceOriginalSrc;
+  if (facePreview && !facePreview.getAttribute("src") && originalSrc) {
+    facePreview.src = originalSrc;
+  }
+  window.ensureTryOnLayerVisible();
   if (!facePreview || !faceContainer || faceContainer.classList.contains("hidden")) {
     showToast("Lütfen önce bir fotoğraf yükleyin veya örnek modellerden birini seçerek cilt analizi yapın.");
     return;
@@ -5915,6 +6084,13 @@ window.runMakeupTryOnAnimation = function(button, color, type) {
     
     // Draw makeup pigments onto canvas
     window.applyMakeupOnCanvas(color, type);
+    window.ensureTryOnLayerVisible();
+    console.log("Makyaj prova katmanı görünürlük kontrolü:", {
+      src: facePreview.getAttribute("src"),
+      display: window.getComputedStyle(facePreview).display,
+      visibility: window.getComputedStyle(facePreview).visibility,
+      opacity: window.getComputedStyle(facePreview).opacity,
+    });
     
     // Interactive futuristic success notification
     const typeLabels = { lipstick: "Kuantum Ruj", blush: "Neon Allık", eyeshadow: "Foton Farı" };
