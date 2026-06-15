@@ -2021,6 +2021,25 @@ def receipt_total(items: list[dict]) -> float:
     )
 
 
+def normalize_receipt_items(
+    items: list[dict],
+    category_hint: str | None = None,
+) -> list[dict]:
+    normalized = []
+    for item in items:
+        title = str(item.get("title") or "").strip()
+        normalized.append({
+            **item,
+            "title": title,
+            "price": round(float(item.get("price") or 0), 2),
+            "quantity": float(item.get("quantity") or 1),
+            "category": str(
+                item.get("category") or category_mapping(title, category_hint)
+            ),
+        })
+    return normalized
+
+
 def normalize_receipt_date(value: str) -> str:
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -2150,7 +2169,10 @@ def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
     category_hint = payload.category_hint or "grocery"
 
     if img == "mock_data" or img in {"grocery", "cosmetics", "electronics"}:
-        items = demo_items[category_hint if img == "mock_data" else img]
+        items = normalize_receipt_items(
+            demo_items[category_hint if img == "mock_data" else img],
+            category_hint,
+        )
         demo_store = {
             "grocery": "migros",
             "cosmetics": "gratis",
@@ -2165,7 +2187,7 @@ def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
         }
     if "cosmetics_receipt" in img or "electronics_receipt" in img:
         category_hint = "cosmetics" if "cosmetics_receipt" in img else "electronics"
-        items = demo_items[category_hint]
+        items = normalize_receipt_items(demo_items[category_hint], category_hint)
         return {
             "store": "gratis" if category_hint == "cosmetics" else "vatanbilgisayar",
             "purchased_at": default_date,

@@ -129,6 +129,7 @@ class CartOptimizationTests(unittest.TestCase):
         self.assertEqual(response["store"], "migros")
         self.assertTrue(len(response["detected_items"]) > 0)
         self.assertEqual(response["detected_items"][0]["title"], "Yudum Ayçiçek Yağı 5 L")
+        self.assertTrue(all(item["category"] for item in response["detected_items"]))
 
     def test_ocr_receipt_multi_category(self) -> None:
         # Cosmetics receipt
