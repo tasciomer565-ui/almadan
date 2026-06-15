@@ -1,3 +1,31 @@
+window.__almadanPanicModeActive = false;
+window.onerror = function (message, source, lineno, colno, error) {
+  console.error("Almadan global hata yakalayıcı:", {
+    message,
+    source,
+    lineno,
+    colno,
+    error,
+  });
+
+  if (window.__almadanPanicModeActive) {
+    return true;
+  }
+
+  window.__almadanPanicModeActive = true;
+  try {
+    showInitialLoadFallback();
+  } catch (fallbackError) {
+    console.error("Almadan kurtarma modu başlatılamadı:", fallbackError);
+  } finally {
+    window.setTimeout(() => {
+      window.__almadanPanicModeActive = false;
+    }, 1500);
+  }
+
+  return true;
+};
+
 const state = {
   products: [],
   activeView: "discover",
@@ -1127,21 +1155,11 @@ async function loadProducts(signal = null) {
     grid.innerHTML = `<div class="loading-state"><span class="spinner"></span>Fırsatlar hazırlanıyor</div>`;
   }
 
-  let timeoutId = null;
-  let controller = null;
-  if (!signal) {
-    controller = new AbortController();
-    signal = controller.signal;
-    timeoutId = setTimeout(() => controller.abort(), 3000); // 3 saniyelik timeout
-  }
-
   try {
-    state.products = await api("/api/opportunities", { signal });
-    if (timeoutId) clearTimeout(timeoutId);
+    state.products = await api("/api/opportunities", { signal: null });
     renderAll();
   } catch (error) {
-    if (timeoutId) clearTimeout(timeoutId);
-    console.warn("Mobil Fırsatlar timeout/hata, fallback tetikleniyor:", error);
+    console.error("loadProducts hatası:", error);
     renderFallbackOpportunities();
   }
 }
@@ -1414,13 +1432,13 @@ async function loadReceipts(month = "", signal = null) {
   try {
     const result = await api(
       `/api/receipts${selectedMonth ? `?month=${encodeURIComponent(selectedMonth)}` : ""}`,
-      { signal }
+      { signal: null }
     );
     state.receipts = result.receipts || [];
     state.receiptSummary = result.summary || null;
     renderReceiptAnalytics();
   } catch (error) {
-    console.warn("Fiş geçmişi yüklenemedi:", error);
+    console.error("loadReceipts hatası:", error);
   }
 }
 
@@ -1600,9 +1618,6 @@ async function parseProduct(event) {
   // 2. Kuantum tarama işlemini asenkron olarak bir sonraki frame'de başlat
   requestAnimationFrame(() => {
     setTimeout(async () => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), window.SEARCH_TIMEOUT || 6000); // 3-6 saniye kuralı
-      
       var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Siber veri düğümlerinden canlı fiyatlar toplanıyor..."; }, 600);
       var t2 = setTimeout(() => { if (progressText) progressText.innerText = "Optimal kuantum frekansı hesaplanıyor..."; }, 1300);
 
@@ -1611,9 +1626,8 @@ async function parseProduct(event) {
           const parsed = await api("/parse-url", {
             method: "POST",
             body: JSON.stringify({ url: val }),
-            signal: controller.signal
+            signal: null
           });
-          clearTimeout(timeoutId);
           showParsedProduct(parsed);
         } else {
           const category = document.getElementById("searchCategorySelector")?.value || "general";
@@ -1633,13 +1647,11 @@ async function parseProduct(event) {
             searchUrl += "&lat=" + state.userCoords.lat + "&lon=" + state.userCoords.lng;
           }
           
-          const results = await api(searchUrl, { signal: controller.signal });
-          clearTimeout(timeoutId);
+          const results = await api(searchUrl, { signal: null });
           showSearchResults(results);
         }
       } catch (error) {
-        clearTimeout(timeoutId);
-        console.warn("Kuantum hata kurtarma protokolü tetiklendi:", error);
+        console.error("parseProduct hatası:", error);
         
         if (overlay && progressText) {
           // 1. Durum bildirimini yeşil mod ve glitch ile güncelle
@@ -1705,7 +1717,6 @@ async function parseProduct(event) {
         lucide.createIcons();
       }
     }, 0);
-  });
   });
 }
 
@@ -6058,51 +6069,12 @@ window.addEventListener("load", () => {
   // Apple Privacy Bypass: Geolocation API'yi sayfa yüklenirken (load) asla otomatik çağırma.
   // Otomatik konum izni isteklerini kaldırıyoruz. İzin sadece Kontrol Et veya GPS pill tıklandığında istenecek.
 
-  // C. Lazy-Boot ve Force-Stop Zamanlayıcısı
-  let initialLoadController = null;
-  
-  // 5 saniye içinde veriler gelmezse zorla durdur (Force-Stop Loading) ve yeşil glitch kurtarma moduna sok
-  const forceStopTimeout = setTimeout(() => {
-    if (initialLoadController) {
-      console.warn("Başlangıç veri yüklemesinde 5s sınırı aşıldı, abort ediliyor.");
-      initialLoadController.abort();
-      showInitialLoadFallback();
-    }
-  }, 5000);
-
-  const startLazyLoading = () => {
-    // DOM-First Rendering: Load event'inden 1 saniye sonra asenkron veri akışını başlat
-    setTimeout(async () => {
-      initialLoadController = new AbortController();
-      try {
-        await Promise.all([
-          loadProducts(initialLoadController.signal),
-          loadReceipts("", initialLoadController.signal)
-        ]);
-        clearTimeout(forceStopTimeout);
-      } catch (err) {
-        clearTimeout(forceStopTimeout);
-        if (err.name === "AbortError") {
-          console.log("Yükleme işlemi timeout nedeniyle iptal edildi (Abort).");
-        } else {
-          console.error("Başlangıç veri yüklemesinde hata:", err);
-          showInitialLoadFallback();
-        }
-      } finally {
-        initialLoadController = null;
-      }
-    }, 1000);
-  };
-
-  // requestIdleCallback (desteklemiyorsa 500ms setTimeout fallback)
-  if (window.requestIdleCallback) {
-    requestIdleCallback(() => {
-      startLazyLoading();
-    });
-  } else {
-    setTimeout(() => {
-      startLazyLoading();
-    }, 500);
+  // Safe Mode: no AbortController, no timeouts, direct execution in window.onload
+  try {
+    loadProducts(null);
+    loadReceipts("", null);
+  } catch (err) {
+    console.error("Başlangıç veri yüklemesinde hata:", err);
   }
 });
 
