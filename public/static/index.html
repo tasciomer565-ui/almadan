@@ -553,11 +553,22 @@
                 </div>
                 <div id="receiptOcrUploadArea" class="hidden">
                   <p class="ocr-info">Fiş fotoğrafını seç. Ürünleri kontrol edip harcama geçmişine kaydet.</p>
-                  <label class="scanner-upload">
-                    <i data-lucide="file-image"></i>
-                    <span>Fiş fotoğrafı seç</span>
-                    <input id="receiptImageInput" type="file" accept="image/*" capture="environment">
-                  </label>
+                  <div class="receipt-tip-box">
+                    <i data-lucide="info"></i>
+                    <p>İpucu: Lütfen fişin tüm kenarlarının (mağaza ismi, tarih ve ürün listesi) net göründüğünden emin olun. Bulanık veya çok karanlık fotoğrafları sistem okuyamayabilir.</p>
+                  </div>
+                  <div class="receipt-upload-actions">
+                    <label class="scanner-upload">
+                      <i data-lucide="camera"></i>
+                      <span>Kamera ile çek</span>
+                      <input id="receiptImageInput" type="file" accept="image/*" capture="environment">
+                    </label>
+                    <label class="scanner-upload">
+                      <i data-lucide="image-up"></i>
+                      <span>Galeriden seç</span>
+                      <input id="receiptGalleryInput" type="file" accept="image/*">
+                    </label>
+                  </div>
                   <select id="ocrReceiptCategorySelector" class="form-select" style="margin-bottom: 10px;">
                     <option value="grocery">Market Fişi (Migros)</option>
                     <option value="cosmetics">Kozmetik Fişi (Gratis)</option>

@@ -305,6 +305,7 @@ function bindEvents() {
   document.getElementById("runOcrScanBtn").addEventListener("click", runOcrScan);
   document.getElementById("barcodeImageInput").addEventListener("change", scanBarcodeImage);
   document.getElementById("receiptImageInput").addEventListener("change", previewReceiptFile);
+  document.getElementById("receiptGalleryInput")?.addEventListener("change", previewReceiptFile);
   document.getElementById("receiptMonthFilter")?.addEventListener("change", (event) => {
     loadReceipts(event.target.value);
   });
@@ -3296,31 +3297,48 @@ async function previewReceiptFile(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   const info = document.querySelector("#receiptOcrUploadArea .ocr-info");
-  if (info) info.textContent = `${file.name} seçildi. Fiş şimdi okunuyor.`;
-  await runOcrScan();
+  if (info) info.textContent = `${file.name} seçildi. Fiş şimdi işleniyor.`;
+  await runOcrScan(event.target);
 }
 
-async function runOcrScan() {
+function receiptReadErrorMessage(error) {
+  const detail = error?.message || "Fişten güvenilir ürün bilgisi okunamadı.";
+  return `Fiş okunamadı: ${detail} Fişin üst kısmı (mağaza bilgisi), tarih ve ürün listesi net görünmüyor olabilir. Fişi düz zeminde, ışık alan bir yerde ve tüm kenarları kadraja girecek şekilde tekrar yükle.`;
+}
+
+async function runOcrScan(sourceInput = null) {
   const cat = document.getElementById("ocrReceiptCategorySelector").value || "grocery";
-  const receiptFile = document.getElementById("receiptImageInput")?.files?.[0];
+  const cameraInput = document.getElementById("receiptImageInput");
+  const galleryInput = document.getElementById("receiptGalleryInput");
+  const receiptFile = sourceInput?.files?.[0]
+    || cameraInput?.files?.[0]
+    || galleryInput?.files?.[0];
   const button = document.getElementById("runOcrScanBtn");
   const status = document.getElementById("receiptUploadStatus");
   const panel = document.getElementById("receiptReviewPanel");
   if (!receiptFile) {
     if (status) {
       status.className = "receipt-upload-status error";
-      status.textContent = "Önce bir fiş fotoğrafı seç.";
+      status.textContent = "Önce kameradan çekilmiş veya galeriden seçilmiş bir fiş görseli ekle.";
     }
     return;
   }
 
   if (button) {
     button.disabled = true;
-    button.innerHTML = `<span class="spinner"></span> Fiş okunuyor`;
+    button.innerHTML = `<span class="spinner"></span> İşleniyor...`;
   }
   if (status) {
     status.className = "receipt-upload-status loading";
-    status.textContent = "Fiş yükleniyor; mağaza, ürünler ve toplam tutar tespit ediliyor...";
+    status.innerHTML = `
+      <div class="receipt-processing">
+        <span class="spinner"></span>
+        <div>
+          <strong>İşleniyor...</strong>
+          <p>Fiş yükleniyor; mağaza, tarih, ürün listesi ve toplam tutar tespit ediliyor.</p>
+        </div>
+      </div>
+    `;
   }
   if (panel) {
     panel.classList.add("hidden");
@@ -3364,9 +3382,9 @@ async function runOcrScan() {
   } catch (error) {
     if (status) {
       status.className = "receipt-upload-status error";
-      status.textContent = `Fiş okunamadı: ${error.message}`;
+      status.textContent = receiptReadErrorMessage(error);
     }
-    showToast(error.message);
+    showToast("Fiş okunamadı. Fişin üst kısmı ve ürün listesi net görünecek şekilde tekrar dene.");
   } finally {
     if (button) {
       button.disabled = false;
@@ -3527,6 +3545,8 @@ async function savePendingReceipt() {
     state.pendingReceipt = null;
     const receiptInput = document.getElementById("receiptImageInput");
     if (receiptInput) receiptInput.value = "";
+    const receiptGalleryInput = document.getElementById("receiptGalleryInput");
+    if (receiptGalleryInput) receiptGalleryInput.value = "";
     showReceiptSavedConfirmation(savedStore, savedTotal, items.length);
     showToast("Fiş harcama geçmişine kaydedildi.");
     await loadReceipts();

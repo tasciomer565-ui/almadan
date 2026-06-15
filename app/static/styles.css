@@ -2245,10 +2245,64 @@ body.dark-theme .opt-savings-tag {
   line-height: 1.45;
 }
 
+.receipt-tip-box {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 10px 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--green) 20%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--green) 7%, transparent);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.receipt-tip-box svg {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  color: var(--green-dark);
+}
+
+.receipt-tip-box p {
+  margin: 0;
+}
+
+.receipt-upload-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.receipt-processing {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.receipt-processing strong,
+.receipt-processing p {
+  margin: 0;
+}
+
+.receipt-processing strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.receipt-processing p {
+  color: var(--muted);
+}
+
 .receipt-upload-status.loading {
   border-color: rgba(57, 121, 168, 0.35);
-  background: rgba(57, 121, 168, 0.08);
+  background: linear-gradient(135deg, rgba(57, 121, 168, 0.14), rgba(47, 133, 90, 0.10));
   color: var(--ink);
+  box-shadow: 0 0 0 1px rgba(57, 121, 168, 0.08), 0 10px 24px rgba(0, 0, 0, 0.08);
 }
 
 .receipt-upload-status.success {
@@ -2391,6 +2445,10 @@ body.dark-theme .opt-savings-tag {
 
   .receipt-review-header-card {
     flex-direction: column;
+  }
+
+  .receipt-upload-actions {
+    grid-template-columns: 1fr;
   }
 
   .receipt-review-row {
@@ -2601,4 +2659,3 @@ body.dark-theme .quantum-node-card {
   background: linear-gradient(90deg, transparent, #00ff66, transparent) !important;
   box-shadow: 0 0 15px #00ff66 !important;
 }
-
