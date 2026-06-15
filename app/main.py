@@ -1823,6 +1823,7 @@ def category_mapping(title: str, fallback: str | None = None) -> str:
             "domates", "patates", "soğan", "sogan", "yağ", "yag", "un",
             "şeker", "seker", "pirinç", "pirinc", "makarna", "çay", "cay",
             "kahve", "su", "kola", "meyve", "sebze", "et", "tavuk",
+            "kuzu", "dana", "kıyma", "kiyma", "kasap",
         ),
     }
     for category, keywords in keyword_map.items():
@@ -1830,7 +1831,7 @@ def category_mapping(title: str, fallback: str | None = None) -> str:
             return category
     if fallback in RECEIPT_ITEM_CATEGORIES:
         return str(fallback)
-    return "other"
+    return "grocery"
 
 
 def parse_receipt_details(
@@ -1923,9 +1924,14 @@ def parse_receipt_details(
 
     def clean_title(value: str) -> str:
         value = re.sub(r"^[^\wÇĞİÖŞÜçğıöşü]+", "", value)
+        value = re.sub(r"^(?:\d+\s*[xX*]\s*)+", "", value)
+        value = re.sub(r"^\d+(?:[.,]\d+)?\s*(?:kg|gr|g|lt|l|adet|ad)\b", "", value, flags=re.I)
         value = re.sub(r"\s+", " ", value)
         value = re.sub(r"\b(adet|kdv|no|fis|fiş)\b[:.]?", "", value, flags=re.I)
         return value.strip(" -:*")
+
+    def has_product_letters(value: str) -> bool:
+        return bool(re.search(r"[A-Za-zÇĞİÖŞÜçğıöşü]", value))
 
     def is_noise_line(folded: str) -> bool:
         if any(label in folded for label in ignored_labels):
@@ -1953,15 +1959,13 @@ def parse_receipt_details(
             continue
 
         accepted = False
-        for match in matches:
+        for match in reversed(matches):
             before = line[:match.start()].strip()
             after = line[match.end():].strip()
-            price_at_start = match.start() == 0
-            price_at_end = match.end() == len(line)
-            if not price_at_start and not price_at_end:
-                continue
-            title = clean_title(after if price_at_start else before)
-            if len(title) < 3 or title.isdigit():
+            before_title = clean_title(before)
+            after_title = clean_title(after)
+            title = before_title if has_product_letters(before_title) else after_title
+            if len(title) < 3 or title.isdigit() or not has_product_letters(title):
                 continue
             price = normalize_price(match.group(0))
             if price is None or not (0.10 <= price <= 50000.0):

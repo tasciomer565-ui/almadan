@@ -186,6 +186,30 @@ class CartOptimizationTests(unittest.TestCase):
             any("Cuma Cami" in line for line in parsed["receipt_info"])
         )
 
+    def test_universal_receipt_parser_accepts_any_product_price_line(self) -> None:
+        parsed = parse_receipt_details(
+            "\n".join([
+                "MIS KASAP",
+                "KUZU ET 1.600,00",
+                "DANA KIYMA 500.00",
+                "KALEM 12,50",
+                "TOPLAM 2.112,50",
+            ])
+        )
+
+        self.assertEqual(
+            [item["title"] for item in parsed["items"]],
+            ["KUZU ET", "DANA KIYMA", "KALEM"],
+        )
+        self.assertEqual([item["price"] for item in parsed["items"]], [1600.0, 500.0, 12.5])
+        self.assertTrue(all(item["category"] == "grocery" for item in parsed["items"]))
+
+    def test_universal_receipt_parser_accepts_price_before_unit_noise(self) -> None:
+        parsed = parse_receipt_details("KUZU ET 1.600,00 KG")
+
+        self.assertEqual(parsed["items"][0]["title"], "KUZU ET")
+        self.assertEqual(parsed["items"][0]["price"], 1600.0)
+
     @patch("app.tracker.load_db")
     @patch("app.tracker.save_db")
     @patch("app.tracker.send_push_to_owner")
