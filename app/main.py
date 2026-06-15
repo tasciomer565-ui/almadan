@@ -1776,9 +1776,119 @@ def api_barcode_lookup(code: str) -> dict:
     }
 
 
-def parse_receipt_text(text: str) -> list[dict]:
+RECEIPT_ITEM_CATEGORIES = (
+    "grocery",
+    "cosmetics",
+    "electronics",
+    "fashion",
+    "supplement",
+    "health",
+    "home",
+    "other",
+)
+
+
+def category_mapping(title: str, fallback: str | None = None) -> str:
+    lower = title.casefold()
+    keyword_map = {
+        "supplement": (
+            "whey", "protein", "creatine", "kreatin", "bcaa", "gainer",
+            "vitamin", "kolajen", "collagen", "takviye", "amino",
+        ),
+        "electronics": (
+            "ssd", "ram", "laptop", "notebook", "telefon", "kulaklık",
+            "kulaklik", "mouse", "klavye", "işlemci", "islemci", "anakart",
+            "monitör", "monitor", "tablet", "kamera", "şarj", "sarj",
+        ),
+        "cosmetics": (
+            "şampuan", "sampuan", "krem", "ruj", "maskara", "parfüm",
+            "parfum", "deodorant", "roll-on", "diş macunu", "dis macunu",
+            "nemlendirici", "tonik", "serum", "oje", "allık", "allik",
+        ),
+        "fashion": (
+            "tişört", "tshirt", "gomlek", "gömlek", "pantolon", "elbise",
+            "ayakkabı", "ayakkabi", "çorap", "corap", "mont", "ceket",
+        ),
+        "health": (
+            "bebek", "mama", "bez", "medikal", "lens", "optik", "ilaç",
+            "ilac", "ateş ölçer", "ates olcer",
+        ),
+        "home": (
+            "deterjan", "yumuşatıcı", "yumusatici", "çamaşır", "camasir",
+            "bulaşık", "bulasik", "peçete", "pecete", "havlu", "tabak",
+            "bardak", "tencere", "temizleyici",
+        ),
+        "grocery": (
+            "süt", "sut", "yoğurt", "yogurt", "peynir", "yumurta", "ekmek",
+            "domates", "patates", "soğan", "sogan", "yağ", "yag", "un",
+            "şeker", "seker", "pirinç", "pirinc", "makarna", "çay", "cay",
+            "kahve", "su", "kola", "meyve", "sebze", "et", "tavuk",
+        ),
+    }
+    for category, keywords in keyword_map.items():
+        if any(keyword in lower for keyword in keywords):
+            return category
+    if fallback in RECEIPT_ITEM_CATEGORIES:
+        return str(fallback)
+    return "other"
+
+
+def parse_receipt_details(
+    text: str,
+    category_hint: str | None = None,
+) -> dict:
     import re
+
     detected_items = []
+    receipt_info = []
+    price_pattern = re.compile(
+        r"(?<!\d)(?:\d{1,3}(?:[.,]\d{3})+|\d+)[.,]\d{2}(?!\d)"
+    )
+    blacklist_terms = (
+        "tarih",
+        "saat",
+        "cuma",
+        "cumartesi",
+        "pazar",
+        "pazartesi",
+        "salı",
+        "sali",
+        "çarşamba",
+        "carsamba",
+        "perşembe",
+        "persembe",
+        "mahmudiye",
+        "caddesi",
+        "cadde",
+        "mah",
+        "mahalle",
+        "sokak",
+        "vergi",
+        "mersis",
+        "kasiyer",
+        "fis",
+        "fiş",
+        "belge",
+        "sube",
+        "şube",
+        "adres",
+        "tel",
+        "telefon",
+        "adi",
+        "adı",
+        "no:",
+        "no ",
+        "www.",
+        "http",
+    )
+    blacklist_phrase_terms = tuple(
+        term for term in blacklist_terms
+        if len(term) > 4 or any(char in term for char in ":. ")
+    )
+    blacklist_word_terms = tuple(
+        term for term in blacklist_terms
+        if term not in blacklist_phrase_terms
+    )
     ignored_labels = (
         "toplam",
         "ara toplam",
@@ -1788,34 +1898,93 @@ def parse_receipt_text(text: str) -> list[dict]:
         "kredi kart",
         "ödenecek",
         "tutar",
+        "pos",
+        "onay",
+        "provizyon",
+        "slip",
     )
+
+    def normalize_price(value: str) -> float | None:
+        cleaned = value.strip().replace(" ", "")
+        if "," in cleaned and "." in cleaned:
+            if cleaned.rfind(",") > cleaned.rfind("."):
+                cleaned = cleaned.replace(".", "").replace(",", ".")
+            else:
+                cleaned = cleaned.replace(",", "")
+        else:
+            cleaned = cleaned.replace(",", ".")
+            if cleaned.count(".") > 1:
+                parts = cleaned.split(".")
+                cleaned = "".join(parts[:-1]) + "." + parts[-1]
+        try:
+            return float(cleaned)
+        except ValueError:
+            return None
+
+    def clean_title(value: str) -> str:
+        value = re.sub(r"^[^\wÇĞİÖŞÜçğıöşü]+", "", value)
+        value = re.sub(r"\s+", " ", value)
+        value = re.sub(r"\b(adet|kdv|no|fis|fiş)\b[:.]?", "", value, flags=re.I)
+        return value.strip(" -:*")
+
+    def is_noise_line(folded: str) -> bool:
+        if any(label in folded for label in ignored_labels):
+            return True
+        if any(term in folded for term in blacklist_phrase_terms):
+            return True
+        return any(
+            re.search(rf"(?<!\w){re.escape(term)}(?!\w)", folded)
+            for term in blacklist_word_terms
+        ) or bool(re.search(r"\bmg\b", folded))
+
     lines = text.split("\n")
     for line in lines:
         line = line.strip()
         if not line:
             continue
-        if any(label in line.casefold() for label in ignored_labels):
+        folded = line.casefold()
+        if is_noise_line(folded):
+            receipt_info.append(line)
             continue
-        matches = list(re.finditer(r"\b\d+([.,]\d{2})?\b", line))
+
+        matches = list(price_pattern.finditer(line))
         if not matches:
+            receipt_info.append(line)
             continue
-        for match in reversed(matches):
-            val_str = match.group(0).replace(",", ".")
-            try:
-                if val_str.count(".") > 1:
-                    parts = val_str.split(".")
-                    val_str = "".join(parts[:-1]) + "." + parts[-1]
-                price = float(val_str)
-                if 2.0 <= price <= 50000.0:
-                    title = line[:match.start()].strip()
-                    title = re.sub(r"^[^\w]+", "", title)
-                    title = re.sub(r"\s+", " ", title).strip()
-                    if len(title) >= 3 and not title.isdigit():
-                        detected_items.append({"title": title, "price": price})
-                        break
-            except ValueError:
+
+        accepted = False
+        for match in matches:
+            before = line[:match.start()].strip()
+            after = line[match.end():].strip()
+            price_at_start = match.start() == 0
+            price_at_end = match.end() == len(line)
+            if not price_at_start and not price_at_end:
                 continue
-    return detected_items
+            title = clean_title(after if price_at_start else before)
+            if len(title) < 3 or title.isdigit():
+                continue
+            price = normalize_price(match.group(0))
+            if price is None or not (0.10 <= price <= 50000.0):
+                continue
+            detected_items.append({
+                "title": title,
+                "price": round(price, 2),
+                "quantity": 1,
+                "category": category_mapping(title, category_hint),
+            })
+            accepted = True
+            break
+        if not accepted:
+            receipt_info.append(line)
+
+    return {
+        "items": detected_items,
+        "receipt_info": receipt_info[:40],
+    }
+
+
+def parse_receipt_text(text: str) -> list[dict]:
+    return parse_receipt_details(text).get("items", [])
 
 
 def receipt_store_from_text(text: str, category_hint: str | None = None) -> str:
@@ -1992,6 +2161,7 @@ def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
             "purchased_at": default_date,
             "total": receipt_total(items),
             "detected_items": items,
+            "receipt_info": ["Demo fiş verisi"],
         }
     if "cosmetics_receipt" in img or "electronics_receipt" in img:
         category_hint = "cosmetics" if "cosmetics_receipt" in img else "electronics"
@@ -2001,6 +2171,7 @@ def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
             "purchased_at": default_date,
             "total": receipt_total(items),
             "detected_items": items,
+            "receipt_info": ["Demo fiş verisi"],
         }
 
     try:
@@ -2019,13 +2190,15 @@ def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
         parsed_results = response.json().get("ParsedResults", [])
         if parsed_results:
             text = parsed_results[0].get("ParsedText", "")
-            detected = parse_receipt_text(text)
+            parsed_receipt = parse_receipt_details(text, category_hint)
+            detected = parsed_receipt["items"]
             if detected:
                 return {
                     "store": receipt_store_from_text(text, category_hint),
                     "purchased_at": default_date,
                     "total": receipt_total(detected),
                     "detected_items": detected,
+                    "receipt_info": parsed_receipt["receipt_info"],
                 }
     except Exception as exc:
         print(f"OCR.space API error: {exc}")

@@ -3343,11 +3343,12 @@ async function runOcrScan() {
         payment_method: "unknown",
         total: res.total,
         category: cat,
+        receipt_info: Array.isArray(res.receipt_info) ? res.receipt_info : [],
         items: res.detected_items.map((item) => ({
           title: item.title,
           price: Number(item.price || 0),
           quantity: Number(item.quantity || 1),
-          category: cat,
+          category: item.category || cat,
         })),
       };
       renderReceiptReview();
@@ -3400,8 +3401,19 @@ function renderReceiptReview() {
   const panel = document.getElementById("receiptReviewPanel");
   const receipt = state.pendingReceipt;
   if (!panel || !receipt) return;
+  const metaInfo = Array.isArray(receipt.receipt_info) ? receipt.receipt_info : [];
   panel.classList.remove("hidden");
   panel.innerHTML = `
+    <div class="receipt-review-header-card">
+      <div>
+        <span>Fiş üst bilgisi</span>
+        <strong>${escapeHtml(receipt.store || "Bilinmeyen mağaza")}</strong>
+        <small>${escapeHtml((receipt.purchased_at || "").slice(0, 10))}</small>
+      </div>
+      <p>${metaInfo.length
+        ? `${metaInfo.length} meta satır ürün listesinden ayrıldı.`
+        : "Meta gürültü bulunmadı; sadece ürün satırları listeleniyor."}</p>
+    </div>
     <div class="receipt-review-meta">
       <label>Mağaza
         <input id="receiptReviewStore" value="${escapeHtml(receipt.store)}">

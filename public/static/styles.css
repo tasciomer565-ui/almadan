@@ -2300,6 +2300,32 @@ body.dark-theme .opt-savings-tag {
   background: var(--bg-card);
 }
 
+.receipt-review-header-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--green) 24%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--green) 8%, transparent);
+}
+
+.receipt-review-header-card span,
+.receipt-review-header-card small,
+.receipt-review-header-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.receipt-review-header-card strong {
+  display: block;
+  margin: 4px 0;
+  color: var(--ink);
+  font-size: 16px;
+}
+
 .receipt-review-meta {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2361,6 +2387,10 @@ body.dark-theme .opt-savings-tag {
 
   .receipt-review-meta {
     grid-template-columns: 1fr;
+  }
+
+  .receipt-review-header-card {
+    flex-direction: column;
   }
 
   .receipt-review-row {
@@ -2571,5 +2601,4 @@ body.dark-theme .quantum-node-card {
   background: linear-gradient(90deg, transparent, #00ff66, transparent) !important;
   box-shadow: 0 0 15px #00ff66 !important;
 }
-
 

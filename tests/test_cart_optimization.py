@@ -16,6 +16,7 @@ from app.main import (
     SharedListItem,
     ReceiptOcrRequest,
     parse_receipt_text,
+    parse_receipt_details,
     receipt_store_from_text,
 )
 
@@ -158,6 +159,31 @@ class CartOptimizationTests(unittest.TestCase):
         )
         self.assertEqual([item["title"] for item in items], ["DOMATES", "SUT 1L"])
         self.assertEqual(receipt_store_from_text("A101 MARKET"), "a101")
+
+    def test_receipt_parser_separates_meta_noise_from_items(self) -> None:
+        parsed = parse_receipt_details(
+            "\n".join([
+                "A101 MARKET",
+                "Tarih: 12/06/2026",
+                "Saat: 14:21",
+                "Mahmudiye Mah. Cuma Cami Caddesi 1078,00",
+                "DOMATES 24,90",
+                "10,00 SUT 1L",
+                "URUN ADI",
+                "TOPLAM 34,90",
+            ]),
+            category_hint="grocery",
+        )
+
+        self.assertEqual(
+            [item["title"] for item in parsed["items"]],
+            ["DOMATES", "SUT 1L"],
+        )
+        self.assertEqual([item["price"] for item in parsed["items"]], [24.9, 10.0])
+        self.assertTrue(all(item["category"] == "grocery" for item in parsed["items"]))
+        self.assertTrue(
+            any("Cuma Cami" in line for line in parsed["receipt_info"])
+        )
 
     @patch("app.tracker.load_db")
     @patch("app.tracker.save_db")
