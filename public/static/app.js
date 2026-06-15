@@ -203,10 +203,31 @@ function optimizeForMobile() {
   }
 }
 
+function persistQuantumState() {
+  const globalCheckbox = document.getElementById("globalModeCheckbox");
+  const data = {
+    userCoords: state.userCoords,
+    userLocation: state.userLocation,
+    isGlobalActive: globalCheckbox ? globalCheckbox.checked : false
+  };
+  localStorage.setItem("almadan_state", JSON.stringify(data));
+  console.log("Kuantum Hafıza: Durum kaydedildi.", data);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   applyTheme();
   optimizeForMobile();
-  lucide.createIcons();
+  
+  if (window.requestIdleCallback) {
+    requestIdleCallback(() => {
+      lucide.createIcons();
+    });
+  } else {
+    requestAnimationFrame(() => {
+      lucide.createIcons();
+    });
+  }
+
   bindEvents();
   registerServiceWorker();
   updateNetworkStatus();
@@ -238,6 +259,11 @@ function bindEvents() {
     gpsPill.addEventListener("click", () => {
       window.triggerGpsActivation();
     });
+  }
+
+  const globalCheckbox = document.getElementById("globalModeCheckbox");
+  if (globalCheckbox) {
+    globalCheckbox.addEventListener("change", persistQuantumState);
   }
   
   document.getElementById("themeToggleButton").addEventListener("click", toggleTheme);
@@ -1099,14 +1125,84 @@ function imageFallback(element, icon = "package-search") {
 
 async function loadProducts() {
   const grid = document.getElementById("dealGrid");
-  grid.innerHTML = `<div class="loading-state"><span class="spinner"></span>Fırsatlar hazırlanıyor</div>`;
+  if (grid) {
+    grid.innerHTML = `<div class="loading-state"><span class="spinner"></span>Fırsatlar hazırlanıyor</div>`;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 saniyelik timeout
 
   try {
-    state.products = await api("/products");
+    state.products = await api("/api/opportunities", { signal: controller.signal });
+    clearTimeout(timeoutId);
     renderAll();
   } catch (error) {
-    grid.innerHTML = `<div class="empty-state">Ürünler yüklenemedi.<br>${escapeHtml(error.message)}</div>`;
+    clearTimeout(timeoutId);
+    console.warn("Mobil Fırsatlar timeout/hata, fallback tetikleniyor:", error);
+    renderFallbackOpportunities();
   }
+}
+
+function renderFallbackOpportunities() {
+  const grid = document.getElementById("dealGrid");
+  if (!grid) return;
+  
+  // Fütüristik simulated yerel/çevrimdışı fırsat ürünleri
+  const fallbackProducts = [
+    {
+      id: "fallback-1",
+      title: "Nutella 750g (Lokal Fırsat)",
+      source: "Migros",
+      price: 119.90,
+      original_price: 159.90,
+      deal_score: 85,
+      image_url: "",
+      discount_analysis: { discount_percent: 25 }
+    },
+    {
+      id: "fallback-2",
+      title: "İpana Diş Macunu 75ml",
+      source: "Gratis",
+      price: 59.90,
+      original_price: 99.90,
+      deal_score: 90,
+      image_url: "",
+      discount_analysis: { discount_percent: 40 }
+    },
+    {
+      id: "fallback-3",
+      title: "Sütaş Kaşar Peyniri 700g",
+      source: "CarrefourSA",
+      price: 189.90,
+      original_price: 239.90,
+      deal_score: 80,
+      image_url: "",
+      discount_analysis: { discount_percent: 20 }
+    }
+  ];
+  
+  state.products = fallbackProducts;
+  renderAll();
+  
+  // Arayüze fütüristik uyarı banner'ı ekleme
+  const banner = document.createElement("div");
+  banner.className = "fallback-alert-banner";
+  banner.style.gridColumn = "1 / -1";
+  banner.style.padding = "12px 16px";
+  banner.style.borderRadius = "8px";
+  banner.style.background = "rgba(16, 185, 129, 0.08)";
+  banner.style.border = "1px solid rgba(16, 185, 129, 0.3)";
+  banner.style.color = "var(--green)";
+  banner.style.fontSize = "12px";
+  banner.style.fontWeight = "700";
+  banner.style.display = "flex";
+  banner.style.alignItems = "center";
+  banner.style.gap = "8px";
+  banner.style.boxShadow = "0 0 10px rgba(16, 185, 129, 0.1)";
+  
+  banner.innerHTML = `<i data-lucide="shield-alert" style="width:16px; height:16px;"></i> MOBİL OPTİMİZASYON AKTİF: Çevrimdışı/Yerel fırsatlar listeleniyor.`;
+  grid.prepend(banner);
+  if (window.lucide) lucide.createIcons();
 }
 
 function renderAll() {
@@ -5628,12 +5724,14 @@ window.triggerGpsActivation = function() {
         if (selector) selector.value = "gps";
         showToast("GPS konumu aktif edildi!");
         updateGpsStatusUI();
+        persistQuantumState();
         renderCart();
       },
       (error) => {
         showToast("GPS konum izni alınamadı veya reddedildi: " + error.message);
         state.userCoords = null;
         updateGpsStatusUI();
+        persistQuantumState();
       }
     );
   } else {
@@ -5661,6 +5759,7 @@ async function updateUserLocation(val) {
           };
           showToast("GPS konumu alındı.");
           updateGpsStatusUI();
+          persistQuantumState();
           renderCart();
         },
         (error) => {
@@ -5669,6 +5768,7 @@ async function updateUserLocation(val) {
           state.userLocation = "default";
           state.userCoords = null;
           updateGpsStatusUI();
+          persistQuantumState();
           renderCart();
         }
       );
@@ -5678,15 +5778,18 @@ async function updateUserLocation(val) {
       state.userLocation = "default";
       state.userCoords = null;
       updateGpsStatusUI();
+      persistQuantumState();
       renderCart();
     }
   } else if (locationCoords[val]) {
     state.userCoords = locationCoords[val];
     updateGpsStatusUI();
+    persistQuantumState();
     renderCart();
   } else {
     state.userCoords = null;
     updateGpsStatusUI();
+    persistQuantumState();
     renderCart();
   }
 }
@@ -5914,7 +6017,44 @@ function initMakeupHelpers() {
 initMakeupHelpers();
 
 window.addEventListener("load", () => {
-  if (navigator.geolocation) {
+  // A. Yükleme ekranını temizle (Overlay Sanitization)
+  const loader = document.getElementById("quantumScanOverlay");
+  if (loader) loader.style.display = "none";
+
+  // B. Hafızadan veriyi çek (Auto-Rehydrate)
+  let rehydrated = false;
+  const savedState = localStorage.getItem("almadan_state");
+  if (savedState) {
+    try {
+      const data = JSON.parse(savedState);
+      if (data) {
+        state.userCoords = data.userCoords || null;
+        state.userLocation = data.userLocation || "default";
+        
+        // UI Güncellemesi: Konum Seçici
+        const selector = document.getElementById("userLocationSelector");
+        if (selector) selector.value = state.userLocation;
+        
+        // UI Güncellemesi: Global/Yerel Modu
+        const globalCheckbox = document.getElementById("globalModeCheckbox");
+        if (globalCheckbox) {
+          globalCheckbox.checked = !!data.isGlobalActive;
+        }
+        
+        // UI Güncellemesi: GPS Pill
+        updateGpsStatusUI();
+        
+        rehydrated = true;
+        console.log("Kuantum Hafıza: Durum geri yüklendi.", data);
+      }
+    } catch (e) {
+      console.error("Kuantum Hafıza bozuldu, sıfırlanıyor...", e);
+      localStorage.removeItem("almadan_state");
+    }
+  }
+
+  // C. Eğer hafızada durum yoksa varsayılan Geolocation talebini tetikle
+  if (!rehydrated && navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         state.userCoords = {

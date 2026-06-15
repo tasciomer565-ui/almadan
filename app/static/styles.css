@@ -115,6 +115,7 @@ button {
   justify-self: end;
   gap: 8px;
   align-items: center;
+  min-height: 40px;
 }
 
 .network-status {

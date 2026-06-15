@@ -1230,6 +1230,20 @@ def list_products(
     ]
 
 
+@app.get("/api/opportunities")
+def list_opportunities(
+    request: Request,
+    x_device_id: str | None = Header(default=None),
+) -> list[dict]:
+    owner_id = request_owner_id(request, x_device_id)
+    db = load_db()
+    return [
+        enrich_product(product)
+        for product in db["products"]
+        if product.get("owner_id") == owner_id
+    ]
+
+
 @app.post("/products")
 def add_product(
     payload: ProductCreate,
