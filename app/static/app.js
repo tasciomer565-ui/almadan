@@ -3353,7 +3353,7 @@ async function runOcrScan(sourceInput = null) {
     state.pendingReceipt = {
       store: res.store || "Bilinmeyen mağaza",
       purchased_at: res.purchased_at || new Date().toISOString().slice(0, 10),
-      payment_method: "unknown",
+      payment_method: res.payment_method || "unknown",
       total: Number(res.total || 0),
       category: res.category || cat,
       receipt_info: Array.isArray(res.receipt_info) ? res.receipt_info : [],
@@ -3436,11 +3436,11 @@ function renderReceiptReview() {
       </label>
       <label>Ödeme yöntemi
         <select id="receiptReviewPayment">
-          <option value="unknown">Belirtilmedi</option>
-          <option value="card">Kart</option>
-          <option value="cash">Nakit</option>
-          <option value="meal_card">Yemek kartı</option>
-          <option value="other">Diğer</option>
+          <option value="unknown" ${receipt.payment_method === "unknown" ? "selected" : ""}>Belirtilmedi</option>
+          <option value="card" ${receipt.payment_method === "card" ? "selected" : ""}>Kart</option>
+          <option value="cash" ${receipt.payment_method === "cash" ? "selected" : ""}>Nakit</option>
+          <option value="meal_card" ${receipt.payment_method === "meal_card" ? "selected" : ""}>Yemek kartı</option>
+          <option value="other" ${receipt.payment_method === "other" ? "selected" : ""}>Diğer</option>
         </select>
       </label>
       <label>Fiş toplamı

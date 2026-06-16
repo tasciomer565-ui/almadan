@@ -1856,6 +1856,7 @@ def extract_receipt_metadata(text: str) -> dict:
 
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     store = lines[0] if lines else ""
+    normalized = text.casefold()
 
     date = ""
     date_match = re.search(r"\b(\d{2})/(\d{2})/(\d{4})\b", text)
@@ -1884,7 +1885,20 @@ def extract_receipt_metadata(text: str) -> dict:
         if amounts:
             total = amounts[-1]
 
-    return {"store": store, "purchased_at": date, "total": total}
+    payment_method = "unknown"
+    if any(term in normalized for term in ("kredi kart", "credit card", "visa", "mastercard")):
+        payment_method = "card"
+    elif any(term in normalized for term in ("nakit", "cash")):
+        payment_method = "cash"
+    elif any(term in normalized for term in ("yemek kart", "sodexo", "multinet", "ticket", "setcard")):
+        payment_method = "meal_card"
+
+    return {
+        "store": store,
+        "purchased_at": date,
+        "total": total,
+        "payment_method": payment_method,
+    }
 
 
 def parse_receipt_details(
@@ -2293,6 +2307,7 @@ def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
                 detected_category,
             ),
             "purchased_at": metadata.get("purchased_at") or "",
+            "payment_method": metadata.get("payment_method") or "unknown",
             "total": (
                 metadata.get("total")
                 if metadata.get("total") is not None
