@@ -1839,6 +1839,54 @@ def categorize_receipt(text: str) -> str:
     return category_mapping(text, "grocery")
 
 
+def parse_receipt_amount(value: str) -> float | None:
+    cleaned = value.strip().replace(" ", "")
+    if "," in cleaned and "." in cleaned:
+        cleaned = cleaned.replace(".", "").replace(",", ".")
+    else:
+        cleaned = cleaned.replace(",", ".")
+    try:
+        return round(float(cleaned), 2)
+    except ValueError:
+        return None
+
+
+def extract_receipt_metadata(text: str) -> dict:
+    import re
+
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    store = lines[0] if lines else ""
+
+    date = ""
+    date_match = re.search(r"\b(\d{2})/(\d{2})/(\d{4})\b", text)
+    if date_match:
+        day, month, year = date_match.groups()
+        date = f"{year}-{month}-{day}"
+
+    amount_pattern = r"(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})"
+    total = None
+    total_match = re.search(
+        rf"(?:GENEL\s+TOPLAM|TOPLAM|TUTAR)\D{{0,24}}{amount_pattern}",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if total_match:
+        total = parse_receipt_amount(total_match.group(1))
+    if total is None:
+        amounts = [
+            parsed for parsed in (
+                parse_receipt_amount(match.group(1))
+                for line in lines[-12:]
+                for match in re.finditer(amount_pattern, line)
+            )
+            if parsed is not None
+        ]
+        if amounts:
+            total = amounts[-1]
+
+    return {"store": store, "purchased_at": date, "total": total}
+
+
 def parse_receipt_details(
     text: str,
     category_hint: str | None = None,
@@ -2228,6 +2276,7 @@ def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
             raise HTTPException(status_code=422, detail="OCR metni bulunamadı.")
 
         detected_category = categorize_receipt(raw_ocr_text)
+        metadata = extract_receipt_metadata(raw_ocr_text)
         try:
             parsed_receipt = parse_receipt_details(raw_ocr_text, detected_category)
         except Exception:
@@ -2239,9 +2288,16 @@ def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
         return {
             "status": "processed",
             "message": "Fiş işlendi ve analiz edildi",
-            "store": receipt_store_from_text(raw_ocr_text, detected_category),
-            "purchased_at": default_date,
-            "total": receipt_total(detected),
+            "store": metadata.get("store") or receipt_store_from_text(
+                raw_ocr_text,
+                detected_category,
+            ),
+            "purchased_at": metadata.get("purchased_at") or "",
+            "total": (
+                metadata.get("total")
+                if metadata.get("total") is not None
+                else receipt_total(detected)
+            ),
             "detected_items": detected,
             "receipt_info": parsed_receipt.get("receipt_info", []),
             "raw_ocr_text": raw_ocr_text,
@@ -2321,7 +2377,11 @@ def create_receipt(
         "id": str(uuid4()),
         "owner_id": owner_id,
         "store": payload.store.strip(),
-        "purchased_at": normalize_receipt_date(payload.purchased_at),
+        "purchased_at": (
+            normalize_receipt_date(payload.purchased_at)
+            if payload.purchased_at
+            else ""
+        ),
         "payment_method": payload.payment_method,
         "category": detected_category,
         "items": items,
