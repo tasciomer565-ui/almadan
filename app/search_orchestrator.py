@@ -25,7 +25,9 @@ WORKER_SITES = {
     "KOZMETİK": ["gratis.com", "rossmann.com.tr", "watsons.com.tr", "eveshop.com.tr", "sephora.com.tr"],
     "MODA": ["lcwaikiki.com", "defacto.com.tr", "koton.com", "mavi.com", "boyner.com.tr", "zara.com"],
     "EV": ["karaca.com", "englishhome.com.tr", "madamecoco.com", "ikea.com.tr", "koctas.com.tr"],
-    "MARKETPLACE": ["trendyol.com", "hepsiburada.com", "amazon.com.tr", "n11.com"]
+    "MARKETPLACE": ["trendyol.com", "hepsiburada.com", "amazon.com.tr", "n11.com"],
+    # N11 hariç genel pazar yerleri — kategori araması boş dönünce kullanılır
+    "MARKETPLACE_NO_N11": ["trendyol.com", "hepsiburada.com", "amazon.com.tr"],
 }
 
 POPULAR_FALLBACKS = [
@@ -515,8 +517,8 @@ async def master_search(
     # 4. Boş Dönme Koruması (Zero-Fail Policy)
     # Eğer local mod seçildiyse ve sonuç çıkmadıysa, otomatik global fallback'e geç
     if not results and mode == "local":
-        global_res = await marketplace_scan(query, fallback=True)
-        for r in global_res:
+        fallback_res = await scan_worker(query, "MARKETPLACE_NO_N11", fallback=True)
+        for r in fallback_res:
             r["delivery_type"] = "global"
             r["delivery_time"] = "2 İş Günü"
             r["distance_km"] = None
@@ -525,11 +527,19 @@ async def master_search(
             r["delivery_cost"] = "Ücretsiz Kargo"
             if "Konum aralığı genişletiliyor..." not in r["labels"]:
                 r["labels"].append("Konum aralığı genişletiliyor...")
-        results = global_res
+        results = fallback_res
 
     if not results:
-        results = await marketplace_scan(query, fallback=True)
-        
+        if category == "GENEL":
+            results = await marketplace_scan(query, fallback=True)
+        else:
+            # Kategori belli ama sonuç yok — önce daha kısa sorgu dene
+            short_query = query.split()[0] if " " in query else query
+            results = await scan_worker(short_query, category, fallback=True)
+            # Hâlâ boşsa Trendyol/Hepsiburada/Amazon'a bak (N11 hariç)
+            if not results:
+                results = await scan_worker(query, "MARKETPLACE_NO_N11", fallback=True)
+
     if not results:
         results = get_popular_fallbacks(query)
         
