@@ -358,19 +358,8 @@ async def master_search(
                 if category == "GENEL":
                     results = await marketplace_scan(query)
                 else:
-                    local_task = scan_worker(query, category)
-                    global_task = marketplace_scan(query)
-                    local_res, global_res = await asyncio.gather(local_task, global_task)
-                    
-                    # Merge unique results
-                    seen_urls = set()
-                    merged_res = []
-                    for r in local_res + global_res:
-                        url_clean = r["url"].split("?")[0].strip()
-                        if url_clean not in seen_urls:
-                            seen_urls.add(url_clean)
-                            merged_res.append(r)
-                    results = merged_res
+                    # Kategori belli olduğunda sadece o kategoriye ait mağazalarda ara
+                    results = await scan_worker(query, category)
     except (asyncio.TimeoutError, Exception) as e:
         await asyncio.sleep(1.5)
         results = generate_local_fallback_results(query, category, lat, lon)

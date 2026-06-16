@@ -1619,14 +1619,14 @@ async function parseProduct(event) {
   const progressText = document.getElementById("quantumScanProgress");
   if (overlay) overlay.style.display = "flex";
   if (progressText) {
-    progressText.innerText = "Kuantum spektrum dalgası başlatıldı...";
+    progressText.innerText = "Sizin için en uygun fırsatları ve ürünleri inceliyoruz...";
   }
 
-  // 2. Kuantum tarama işlemini asenkron olarak bir sonraki frame'de başlat
+  // 2. Arama işlemini asenkron olarak bir sonraki frame'de başlat
   requestAnimationFrame(() => {
     setTimeout(async () => {
-      var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Siber veri düğümlerinden canlı fiyatlar toplanıyor..."; }, 600);
-      var t2 = setTimeout(() => { if (progressText) progressText.innerText = "Optimal kuantum frekansı hesaplanıyor..."; }, 1300);
+      var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Mağaza fiyatları karşılaştırılıyor..."; }, 600);
+      var t2 = setTimeout(() => { if (progressText) progressText.innerText = "En iyi teklifler seçiliyor..."; }, 1300);
 
       try {
         if (isUrl(val)) {
@@ -1662,21 +1662,11 @@ async function parseProduct(event) {
         
         if (overlay && progressText) {
           // 1. Durum bildirimini yeşil mod ve glitch ile güncelle
-          overlay.classList.add("recovery-mode");
           const header = overlay.querySelector("h3");
           if (header) {
-            header.classList.add("glitch-active");
-            if (isMobile) {
-              header.innerText = "SİSTEM KURTARMA AKTİF: MOBİL AĞ OPTİMİZASYONU";
-            } else {
-              header.innerText = "SİSTEM KURTARMA AKTİF: LOKAL ANALİZ";
-            }
+            header.innerText = "Alternatif Sonuçlar Yükleniyor";
           }
-          if (isMobile) {
-            progressText.innerText = "Mobil ağ optimizasyonu aktif. Yerel rezonans verileri kullanılıyor...";
-          } else {
-            progressText.innerText = "Kuantum düğümleri yanıt vermedi. Yerel çekirdekler üzerinden tarama sürdürülüyor...";
-          }
+          progressText.innerText = "Bağlantı yavaş, yakın alternatifler getiriliyor...";
           
           // 2. Lokal CPU simülasyonu için 1.5 saniye bekle
           await new Promise(resolve => setTimeout(resolve, 1500));
