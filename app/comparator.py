@@ -406,7 +406,7 @@ def parse_price(val_str: str) -> float | None:
 
 def _fetch_aol_urls(query: str) -> list[str]:
     # AOL is a reliable Yahoo proxy for finding product details across multiple stores
-    modified_query = f'{query} "sepete ekle" (site:trendyol.com OR site:hepsiburada.com OR site:n11.com OR site:amazon.com.tr OR site:gratis.com OR site:rossmann.com.tr OR site:migros.com.tr OR site:carrefoursa.com OR site:a101.com.tr OR site:bim.com.tr OR site:sokmarket.com.tr OR site:metro-tr.com OR site:file.com.tr OR site:vatanbilgisayar.com OR site:itopya.com OR site:mediamarkt.com.tr OR site:teknosa.com)'
+    modified_query = f'{query} "sepete ekle" (site:trendyol.com OR site:hepsiburada.com OR site:n11.com OR site:amazon.com.tr OR site:gratis.com OR site:rossmann.com.tr OR site:migros.com.tr OR site:carrefoursa.com OR site:sokmarket.com.tr OR site:metro-tr.com OR site:vatanbilgisayar.com OR site:itopya.com OR site:mediamarkt.com.tr OR site:teknosa.com)'
     url = f"https://search.aol.com/aol/search?q={urllib.parse.quote_plus(modified_query)}"
     headers = {
         "User-Agent": YAHOO_USER_AGENT,

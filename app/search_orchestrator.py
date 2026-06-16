@@ -15,18 +15,18 @@ from app.comparator import (
     is_logical_product
 )
 
-LOCAL_SOURCES = {"migros", "carrefoursa", "a101", "bim", "sokmarket", "file", "metro"}
+LOCAL_SOURCES = {"migros", "carrefoursa", "sokmarket", "metro"}
 
 YAHOO_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 WORKER_SITES = {
-    "GIDA": ["migros.com.tr", "carrefoursa.com", "a101.com.tr", "bim.com.tr", "sokmarket.com.tr", "metro-tr.com", "file.com.tr"],
+    # Yalnızca online sipariş veren mağazalar
+    "GIDA": ["migros.com.tr", "carrefoursa.com", "sokmarket.com.tr", "metro-tr.com"],
     "TEKNOLOJİ": ["teknosa.com", "mediamarkt.com.tr", "vatanbilgisayar.com", "itopya.com"],
-    "KOZMETİK": ["gratis.com", "rossmann.com.tr", "watsons.com.tr", "eveshop.com.tr", "sephora.com.tr"],
+    "KOZMETİK": ["gratis.com", "rossmann.com.tr", "watsons.com.tr", "sephora.com.tr"],
     "MODA": ["lcwaikiki.com", "defacto.com.tr", "koton.com", "mavi.com", "boyner.com.tr", "zara.com"],
     "EV": ["karaca.com", "englishhome.com.tr", "madamecoco.com", "ikea.com.tr", "koctas.com.tr"],
     "MARKETPLACE": ["trendyol.com", "hepsiburada.com", "amazon.com.tr", "n11.com"],
-    # N11 hariç genel pazar yerleri — kategori araması boş dönünce kullanılır
     "MARKETPLACE_NO_N11": ["trendyol.com", "hepsiburada.com", "amazon.com.tr"],
 }
 
