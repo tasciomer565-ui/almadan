@@ -81,53 +81,201 @@ POPULAR_FALLBACKS = [
     }
 ]
 
+def _normalize_tr(text: str) -> str:
+    """Türkçe karakterleri ve yaygın yazım hatalarını normalize eder."""
+    tr_map = str.maketrans("şğıöüçŞĞİÖÜÇ", "sgioucSGIOUC")
+    return text.lower().translate(tr_map)
+
+
 def classify_intent(query: str) -> str:
-    query_lower = query.lower()
-    
+    q = query.lower()
+    qn = _normalize_tr(query)  # normalize edilmiş (ş→s, ğ→g, ı→i, ö→o, ü→u, ç→c)
+
+    # Her kategori için (orijinal, normalize) çiftleri
     grocery_keywords = {
-        "süt", "sut", "yoğurt", "yogurt", "peynir", "yağ", "yag", "ekmek", "makarna", 
-        "un", "şeker", "seker", "pirinç", "pirinc", "deterjan", "sabun", "şampuan", 
-        "sampuan", "sucuk", "zeytin", "yumurta", "sosis", "cips", "çay", "cay", "kahve", 
-        "su", "balık", "balik", "et", "tavuk", "sebze", "meyve", "salça", "salca"
+        # Süt & süt ürünleri
+        "süt", "sut", "süts", "suts", "sutlu", "sütlü",
+        "yoğurt", "yogurt", "yoghurt", "yogurt",
+        "peynir", "peyniri", "beyaz peynir", "kasar", "kaşar",
+        "tereyağ", "tereyag", "tereyağı", "margarin",
+        "ayran", "kefir", "krema", "labne",
+        # Et & protein
+        "et", "kıyma", "kiyma", "kiyme", "köfte", "kofte",
+        "tavuk", "tavug", "tavuğu", "pilic", "piliç", "hindi",
+        "sucuk", "salam", "sosis", "pastırma", "pastirma",
+        "balık", "balik", "somon", "levrek", "çupra", "cupra",
+        "yumurta", "yumurta",
+        # Tahıl & baklagil
+        "ekmek", "ekmegi", "ekmek",
+        "makarna", "spagetti", "spaghetti", "eriste", "erişte",
+        "pirinç", "pirinc", "bulgur", "irmik", "semolina",
+        "un", "nişasta", "nisasta", "yulaf",
+        "mercimek", "nohut", "fasulye", "barbunya",
+        # Yağ & sos
+        "yağ", "yag", "zeytinyağı", "zeytinyagi", "ayçiçek", "aycicek", "mısır yağı",
+        "salça", "salca", "ketçap", "ketsap", "mayonez", "hardal",
+        "sirke", "sos",
+        # Şeker & tatlı
+        "şeker", "seker", "bal", "pekmez", "reçel", "recel",
+        "çikolata", "cikolata", "biskuvi", "bisküvi", "gofret",
+        "kek", "pasta", "puding",
+        # İçecek
+        "su", "maden suyu", "maden", "soda", "kola", "gazlı içecek",
+        "meyve suyu", "limonata", "ayran", "çay", "cay", "kahve", "nes",
+        "nescafe", "bitki çayı", "bitki cayi",
+        # Sebze & meyve
+        "sebze", "meyve", "domates", "salatalık", "salatalik",
+        "biber", "patlıcan", "patlican", "kabak", "havuç", "havuc",
+        "soğan", "sogan", "sarımsak", "sarimsak", "patates", "ıspanak", "ispanak",
+        "elma", "armut", "portakal", "mandalina", "limon", "muz",
+        "üzüm", "uzum", "çilek", "cilek", "kiraz", "şeftali", "seftali",
+        # Market genel
+        "zeytin", "turşu", "tursu", "konserve", "salata",
+        "deterjan", "çamaşır", "camasir", "bulaşık", "bulasik",
+        "sabun", "şampuan", "sampuan", "saç bakım", "sac bakim",
+        "tuvalet kağıdı", "tuvalet kagidi", "kağıt havlu", "kagit havlu",
+        "cips", "çips", "çekirdek", "cekirdek", "kuruyemiş", "kuruyemis",
+        "market", "aktüel", "gıda", "gida",
     }
-    
+
     tech_keywords = {
-        "telefon", "bilgisayar", "laptop", "tablet", "monitör", "monitor", "kulaklık", 
-        "kulaklik", "televizyon", "tv", "mouse", "mause", "klavye", "şarj", "sarj", 
-        "kablo", "ram", "ssd", "gpu", "cpu", "samsung", "iphone", "apple", "xiaomi", "redmi",
-        "lenovo", "asus", "hp", "dell", "itopya", "vatanbilgisayar"
+        # Cihazlar
+        "telefon", "cep telefonu", "akıllı telefon", "akilli telefon",
+        "bilgisayar", "laptop", "dizüstü", "dizustu", "masaüstü", "masaustu",
+        "tablet", "ipad", "e-kitap okuyucu",
+        "tv", "televizyon", "smart tv", "oled", "qled",
+        "monitör", "monitor", "ekran",
+        "kulaklık", "kulaklik", "headphone", "airpods", "earbuds", "hoparlör", "hoparlor",
+        "kamera", "fotoğraf makinesi", "fotograf makinesi", "lens", "drone",
+        "akıllı saat", "akilli saat", "smartwatch", "watch",
+        # Bilgisayar parçaları
+        "ram", "ssd", "hdd", "harddisk", "hard disk", "nvme", "m.2",
+        "gpu", "ekran kartı", "ekran karti", "anakart", "cpu", "işlemci", "islemci",
+        "kasa", "psu", "güç kaynağı", "guc kaynagi", "soğutucu", "sogutucu",
+        # Aksesuar & çevre birimleri
+        "mouse", "maus", "klavye", "keyboard", "mousepad",
+        "kablo", "hdmi", "usb", "adaptör", "adaptor", "şarj", "sarj", "powerbank",
+        "router", "modem", "switch", "ağ", "ag",
+        "yazıcı", "yazici", "printer", "tarayıcı", "tarayici", "scanner",
+        # Markalar
+        "samsung", "apple", "iphone", "macbook", "ipad",
+        "xiaomi", "redmi", "poco", "realme", "oppo", "vivo",
+        "huawei", "honor", "oneplus",
+        "lenovo", "asus", "hp", "dell", "acer", "msi", "toshiba",
+        "sony", "lg", "philips", "vestel", "arcelik", "arçelik",
+        "logitech", "corsair", "razer", "hyperx",
+        "itopya", "vatanbilgisayar", "teknosa", "mediamarkt",
+        # Genel
+        "elektronik", "teknoloji", "gadget",
     }
-    
+
     cosmetics_keywords = {
-        "ruj", "rimel", "allık", "allik", "far", "makyaj", "cilt", "krem", "parfüm", 
-        "parfum", "deodorant", "oje", "maskara", "fondöten", "fondoten", "tonik", "losyon", "maske"
+        "ruj", "rujum", "lipstick", "lip",
+        "rimel", "maskara", "mascara",
+        "allık", "allik", "ruj", "far", "göz farı", "goz fari", "eyeliner",
+        "fondöten", "fondoten", "foundation", "bb krem", "cc krem",
+        "makyaj", "makeup", "make-up", "kozmetik",
+        "cilt", "cilt bakım", "cilt bakim", "serum", "nemlendirici",
+        "krem", "losyon", "tonik", "yüz yıkama", "yuz yikama",
+        "güneş kremi", "gunes kremi", "spf",
+        "parfüm", "parfum", "cologne", "kolonya",
+        "deodorant", "roll-on", "antiperspirant",
+        "oje", "tırnak", "tirnak", "nail",
+        "maske", "peeling", "scrub",
+        "saç", "sac", "şampuan", "sampuan", "saç bakım", "sac bakim",
+        "saç boyası", "sac boyasi", "boya", "keratin",
+        "epilasyon", "ağda", "agda", "tıraş", "tras", "jilet",
+        "gratis", "rossmann", "watsons", "sephora",
     }
-    
+
     fashion_keywords = {
-        "tişört", "tshirt", "elbise", "pantolon", "gömlek", "gomlek", "ceket", "mont", 
-        "kaban", "ayakkabı", "ayakkabi", "bot", "çizme", "cizme", "hırka", "hirka", 
-        "kazak", "yelek", "şort", "sort", "etek", "hırka", "t-shirt", "giyim", "kıyafet"
+        # Üst giyim
+        "tişört", "tisort", "tshirt", "t-shirt", "tee",
+        "gömlek", "gomlek", "shirt", "bluz", "blouse",
+        "kazak", "sweatshirt", "hoodie", "hırka", "hirka", "triko",
+        "ceket", "mont", "kaban", "parka", "yağmurluk", "yagmurluk",
+        "yelek", "vest",
+        # Alt giyim
+        "pantolon", "jean", "jeans", "denim", "tayt", "tayt",
+        "şort", "sort", "bermuda",
+        "etek", "skirt",
+        # Elbise & tulum
+        "elbise", "dress", "tulum", "overall",
+        # Ayakkabı & çanta
+        "ayakkabı", "ayakkabi", "shoe", "sneaker", "spor ayakkabı",
+        "bot", "çizme", "cizme", "boot", "sandalet", "terlik",
+        "çanta", "canta", "bag", "sırt çantası", "sirt cantasi", "cüzdan", "cuzdan",
+        # İç giyim & çorap
+        "iç çamaşır", "ic camasir", "külot", "kulot", "sütyen", "sutyen",
+        "çorap", "corap", "sock",
+        # Aksesuar
+        "kemer", "kravat", "fular", "şapka", "sapka", "bere", "eldiven",
+        "gözlük", "gozluk", "saat",
+        # Markalar & genel
+        "lcw", "lcwaikiki", "defacto", "koton", "mavi", "zara", "h&m",
+        "boyner", "vakko", "pierre cardin",
+        "giyim", "kıyafet", "kiyafet", "moda", "fashion",
     }
-    
+
     home_keywords = {
-        "tencere", "tava", "tabak", "çatal", "catal", "bıçak", "bicak", "kaşık", "kasik", 
-        "bardak", "nevresim", "yastık", "yastik", "yorgan", "halı", "hali", "perde", 
-        "koltuk", "dolap", "masa", "sandalye", "mobilya", "avize", "lamba", "koçtaş", "koctas"
+        # Mutfak
+        "tencere", "tava", "düdüklü", "duduklu", "wok",
+        "tabak", "kase", "bardak", "çatal", "catal", "kaşık", "kasik", "bıçak", "bicak",
+        "bıçak seti", "bicak seti", "çatal bıçak", "catal bicak",
+        "blender", "mikser", "toaster", "fırın", "firin", "microdalga", "mikrodalga",
+        "kahve makinesi", "çay makinesi", "cay makinesi", "kettle",
+        "buzdolabı", "buzdolabi", "çamaşır makinesi", "camasir makinesi",
+        "bulaşık makinesi", "bulasik makinesi", "fırın", "ocak",
+        # Yatak odası
+        "nevresim", "yorgan", "yastık", "yastik", "çarşaf", "carsaf",
+        "battaniye", "pike",
+        # Oturma odası
+        "koltuk", "kanepe", "couch", "sofa", "puf",
+        "halı", "hali", "kilim", "rug",
+        "perde", "stor perde", "tül",
+        "avize", "lamba", "abajur", "led",
+        # Mobilya & dekorasyon
+        "masa", "sandalye", "dolap", "raf", "kitaplık", "kitaplik",
+        "mobilya", "furniture", "dekorasyon", "çerçeve", "cerceve",
+        # Temizlik & ev bakım
+        "elektrikli süpürge", "elektrikli supurge", "süpürge", "supurge",
+        "robot süpürge", "robot supurge", "mop", "paspas",
+        "ütü", "utu", "iron",
+        # Banyo
+        "havlu", "bornoz", "banyo", "duş", "dus", "tuvalet",
+        # Markalar
+        "ikea", "karaca", "korkmaz", "tefal", "beko", "arçelik", "arcelik",
+        "vestel", "bosch", "siemens", "philips", "arzum",
+        "english home", "madame coco", "koçtaş", "koctas",
+        "ev", "home", "mutfak", "yatak",
     }
-    
-    words = set(re.findall(r"\w+", query_lower))
-    
-    if words.intersection(grocery_keywords):
+
+    words = set(re.findall(r"\w+", q))
+    words_n = set(re.findall(r"\w+", qn))
+
+    def matches(kw_set):
+        # normalize edilmiş keyword seti
+        kw_norm = {_normalize_tr(k) for k in kw_set}
+        # kelime bazlı eşleşme
+        if words.intersection(kw_set) or words_n.intersection(kw_norm):
+            return True
+        # substring eşleşme (çok kelimeli kalıplar ve kısmi yazımlar için)
+        for kw in kw_norm:
+            if kw in qn:
+                return True
+        return False
+
+    if matches(grocery_keywords):
         return "GIDA"
-    if words.intersection(tech_keywords):
+    if matches(tech_keywords):
         return "TEKNOLOJİ"
-    if words.intersection(cosmetics_keywords):
+    if matches(cosmetics_keywords):
         return "KOZMETİK"
-    if words.intersection(fashion_keywords):
+    if matches(fashion_keywords):
         return "MODA"
-    if words.intersection(home_keywords):
+    if matches(home_keywords):
         return "EV"
-        
+
     return "GENEL"
 
 def fetch_aol_urls_for_sites(query: str, sites: list[str]) -> list[str]:
