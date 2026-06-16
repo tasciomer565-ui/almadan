@@ -1840,7 +1840,7 @@ def categorize_receipt(text: str) -> str:
 
 
 def parse_receipt_amount(value: str) -> float | None:
-    cleaned = value.strip().replace(" ", "")
+    cleaned = value.strip().replace(" ", "").lstrip("*")
     if "," in cleaned and "." in cleaned:
         cleaned = cleaned.replace(".", "").replace(",", ".")
     else:
@@ -1853,10 +1853,14 @@ def parse_receipt_amount(value: str) -> float | None:
 
 def extract_receipt_metadata(text: str) -> dict:
     import re
+    import unicodedata
 
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     store = lines[0] if lines else ""
-    normalized = text.casefold()
+    normalized = "".join(
+        char for char in unicodedata.normalize("NFKD", text.casefold())
+        if not unicodedata.combining(char)
+    )
 
     date = ""
     date_match = re.search(r"\b(\d{2})/(\d{2})/(\d{4})\b", text)
@@ -1864,7 +1868,7 @@ def extract_receipt_metadata(text: str) -> dict:
         day, month, year = date_match.groups()
         date = f"{year}-{month}-{day}"
 
-    amount_pattern = r"(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})"
+    amount_pattern = r"\*?(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})"
     total = None
     total_match = re.search(
         rf"(?:GENEL\s+TOPLAM|TOPLAM|TUTAR)\D{{0,24}}{amount_pattern}",
@@ -1886,7 +1890,7 @@ def extract_receipt_metadata(text: str) -> dict:
             total = amounts[-1]
 
     payment_method = "unknown"
-    if any(term in normalized for term in ("kredi kart", "credit card", "visa", "mastercard")):
+    if any(term in normalized for term in ("kred", "kart", "credit card", "visa", "mastercard")):
         payment_method = "card"
     elif any(term in normalized for term in ("nakit", "cash")):
         payment_method = "cash"
