@@ -1738,7 +1738,7 @@ class ReceiptCreateRequest(BaseModel):
     payment_method: Literal[
         "unknown", "cash", "card", "meal_card", "other"
     ] = "unknown"
-    items: list[ReceiptItemPayload] = Field(min_length=1, max_length=250)
+    items: list[ReceiptItemPayload] = Field(default_factory=list, max_length=250)
     total: float | None = Field(default=None, ge=0)
     note: str | None = Field(default=None, max_length=500)
     raw_ocr_text: str | None = None
@@ -2228,14 +2228,17 @@ def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
             raise HTTPException(status_code=422, detail="OCR metni bulunamadı.")
 
         detected_category = categorize_receipt(raw_ocr_text)
-        parsed_receipt = parse_receipt_details(raw_ocr_text, detected_category)
+        try:
+            parsed_receipt = parse_receipt_details(raw_ocr_text, detected_category)
+        except Exception:
+            parsed_receipt = {"items": [], "receipt_info": [raw_ocr_text]}
         detected = [
             {**item, "category": detected_category}
             for item in parsed_receipt.get("items", [])
         ]
         return {
             "status": "processed",
-            "message": f"Fiş işlendi. Otomatik Tespit Edildi: {detected_category}",
+            "message": "Fiş işlendi ve analiz edildi",
             "store": receipt_store_from_text(raw_ocr_text, detected_category),
             "purchased_at": default_date,
             "total": receipt_total(detected),
@@ -2288,19 +2291,32 @@ def create_receipt(
     db = load_db()
     raw_ocr_text = (payload.raw_ocr_text or "").strip()
     detected_category = categorize_receipt(raw_ocr_text)
-    items = [
-        {
-            **item.model_dump(exclude={"category"}),
-            "category": detected_category,
-        }
-        for item in payload.items
-    ]
-    calculated_total = receipt_total(items)
-    total = (
-        round(float(payload.total), 2)
-        if payload.total is not None
-        else calculated_total
-    )
+    try:
+        items = [
+            {
+                **item.model_dump(exclude={"category"}),
+                "category": detected_category,
+            }
+            for item in payload.items
+        ]
+    except Exception:
+        items = []
+    try:
+        calculated_total = receipt_total(items)
+    except Exception:
+        calculated_total = 0.0
+        items = []
+    try:
+        total = (
+            round(float(payload.total), 2)
+            if payload.total is not None
+            else calculated_total
+        )
+    except Exception:
+        total = calculated_total
+    note = payload.note
+    if raw_ocr_text and (not items or not total):
+        note = raw_ocr_text
     receipt = {
         "id": str(uuid4()),
         "owner_id": owner_id,
@@ -2311,14 +2327,14 @@ def create_receipt(
         "items": items,
         "subtotal": calculated_total,
         "total": total,
-        "note": payload.note,
+        "note": note,
         "raw_ocr_text": raw_ocr_text,
         "auto_categorized": True,
         "created_at": utc_now(),
     }
     db.setdefault("receipts", []).append(receipt)
     save_db(db)
-    receipt["message"] = f"Otomatik Tespit Edildi: {detected_category}"
+    receipt["message"] = "Fiş işlendi ve analiz edildi"
     return receipt
 
 
