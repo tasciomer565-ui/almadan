@@ -1,6 +1,6 @@
 ﻿window.__almadanPanicModeActive = false;
 window.onerror = function (message, source, lineno, colno, error) {
-  console.error("Almadan global hata yakalayÄ±cÄ±:", {
+  console.error("Almadan global hata yakalayıcı:", {
     message,
     source,
     lineno,
@@ -16,7 +16,7 @@ window.onerror = function (message, source, lineno, colno, error) {
   try {
     showInitialLoadFallback();
   } catch (fallbackError) {
-    console.error("Almadan kurtarma modu baÅŸlatÄ±lamadÄ±:", fallbackError);
+    console.error("Almadan kurtarma modu başlatılamadı:", fallbackError);
   } finally {
     window.setTimeout(() => {
       window.__almadanPanicModeActive = false;
@@ -222,7 +222,7 @@ window.SEARCH_TIMEOUT = 6000;
 
 function optimizeForMobile() {
   if (isMobile) {
-    console.log("Mobil Mod: Optimizasyonlar devreye alÄ±ndÄ±.");
+    console.log("Mobil Mod: Optimizasyonlar devreye alındı.");
     document.documentElement.style.setProperty('--animation-speed', '0s');
     window.SEARCH_TIMEOUT = 3000;
     
@@ -244,7 +244,7 @@ function persistQuantumState() {
     isGlobalActive: globalCheckbox ? globalCheckbox.checked : false
   };
   localStorage.setItem("almadan_state", JSON.stringify(data));
-  console.log("Kuantum HafÄ±za: Durum kaydedildi.", data);
+  console.log("Kuantum Hafıza: Durum kaydedildi.", data);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -581,7 +581,7 @@ async function api(path, options = {}) {
   const contentType = response.headers.get("content-type") || "";
   const data = contentType.includes("application/json")
     ? await response.json()
-    : { detail: await response.text() || `Sunucu hatasÄ± (${response.status})` };
+    : { detail: await response.text() || `Sunucu hatası (${response.status})` };
 
   if (!response.ok) {
     throw new Error(apiErrorMessage(data, response.status));
@@ -605,11 +605,11 @@ function renderAccountButton() {
   if (!label || !button) return;
 
   if (state.auth.authenticated) {
-    label.textContent = state.auth.user?.email?.split("@")[0] || "HesabÄ±m";
-    button.title = state.auth.user?.email || "HesabÄ±m";
+    label.textContent = state.auth.user?.email?.split("@")[0] || "Hesabım";
+    button.title = state.auth.user?.email || "Hesabım";
   } else {
-    label.textContent = "GiriÅŸ";
-    button.title = "GiriÅŸ yap veya hesap oluÅŸtur";
+    label.textContent = "Giriş";
+    button.title = "Giriş yap veya hesap oluştur";
   }
 }
 
@@ -624,11 +624,11 @@ function renderUnauthenticatedAuth(content) {
         <h2>Takiplerini kaybetme.</h2>
         
         <div class="auth-tabs" style="display: flex; gap: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 10px; width: 100%;">
-          <button type="button" onclick="switchAuthMethod('email')" style="background: none; border: none; font-weight: bold; cursor: pointer; color: var(--green-dark); border-bottom: 2px solid var(--green-dark); padding-bottom: 8px; font-family: inherit; font-size: 14px;">E-posta ile GiriÅŸ</button>
-          <button type="button" onclick="switchAuthMethod('sms')" style="background: none; border: none; cursor: pointer; color: var(--ink-light); padding-bottom: 8px; font-family: inherit; font-size: 14px;">SMS ile GiriÅŸ</button>
+          <button type="button" onclick="switchAuthMethod('email')" style="background: none; border: none; font-weight: bold; cursor: pointer; color: var(--green-dark); border-bottom: 2px solid var(--green-dark); padding-bottom: 8px; font-family: inherit; font-size: 14px;">E-posta ile Giriş</button>
+          <button type="button" onclick="switchAuthMethod('sms')" style="background: none; border: none; cursor: pointer; color: var(--ink-light); padding-bottom: 8px; font-family: inherit; font-size: 14px;">SMS ile Giriş</button>
         </div>
         
-        <p class="auth-copy" style="margin-bottom: 16px; font-size: 13px; color: var(--ink-light);">E-posta ile giriÅŸ yap. Bu cihazdaki Ã¼rÃ¼nlerin hesabÄ±na otomatik taÅŸÄ±nsÄ±n.</p>
+        <p class="auth-copy" style="margin-bottom: 16px; font-size: 13px; color: var(--ink-light);">E-posta ile giriş yap. Bu cihazdaki ürünlerin hesabına otomatik taşınsın.</p>
         
         <div class="manual-fields">
           <label class="manual-field">
@@ -636,15 +636,15 @@ function renderUnauthenticatedAuth(content) {
             <input id="authEmail" type="email" autocomplete="email" placeholder="ornek@email.com">
           </label>
           <label class="manual-field">
-            <span>Åifre</span>
+            <span>Şifre</span>
             <input id="authPassword" type="password" autocomplete="current-password" minlength="8" placeholder="En az 8 karakter">
           </label>
           <label class="manual-field">
-            <span>Cinsiyet (KiÅŸiselleÅŸtirilmiÅŸ Arama Ä°Ã§in)</span>
+            <span>Cinsiyet (Kişiselleştirilmiş Arama İçin)</span>
             <select id="authGender" style="width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: white; font-family: inherit; font-size: 14px; color: var(--ink);">
-              <option value="belirtilmemiÅŸ">BelirtilmemiÅŸ</option>
+              <option value="belirtilmemiş">Belirtilmemiş</option>
               <option value="erkek">Erkek</option>
-              <option value="kadÄ±n">KadÄ±n</option>
+              <option value="kadın">Kadın</option>
             </select>
           </label>
           <label class="manual-field">
@@ -656,25 +656,25 @@ function renderUnauthenticatedAuth(content) {
             </select>
           </label>
           <label id="phoneFieldLabel" class="manual-field">
-            <span>Telefon NumarasÄ±</span>
+            <span>Telefon Numarası</span>
             <input id="authPhone" type="tel" placeholder="05XXXXXXXXX">
           </label>
         </div>
         <button class="auth-link-button" type="button" onclick="showForgotPassword()">
-          Åifremi unuttum
+          Şifremi unuttum
         </button>
         <p class="dialog-error" id="authError" hidden></p>
         <p class="dialog-success" id="authSuccess" hidden></p>
         ${state.auth.enabled ? `
           <div class="dialog-actions">
-            <button class="secondary-button" type="button" onclick="submitAuth('signup')">Hesap oluÅŸtur</button>
+            <button class="secondary-button" type="button" onclick="submitAuth('signup')">Hesap oluştur</button>
             <button class="primary-button" type="button" onclick="submitAuth('login')">
               <i data-lucide="log-in"></i>
-              GiriÅŸ yap
+              Giriş yap
             </button>
           </div>
         ` : `
-          <p class="dialog-error">Hesap sistemi henÃ¼z sunucuda etkinleÅŸtirilmedi.</p>
+          <p class="dialog-error">Hesap sistemi henüz sunucuda etkinleştirilmedi.</p>
         `}
       </div>
     `;
@@ -682,23 +682,23 @@ function renderUnauthenticatedAuth(content) {
     content.innerHTML = `
       <div class="dialog-body auth-dialog">
         <p class="eyebrow">ALMADAN HESABI</p>
-        <h2>SMS ile HÄ±zlÄ± GiriÅŸ.</h2>
+        <h2>SMS ile Hızlı Giriş.</h2>
         
         <div class="auth-tabs" style="display: flex; gap: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 10px; width: 100%;">
-          <button type="button" onclick="switchAuthMethod('email')" style="background: none; border: none; cursor: pointer; color: var(--ink-light); padding-bottom: 8px; font-family: inherit; font-size: 14px;">E-posta ile GiriÅŸ</button>
-          <button type="button" onclick="switchAuthMethod('sms')" style="background: none; border: none; font-weight: bold; cursor: pointer; color: var(--green-dark); border-bottom: 2px solid var(--green-dark); padding-bottom: 8px; font-family: inherit; font-size: 14px;">SMS ile GiriÅŸ</button>
+          <button type="button" onclick="switchAuthMethod('email')" style="background: none; border: none; cursor: pointer; color: var(--ink-light); padding-bottom: 8px; font-family: inherit; font-size: 14px;">E-posta ile Giriş</button>
+          <button type="button" onclick="switchAuthMethod('sms')" style="background: none; border: none; font-weight: bold; cursor: pointer; color: var(--green-dark); border-bottom: 2px solid var(--green-dark); padding-bottom: 8px; font-family: inherit; font-size: 14px;">SMS ile Giriş</button>
         </div>
         
-        <p class="auth-copy" style="margin-bottom: 16px; font-size: 13px; color: var(--ink-light);">Åifresiz giriÅŸ yap. Telefonuna gelecek tek kullanÄ±mlÄ±k SMS koduyla hesabÄ±na anÄ±nda ulaÅŸ.</p>
+        <p class="auth-copy" style="margin-bottom: 16px; font-size: 13px; color: var(--ink-light);">Şifresiz giriş yap. Telefonuna gelecek tek kullanımlık SMS koduyla hesabına anında ulaş.</p>
         
         <div class="manual-fields">
           <label class="manual-field">
-            <span>Telefon NumarasÄ±</span>
+            <span>Telefon Numarası</span>
             <input id="authSmsPhone" type="tel" placeholder="05XXXXXXXXX" ${smsCodeSent ? 'disabled' : ''}>
           </label>
           ${smsCodeSent ? `
             <label class="manual-field">
-              <span>6 Haneli DoÄŸrulama Kodu</span>
+              <span>6 Haneli Doğrulama Kodu</span>
               <input id="authSmsCode" type="text" pattern="[0-9]*" inputmode="numeric" maxlength="6" placeholder="******">
             </label>
           ` : ''}
@@ -710,20 +710,20 @@ function renderUnauthenticatedAuth(content) {
         ${state.auth.enabled ? `
           <div class="dialog-actions" style="margin-top: 20px;">
             ${smsCodeSent ? `
-              <button class="secondary-button" type="button" onclick="resetSmsFlow()">Telefonu DeÄŸiÅŸtir</button>
+              <button class="secondary-button" type="button" onclick="resetSmsFlow()">Telefonu Değiştir</button>
               <button class="primary-button" type="button" onclick="verifySmsCode()">
                 <i data-lucide="check"></i>
-                DoÄŸrula ve GiriÅŸ Yap
+                Doğrula ve Giriş Yap
               </button>
             ` : `
               <button class="primary-button" type="button" onclick="sendSmsCode()" style="width: 100%;">
                 <i data-lucide="send"></i>
-                Kod GÃ¶nder
+                Kod Gönder
               </button>
             `}
           </div>
         ` : `
-          <p class="dialog-error">Hesap sistemi henÃ¼z sunucuda etkinleÅŸtirilmedi.</p>
+          <p class="dialog-error">Hesap sistemi henüz sunucuda etkinleştirilmedi.</p>
         `}
       </div>
     `;
@@ -751,7 +751,7 @@ function resetSmsFlow() {
 async function sendSmsCode() {
   const phone = document.getElementById("authSmsPhone")?.value.trim();
   if (!phone || phone.length < 10) {
-    showAuthError("LÃ¼tfen geÃ§erli bir telefon numarasÄ± girin.");
+    showAuthError("Lütfen geçerli bir telefon numarası girin.");
     return;
   }
   
@@ -769,7 +769,7 @@ async function sendSmsCode() {
     if (content) {
       renderUnauthenticatedAuth(content);
     }
-    showToast("DoÄŸrulama kodu gÃ¶nderildi.");
+    showToast("Doğrulama kodu gönderildi.");
   } catch (error) {
     showAuthError(error.message);
   }
@@ -780,7 +780,7 @@ async function verifySmsCode() {
   const code = document.getElementById("authSmsCode")?.value.trim();
   
   if (!phone || !code || code.length !== 6) {
-    showAuthError("LÃ¼tfen 6 haneli doÄŸrulama kodunu girin.");
+    showAuthError("Lütfen 6 haneli doğrulama kodunu girin.");
     return;
   }
   
@@ -802,7 +802,7 @@ async function verifySmsCode() {
     handleCategoryChange();
     closeDialog();
     await loadProducts();
-    showToast("GiriÅŸ yapÄ±ldÄ±.");
+    showToast("Giriş yapıldı.");
   } catch (error) {
     showAuthError(error.message);
   }
@@ -820,17 +820,17 @@ function showAccount() {
         <div class="account-summary">
           <span class="account-avatar"><i data-lucide="user-round"></i></span>
           <div>
-            <strong>${escapeHtml(state.auth.user?.email || state.auth.user?.phone || "Almadan kullanÄ±cÄ±sÄ±")}</strong>
-            <p>Takiplerin bu hesapla farklÄ± cihazlarda eÅŸitlenir.</p>
+            <strong>${escapeHtml(state.auth.user?.email || state.auth.user?.phone || "Almadan kullanıcısı")}</strong>
+            <p>Takiplerin bu hesapla farklı cihazlarda eşitlenir.</p>
           </div>
         </div>
         <div class="manual-fields">
           <label class="manual-field">
             <span>Cinsiyet</span>
             <select id="profileGender">
-              <option value="belirtilmemiÅŸ">BelirtilmemiÅŸ</option>
+              <option value="belirtilmemiş">Belirtilmemiş</option>
               <option value="erkek" ${state.auth.user?.gender === "erkek" ? "selected" : ""}>Erkek</option>
-              <option value="kadÄ±n" ${state.auth.user?.gender === "kadÄ±n" ? "selected" : ""}>KadÄ±n</option>
+              <option value="kadın" ${state.auth.user?.gender === "kadın" ? "selected" : ""}>Kadın</option>
             </select>
           </label>
           <label class="manual-field">
@@ -842,22 +842,22 @@ function showAccount() {
             </select>
           </label>
           <label class="manual-field" id="profilePhoneField">
-            <span>Telefon NumarasÄ±</span>
+            <span>Telefon Numarası</span>
             <input id="profilePhone" type="tel" value="${escapeHtml(state.auth.user?.phone || "")}" placeholder="05XXXXXXXXX">
           </label>
           <label class="profile-checkbox">
             <input id="profileSilenceEnabled" type="checkbox" ${state.auth.user?.silence_hours ? "checked" : ""}>
-            <span>22:00-08:00 arasÄ±nda bildirimleri sabaha ertele</span>
+            <span>22:00-08:00 arasında bildirimleri sabaha ertele</span>
           </label>
         </div>
         <p class="dialog-error" id="authError" hidden></p>
         <button class="primary-button auth-submit-button" type="button" onclick="saveProfileSettings()">
           <i data-lucide="save"></i>
-          AyarlarÄ± kaydet
+          Ayarları kaydet
         </button>
         <button class="danger-button" type="button" onclick="logoutAccount()">
           <i data-lucide="log-out"></i>
-          Ã‡Ä±kÄ±ÅŸ yap
+          Çıkış yap
         </button>
       </div>
     `;
@@ -879,13 +879,13 @@ function toggleProfilePhoneField() {
 }
 
 async function saveProfileSettings() {
-  const gender = document.getElementById("profileGender")?.value || "belirtilmemiÅŸ";
+  const gender = document.getElementById("profileGender")?.value || "belirtilmemiş";
   const notificationPref = document.getElementById("profileNotificationPref")?.value || "both";
   const phone = document.getElementById("profilePhone")?.value.trim() || "";
   const silenceEnabled = Boolean(document.getElementById("profileSilenceEnabled")?.checked);
 
   if (notificationPref !== "email" && !phone) {
-    showAuthError("SMS bildirimleri iÃ§in telefon numarasÄ± gereklidir.");
+    showAuthError("SMS bildirimleri için telefon numarası gereklidir.");
     return;
   }
 
@@ -901,7 +901,7 @@ async function saveProfileSettings() {
     });
     state.auth.user = result.user;
     closeDialog();
-    showToast("Profil ve bildirim ayarlarÄ±n kaydedildi.");
+    showToast("Profil ve bildirim ayarların kaydedildi.");
   } catch (error) {
     showAuthError(error.message);
   }
@@ -914,9 +914,9 @@ function showForgotPassword() {
 
   content.innerHTML = `
     <div class="dialog-body auth-dialog">
-      <p class="eyebrow">ÅÄ°FRE YENÄ°LEME</p>
-      <h2>HesabÄ±na yeniden ulaÅŸ.</h2>
-      <p class="auth-copy">E-posta adresini yaz. Sana yeni ÅŸifre belirleyebileceÄŸin gÃ¼venli bir baÄŸlantÄ± gÃ¶nderelim.</p>
+      <p class="eyebrow">ŞİFRE YENİLEME</p>
+      <h2>Hesabına yeniden ulaş.</h2>
+      <p class="auth-copy">E-posta adresini yaz. Sana yeni şifre belirleyebileceğin güvenli bir bağlantı gönderelim.</p>
       <div class="manual-fields">
         <label class="manual-field">
           <span>E-posta</span>
@@ -925,10 +925,10 @@ function showForgotPassword() {
       </div>
       <p class="dialog-error" id="authError" hidden></p>
       <div class="dialog-actions">
-        <button class="secondary-button" type="button" onclick="showAccount()">Geri dÃ¶n</button>
+        <button class="secondary-button" type="button" onclick="showAccount()">Geri dön</button>
         <button class="primary-button" type="button" onclick="sendPasswordReset()">
           <i data-lucide="mail"></i>
-          BaÄŸlantÄ± gÃ¶nder
+          Bağlantı gönder
         </button>
       </div>
     </div>
@@ -942,7 +942,7 @@ function showForgotPassword() {
 async function sendPasswordReset() {
   const email = document.getElementById("resetEmail")?.value.trim();
   if (!email) {
-    showAuthError("GeÃ§erli bir e-posta adresi yaz.");
+    showAuthError("Geçerli bir e-posta adresi yaz.");
     return;
   }
 
@@ -951,7 +951,7 @@ async function sendPasswordReset() {
       method: "POST",
       body: JSON.stringify({ email }),
     });
-    showToast(result.message || "Åifre yenileme baÄŸlantÄ±sÄ± gÃ¶nderildi.");
+    showToast(result.message || "Şifre yenileme bağlantısı gönderildi.");
     closeDialog();
   } catch (error) {
     showAuthError(error.message);
@@ -980,23 +980,23 @@ function showPasswordReset(recoverySession) {
 
   content.innerHTML = `
     <div class="dialog-body auth-dialog">
-      <p class="eyebrow">YENÄ° ÅÄ°FRE</p>
-      <h2>Yeni ÅŸifreni belirle.</h2>
-      <p class="auth-copy">En az 8 karakterli, baÅŸka hesaplarÄ±nda kullanmadÄ±ÄŸÄ±n bir ÅŸifre seÃ§.</p>
+      <p class="eyebrow">YENİ ŞİFRE</p>
+      <h2>Yeni şifreni belirle.</h2>
+      <p class="auth-copy">En az 8 karakterli, başka hesaplarında kullanmadığın bir şifre seç.</p>
       <div class="manual-fields">
         <label class="manual-field">
-          <span>Yeni ÅŸifre</span>
+          <span>Yeni şifre</span>
           <input id="newPassword" type="password" autocomplete="new-password" minlength="8" placeholder="En az 8 karakter">
         </label>
         <label class="manual-field">
-          <span>Yeni ÅŸifre tekrar</span>
-          <input id="newPasswordConfirm" type="password" autocomplete="new-password" minlength="8" placeholder="Åifreni tekrar yaz">
+          <span>Yeni şifre tekrar</span>
+          <input id="newPasswordConfirm" type="password" autocomplete="new-password" minlength="8" placeholder="Şifreni tekrar yaz">
         </label>
       </div>
       <p class="dialog-error" id="authError" hidden></p>
       <button class="primary-button auth-submit-button" type="button" onclick="submitPasswordReset()">
         <i data-lucide="key-round"></i>
-        Åifreyi yenile
+        Şifreyi yenile
       </button>
     </div>
   `;
@@ -1011,15 +1011,15 @@ async function submitPasswordReset() {
   const recovery = state.passwordRecovery;
 
   if (!recovery?.accessToken) {
-    showAuthError("Åifre yenileme baÄŸlantÄ±sÄ± geÃ§ersiz veya sÃ¼resi dolmuÅŸ.");
+    showAuthError("Şifre yenileme bağlantısı geçersiz veya süresi dolmuş.");
     return;
   }
   if (password.length < 8) {
-    showAuthError("Yeni ÅŸifre en az 8 karakter olmalÄ±.");
+    showAuthError("Yeni şifre en az 8 karakter olmalı.");
     return;
   }
   if (password !== confirmation) {
-    showAuthError("YazdÄ±ÄŸÄ±n ÅŸifreler birbiriyle eÅŸleÅŸmiyor.");
+    showAuthError("Yazdığın şifreler birbiriyle eşleşmiyor.");
     return;
   }
 
@@ -1042,7 +1042,7 @@ async function submitPasswordReset() {
     };
     renderAccountButton();
     closeDialog();
-    showToast("Åifren yenilendi. HesabÄ±na giriÅŸ yapÄ±ldÄ±.");
+    showToast("Şifren yenilendi. Hesabına giriş yapıldı.");
   } catch (error) {
     showAuthError(error.message);
   }
@@ -1053,16 +1053,16 @@ async function submitAuth(mode) {
   const password = document.getElementById("authPassword")?.value || "";
 
   if (!email || password.length < 8) {
-    showAuthError("GeÃ§erli e-posta ve en az 8 karakterli ÅŸifre gerekli.");
+    showAuthError("Geçerli e-posta ve en az 8 karakterli şifre gerekli.");
     return;
   }
 
-  const gender = document.getElementById("authGender")?.value || "belirtilmemiÅŸ";
+  const gender = document.getElementById("authGender")?.value || "belirtilmemiş";
   const notificationPref = document.getElementById("authNotificationPref")?.value || "both";
   const phone = document.getElementById("authPhone")?.value.trim() || "";
 
   if (mode === "signup" && notificationPref !== "email" && !phone) {
-    showAuthError("SMS bildirimleri iÃ§in telefon numarasÄ± gereklidir.");
+    showAuthError("SMS bildirimleri için telefon numarası gereklidir.");
     return;
   }
 
@@ -1080,7 +1080,7 @@ async function submitAuth(mode) {
     });
 
     if (result.requires_email_confirmation) {
-      showAuthSuccess("KullanÄ±cÄ± kaydÄ± baÅŸarÄ±yla oluÅŸturuldu! E-posta adresinize bir onay baÄŸlantÄ±sÄ± gÃ¶nderildi. GiriÅŸ yapmadan Ã¶nce lÃ¼tfen e-postanÄ±zÄ± onaylayÄ±n.");
+      showAuthSuccess("Kullanıcı kaydı başarıyla oluşturuldu! E-posta adresinize bir onay bağlantısı gönderildi. Giriş yapmadan önce lütfen e-postanızı onaylayın.");
       return;
     }
 
@@ -1093,7 +1093,7 @@ async function submitAuth(mode) {
     handleCategoryChange();
     closeDialog();
     await loadProducts();
-    showToast(mode === "signup" ? "HesabÄ±n oluÅŸturuldu." : "GiriÅŸ yapÄ±ldÄ±.");
+    showToast(mode === "signup" ? "Hesabın oluşturuldu." : "Giriş yapıldı.");
   } catch (error) {
     showAuthError(error.message);
   }
@@ -1126,7 +1126,7 @@ async function logoutAccount() {
     renderAccountButton();
     closeDialog();
     await loadProducts();
-    showToast("Ã‡Ä±kÄ±ÅŸ yapÄ±ldÄ±.");
+    showToast("Çıkış yapıldı.");
   } catch (error) {
     showToast(error.message);
   }
@@ -1141,7 +1141,7 @@ function apiErrorMessage(data, status) {
       .map((item) => item?.msg || item?.message || String(item))
       .join(" ");
   }
-  return `Ä°ÅŸlem tamamlanamadÄ± (HTTP ${status}).`;
+  return `İşlem tamamlanamadı (HTTP ${status}).`;
 }
 
 function proxiedImageUrl(url) {
@@ -1159,14 +1159,14 @@ function imageFallback(element, icon = "package-search") {
 async function loadProducts(signal = null) {
   const grid = document.getElementById("dealGrid");
   if (grid) {
-    grid.innerHTML = `<div class="loading-state"><span class="spinner"></span>FÄ±rsatlar hazÄ±rlanÄ±yor</div>`;
+    grid.innerHTML = `<div class="loading-state"><span class="spinner"></span>Fırsatlar hazırlanıyor</div>`;
   }
 
   try {
     state.products = await api("/api/opportunities", { signal: null });
     renderAll();
   } catch (error) {
-    console.error("loadProducts hatasÄ±:", error);
+    console.error("loadProducts hatası:", error);
     renderFallbackOpportunities();
   }
 }
@@ -1175,11 +1175,11 @@ function renderFallbackOpportunities() {
   const grid = document.getElementById("dealGrid");
   if (!grid) return;
   
-  // FÃ¼tÃ¼ristik simulated yerel/Ã§evrimdÄ±ÅŸÄ± fÄ±rsat Ã¼rÃ¼nleri
+  // Fütüristik simulated yerel/çevrimdışı fırsat ürünleri
   const fallbackProducts = [
     {
       id: "fallback-1",
-      title: "Nutella 750g (Lokal FÄ±rsat)",
+      title: "Nutella 750g (Lokal Fırsat)",
       source: "Migros",
       price: 119.90,
       original_price: 159.90,
@@ -1189,7 +1189,7 @@ function renderFallbackOpportunities() {
     },
     {
       id: "fallback-2",
-      title: "Ä°pana DiÅŸ Macunu 75ml",
+      title: "İpana Diş Macunu 75ml",
       source: "Gratis",
       price: 59.90,
       original_price: 99.90,
@@ -1199,7 +1199,7 @@ function renderFallbackOpportunities() {
     },
     {
       id: "fallback-3",
-      title: "SÃ¼taÅŸ KaÅŸar Peyniri 700g",
+      title: "Sütaş Kaşar Peyniri 700g",
       source: "CarrefourSA",
       price: 189.90,
       original_price: 239.90,
@@ -1212,7 +1212,7 @@ function renderFallbackOpportunities() {
   state.products = fallbackProducts;
   renderAll();
   
-  // ArayÃ¼ze fÃ¼tÃ¼ristik uyarÄ± banner'Ä± ekleme
+  // Arayüze fütüristik uyarı banner'ı ekleme
   const banner = document.createElement("div");
   banner.className = "fallback-alert-banner";
   banner.style.gridColumn = "1 / -1";
@@ -1228,7 +1228,7 @@ function renderFallbackOpportunities() {
   banner.style.gap = "8px";
   banner.style.boxShadow = "0 0 10px rgba(16, 185, 129, 0.1)";
   
-  banner.innerHTML = `<i data-lucide="shield-alert" style="width:16px; height:16px;"></i> MOBÄ°L OPTÄ°MÄ°ZASYON AKTÄ°F: Ã‡evrimdÄ±ÅŸÄ±/Yerel fÄ±rsatlar listeleniyor.`;
+  banner.innerHTML = `<i data-lucide="shield-alert" style="width:16px; height:16px;"></i> MOBİL OPTİMİZASYON AKTİF: Çevrimdışı/Yerel fırsatlar listeleniyor.`;
   grid.prepend(banner);
   if (window.lucide) lucide.createIcons();
 }
@@ -1245,7 +1245,7 @@ function renderDeals() {
   const products = [...state.products].sort((a, b) => b.deal_score - a.deal_score).slice(0, 6);
 
   if (!products.length) {
-    grid.innerHTML = `<div class="empty-state"><i data-lucide="scan-search"></i>Ä°lk Ã¼rÃ¼n linkini ekleyerek fÄ±rsat radarÄ±nÄ± baÅŸlat.</div>`;
+    grid.innerHTML = `<div class="empty-state"><i data-lucide="scan-search"></i>İlk ürün linkini ekleyerek fırsat radarını başlat.</div>`;
     return;
   }
 
@@ -1256,8 +1256,8 @@ function renderDeals() {
       : "";
     const forecast = product.discount_forecast;
     const forecastBadge = forecast?.status === "ready"
-      ? `<span class="forecast-chip">%${forecast.probability} Â· 7 gÃ¼n</span>`
-      : `<span class="forecast-chip muted">Tahmin hazÄ±rlanÄ±yor</span>`;
+      ? `<span class="forecast-chip">%${forecast.probability} Â· 7 gün</span>`
+      : `<span class="forecast-chip muted">Tahmin hazırlanıyor</span>`;
     return `
     <article class="deal-card">
       <div class="deal-image">
@@ -1273,7 +1273,7 @@ function renderDeals() {
           <span class="price">${currency.format(product.current_price)}</span>
           <span class="verdict ${product.verdict === "bekle" ? "wait" : ""}">${escapeHtml(product.verdict)}</span>
         </div>
-        <button class="card-button" onclick="openProduct('${product.id}')">KararÄ± gÃ¶r</button>
+        <button class="card-button" onclick="openProduct('${product.id}')">Kararı gör</button>
       </div>
     </article>
   `;
@@ -1282,10 +1282,10 @@ function renderDeals() {
 
 function renderTracking() {
   const list = document.getElementById("trackingList");
-  document.getElementById("trackingCount").textContent = `${state.products.length} Ã¼rÃ¼n`;
+  document.getElementById("trackingCount").textContent = `${state.products.length} ürün`;
 
   if (!state.products.length) {
-    list.innerHTML = `<div class="empty-state">HenÃ¼z takip edilen Ã¼rÃ¼n yok.</div>`;
+    list.innerHTML = `<div class="empty-state">Henüz takip edilen ürün yok.</div>`;
     return;
   }
 
@@ -1299,20 +1299,20 @@ function renderTracking() {
         <span class="tracking-thumb">${productImage(product)}</span>
         <span class="tracking-copy">
           <h3>${escapeHtml(product.title)}</h3>
-          <p>${escapeHtml(product.source)} Â· ${product.price_history.length} fiyat kaydÄ±</p>
+          <p>${escapeHtml(product.source)} Â· ${product.price_history.length} fiyat kaydı</p>
           <span class="check-status">
             <span class="status-dot ${escapeHtml(product.last_check_status || "pending")}"></span>
             ${escapeHtml(checkStatusText(product))}
           </span>
           <span class="tracking-forecast">
             ${forecast?.status === "ready"
-              ? `7 gÃ¼nlÃ¼k indirim ihtimali: %${forecast.probability}`
-              : escapeHtml(forecast?.message || "Tahmin iÃ§in fiyat geÃ§miÅŸi bekleniyor.")}
+              ? `7 günlük indirim ihtimali: %${forecast.probability}`
+              : escapeHtml(forecast?.message || "Tahmin için fiyat geçmişi bekleniyor.")}
           </span>
         </span>
         <span class="tracking-price">
           <strong>${currency.format(product.current_price)}</strong>
-          <span>${difference > 0 ? currency.format(difference) + " dÃ¼ÅŸtÃ¼" : "Takipte"}</span>
+          <span>${difference > 0 ? currency.format(difference) + " düştü" : "Takipte"}</span>
           ${discountPercent > 0 ? `<span class="discount-badge" style="position: static; display: inline-block; margin-top: 4px; padding: 2px 5px; font-size: 10px;">-%${discountPercent}</span>` : ""}
         </span>
       </button>
@@ -1384,7 +1384,7 @@ function renderSavingsCharts() {
     data: {
       labels: productSavings.length
         ? productSavings.map((item) => item.label)
-        : ["HenÃ¼z veri yok"],
+        : ["Henüz veri yok"],
       datasets: [{
         label: "Tasarruf",
         data: productSavings.length ? productSavings.map((item) => item.value) : [0],
@@ -1409,7 +1409,7 @@ function renderSavingsCharts() {
     data: {
       labels: categoryEntries.length
         ? categoryEntries.map(([category]) => categoryLabels[category] || category)
-        : ["HenÃ¼z veri yok"],
+        : ["Henüz veri yok"],
       datasets: [{
         data: categoryEntries.length ? categoryEntries.map(([, value]) => value) : [1],
         backgroundColor: ["#287a50", "#3979a8", "#c45243", "#8e5fa2", "#d39a32"],
@@ -1445,7 +1445,7 @@ async function loadReceipts(month = "", signal = null) {
     state.receiptSummary = result.summary || null;
     renderReceiptAnalytics();
   } catch (error) {
-    console.error("loadReceipts hatasÄ±:", error);
+    console.error("loadReceipts hatası:", error);
   }
 }
 
@@ -1459,17 +1459,17 @@ function renderReceiptAnalytics() {
 
   const change = document.getElementById("receiptMonthChange");
   if (summary.change_percent === null || summary.change_percent === undefined) {
-    change.textContent = "Ã–nceki ay verisi yok";
+    change.textContent = "Önceki ay verisi yok";
   } else {
-    const direction = summary.change_percent > 0 ? "arttÄ±" : "azaldÄ±";
-    change.textContent = `Ã–nceki aya gÃ¶re %${Math.abs(summary.change_percent)} ${direction}`;
+    const direction = summary.change_percent > 0 ? "arttı" : "azaldı";
+    change.textContent = `Önceki aya göre %${Math.abs(summary.change_percent)} ${direction}`;
   }
 
   const stores = Object.entries(summary.store_totals || {});
   document.getElementById("receiptTopStore").textContent = stores[0]?.[0] || "-";
   document.getElementById("receiptTopStoreAmount").textContent = stores[0]
     ? currency.format(stores[0][1])
-    : "HenÃ¼z veri yok";
+    : "Henüz veri yok";
 
   renderReceiptHistory();
   renderReceiptCharts();
@@ -1480,15 +1480,15 @@ function renderReceiptHistory() {
   const container = document.getElementById("receiptHistoryList");
   if (!container) return;
   if (!state.receipts.length) {
-    container.innerHTML = `<p class="empty-text">Bu ay iÃ§in kaydedilmiÅŸ fiÅŸ yok.</p>`;
+    container.innerHTML = `<p class="empty-text">Bu ay için kaydedilmiş fiş yok.</p>`;
     return;
   }
   const paymentLabels = {
-    unknown: "Ã–deme belirtilmedi",
+    unknown: "Ödeme belirtilmedi",
     card: "Kart",
     cash: "Nakit",
-    meal_card: "Yemek kartÄ±",
-    other: "DiÄŸer",
+    meal_card: "Yemek kartı",
+    other: "Diğer",
   };
   container.innerHTML = state.receipts.map((receipt) => `
     <article class="receipt-history-item">
@@ -1496,22 +1496,22 @@ function renderReceiptHistory() {
         <div class="receipt-history-heading">
           <div>
             <h4>${escapeHtml(receipt.store)}</h4>
-            <p>${formatReceiptDate(receipt.purchased_at)} Â· ${receipt.items?.length || 0} Ã¼rÃ¼n Â·
-              ${paymentLabels[receipt.payment_method] || "Ã–deme belirtilmedi"}</p>
+            <p>${formatReceiptDate(receipt.purchased_at)} Â· ${receipt.items?.length || 0} ürün Â·
+              ${paymentLabels[receipt.payment_method] || "Ödeme belirtilmedi"}</p>
           </div>
           <strong class="receipt-history-total">${currency.format(receipt.total || 0)}</strong>
         </div>
         <div class="receipt-history-products">
           ${(receipt.items || []).map((item) => `
             <div class="receipt-history-product">
-              <span>${escapeHtml(item.title)}${Number(item.quantity || 1) > 1 ? ` Ã— ${item.quantity}` : ""}</span>
+              <span>${escapeHtml(item.title)}${Number(item.quantity || 1) > 1 ? ` × ${item.quantity}` : ""}</span>
               <strong>${currency.format(Number(item.price || 0) * Number(item.quantity || 1))}</strong>
             </div>
           `).join("")}
         </div>
       </div>
       <button type="button" class="icon-button light" onclick="deleteReceipt('${receipt.id}')"
-        title="FiÅŸi sil" aria-label="FiÅŸi sil"><i data-lucide="trash-2"></i></button>
+        title="Fişi sil" aria-label="Fişi sil"><i data-lucide="trash-2"></i></button>
     </article>
   `).join("");
 }
@@ -1545,7 +1545,7 @@ function renderReceiptCharts() {
     data: {
       labels: monthlyEntries.length
         ? monthlyEntries.map(([key]) => key)
-        : ["HenÃ¼z veri yok"],
+        : ["Henüz veri yok"],
       datasets: [{
         data: monthlyEntries.length ? monthlyEntries.map(([, value]) => value) : [0],
         backgroundColor: "#287a50",
@@ -1566,7 +1566,7 @@ function renderReceiptCharts() {
   state.charts.receiptStores = new Chart(storeCanvas, {
     type: "doughnut",
     data: {
-      labels: storeEntries.length ? storeEntries.map(([store]) => store) : ["HenÃ¼z veri yok"],
+      labels: storeEntries.length ? storeEntries.map(([store]) => store) : ["Henüz veri yok"],
       datasets: [{
         data: storeEntries.length ? storeEntries.map(([, value]) => value) : [1],
         backgroundColor: ["#287a50", "#3979a8", "#d39a32", "#c45243", "#8e5fa2", "#4d9b8f", "#7b846f"],
@@ -1588,10 +1588,10 @@ function renderReceiptCharts() {
 }
 
 async function deleteReceipt(receiptId) {
-  if (!window.confirm("Bu fiÅŸi harcama geÃ§miÅŸinden silmek istiyor musun?")) return;
+  if (!window.confirm("Bu fişi harcama geçmişinden silmek istiyor musun?")) return;
   try {
     await api(`/api/receipts/${receiptId}`, { method: "DELETE" });
-    showToast("FiÅŸ silindi.");
+    showToast("Fiş silindi.");
     await loadReceipts(document.getElementById("receiptMonthFilter")?.value || "");
   } catch (error) {
     showToast(error.message);
@@ -1611,22 +1611,22 @@ async function parseProduct(event) {
 
   if (!val) return;
 
-  // 1. ArayÃ¼zÃ¼ anÄ±nda gÃ¼ncelle (Zero-Blocking)
+  // 1. Arayüzü anında güncelle (Zero-Blocking)
   submit.disabled = true;
-  submit.innerHTML = `<span class="spinner"></span> Ä°ÅŸleniyor...`;
+  submit.innerHTML = `<span class="spinner"></span> İşleniyor...`;
 
   const overlay = document.getElementById("quantumScanOverlay");
   const progressText = document.getElementById("quantumScanProgress");
   if (overlay) overlay.style.display = "flex";
   if (progressText) {
-    progressText.innerText = "Kuantum spektrum dalgasÄ± baÅŸlatÄ±ldÄ±...";
+    progressText.innerText = "Kuantum spektrum dalgası başlatıldı...";
   }
 
-  // 2. Kuantum tarama iÅŸlemini asenkron olarak bir sonraki frame'de baÅŸlat
+  // 2. Kuantum tarama işlemini asenkron olarak bir sonraki frame'de başlat
   requestAnimationFrame(() => {
     setTimeout(async () => {
-      var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Siber veri dÃ¼ÄŸÃ¼mlerinden canlÄ± fiyatlar toplanÄ±yor..."; }, 600);
-      var t2 = setTimeout(() => { if (progressText) progressText.innerText = "Optimal kuantum frekansÄ± hesaplanÄ±yor..."; }, 1300);
+      var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Siber veri düğümlerinden canlı fiyatlar toplanıyor..."; }, 600);
+      var t2 = setTimeout(() => { if (progressText) progressText.innerText = "Optimal kuantum frekansı hesaplanıyor..."; }, 1300);
 
       try {
         if (isUrl(val)) {
@@ -1658,30 +1658,30 @@ async function parseProduct(event) {
           showSearchResults(results);
         }
       } catch (error) {
-        console.error("parseProduct hatasÄ±:", error);
+        console.error("parseProduct hatası:", error);
         
         if (overlay && progressText) {
-          // 1. Durum bildirimini yeÅŸil mod ve glitch ile gÃ¼ncelle
+          // 1. Durum bildirimini yeşil mod ve glitch ile güncelle
           overlay.classList.add("recovery-mode");
           const header = overlay.querySelector("h3");
           if (header) {
             header.classList.add("glitch-active");
             if (isMobile) {
-              header.innerText = "SÄ°STEM KURTARMA AKTÄ°F: MOBÄ°L AÄ OPTÄ°MÄ°ZASYONU";
+              header.innerText = "SİSTEM KURTARMA AKTİF: MOBİL AĞ OPTİMİZASYONU";
             } else {
-              header.innerText = "SÄ°STEM KURTARMA AKTÄ°F: LOKAL ANALÄ°Z";
+              header.innerText = "SİSTEM KURTARMA AKTİF: LOKAL ANALİZ";
             }
           }
           if (isMobile) {
-            progressText.innerText = "Mobil aÄŸ optimizasyonu aktif. Yerel rezonans verileri kullanÄ±lÄ±yor...";
+            progressText.innerText = "Mobil ağ optimizasyonu aktif. Yerel rezonans verileri kullanılıyor...";
           } else {
-            progressText.innerText = "Kuantum dÃ¼ÄŸÃ¼mleri yanÄ±t vermedi. Yerel Ã§ekirdekler Ã¼zerinden tarama sÃ¼rdÃ¼rÃ¼lÃ¼yor...";
+            progressText.innerText = "Kuantum düğümleri yanıt vermedi. Yerel çekirdekler üzerinden tarama sürdürülüyor...";
           }
           
-          // 2. Lokal CPU simÃ¼lasyonu iÃ§in 1.5 saniye bekle
+          // 2. Lokal CPU simülasyonu için 1.5 saniye bekle
           await new Promise(resolve => setTimeout(resolve, 1500));
           
-          // 3. Lokal rezonans fallback sonuÃ§larÄ±nÄ± oluÅŸtur
+          // 3. Lokal rezonans fallback sonuçlarını oluştur
           const localResults = {
             products: [
               {
@@ -1706,14 +1706,14 @@ async function parseProduct(event) {
           };
           showSearchResults(localResults);
           
-          // ArayÃ¼zÃ¼ eski haline temizle
+          // Arayüzü eski haline temizle
           overlay.classList.remove("recovery-mode");
           if (header) {
             header.classList.remove("glitch-active");
             header.innerText = "KUANTUM SPEKTRUMU TARANIYOR";
           }
         } else {
-          showToast("Kuantum veri darboÄŸazÄ±. Yerel analiz baÅŸlatÄ±lÄ±yor...");
+          showToast("Kuantum veri darboğazı. Yerel analiz başlatılıyor...");
         }
       } finally {
         clearTimeout(t1);
@@ -1750,8 +1750,8 @@ function showSearchResults(response) {
     content.innerHTML = `
       <div class="dialog-body" style="text-align: center; padding: 40px 20px;">
         <i data-lucide="frown" style="width: 48px; height: 48px; color: var(--muted); margin-bottom: 16px;"></i>
-        <h2>Arama Sonucu BulunamadÄ±</h2>
-        <p style="color: var(--muted); margin-top: 8px;">"${escapeHtml(originalQuery)}" iÃ§in alternatif satÄ±cÄ± veya fiyat bilgisi bulunamadÄ±.</p>
+        <h2>Arama Sonucu Bulunamadı</h2>
+        <p style="color: var(--muted); margin-top: 8px;">"${escapeHtml(originalQuery)}" için alternatif satıcı veya fiyat bilgisi bulunamadı.</p>
         ${suggestionHtml}
         <button class="secondary-button" style="margin-top: 24px;" onclick="closeDialog()">Kapat</button>
       </div>
@@ -1766,10 +1766,10 @@ function showSearchResults(response) {
     ? `
       <div class="assistant-info-box" style="border-left: 3px solid var(--red); background: rgba(248, 215, 211, 0.1); margin-bottom: 16px;">
         <div class="assistant-info-title" style="color: #d9383a; font-weight: 700;">
-          <i data-lucide="info"></i> Tam EÅŸleÅŸme BulunamadÄ±
+          <i data-lucide="info"></i> Tam Eşleşme Bulunamadı
         </div>
         <div class="assistant-info-content" style="color: var(--ink);">
-          "${escapeHtml(originalQuery)}" iÃ§in tam eÅŸleÅŸen Ã¼rÃ¼n bulunamadÄ±. Size en yakÄ±n popÃ¼ler alternatifleri listeliyoruz.
+          "${escapeHtml(originalQuery)}" için tam eşleşen ürün bulunamadı. Size en yakın popüler alternatifleri listeliyoruz.
         </div>
       </div>
     `
@@ -1777,14 +1777,14 @@ function showSearchResults(response) {
 
   // Dynamic search refinement chips for generic products
   const queryLower = originalQuery.toLowerCase().trim();
-  let matchingKey = Object.keys(genericProductSizes).find(key => queryLower === key || queryLower === key + "sÄ±" || queryLower === key + "su" || queryLower === key + "yu");
+  let matchingKey = Object.keys(genericProductSizes).find(key => queryLower === key || queryLower === key + "sı" || queryLower === key + "su" || queryLower === key + "yu");
   
   let sizeChipsHtml = "";
   if (matchingKey) {
     const chips = genericProductSizes[matchingKey];
     sizeChipsHtml = `
       <div class="search-refinement-chips" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; background: rgba(40, 122, 80, 0.05); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(40, 122, 80, 0.15);">
-        <span style="font-size: 11px; font-weight: 700; color: var(--green); margin-right: 4px;">EBAT HIZLI FÄ°LTRE:</span>
+        <span style="font-size: 11px; font-weight: 700; color: var(--green); margin-right: 4px;">EBAT HIZLI FİLTRE:</span>
         ${chips.map(sz => `
           <button type="button" class="secondary-button" style="padding: 4px 10px; border-radius: 12px; font-size: 10px; font-weight: 700; height: auto;" onclick="event.preventDefault(); triggerSuggestionSearch('${escapeHtml(matchingKey)} ${escapeHtml(sz)}');">
             ${escapeHtml(sz)}
@@ -1800,14 +1800,14 @@ function showSearchResults(response) {
 
   let categoryHeaderHtml = "";
   if (isFashion) {
-    const isShoe = ["ayakkabi", "ayakkabÄ±", "bot", "Ã§izme", "cizme", "terlik", "sneaker"].some(kw => originalQuery.toLowerCase().includes(kw)) ||
-                   products.some(p => ["ayakkabi", "ayakkabÄ±", "bot", "Ã§izme", "cizme", "terlik", "sneaker"].some(kw => p.title.toLowerCase().includes(kw)));
+    const isShoe = ["ayakkabi", "ayakkabı", "bot", "çizme", "cizme", "terlik", "sneaker"].some(kw => originalQuery.toLowerCase().includes(kw)) ||
+                   products.some(p => ["ayakkabi", "ayakkabı", "bot", "çizme", "cizme", "terlik", "sneaker"].some(kw => p.title.toLowerCase().includes(kw)));
     
     categoryHeaderHtml = `
       <div class="fashion-size-selector-container" style="margin-bottom: 16px; background: var(--bg-card); border: 1px solid var(--line); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <i data-lucide="scissors" style="color: var(--green); width: 16px; height: 16px;"></i>
-          <span style="font-size: 13px; font-weight: 700; color: var(--ink);">Beden / Numara SeÃ§imi:</span>
+          <span style="font-size: 13px; font-weight: 700; color: var(--ink);">Beden / Numara Seçimi:</span>
         </div>
         <select id="fashionSizeSelect" class="form-input" style="width: auto; padding: 4px 10px; font-size: 12px; height: auto;" onchange="window.updateFashionPrices(this.value)">
           ${isShoe ? `
@@ -1829,11 +1829,11 @@ function showSearchResults(response) {
       <div class="electronics-warranty-filter-container" style="margin-bottom: 16px; background: var(--bg-card); border: 1px solid var(--line); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <i data-lucide="shield-check" style="color: var(--green); width: 16px; height: 16px;"></i>
-          <span style="font-size: 13px; font-weight: 700; color: var(--ink);">Garanti TÃ¼rÃ¼ Filtresi:</span>
+          <span style="font-size: 13px; font-weight: 700; color: var(--ink);">Garanti Türü Filtresi:</span>
         </div>
         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 700; color: var(--ink);">
           <input type="checkbox" id="warrantyFilterCheckbox" style="accent-color: var(--green); width: 16px; height: 16px; cursor: pointer;" onchange="window.updateWarrantyFilter(this.checked)">
-          Sadece Resmi DistribÃ¼tÃ¶r
+          Sadece Resmi Distribütör
         </label>
       </div>
     `;
@@ -1855,8 +1855,8 @@ function showSearchResults(response) {
       }
     </style>
     <div class="dialog-body" style="max-width: 600px; width: 100%;">
-      <p class="eyebrow" style="color: var(--green); font-weight: 700;">ARAMA SONUÃ‡LARI</p>
-      <h2 style="margin-bottom: 16px;">En MantÄ±klÄ± SeÃ§enekler</h2>
+      <p class="eyebrow" style="color: var(--green); font-weight: 700;">ARAMA SONUÇLARI</p>
+      <h2 style="margin-bottom: 16px;">En Mantıklı Seçenekler</h2>
       ${sizeChipsHtml}
       ${fallbackNoticeHtml}
       ${categoryHeaderHtml}
@@ -1865,12 +1865,12 @@ function showSearchResults(response) {
           const badgesHtml = item.labels.map(lbl => {
             let colorClass = "bg-gray";
             if (lbl === "En Ucuz") colorClass = "bg-green";
-            if (lbl === "En YÃ¼ksek Ä°ndirim") colorClass = "bg-red";
-            if (lbl === "HÄ±zlÄ± Kargo") colorClass = "bg-blue";
-            if (lbl === "En Ä°yi Puan") colorClass = "bg-yellow";
-            if (lbl === "ÅÃ¼pheli Fiyat") colorClass = "bg-red";
+            if (lbl === "En Yüksek İndirim") colorClass = "bg-red";
+            if (lbl === "Hızlı Kargo") colorClass = "bg-blue";
+            if (lbl === "En İyi Puan") colorClass = "bg-yellow";
+            if (lbl === "Şüpheli Fiyat") colorClass = "bg-red";
             if (lbl === "Birim Fiyat Riski") colorClass = "bg-red";
-            if (lbl === "Birim Fiyat AvantajÄ±") colorClass = "bg-green";
+            if (lbl === "Birim Fiyat Avantajı") colorClass = "bg-green";
             return `<span class="analysis-status-badge ${colorClass}" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase;">${escapeHtml(lbl)}</span>`;
           }).join(" ");
 
@@ -1893,7 +1893,7 @@ function showSearchResults(response) {
 
           const suspiciousWarningHtml = item.extra_info?.suspicious
             ? `<div style="display: flex; align-items: center; gap: 4px; color: var(--red); font-size: 11px; margin-top: 6px; font-weight: 700;">
-                 <i data-lucide="shield-alert" style="width: 13px; height: 13px; flex-shrink: 0;"></i> ÅÃ¼pheli Fiyat UyarÄ±sÄ±!
+                 <i data-lucide="shield-alert" style="width: 13px; height: 13px; flex-shrink: 0;"></i> Şüpheli Fiyat Uyarısı!
                </div>`
             : "";
           const unitPriceHtml = item.extra_info?.unit_price && item.extra_info?.unit
@@ -1906,7 +1906,7 @@ function showSearchResults(response) {
           let isImporter = false;
           if (isElectronics) {
             isImporter = index % 2 === 1;
-            const warrantyText = isImporter ? "Ä°thalatÃ§Ä± Garantili" : "Resmi DistribÃ¼tÃ¶r";
+            const warrantyText = isImporter ? "İthalatçı Garantili" : "Resmi Distribütör";
             const badgeColor = isImporter ? "rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245,158,11,0.2)" : "rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2)";
             warrantyBadgeHtml = `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: ${badgeColor}; display: inline-block;">${warrantyText}</span>`;
           }
@@ -1939,7 +1939,7 @@ function showSearchResults(response) {
                 <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                   ${isLocal 
                     ? `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: rgba(0,243,255,0.1); color: #00d2ff; border: 1px solid rgba(0,243,255,0.2); display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="truck" style="width:11px; height:11px;"></i> ${escapeHtml(item.delivery_time || '30-60 Dakika')} ${item.distance_km ? `(${item.distance_km} km)` : ''}</span>`
-                    : `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: rgba(16,185,129,0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2); display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="globe" style="width:11px; height:11px;"></i> ${escapeHtml(item.delivery_time || '2 Ä°ÅŸ GÃ¼nÃ¼')}</span>`
+                    : `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: rgba(16,185,129,0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2); display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="globe" style="width:11px; height:11px;"></i> ${escapeHtml(item.delivery_time || '2 İş Günü')}</span>`
                   }
                   ${warrantyBadgeHtml}
                 </div>
@@ -1958,7 +1958,7 @@ function showSearchResults(response) {
         }).join("")}
       </div>
       <div class="dialog-actions" style="margin-top: 0;">
-        <button class="secondary-button" type="button" onclick="closeDialog()" style="width: 100%;">VazgeÃ§</button>
+        <button class="secondary-button" type="button" onclick="closeDialog()" style="width: 100%;">Vazgeç</button>
       </div>
     </div>
   `;
@@ -2042,13 +2042,13 @@ async function trackSearchResultProduct(button, index) {
       }),
     });
 
-    showToast("ÃœrÃ¼n radara eklendi.");
+    showToast("Ürün radara eklendi.");
     closeDialog();
     document.getElementById("productUrl").value = "";
     await loadProducts();
     switchView("tracking");
   } catch (error) {
-    showToast(`ÃœrÃ¼n kaydedilemedi: ${error.message}`);
+    showToast(`Ürün kaydedilemedi: ${error.message}`);
     button.disabled = false;
     button.innerHTML = `<i data-lucide="radar" style="width:12px; height:12px; margin-right:4px;"></i> Radara Ekle`;
     lucide.createIcons();
@@ -2059,7 +2059,7 @@ function showParsedProduct(parsed) {
   state.parsedProduct = parsed;
   const dialog = document.getElementById("productDialog");
   const content = document.getElementById("dialogContent");
-  const title = parsed.title || "ÃœrÃ¼n bilgisi tamamlanamadÄ±";
+  const title = parsed.title || "Ürün bilgisi tamamlanamadı";
 
   const isSupplement = parsed.source === "supplementler" || 
                        parsed.source === "proteinocean" || 
@@ -2082,58 +2082,58 @@ function showParsedProduct(parsed) {
       <div class="decision-panel">
         <div class="score-ring">${parsed.confidence}</div>
         <div>
-          <strong>Bilgi gÃ¼veni</strong>
-          <p>${parsed.price ? "ÃœrÃ¼n ve fiyat bilgisi bulundu." : "Fiyat bulunamadÄ±. AÅŸaÄŸÄ±dan elle tamamlayabilirsin."}</p>
+          <strong>Bilgi güveni</strong>
+          <p>${parsed.price ? "Ürün ve fiyat bilgisi bulundu." : "Fiyat bulunamadı. Aşağıdan elle tamamlayabilirsin."}</p>
         </div>
       </div>
       <div class="manual-fields">
         <label class="manual-field">
-          <span>ÃœrÃ¼n adÄ±</span>
-          <input id="parsedTitle" type="text" value="${escapeHtml(parsed.title || "")}" placeholder="ÃœrÃ¼n adÄ±nÄ± yaz">
+          <span>Ürün adı</span>
+          <input id="parsedTitle" type="text" value="${escapeHtml(parsed.title || "")}" placeholder="Ürün adını yaz">
         </label>
         <label class="manual-field">
-          <span>GÃ¼ncel fiyat</span>
-          <input id="parsedPrice" type="text" inputmode="decimal" value="${parsed.price ?? ""}" placeholder="Ã–rn. 1849,90">
+          <span>Güncel fiyat</span>
+          <input id="parsedPrice" type="text" inputmode="decimal" value="${parsed.price ?? ""}" placeholder="Örn. 1849,90">
         </label>
         <label class="manual-field">
-          <span>Hedef Fiyat EÅŸiÄŸi (Alarm)</span>
-          <input id="parsedTargetPrice" type="text" inputmode="decimal" placeholder="Bu fiyata dÃ¼ÅŸÃ¼nce haber ver (Ä°steÄŸe baÄŸlÄ±)">
+          <span>Hedef Fiyat Eşiği (Alarm)</span>
+          <input id="parsedTargetPrice" type="text" inputmode="decimal" placeholder="Bu fiyata düşünce haber ver (İsteğe bağlı)">
         </label>
         <label class="manual-field">
-          <span>Fiyat DÃ¼ÅŸÃ¼ÅŸ AlarmÄ± (%)</span>
+          <span>Fiyat Düşüş Alarmı (%)</span>
           <input id="parsedAlertThreshold" type="number" min="1" max="100" value="5">
         </label>
         <label class="manual-field">
-          <span>Son SatÄ±n Alma Tarihi</span>
+          <span>Son Satın Alma Tarihi</span>
           <input id="parsedLastPurchasedDate" type="date">
         </label>
         <label class="manual-field">
-          <span>Tekrar Alma Periyodu (GÃ¼n)</span>
-          <input id="parsedRestockPeriod" type="number" min="1" max="730" placeholder="Ã–rn. 30">
+          <span>Tekrar Alma Periyodu (Gün)</span>
+          <input id="parsedRestockPeriod" type="number" min="1" max="730" placeholder="Örn. 30">
         </label>
         ${isSupplement ? `
         <label class="manual-field">
-          <span>Toplam Servis SayÄ±sÄ±</span>
-          <input id="parsedServings" type="number" value="${parsed.extra_info && parsed.extra_info.servings ? parsed.extra_info.servings : ""}" placeholder="Ã–rn. 60">
+          <span>Toplam Servis Sayısı</span>
+          <input id="parsedServings" type="number" value="${parsed.extra_info && parsed.extra_info.servings ? parsed.extra_info.servings : ""}" placeholder="Örn. 60">
         </label>
         <div id="parsedServingPriceRow" class="form-hint" style="margin-top: -6px; color: var(--green); font-weight: 700; min-height: 16px;"></div>
         ` : ""}
         ${isCosmetics ? `
         <label class="manual-field">
-          <span>Kozmetik AÃ§Ä±lÄ±ÅŸ Tarihi</span>
-          <input id="parsedOpeningDate" type="date" value="" placeholder="AÃ§Ä±lÄ±ÅŸ Tarihi">
+          <span>Kozmetik Açılış Tarihi</span>
+          <input id="parsedOpeningDate" type="date" value="" placeholder="Açılış Tarihi">
         </label>
         <label class="manual-field">
-          <span>KullanÄ±m Ã–mrÃ¼ (Ay)</span>
-          <input id="parsedShelfLife" type="number" value="12" placeholder="Ã–rn. 12">
+          <span>Kullanım Ömrü (Ay)</span>
+          <input id="parsedShelfLife" type="number" value="12" placeholder="Örn. 12">
         </label>
         ` : ""}
-        <p class="form-hint">Otomatik bulunan bilgileri kontrol edip dÃ¼zeltebilirsin.</p>
+        <p class="form-hint">Otomatik bulunan bilgileri kontrol edip düzeltebilirsin.</p>
       </div>
       ${parsed.warnings.length ? `<p class="source-name">${parsed.warnings.map(escapeHtml).join(" ")}</p>` : ""}
       <p class="dialog-error" id="trackProductError" hidden></p>
       <div class="dialog-actions">
-        <button class="secondary-button" type="button" onclick="closeDialog()">VazgeÃ§</button>
+        <button class="secondary-button" type="button" onclick="closeDialog()">Vazgeç</button>
         <button class="primary-button" type="button" id="trackParsedButton" onclick="trackParsedProduct()">
           <i data-lucide="radar"></i>
           Takibe al
@@ -2157,7 +2157,7 @@ function showParsedProduct(parsed) {
 
     if (price && servings && servings > 0) {
       const perServing = price / servings;
-      display.textContent = `Servis baÅŸÄ±na maliyet: ${currency.format(perServing)}`;
+      display.textContent = `Servis başına maliyet: ${currency.format(perServing)}`;
     } else {
       display.textContent = "";
     }
@@ -2223,7 +2223,7 @@ async function trackParsedProduct() {
   const servings = servingsInput ? parseInt(servingsInput.value, 10) : null;
 
   if (!title || !price) {
-    showDialogError("ÃœrÃ¼n adÄ± ve geÃ§erli fiyat gerekli.");
+    showDialogError("Ürün adı ve geçerli fiyat gerekli.");
     return;
   }
 
@@ -2274,11 +2274,11 @@ async function trackParsedProduct() {
 
     closeDialog();
     document.getElementById("productUrl").value = "";
-    showToast("ÃœrÃ¼n fiyat radarÄ±na eklendi.");
+    showToast("Ürün fiyat radarına eklendi.");
     await loadProducts();
     switchView("tracking");
   } catch (error) {
-    showDialogError(`ÃœrÃ¼n kaydedilemedi: ${error.message}`);
+    showDialogError(`Ürün kaydedilemedi: ${error.message}`);
     button.disabled = false;
     button.innerHTML = `<i data-lucide="radar"></i> Takibe al`;
     lucide.createIcons();
@@ -2307,10 +2307,10 @@ function openProduct(id) {
   const lowest = Math.min(...history);
   const highest = Math.max(...history);
 
-  // Fiyat geÃ§miÅŸini kronolojik sÄ±raya gÃ¶re diz
+  // Fiyat geçmişini kronolojik sıraya göre diz
   const sortedHistory = [...product.price_history].sort((a, b) => new Date(a.seen_at) - new Date(b.seen_at));
   const labels = sortedHistory.map((item) => {
-    if (!item.seen_at) return "Ä°lk KayÄ±t";
+    if (!item.seen_at) return "İlk Kayıt";
     return new Intl.DateTimeFormat("tr-TR", {
       day: "2-digit",
       month: "short",
@@ -2331,19 +2331,19 @@ function openProduct(id) {
           <i data-lucide="dumbbell"></i> Porsiyon Analizi
         </div>
         <div class="assistant-info-content">
-          Bu Ã¼rÃ¼n <strong>${servings} servis</strong> iÃ§eriyor.<br>
-          Servis baÅŸÄ±na maliyet: <strong>${currency.format(costPerServing)}</strong>
+          Bu ürün <strong>${servings} servis</strong> içeriyor.<br>
+          Servis başına maliyet: <strong>${currency.format(costPerServing)}</strong>
         </div>
       </div>
     `;
   }
 
-  // 2. PC donanÄ±m uyumluluk bilgileri
+  // 2. PC donanım uyumluluk bilgileri
   if (extraInfo.compatibility_info) {
     assistantHtml += `
       <div class="assistant-info-box">
         <div class="assistant-info-title">
-          <i data-lucide="cpu"></i> DonanÄ±m Uyumluluk Rehberi
+          <i data-lucide="cpu"></i> Donanım Uyumluluk Rehberi
         </div>
         <div class="assistant-info-content">
           ${escapeHtml(extraInfo.compatibility_info)}
@@ -2352,7 +2352,7 @@ function openProduct(id) {
     `;
   }
 
-  // 2.5. Kozmetik son kullanma ve Ã¶mÃ¼r bilgisi
+  // 2.5. Kozmetik son kullanma ve ömür bilgisi
   if (extraInfo.opening_date && extraInfo.shelf_life_months) {
     const openingDate = new Date(extraInfo.opening_date);
     const shelfMonths = parseInt(extraInfo.shelf_life_months, 10);
@@ -2362,18 +2362,18 @@ function openProduct(id) {
     
     let statusMsg = "";
     if (daysLeft < 0) {
-      statusMsg = `<span style="color: var(--red); font-weight: 700;">KullanÄ±m Ã¶mrÃ¼ dolmuÅŸ! (${Math.abs(daysLeft)} gÃ¼n Ã¶nce)</span>`;
+      statusMsg = `<span style="color: var(--red); font-weight: 700;">Kullanım ömrü dolmuş! (${Math.abs(daysLeft)} gün önce)</span>`;
     } else {
-      statusMsg = `Kalan kullanÄ±m sÃ¼resi: <strong>${daysLeft} gÃ¼n</strong>`;
+      statusMsg = `Kalan kullanım süresi: <strong>${daysLeft} gün</strong>`;
     }
 
     assistantHtml += `
       <div class="assistant-info-box">
         <div class="assistant-info-title">
-          <i data-lucide="calendar"></i> Kozmetik Ã–mÃ¼r Takibi
+          <i data-lucide="calendar"></i> Kozmetik Ömür Takibi
         </div>
         <div class="assistant-info-content">
-          AÃ§Ä±lÄ±ÅŸ Tarihi: <strong>${extraInfo.opening_date}</strong> (KullanÄ±m Ã–mrÃ¼: <strong>${shelfMonths} Ay</strong>)<br>
+          Açılış Tarihi: <strong>${extraInfo.opening_date}</strong> (Kullanım Ömrü: <strong>${shelfMonths} Ay</strong>)<br>
           Son Kullanma Hedefi: <strong>${expDate.toISOString().split('T')[0]}</strong><br>
           ${statusMsg}
         </div>
@@ -2389,16 +2389,16 @@ function openProduct(id) {
     );
     const daysUntilDue = Math.ceil((dueAt - new Date()) / (24 * 60 * 60 * 1000));
     const restockStatus = daysUntilDue > 0
-      ? `${daysUntilDue} gÃ¼n sonra yeniden alma zamanÄ±`
-      : `${Math.abs(daysUntilDue)} gÃ¼ndÃ¼r yeniden alma zamanÄ± gelmiÅŸ`;
+      ? `${daysUntilDue} gün sonra yeniden alma zamanı`
+      : `${Math.abs(daysUntilDue)} gündür yeniden alma zamanı gelmiş`;
 
     assistantHtml += `
       <div class="assistant-info-box">
         <div class="assistant-info-title">
-          <i data-lucide="repeat-2"></i> Periyodik Ä°htiyaÃ§ AsistanÄ±
+          <i data-lucide="repeat-2"></i> Periyodik İhtiyaç Asistanı
         </div>
         <div class="assistant-info-content">
-          ${Number(extraInfo.restock_period_days)} gÃ¼nlÃ¼k periyot takip ediliyor.<br>
+          ${Number(extraInfo.restock_period_days)} günlük periyot takip ediliyor.<br>
           Sonraki hedef: <strong>${dueAt.toLocaleDateString("tr-TR")}</strong><br>
           <strong>${restockStatus}</strong>
         </div>
@@ -2411,35 +2411,35 @@ function openProduct(id) {
     assistantHtml += `
       <div class="assistant-info-box">
         <div class="assistant-info-title">
-          <i data-lucide="bell-ring"></i> Hedef Fiyat AlarmÄ±
+          <i data-lucide="bell-ring"></i> Hedef Fiyat Alarmı
         </div>
         <div class="assistant-info-content">
-          Hedef fiyatÄ±n: <strong>${currency.format(extraInfo.target_price)}</strong>. Fiyat bu seviyeye veya altÄ±na dÃ¼ÅŸtÃ¼ÄŸÃ¼nde bildirim gÃ¶nderilecektir.
+          Hedef fiyatın: <strong>${currency.format(extraInfo.target_price)}</strong>. Fiyat bu seviyeye veya altına düştüğünde bildirim gönderilecektir.
         </div>
       </div>
     `;
   }
 
-  // 4. Sahte Ä°ndirim Analiz Raporu
+  // 4. Sahte İndirim Analiz Raporu
   const forecast = product.discount_forecast;
   if (forecast) {
     assistantHtml += `
       <div class="forecast-panel ${forecast.status === "ready" ? "" : "forecast-pending"}">
         <div class="forecast-heading">
           <div>
-            <span class="forecast-label">7 GÃœNLÃœK TAHMÄ°N</span>
+            <span class="forecast-label">7 GÜNLÜK TAHMİN</span>
             <strong>${forecast.status === "ready"
               ? `%${forecast.probability} indirim ihtimali`
-              : "Tahmin hazÄ±rlanÄ±yor"}</strong>
+              : "Tahmin hazırlanıyor"}</strong>
           </div>
           <span class="forecast-recommendation">${escapeHtml(forecast.recommendation)}</span>
         </div>
         <p>${escapeHtml(forecast.message)}</p>
         ${forecast.status === "ready" ? `
           <div class="forecast-stats">
-            <span>GÃ¼ven <strong>${escapeHtml(forecast.confidence)}</strong></span>
-            <span>Beklenen dÃ¼ÅŸÃ¼ÅŸ <strong>%${forecast.expected_drop_percent}</strong></span>
-            <span>Veri <strong>${forecast.observation_count} kayÄ±t</strong></span>
+            <span>Güven <strong>${escapeHtml(forecast.confidence)}</strong></span>
+            <span>Beklenen düşüş <strong>%${forecast.expected_drop_percent}</strong></span>
+            <span>Veri <strong>${forecast.observation_count} kayıt</strong></span>
           </div>
         ` : ""}
       </div>
@@ -2460,14 +2460,14 @@ function openProduct(id) {
     `;
   }
 
-  // 5. DiÄŸer MaÄŸaza Fiyat KarÅŸÄ±laÅŸtÄ±rmasÄ±
+  // 5. Diğer Mağaza Fiyat Karşılaştırması
   const comparison = product.price_comparison || [];
   let comparisonHtml = "";
   if (comparison.length > 0) {
     comparisonHtml += `
       <div class="price-chart-container" style="margin: 18px 0; padding: 12px; background: #f4f6f2; border: 1px solid var(--line); border-radius: 8px;">
         <p class="source-name" style="margin-top: 0; margin-bottom: 10px; font-weight: 700; color: var(--green-dark); display: flex; align-items: center; justify-content: space-between;">
-          <span style="display: flex; align-items: center; gap: 6px;"><i data-lucide="arrow-left-right" style="width: 14px; height: 14px;"></i> DiÄŸer MaÄŸazalardaki Fiyatlar</span>
+          <span style="display: flex; align-items: center; gap: 6px;"><i data-lucide="arrow-left-right" style="width: 14px; height: 14px;"></i> Diğer Mağazalardaki Fiyatlar</span>
           <button onclick="refreshProductComparison('${product.id}')" style="background: none; border: none; color: var(--green); font-size: 11px; font-weight: 700; cursor: pointer; padding: 0; display: flex; align-items: center; gap: 4px;">
             <i data-lucide="refresh-cw" style="width: 11px; height: 11px;"></i> Yenile
           </button>
@@ -2486,7 +2486,7 @@ function openProduct(id) {
               <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
                 <strong style="color: ${isCheapest ? "var(--green-dark)" : "var(--ink)"}; font-size: 13px;">${currency.format(item.price)}</strong>
                 ${isCheapest ? `<span style="${badgeStyle}">EN UCUZ</span>` : ""}
-                <a href="${escapeHtml(item.url)}" target="_blank" style="color: var(--muted); display: inline-grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 4px; background: white;" title="MaÄŸazaya git">
+                <a href="${escapeHtml(item.url)}" target="_blank" style="color: var(--muted); display: inline-grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 4px; background: white;" title="Mağazaya git">
                   <i data-lucide="external-link" style="width: 14px; height: 14px; color: var(--ink);"></i>
                 </a>
               </div>
@@ -2501,7 +2501,7 @@ function openProduct(id) {
       <div class="price-chart-container" style="margin: 18px 0; padding: 12px; background: #fbfcf9; border: 1px solid var(--line); border-radius: 6px; text-align: center;">
         <button class="card-button" style="margin-top: 0; width: auto; display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;" onclick="refreshProductComparison('${product.id}')">
           <i data-lucide="search" style="width: 14px; height: 14px;"></i>
-          DiÄŸer MaÄŸazalardaki FiyatlarÄ± Sorgula
+          Diğer Mağazalardaki Fiyatları Sorgula
         </button>
       </div>
     `;
@@ -2520,67 +2520,67 @@ function openProduct(id) {
         </div>
       </div>
       
-      <!-- AkÄ±llÄ± Asistan Bilgileri -->
+      <!-- Akıllı Asistan Bilgileri -->
       ${assistantHtml}
 
       <div class="price-row">
         <span class="price">${currency.format(product.current_price)}</span>
         <span class="verdict">${escapeHtml(product.verdict)}</span>
       </div>
-      <p class="source-name">En dÃ¼ÅŸÃ¼k ${currency.format(lowest)} Â· En yÃ¼ksek ${currency.format(highest)}</p>
+      <p class="source-name">En düşük ${currency.format(lowest)} Â· En yüksek ${currency.format(highest)}</p>
       
-      <!-- Fiyat GeÃ§miÅŸi GrafiÄŸi -->
+      <!-- Fiyat Geçmişi Grafiği -->
       <div class="price-chart-container" style="margin: 18px 0; padding: 12px; background: #fbfcf9; border: 1px solid var(--line); border-radius: 6px;">
-        <p class="source-name" style="margin-top: 0; margin-bottom: 8px; font-weight: 600; color: var(--ink);">Fiyat DeÄŸiÅŸim GrafiÄŸi</p>
+        <p class="source-name" style="margin-top: 0; margin-bottom: 8px; font-weight: 600; color: var(--ink);">Fiyat Değişim Grafiği</p>
         <div style="position: relative; height: 160px; width: 100%;">
           <canvas id="priceHistoryChart"></canvas>
         </div>
       </div>
 
-      <!-- Fiyat KarÅŸÄ±laÅŸtÄ±rmasÄ± -->
+      <!-- Fiyat Karşılaştırması -->
       ${comparisonHtml}
 
       <div class="manual-fields">
         <label class="manual-field">
-          <span>Yeni fiyat kaydÄ±</span>
-          <input id="newPriceInput" type="text" inputmode="decimal" placeholder="Ã–rn. 1749,90">
+          <span>Yeni fiyat kaydı</span>
+          <input id="newPriceInput" type="text" inputmode="decimal" placeholder="Örn. 1749,90">
         </label>
-        <button class="secondary-button" onclick="updateProductPrice('${product.id}')">FiyatÄ± gÃ¼ncelle</button>
+        <button class="secondary-button" onclick="updateProductPrice('${product.id}')">Fiyatı güncelle</button>
       </div>
 
-      <!-- TÃ¼ketim & Bitme Takibi -->
+      <!-- Tüketim & Bitme Takibi -->
       <div class="manual-fields" style="margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px;">
         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 10px;">
           <input type="checkbox" id="enableRestockTracking" style="accent-color: var(--green); width: 16px; height: 16px;" ${extraInfo.restock_period_days ? "checked" : ""} onchange="document.getElementById('restockFields').style.display = this.checked ? 'block' : 'none'">
-          TÃ¼ketim & Bitme Takibi Aktif
+          Tüketim & Bitme Takibi Aktif
         </label>
         <div id="restockFields" style="display: ${extraInfo.restock_period_days ? "block" : "none"}; margin-bottom: 10px;">
           <div style="display: flex; gap: 10px; margin-bottom: 10px;">
             <label class="manual-field" style="flex: 1; margin: 0;">
-              <span style="font-size: 11px;">TÃ¼ketim SÃ¼resi (GÃ¼n)</span>
+              <span style="font-size: 11px;">Tüketim Süresi (Gün)</span>
               <input id="restockPeriodInput" type="number" min="1" value="${extraInfo.restock_period_days || 30}" style="padding: 6px 10px; font-size: 12px;">
             </label>
             <label class="manual-field" style="flex: 1; margin: 0;">
-              <span style="font-size: 11px;">Son SatÄ±n AlÄ±m</span>
+              <span style="font-size: 11px;">Son Satın Alım</span>
               <input id="restockLastPurchasedInput" type="date" value="${extraInfo.last_purchased_date || new Date().toISOString().split('T')[0]}" style="padding: 6px 10px; font-size: 12px;">
             </label>
           </div>
         </div>
-        <button class="secondary-button" style="width: 100%; font-size: 12px; height: 34px;" onclick="window.saveRestockTracking('${product.id}')">Takip AyarlarÄ±nÄ± Kaydet</button>
+        <button class="secondary-button" style="width: 100%; font-size: 12px; height: 34px;" onclick="window.saveRestockTracking('${product.id}')">Takip Ayarlarını Kaydet</button>
       </div>
       <div class="dialog-actions">
         <button class="danger-button" type="button" onclick="removeTrackedProduct('${product.id}')">
           <i data-lucide="trash-2"></i>
-          Takipten Ã§Ä±kar
+          Takipten çıkar
         </button>
         <button class="primary-button" onclick="window.open('${escapeHtml(product.url)}', '_blank')">
           <i data-lucide="external-link"></i>
-          MaÄŸazaya git
+          Mağazaya git
         </button>
       </div>
       <button class="card-button" onclick="refreshSingleProduct('${product.id}')">
         <i data-lucide="refresh-cw"></i>
-        Åimdi otomatik kontrol et
+        Şimdi otomatik kontrol et
       </button>
     </div>
   `;
@@ -2588,7 +2588,7 @@ function openProduct(id) {
   dialog.showModal();
   lucide.createIcons();
 
-  // Grafik Ã§izimi
+  // Grafik çizimi
   setTimeout(() => {
     const ctx = document.getElementById("priceHistoryChart");
     if (!ctx) return;
@@ -2663,7 +2663,7 @@ async function updateProductPrice(productId) {
   const price = parseUserPrice(input?.value);
 
   if (!price) {
-    showToast("GeÃ§erli bir fiyat yaz.");
+    showToast("Geçerli bir fiyat yaz.");
     return;
   }
 
@@ -2677,7 +2677,7 @@ async function updateProductPrice(productId) {
       product.id === productId ? updated : product
     ));
     renderAll();
-    showToast("Yeni fiyat kaydedildi, fÄ±rsat skoru gÃ¼ncellendi.");
+    showToast("Yeni fiyat kaydedildi, fırsat skoru güncellendi.");
     openProduct(productId);
   } catch (error) {
     showToast(error.message);
@@ -2688,7 +2688,7 @@ async function removeTrackedProduct(productId) {
   const product = state.products.find((item) => item.id === productId);
   if (!product) return;
 
-  const confirmed = window.confirm(`"${product.title}" takipten Ã§Ä±karÄ±lsÄ±n mÄ±?`);
+  const confirmed = window.confirm(`"${product.title}" takipten çıkarılsın mı?`);
   if (!confirmed) return;
 
   try {
@@ -2696,14 +2696,14 @@ async function removeTrackedProduct(productId) {
     state.products = state.products.filter((item) => item.id !== productId);
     closeDialog();
     renderAll();
-    showToast("ÃœrÃ¼n takip listesinden Ã§Ä±karÄ±ldÄ±.");
+    showToast("Ürün takip listesinden çıkarıldı.");
   } catch (error) {
     showToast(error.message);
   }
 }
 
 async function refreshSingleProduct(productId) {
-  showToast("ÃœrÃ¼nÃ¼n gÃ¼ncel fiyatÄ± kontrol ediliyor...");
+  showToast("Ürünün güncel fiyatı kontrol ediliyor...");
 
   try {
     const result = await api(`/products/${productId}/refresh`, {
@@ -2717,11 +2717,11 @@ async function refreshSingleProduct(productId) {
     openProduct(productId);
 
     if (result.status === "success" && result.price_changed) {
-      showToast(`Fiyat gÃ¼ncellendi: ${currency.format(result.new_price)}`);
+      showToast(`Fiyat güncellendi: ${currency.format(result.new_price)}`);
     } else if (result.status === "success") {
-      showToast("Fiyat deÄŸiÅŸmemiÅŸ.");
+      showToast("Fiyat değişmemiş.");
     } else {
-      showToast(`Fiyat bulunamadÄ±: ${result.message}`);
+      showToast(`Fiyat bulunamadı: ${result.message}`);
     }
   } catch (error) {
     showToast(error.message);
@@ -2736,12 +2736,12 @@ async function refreshAllPrices() {
   try {
     const result = await api("/refresh-all", { method: "POST" });
     await loadProducts();
-    showToast(`${result.successful} Ã¼rÃ¼n kontrol edildi, ${result.failed} Ã¼rÃ¼nde fiyat bulunamadÄ±.`);
+    showToast(`${result.successful} ürün kontrol edildi, ${result.failed} üründe fiyat bulunamadı.`);
   } catch (error) {
     showToast(error.message);
   } finally {
     button.disabled = false;
-    button.innerHTML = `<i data-lucide="scan-line"></i> FiyatlarÄ± kontrol et`;
+    button.innerHTML = `<i data-lucide="scan-line"></i> Fiyatları kontrol et`;
     lucide.createIcons();
   }
 }
@@ -2758,15 +2758,15 @@ async function showNotifications() {
 
     content.innerHTML = `
       <div class="dialog-body">
-        <p class="eyebrow">BÄ°LDÄ°RÄ°MLER</p>
-        <h2>FÄ±rsat hareketleri</h2>
+        <p class="eyebrow">BİLDİRİMLER</p>
+        <h2>Fırsat hareketleri</h2>
         <div class="push-settings">
           <div>
-            <strong>Fiyat alarmÄ± bildirimleri</strong>
+            <strong>Fiyat alarmı bildirimleri</strong>
             <span>${escapeHtml(pushState.message)}</span>
           </div>
           ${pushState.action === "enable"
-            ? `<button class="primary-button compact-button" type="button" onclick="enablePushNotifications()">AÃ§</button>`
+            ? `<button class="primary-button compact-button" type="button" onclick="enablePushNotifications()">Aç</button>`
             : pushState.action === "disable"
               ? `<button class="secondary-button compact-button" type="button" onclick="disablePushNotifications()">Kapat</button>`
               : ""}
@@ -2776,15 +2776,15 @@ async function showNotifications() {
             ? notifications.map((item) => {
                 let badgeHtml = "";
                 if (item.type === "catalog_bim") {
-                  badgeHtml = `<span class="analysis-status-badge bg-blue" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; margin-right: 6px;">BÄ°M AKTÃœEL</span>`;
+                  badgeHtml = `<span class="analysis-status-badge bg-blue" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; margin-right: 6px;">BİM AKTÜEL</span>`;
                 } else if (item.type === "catalog_a101") {
-                  badgeHtml = `<span class="analysis-status-badge bg-yellow" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; color: #775815; margin-right: 6px;">A101 AKTÃœEL</span>`;
+                  badgeHtml = `<span class="analysis-status-badge bg-yellow" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; color: #775815; margin-right: 6px;">A101 AKTÜEL</span>`;
                 } else if (item.type === "catalog_gratis") {
-                  badgeHtml = `<span class="analysis-status-badge bg-red" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; margin-right: 6px;">GRATÄ°S</span>`;
+                  badgeHtml = `<span class="analysis-status-badge bg-red" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; margin-right: 6px;">GRATİS</span>`;
                 } else if (item.type === "stock_back") {
-                  badgeHtml = `<span class="analysis-status-badge bg-green" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; margin-right: 6px;">STOK GELDÄ°</span>`;
+                  badgeHtml = `<span class="analysis-status-badge bg-green" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; margin-right: 6px;">STOK GELDİ</span>`;
                 } else if (item.type === "catalog_match") {
-                  badgeHtml = `<span class="analysis-status-badge bg-green" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; margin-right: 6px;">KATALOÄA DÃœÅTÃœ!</span>`;
+                  badgeHtml = `<span class="analysis-status-badge bg-green" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; margin-right: 6px;">KATALOĞA DÜŞTÜ!</span>`;
                 }
                 
                 return `
@@ -2798,7 +2798,7 @@ async function showNotifications() {
                   </div>
                 `;
               }).join("")
-            : `<div class="empty-state">HenÃ¼z fiyat dÃ¼ÅŸÃ¼ÅŸÃ¼ bildirimi yok.</div>`}
+            : `<div class="empty-state">Henüz fiyat düşüşü bildirimi yok.</div>`}
         </div>
       </div>
     `;
@@ -2822,27 +2822,27 @@ async function currentPushState(config) {
   if (!config.enabled) {
     return {
       action: null,
-      message: "Sunucuda web bildirimleri henÃ¼z etkin deÄŸil.",
+      message: "Sunucuda web bildirimleri henüz etkin değil.",
     };
   }
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
     return {
       action: null,
-      message: "Bu tarayÄ±cÄ± web bildirimlerini desteklemiyor.",
+      message: "Bu tarayıcı web bildirimlerini desteklemiyor.",
     };
   }
   if (Notification.permission === "denied") {
     return {
       action: null,
-      message: "Bildirim izni tarayÄ±cÄ± ayarlarÄ±ndan engellenmiÅŸ.",
+      message: "Bildirim izni tarayıcı ayarlarından engellenmiş.",
     };
   }
 
   const registration = await navigator.serviceWorker.ready;
   const subscription = await registration.pushManager.getSubscription();
   return subscription
-    ? { action: "disable", message: "Bu cihazda bildirimler aÃ§Ä±k." }
-    : { action: "enable", message: "Hedef fiyat ve ciddi dÃ¼ÅŸÃ¼ÅŸlerde haber al." };
+    ? { action: "disable", message: "Bu cihazda bildirimler açık." }
+    : { action: "enable", message: "Hedef fiyat ve ciddi düşüşlerde haber al." };
 }
 
 function urlBase64ToUint8Array(value) {
@@ -2856,7 +2856,7 @@ async function enablePushNotifications() {
   try {
     const config = await api("/push/config");
     if (!config.enabled || !config.public_key) {
-      throw new Error("Web bildirimleri sunucuda henÃ¼z etkinleÅŸtirilmedi.");
+      throw new Error("Web bildirimleri sunucuda henüz etkinleştirilmedi.");
     }
 
     const permission = await Notification.requestPermission();
@@ -2878,7 +2878,7 @@ async function enablePushNotifications() {
       body: JSON.stringify(subscription.toJSON()),
     });
     closeDialog();
-    showToast("Fiyat alarmÄ± bildirimleri aÃ§Ä±ldÄ±.");
+    showToast("Fiyat alarmı bildirimleri açıldı.");
   } catch (error) {
     showToast(error.message);
   }
@@ -2896,7 +2896,7 @@ async function disablePushNotifications() {
       await subscription.unsubscribe();
     }
     closeDialog();
-    showToast("Bu cihazdaki bildirimler kapatÄ±ldÄ±.");
+    showToast("Bu cihazdaki bildirimler kapatıldı.");
   } catch (error) {
     showToast(error.message);
   }
@@ -2907,13 +2907,13 @@ function checkStatusText(product) {
     return `Son kontrol: ${formatDate(product.last_checked_at)}`;
   }
   if (product.last_check_status === "failed") {
-    return "Otomatik fiyat bulunamadÄ±";
+    return "Otomatik fiyat bulunamadı";
   }
-  return "Ä°lk otomatik kontrol bekleniyor";
+  return "İlk otomatik kontrol bekleniyor";
 }
 
 function formatDate(value) {
-  if (!value) return "HenÃ¼z kontrol edilmedi";
+  if (!value) return "Henüz kontrol edilmedi";
   return new Intl.DateTimeFormat("tr-TR", {
     day: "2-digit",
     month: "short",
@@ -2974,12 +2974,12 @@ async function pasteUrl() {
     const value = await navigator.clipboard.readText();
     document.getElementById("productUrl").value = value;
   } catch {
-    showToast("Pano izni verilmedi. Linki elle yapÄ±ÅŸtÄ±rabilirsin.");
+    showToast("Pano izni verilmedi. Linki elle yapıştırabilirsin.");
   }
 }
 
 async function refreshProductComparison(productId) {
-  showToast("DiÄŸer maÄŸazalardaki fiyatlar sorgulanÄ±yor...");
+  showToast("Diğer mağazalardaki fiyatlar sorgulanıyor...");
   try {
     const updated = await api(`/products/${productId}/compare`, {
       method: "POST",
@@ -2990,7 +2990,7 @@ async function refreshProductComparison(productId) {
     ));
     renderAll();
     openProduct(productId);
-    showToast("DiÄŸer maÄŸaza fiyatlarÄ± gÃ¼ncellendi.");
+    showToast("Diğer mağaza fiyatları güncellendi.");
   } catch (error) {
     showToast(error.message);
   }
@@ -3015,11 +3015,11 @@ function updateNetworkStatus() {
   const online = navigator.onLine;
   status.classList.toggle("offline", !online);
   status.innerHTML = online
-    ? `<i data-lucide="wifi"></i><span>Ã‡evrimiÃ§i</span>`
-    : `<i data-lucide="wifi-off"></i><span>Ã‡evrimdÄ±ÅŸÄ± mod</span>`;
+    ? `<i data-lucide="wifi"></i><span>Çevrimiçi</span>`
+    : `<i data-lucide="wifi-off"></i><span>Çevrimdışı mod</span>`;
   lucide.createIcons();
   if (!online) {
-    showToast("Ã‡evrimdÄ±ÅŸÄ± mod aktif. KayÄ±tlÄ± liste ve market karÅŸÄ±laÅŸtÄ±rmalarÄ± kullanÄ±labilir.");
+    showToast("Çevrimdışı mod aktif. Kayıtlı liste ve market karşılaştırmaları kullanılabilir.");
   }
 }
 
@@ -3120,13 +3120,13 @@ function toggleTheme() {
 }
 
 
-/* SEPETÄ°M & ALIVERÄ°Å LÄ°STEM */
+/* SEPETİM & ALIVERİŞ LİSTEM */
 function addQuickCartItem() {
   const input = document.getElementById("quickCartInput");
   const val = input.value.trim();
   if (!val) return;
 
-  const hasSize = /\d+\s*(ml|l|g|gr|kg|li|'lu|'li|'lÃ¼|'lu|'lÃ¼|adet|porsiyon|servis)/i.test(val);
+  const hasSize = /\d+\s*(ml|l|g|gr|kg|li|'lu|'li|'lü|'lu|'lü|adet|porsiyon|servis)/i.test(val);
   const lowerVal = val.toLowerCase();
   const isGeneric = Object.keys(genericProductSizes).some(key => lowerVal === key || lowerVal.includes(key));
   
@@ -3156,7 +3156,7 @@ function addQuickCartItem() {
 
 function clearCart() {
   if (state.cart.length === 0) return;
-  const confirmed = window.confirm("TÃ¼m sepeti temizlemek istediÄŸinizden emin misiniz?");
+  const confirmed = window.confirm("Tüm sepeti temizlemek istediğinizden emin misiniz?");
   if (!confirmed) return;
 
   state.cart = [];
@@ -3323,7 +3323,7 @@ async function stopLiveBarcodeScanner() {
 async function runBarcodeScan() {
   const code = document.getElementById("barcodeSelector").value;
   if (!code) {
-    showToast("LÃ¼tfen bir barkod seÃ§in.");
+    showToast("Lütfen bir barkod seçin.");
     return;
   }
 
@@ -3383,7 +3383,7 @@ async function scanBarcodeImage(event) {
   if (!file) return;
 
   if (!("BarcodeDetector" in window)) {
-    showToast("Bu tarayÄ±cÄ± fotoÄŸraftan barkod okumayÄ± desteklemiyor. Demo barkod listesini kullanabilirsin.");
+    showToast("Bu tarayıcı fotoğraftan barkod okumayı desteklemiyor. Demo barkod listesini kullanabilirsin.");
     return;
   }
 
@@ -3396,12 +3396,12 @@ async function scanBarcodeImage(event) {
     bitmap.close();
 
     if (!barcodes.length) {
-      showToast("FotoÄŸrafta okunabilir EAN barkodu bulunamadÄ±.");
+      showToast("Fotoğrafta okunabilir EAN barkodu bulunamadı.");
       return;
     }
     await lookupAndAddBarcode(barcodes[0].rawValue);
   } catch (error) {
-    showToast(`Barkod okunamadÄ±: ${error.message}`);
+    showToast(`Barkod okunamadı: ${error.message}`);
   } finally {
     event.target.value = "";
   }
@@ -3411,7 +3411,7 @@ async function previewReceiptFile(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   const info = document.querySelector("#receiptOcrUploadArea .ocr-info");
-  if (info) info.textContent = `${file.name} seÃ§ildi. FiÅŸ ÅŸimdi iÅŸleniyor.`;
+  if (info) info.textContent = `${file.name} seçildi. Fiş şimdi işleniyor.`;
   await runOcrScan(event.target);
 }
 
@@ -3428,14 +3428,14 @@ async function runOcrScan(sourceInput = null) {
   if (!receiptFile) {
     if (status) {
       status.className = "receipt-upload-status";
-      status.textContent = "Ã–nce kameradan Ã§ekilmiÅŸ veya galeriden seÃ§ilmiÅŸ bir fiÅŸ gÃ¶rseli ekle.";
+      status.textContent = "Önce kameradan çekilmiş veya galeriden seçilmiş bir fiş görseli ekle.";
     }
     return;
   }
 
   if (button) {
     button.disabled = true;
-    button.innerHTML = `<span class="spinner"></span> Ä°ÅŸleniyor...`;
+    button.innerHTML = `<span class="spinner"></span> İşleniyor...`;
   }
   if (status) {
     status.className = "receipt-upload-status loading";
@@ -3443,8 +3443,8 @@ async function runOcrScan(sourceInput = null) {
       <div class="receipt-processing">
         <span class="spinner"></span>
         <div>
-          <strong>Ä°ÅŸleniyor...</strong>
-          <p>FiÅŸ yÃ¼kleniyor; maÄŸaza, tarih, Ã¼rÃ¼n listesi ve toplam tutar tespit ediliyor.</p>
+          <strong>İşleniyor...</strong>
+          <p>Fiş yükleniyor; mağaza, tarih, ürün listesi ve toplam tutar tespit ediliyor.</p>
         </div>
       </div>
     `;
@@ -3465,7 +3465,7 @@ async function runOcrScan(sourceInput = null) {
 
     const detectedItems = Array.isArray(res.detected_items) ? res.detected_items : [];
     state.pendingReceipt = {
-      store: res.store || "Bilinmeyen maÄŸaza",
+      store: res.store || "Bilinmeyen mağaza",
       purchased_at: res.purchased_at || new Date().toISOString().slice(0, 10),
       payment_method: res.payment_method || "unknown",
       total: Number(res.total || 0),
@@ -3482,20 +3482,20 @@ async function runOcrScan(sourceInput = null) {
     renderReceiptReview();
     if (status) {
       status.className = "receipt-upload-status success";
-      status.textContent = "FiÅŸ baÅŸarÄ±yla iÅŸlendi";
+      status.textContent = "Fiş başarıyla işlendi";
     }
     panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    showToast("FiÅŸ baÅŸarÄ±yla iÅŸlendi.");
+    showToast("Fiş başarıyla işlendi.");
   } catch (error) {
     if (status) {
       status.className = "receipt-upload-status";
-      status.textContent = error.message || "FiÅŸ iÅŸleme tamamlanamadÄ±.";
+      status.textContent = error.message || "Fiş işleme tamamlanamadı.";
     }
-    showToast(error.message || "FiÅŸ iÅŸleme tamamlanamadÄ±.");
+    showToast(error.message || "Fiş işleme tamamlanamadı.");
   } finally {
     if (button) {
       button.disabled = false;
-      button.textContent = "FiÅŸi yeniden tara";
+      button.textContent = "Fişi yeniden tara";
     }
   }
 }
@@ -3505,7 +3505,7 @@ async function readFileAsDataUrl(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = () => reject(new Error("FiÅŸ gÃ¶rseli okunamadÄ±."));
+      reader.onerror = () => reject(new Error("Fiş görseli okunamadı."));
       reader.readAsDataURL(file);
     });
   }
@@ -3529,31 +3529,31 @@ function renderReceiptReview() {
   panel.classList.remove("hidden");
   panel.innerHTML = `
     <div class="receipt-success-card">
-      <strong>FiÅŸ BaÅŸarÄ±yla Ä°ÅŸlendi ve Kaydedildi!</strong>
+      <strong>Fiş Başarıyla İşlendi ve Kaydedildi!</strong>
     </div>
     <div class="receipt-review-meta">
-      <label>MaÄŸaza
+      <label>Mağaza
         <input id="receiptReviewStore" value="${escapeHtml(receipt.store)}">
       </label>
-      <label>AlÄ±ÅŸveriÅŸ tarihi
+      <label>Alışveriş tarihi
         <input id="receiptReviewDate" type="date" value="${escapeHtml(receipt.purchased_at.slice(0, 10))}">
       </label>
-      <label>Ã–deme yÃ¶ntemi
+      <label>Ödeme yöntemi
         <select id="receiptReviewPayment">
           <option value="unknown" ${receipt.payment_method === "unknown" ? "selected" : ""}>Belirtilmedi</option>
           <option value="card" ${receipt.payment_method === "card" ? "selected" : ""}>Kart</option>
           <option value="cash" ${receipt.payment_method === "cash" ? "selected" : ""}>Nakit</option>
-          <option value="meal_card" ${receipt.payment_method === "meal_card" ? "selected" : ""}>Yemek kartÄ±</option>
-          <option value="other" ${receipt.payment_method === "other" ? "selected" : ""}>DiÄŸer</option>
+          <option value="meal_card" ${receipt.payment_method === "meal_card" ? "selected" : ""}>Yemek kartı</option>
+          <option value="other" ${receipt.payment_method === "other" ? "selected" : ""}>Diğer</option>
         </select>
       </label>
-      <label>FiÅŸ toplamÄ±
+      <label>Fiş toplamı
         <input id="receiptReviewTotal" type="number" min="0" step="0.01"
           value="${Number(receipt.total || calculatePendingReceiptTotal()).toFixed(2)}">
       </label>
     </div>
     <div class="receipt-review-actions">
-      <button type="button" class="secondary-button" onclick="cancelReceiptReview()">VazgeÃ§</button>
+      <button type="button" class="secondary-button" onclick="cancelReceiptReview()">Vazgeç</button>
       <button type="button" class="primary-button" onclick="savePendingReceipt()">
         <i data-lucide="receipt-text"></i> Kaydet
       </button>
@@ -3569,9 +3569,9 @@ function receiptCategoryOptions(selected) {
     electronics: "Elektronik",
     fashion: "Giyim",
     supplement: "Takviye",
-    health: "SaÄŸlÄ±k",
+    health: "Sağlık",
     home: "Ev",
-    other: "DiÄŸer",
+    other: "Diğer",
   };
   return Object.entries(labels).map(([value, label]) => (
     `<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`
@@ -3624,7 +3624,7 @@ async function savePendingReceipt() {
     const receiptGalleryInput = document.getElementById("receiptGalleryInput");
     if (receiptGalleryInput) receiptGalleryInput.value = "";
     showReceiptSavedConfirmation(savedStore, savedTotal, items.length);
-    showToast("FiÅŸ harcama geÃ§miÅŸine kaydedildi.");
+    showToast("Fiş harcama geçmişine kaydedildi.");
     await loadReceipts();
   } catch (error) {
     showToast(error.message);
@@ -3641,14 +3641,14 @@ function showReceiptSavedConfirmation(store, total, itemCount) {
     <div class="receipt-saved-card">
       <i data-lucide="circle-check-big"></i>
       <div>
-        <strong>FiÅŸ harcama geÃ§miÅŸine kaydedildi</strong>
-        <p>${escapeHtml(store)} Â· ${itemCount} Ã¼rÃ¼n Â· ${currency.format(total)}</p>
+        <strong>Fiş harcama geçmişine kaydedildi</strong>
+        <p>${escapeHtml(store)} Â· ${itemCount} ürün Â· ${currency.format(total)}</p>
       </div>
     </div>
     <div class="receipt-review-actions">
-      <button type="button" class="secondary-button" onclick="scanAnotherReceipt()">BaÅŸka fiÅŸ tara</button>
+      <button type="button" class="secondary-button" onclick="scanAnotherReceipt()">Başka fiş tara</button>
       <button type="button" class="primary-button" onclick="goToReceiptHistory()">
-        <i data-lucide="wallet-cards"></i> HarcamalarÄ±ma git
+        <i data-lucide="wallet-cards"></i> Harcamalarıma git
       </button>
     </div>
   `;
@@ -3665,7 +3665,7 @@ function scanAnotherReceipt() {
     panel.innerHTML = "";
   }
   if (status) status.classList.add("hidden");
-  if (info) info.textContent = "FiÅŸ fotoÄŸrafÄ±nÄ± seÃ§. ÃœrÃ¼nleri kontrol edip harcama geÃ§miÅŸine kaydet.";
+  if (info) info.textContent = "Fiş fotoğrafını seç. Ürünleri kontrol edip harcama geçmişine kaydet.";
   document.getElementById("receiptImageInput")?.click();
 }
 
@@ -3679,7 +3679,7 @@ async function goToReceiptHistory() {
 }
 
 
-/* SEPET EN Ä°YÄ°LEÅTÄ°RÄ°CÄ° MOTORU */
+/* SEPET EN İYİLEŞTİRİCİ MOTORU */
 function switchOptimizerMode(mode) {
   state.optimizerMode = mode;
   document.getElementById("optModeSingle").classList.toggle("active", mode === "single");
@@ -3689,13 +3689,13 @@ function switchOptimizerMode(mode) {
 
 function getItemCategory(name) {
   const lower = name.toLowerCase();
-  const groceryKeywords = ["yaÄŸ", "yag", "seker", "ÅŸeker", "un", "bakliyat", "makarna", "pirinc", "pirinÃ§", "mercimek", "salca", "salÃ§a", "cay", "Ã§ay", "kahve", "sut", "sÃ¼t", "peynir", "zeytin", "yumurta", "deterjan", "sabun", "bulaÅŸÄ±k", "Ã§amaÅŸÄ±r", "domates", "soÄŸan", "patates", "ekmek", "yoÄŸurt", "yogurt", "makarna", "salata", "su", "kola"];
-  const electronicsKeywords = ["tv", "televizyon", "telefon", "kulaklik", "kulaklÄ±k", "laptop", "bilgisayar", "ekran", "kart", "gpu", "cpu", "islemci", "iÅŸlemci", "anakart", "ram", "ssd", "klavye", "mouse", "fare", "tablet", "kamera", "fotoÄŸraf", "monitÃ¶r", "monitor", "disk", "sabit disk", "bellek"];
-  const fashionKeywords = ["elbise", "pantolon", "gomlek", "gÃ¶mlek", "tshirt", "tiÅŸÃ¶rt", "ceket", "mont", "kaban", "hÄ±rka", "hirka", "kazak", "yelek", "ayakkabi", "ayakkabÄ±", "bot", "Ã§izme", "terlik", "corap", "Ã§orap", "etek", "sort", "ÅŸort", "takim", "takÄ±m", "bluz", "sweatshirt", "sweat", "kemer", "cÃ¼zdan", "aksesuar"];
+  const groceryKeywords = ["yağ", "yag", "seker", "şeker", "un", "bakliyat", "makarna", "pirinc", "pirinç", "mercimek", "salca", "salça", "cay", "çay", "kahve", "sut", "süt", "peynir", "zeytin", "yumurta", "deterjan", "sabun", "bulaşık", "çamaşır", "domates", "soğan", "patates", "ekmek", "yoğurt", "yogurt", "makarna", "salata", "su", "kola"];
+  const electronicsKeywords = ["tv", "televizyon", "telefon", "kulaklik", "kulaklık", "laptop", "bilgisayar", "ekran", "kart", "gpu", "cpu", "islemci", "işlemci", "anakart", "ram", "ssd", "klavye", "mouse", "fare", "tablet", "kamera", "fotoğraf", "monitör", "monitor", "disk", "sabit disk", "bellek"];
+  const fashionKeywords = ["elbise", "pantolon", "gomlek", "gömlek", "tshirt", "tişört", "ceket", "mont", "kaban", "hırka", "hirka", "kazak", "yelek", "ayakkabi", "ayakkabı", "bot", "çizme", "terlik", "corap", "çorap", "etek", "sort", "şort", "takim", "takım", "bluz", "sweatshirt", "sweat", "kemer", "cüzdan", "aksesuar"];
   const supplementKeywords = ["whey", "protein", "creatine", "kreatin", "gainer", "bcaa", "arginine", "arjinin", "supplement", "takviye", "karbonhidrat", "glutamine", "glutamin", "aminoasit", "preworkout", "vitamin", "kolajen", "collagen"];
-  const cosmeticsKeywords = ["ÅŸampuan", "sampuan", "krem", "parfÃ¼m", "parfum", "ruj", "maskara", "fondÃ¶ten", "oje", "far", "allÄ±k", "liner", "eyeliner", "saÃ§ kremi", "saÃ§ boyasÄ±", "tonik", "serum", "nemlendirici", "losyon", "gratis", "rossmann", "deodorant", "roll-on", "diÅŸ macunu", "dis macunu", "diÅŸ fÄ±rÃ§asÄ±", "makyaj"];
-  const healthKeywords = ["optik", "gÃ¶zlÃ¼k", "lens", "ebebek", "bebek", "mama", "bez", "medikal", "vitamin", "gnc", "takviye", "emzik", "biberon", "saÄŸlÄ±k", "saglik", "joker", "babymall"];
-  const homeKeywords = ["tencere", "tabak", "Ã§atal", "kaÅŸÄ±k", "bÄ±Ã§ak", "mutfak", "zÃ¼ccaciye", "karaca", "ikea", "koÃ§taÅŸ", "koctas", "english home", "madame coco", "nevresim", "yastÄ±k", "yorgan", "perde", "mobilya", "dolap", "matkap", "boya", "yapÄ± market", "yapi market", "bahÃ§e", "bahce", "linens", "tekzen", "bauhaus", "bella maison", "jumbo", "korkmaz", "schafer", "porland", "pasabahce", "paÅŸabahÃ§e", "bernardo"];
+  const cosmeticsKeywords = ["şampuan", "sampuan", "krem", "parfüm", "parfum", "ruj", "maskara", "fondöten", "oje", "far", "allık", "liner", "eyeliner", "saç kremi", "saç boyası", "tonik", "serum", "nemlendirici", "losyon", "gratis", "rossmann", "deodorant", "roll-on", "diş macunu", "dis macunu", "diş fırçası", "makyaj"];
+  const healthKeywords = ["optik", "gözlük", "lens", "ebebek", "bebek", "mama", "bez", "medikal", "vitamin", "gnc", "takviye", "emzik", "biberon", "sağlık", "saglik", "joker", "babymall"];
+  const homeKeywords = ["tencere", "tabak", "çatal", "kaşık", "bıçak", "mutfak", "züccaciye", "karaca", "ikea", "koçtaş", "koctas", "english home", "madame coco", "nevresim", "yastık", "yorgan", "perde", "mobilya", "dolap", "matkap", "boya", "yapı market", "yapi market", "bahçe", "bahce", "linens", "tekzen", "bauhaus", "bella maison", "jumbo", "korkmaz", "schafer", "porland", "pasabahce", "paşabahçe", "bernardo"];
 
   if (supplementKeywords.some(kw => lower.includes(kw))) return "supplement";
   if (electronicsKeywords.some(kw => lower.includes(kw))) return "electronics";
@@ -3726,7 +3726,7 @@ function getPricesForOptimizerItem(name) {
   let basePrice = 50.00;
   if (category === "electronics") {
     basePrice = 2500.00;
-    if (lower.includes("kulaklÄ±k") || lower.includes("mouse") || lower.includes("klavye")) {
+    if (lower.includes("kulaklık") || lower.includes("mouse") || lower.includes("klavye")) {
       basePrice = 450.00;
     }
   } else if (category === "supplement") {
@@ -3736,17 +3736,17 @@ function getPricesForOptimizerItem(name) {
     }
   } else if (category === "fashion") {
     basePrice = 350.00;
-    if (lower.includes("Ã§orap") || lower.includes("corap")) {
+    if (lower.includes("çorap") || lower.includes("corap")) {
       basePrice = 80.00;
     }
   } else if (category === "cosmetics") {
     basePrice = 180.00;
-    if (lower.includes("parfÃ¼m") || lower.includes("parfum")) {
+    if (lower.includes("parfüm") || lower.includes("parfum")) {
       basePrice = 950.00;
     }
   } else if (category === "health") {
     basePrice = 150.00;
-    if (lower.includes("gÃ¶zlÃ¼k") || lower.includes("lens") || lower.includes("optik")) {
+    if (lower.includes("gözlük") || lower.includes("lens") || lower.includes("optik")) {
       basePrice = 850.00;
     }
   } else if (category === "home") {
@@ -3755,17 +3755,17 @@ function getPricesForOptimizerItem(name) {
       basePrice = 1200.00;
     }
   } else {
-    if (lower.includes("yaÄŸ") || lower.includes("yag") || lower.includes("yudum")) {
+    if (lower.includes("yağ") || lower.includes("yag") || lower.includes("yudum")) {
       basePrice = 185.00;
-    } else if (lower.includes("sÃ¼t") || lower.includes("sut")) {
+    } else if (lower.includes("süt") || lower.includes("sut")) {
       basePrice = 28.00;
     } else if (lower.includes("peynir")) {
       basePrice = 85.00;
     } else if (lower.includes("un")) {
       basePrice = 75.00;
-    } else if (lower.includes("Ã§ay") || lower.includes("cay")) {
+    } else if (lower.includes("çay") || lower.includes("cay")) {
       basePrice = 140.00;
-    } else if (lower.includes("ÅŸeker") || lower.includes("seker")) {
+    } else if (lower.includes("şeker") || lower.includes("seker")) {
       basePrice = 140.00;
     }
   }
@@ -3876,9 +3876,9 @@ window.restoreOriginalFace = function(reason = "unknown") {
     window.tryOnRenderState.modelDrawn = true;
     window.tryOnRenderState.garmentDrawn = false;
     window.tryOnRenderState.lastDrawnAt = Date.now();
-    console.log("Virtual Try-On orijinal manken geri yÃ¼klendi:", window.tryOnRenderState);
+    console.log("Virtual Try-On orijinal manken geri yüklendi:", window.tryOnRenderState);
   };
-  originalImage.onerror = (error) => console.error("Orijinal manken gÃ¶rseli geri yÃ¼klenemedi:", error);
+  originalImage.onerror = (error) => console.error("Orijinal manken görseli geri yüklenemedi:", error);
   originalImage.src = originalSrc;
   return true;
 };
@@ -3894,7 +3894,7 @@ window.verifyTryOnVisual = function(context = "render", requireGarment = false) 
   const drawn = window.tryOnRenderState.modelDrawn
     && (!requireGarment || window.tryOnRenderState.garmentDrawn);
 
-  console.log("Virtual Try-On DOM kontrolÃ¼:", {
+  console.log("Virtual Try-On DOM kontrolü:", {
     context,
     visible,
     requireGarment,
@@ -3905,7 +3905,7 @@ window.verifyTryOnVisual = function(context = "render", requireGarment = false) 
   });
 
   if (!visible || !drawn) {
-    window.restoreOriginalFace(`${context}: gÃ¶rsel DOM'a Ã§izilemedi`);
+    window.restoreOriginalFace(`${context}: görsel DOM'a çizilemedi`);
     return false;
   }
   canvas.style.opacity = "1";
@@ -3922,7 +3922,7 @@ window.detectPoseAndFitGarment = async function(photoBase64) {
   window.isBackendScanning = true;
   window.tryOnAnimationActive = true;
   window.animateTryOnCanvas();
-  showToast("[AI STATUS: Landmark taramasÄ± aktif. VÃ¼cut taranÄ±yor...]");
+  showToast("[AI STATUS: Landmark taraması aktif. Vücut taranıyor...]");
   
   try {
     const response = await fetch("/api/detect-pose", {
@@ -3956,18 +3956,18 @@ window.detectPoseAndFitGarment = async function(photoBase64) {
       if (slider) slider.value = window.tryOnGarmentW;
       
       window.poseDetected = true;
-      showToast("[AI SUCCESS: VÃ¼cut hatlarÄ± baÅŸarÄ±yla Ã§Ã¶zÃ¼mlendi.]");
+      showToast("[AI SUCCESS: Vücut hatları başarıyla çözümlendi.]");
     } else {
       console.warn("Backend pose detection success=false:", data.error_message);
       window.autoFitGarmentOnUserPhoto();
       window.poseDetected = true;
-      showToast("[AI ALERT: Pose saptanamadÄ±. Lokal tarama aktif edildi.]");
+      showToast("[AI ALERT: Pose saptanamadı. Lokal tarama aktif edildi.]");
     }
   } catch (err) {
     console.warn("Backend pose detection call failed, using client scanning fallback:", err);
     window.autoFitGarmentOnUserPhoto();
     window.poseDetected = true;
-    showToast("[AI ALERT: API baÄŸlantÄ± hatasÄ±. Lokal yedek tarama devrede.]");
+    showToast("[AI ALERT: API bağlantı hatası. Lokal yedek tarama devrede.]");
   } finally {
     window.isBackendScanning = false;
     if (!window.isScanningPose) {
@@ -4110,7 +4110,7 @@ window.animateTryOnCanvas = function() {
 window.drawTryOnScene = function() {
   const canvas = document.getElementById("tryOnCanvas");
   if (!canvas) {
-    window.restoreOriginalFace("tryOnCanvas bulunamadÄ±");
+    window.restoreOriginalFace("tryOnCanvas bulunamadı");
     return;
   }
   window.ensureTryOnLayerVisible();
@@ -4129,7 +4129,7 @@ window.drawTryOnScene = function() {
       ctx.fillStyle = "#666";
       ctx.font = "14px 'Manrope', sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("LÃ¼tfen fotoÄŸraf yÃ¼kleyin", 150, 150);
+      ctx.fillText("Lütfen fotoğraf yükleyin", 150, 150);
       return;
     }
     modelImg.src = window.userTryOnPhoto;
@@ -4207,11 +4207,11 @@ window.drawTryOnScene = function() {
       ctx.font = "9px monospace";
       ctx.textAlign = "left";
       ctx.fillText(`[AI BODY SCANNING: ${Math.round(scanPercent * 100)}%]`, 15, 25);
-      ctx.fillText(`[OMUZ GENÄ°ÅLÄ°ÄÄ°: ${window.tryOnGarmentW}px]`, 15, 280);
+      ctx.fillText(`[OMUZ GENİŞLİĞİ: ${window.tryOnGarmentW}px]`, 15, 280);
       
       ctx.textAlign = "right";
-      ctx.fillText(`[AÃ‡I: ${(window.tryOnGarmentAngle * 180 / Math.PI).toFixed(1)}Â°]`, 285, 25);
-      ctx.fillText(`[YAKA TESPÄ°TÄ°: TAMAM]`, 285, 280);
+      ctx.fillText(`[AÇI: ${(window.tryOnGarmentAngle * 180 / Math.PI).toFixed(1)}Â°]`, 285, 25);
+      ctx.fillText(`[YAKA TESPİTİ: TAMAM]`, 285, 280);
       
       // 4. Detected target points
       const leftS = { x: window.tryOnGarmentX, y: window.tryOnGarmentY + 15 };
@@ -4257,7 +4257,7 @@ window.drawTryOnScene = function() {
         ctx.fillStyle = "#666";
         ctx.font = "14px 'Manrope', sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("LÃ¼tfen tiÅŸÃ¶rt yÃ¼kleyin", 150, 150);
+        ctx.fillText("Lütfen tişört yükleyin", 150, 150);
         return;
       }
       garmentImg.src = window.userTryOnGarment;
@@ -4312,18 +4312,18 @@ window.drawTryOnScene = function() {
       window.tryOnRenderState.lastDrawnAt = Date.now();
       canvas.style.opacity = "1";
       window.ensureTryOnLayerVisible();
-      console.log("Virtual Try-On Ã§izimi tamamlandÄ±:", { ...window.tryOnRenderState });
+      console.log("Virtual Try-On çizimi tamamlandı:", { ...window.tryOnRenderState });
     };
     garmentImg.onerror = (error) => {
       window.tryOnRenderState.loading = false;
-      console.error("TiÅŸÃ¶rt gÃ¶rseli yÃ¼klenemedi:", garmentImg.src, error);
-      window.restoreOriginalFace("tiÅŸÃ¶rt gÃ¶rseli yÃ¼klenemedi");
+      console.error("Tişört görseli yüklenemedi:", garmentImg.src, error);
+      window.restoreOriginalFace("tişört görseli yüklenemedi");
     };
   };
   modelImg.onerror = (error) => {
     window.tryOnRenderState.loading = false;
-    console.error("Manken gÃ¶rseli yÃ¼klenemedi:", modelImg.src, error);
-    window.restoreOriginalFace("manken gÃ¶rseli yÃ¼klenemedi");
+    console.error("Manken görseli yüklenemedi:", modelImg.src, error);
+    window.restoreOriginalFace("manken görseli yüklenemedi");
   };
 };
 
@@ -4489,11 +4489,11 @@ window.autoFitGarmentOnUserPhoto = function() {
 
 window.runFashionTryOnAnimation = function() {
   if (window.selectedTryOnModel === "user" && !window.userTryOnPhoto) {
-    showToast("LÃ¼tfen Ã¶nce kendi fotoÄŸrafÄ±nÄ±zÄ± yÃ¼kleyin.");
+    showToast("Lütfen önce kendi fotoğrafınızı yükleyin.");
     return;
   }
   if (window.selectedTryOnGarment === "user" && !window.userTryOnGarment) {
-    showToast("LÃ¼tfen Ã¶nce bir kÄ±yafet yÃ¼kleyin veya linkini girin.");
+    showToast("Lütfen önce bir kıyafet yükleyin veya linkini girin.");
     return;
   }
 
@@ -4507,7 +4507,7 @@ window.runFashionTryOnAnimation = function() {
   if (svgHud) svgHud.classList.remove("hidden");
   
   laserEl.classList.remove("hidden");
-  showToast("Yapay zeka prova iÅŸlemi baÅŸlatÄ±ldÄ±...");
+  showToast("Yapay zeka prova işlemi başlatıldı...");
   
   if (window.selectedTryOnModel !== "user") {
     window.tryOnGarmentX = 75;
@@ -4536,13 +4536,13 @@ window.runFashionTryOnAnimation = function() {
     
     window.drawTryOnScene();
     setTimeout(() => {
-      const renderSucceeded = window.verifyTryOnVisual("prova tamamlandÄ±", true);
+      const renderSucceeded = window.verifyTryOnVisual("prova tamamlandı", true);
       if (renderSucceeded) {
         if (successBanner) successBanner.classList.remove("hidden");
-        showToast("Prova tamamlandÄ±! Yapay zeka kÄ±yafeti baÅŸarÄ±yla giydirdi.");
+        showToast("Prova tamamlandı! Yapay zeka kıyafeti başarıyla giydirdi.");
       } else {
         if (successBanner) successBanner.classList.add("hidden");
-        showToast("Prova gÃ¶rseli oluÅŸturulamadÄ±. Orijinal manken geri getirildi.");
+        showToast("Prova görseli oluşturulamadı. Orijinal manken geri getirildi.");
       }
     }, 350);
   }, 2500);
@@ -4572,7 +4572,7 @@ window.saveRestockTracking = async function(productId) {
       product.id === productId ? updated : product
     ));
     renderAll();
-    showToast("TÃ¼ketim takip ayarlarÄ± kaydedildi.");
+    showToast("Tüketim takip ayarları kaydedildi.");
     openProduct(productId);
   } catch (error) {
     showToast(error.message);
@@ -4670,11 +4670,11 @@ function renderBackendOptimization(result, mode) {
       .join(", ");
     resultsDiv.innerHTML = `
       <div class="optimizer-summary optimizer-unavailable">
-        <span class="optimizer-kicker">KUANTUM VERÄ° SÄ°NYALÄ° GEREKLÄ°</span>
-        <h4>Fiyat spektrumu karÅŸÄ±laÅŸtÄ±rÄ±lamadÄ±</h4>
-        <p>${escapeHtml(result.message || "DoÄŸrulanmÄ±ÅŸ maÄŸaza fiyatÄ± bulunamadÄ±.")}</p>
+        <span class="optimizer-kicker">KUANTUM VERİ SİNYALİ GEREKLİ</span>
+        <h4>Fiyat spektrumu karşılaştırılamadı</h4>
+        <p>${escapeHtml(result.message || "Doğrulanmış mağaza fiyatı bulunamadı.")}</p>
         ${missingNames ? `<p><strong>Eksik:</strong> ${missingNames}</p>` : ""}
-        <p class="optimizer-source-note">Almadan tahmini veya uydurma market fiyatÄ± gÃ¶stermez.</p>
+        <p class="optimizer-source-note">Almadan tahmini veya uydurma market fiyatı göstermez.</p>
       </div>
     `;
     return true;
@@ -4683,7 +4683,7 @@ function renderBackendOptimization(result, mode) {
 
   const fallbackWarningHtml = result.distance_fallback_applied
     ? `<div style="font-size: 11px; color: var(--red); font-weight: 700; margin-bottom: 10px; background: rgba(196, 82, 67, 0.08); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(196, 82, 67, 0.2); display: flex; align-items: center; gap: 4px;">
-         <i data-lucide="shield-alert" style="width:14px; height:14px;"></i> Limit dahilinde maÄŸaza bulunamadÄ±! En yakÄ±n maÄŸazaya yÃ¶nlendirildiniz.
+         <i data-lucide="shield-alert" style="width:14px; height:14px;"></i> Limit dahilinde mağaza bulunamadı! En yakın mağazaya yönlendirildiniz.
        </div>`
     : "";
 
@@ -4699,9 +4699,9 @@ function renderBackendOptimization(result, mode) {
       <div class="optimizer-summary quantum-node-card cheapest-node-glow" style="padding: 14px; margin-bottom: 14px; border: 1px solid var(--line);">
         <span class="optimizer-kicker" style="color:#00f0ff;">OPTIMAL TEK MARKET SPEKTRUMU</span>
         <h4 style="color: #00f0ff; text-shadow: 0 0 10px rgba(0,240,255,0.3);">${currency.format(option.total)}</h4>
-        <p><strong>${escapeHtml(option.store.toUpperCase())}</strong>${distanceText} veri dÃ¼ÄŸÃ¼mÃ¼ ile
+        <p><strong>${escapeHtml(option.store.toUpperCase())}</strong>${distanceText} veri düğümü ile
           ${currency.format(option.savings)} tasarruf.</p>
-        ${option.shipping_fee > 0 ? `<p style="font-size:11px; color:var(--red); font-weight:600; margin-top:4px;">Kargo Ãœcreti: ${currency.format(option.shipping_fee)}</p>` : `<p style="font-size:11px; color:#00f0ff; font-weight:600; margin-top:4px;">Kargo Bedava!</p>`}
+        ${option.shipping_fee > 0 ? `<p style="font-size:11px; color:var(--red); font-weight:600; margin-top:4px;">Kargo Ücreti: ${currency.format(option.shipping_fee)}</p>` : `<p style="font-size:11px; color:#00f0ff; font-weight:600; margin-top:4px;">Kargo Bedava!</p>`}
       </div>
       <div class="opt-store-card quantum-node-card" style="padding:12px; border:1px solid var(--line);">
         ${option.items.map(item => `
@@ -4724,9 +4724,9 @@ function renderBackendOptimization(result, mode) {
   resultsDiv.innerHTML = `
     ${fallbackWarningHtml}
     <div class="optimizer-summary quantum-node-card cheapest-node-glow" style="padding: 14px; margin-bottom: 14px; border: 1px solid var(--line);">
-      <span class="optimizer-kicker" style="color:#00f0ff;">KUANTUM KÃœMÃœLATÄ°F OPTÄ°MÄ°ZASYON</span>
+      <span class="optimizer-kicker" style="color:#00f0ff;">KUANTUM KÜMÜLATİF OPTİMİZASYON</span>
       <h4 style="color: #00f0ff; text-shadow: 0 0 10px rgba(0,240,255,0.3);">${currency.format(split.total)}</h4>
-      <p>En ucuz tek veri dÃ¼ÄŸÃ¼mÃ¼ne gÃ¶re ek ${currency.format(split.savings)} kuantum tasarrufu.</p>
+      <p>En ucuz tek veri düğümüne göre ek ${currency.format(split.savings)} kuantum tasarrufu.</p>
     </div>
     <div class="optimizer-store-list" style="display: flex; flex-direction: column; gap: 12px;">
       ${split.stores.map(group => {
@@ -4740,7 +4740,7 @@ function renderBackendOptimization(result, mode) {
               <span class="opt-store-name">${escapeHtml(group.store.toUpperCase())}${distanceText}</span>
               <span class="opt-store-total" style="color:#00f0ff;">${currency.format(group.total)}</span>
             </div>
-            ${group.shipping_fee > 0 ? `<p style="font-size:11px; color:var(--red); font-weight:600; margin-top:4px;">Kargo Ãœcreti: ${currency.format(group.shipping_fee)}</p>` : `<p style="font-size:11px; color:#00f0ff; font-weight:600; margin-top:4px;">Kargo Bedava!</p>`}
+            ${group.shipping_fee > 0 ? `<p style="font-size:11px; color:var(--red); font-weight:600; margin-top:4px;">Kargo Ücreti: ${currency.format(group.shipping_fee)}</p>` : `<p style="font-size:11px; color:#00f0ff; font-weight:600; margin-top:4px;">Kargo Bedava!</p>`}
             ${group.items.map(item => `
               <div class="opt-item-row" style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0;">
                 <span>
@@ -4774,14 +4774,14 @@ async function renderCart() {
         <div class="shared-list-badge" style="display:flex; justify-content:space-between; align-items:center; background: rgba(34, 197, 94, 0.1); border: 1px solid rgb(34, 197, 94); border-radius: 8px; padding: 10px 16px; margin-bottom: 20px; font-size: 13px; color: var(--ink);">
           <div style="display:flex; align-items:center; gap:8px; color: rgb(21, 128, 61);">
             <span style="width:8px; height:8px; border-radius:50%; background: rgb(34, 197, 94); display:inline-block; animation: pulse 1s infinite alternate;"></span>
-            <strong>CanlÄ± Ortak Liste Aktif</strong> (Kod: ${state.sharedListId})
+            <strong>Canlı Ortak Liste Aktif</strong> (Kod: ${state.sharedListId})
           </div>
           <div style="display:flex; gap:10px;">
             <button type="button" class="text-button" onclick="shareCartList()" style="padding: 4px 8px; font-size: 12px; height: auto;">
-              <i data-lucide="copy" style="width: 12px; height: 12px;"></i> BaÄŸlantÄ±yÄ± Al
+              <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Bağlantıyı Al
             </button>
             <button type="button" class="text-button btn-danger" onclick="leaveSharedList()" style="padding: 4px 8px; font-size: 12px; height: auto; color: var(--red);">
-              <i data-lucide="log-out" style="width: 12px; height: 12px;"></i> AyrÄ±l
+              <i data-lucide="log-out" style="width: 12px; height: 12px;"></i> Ayrıl
             </button>
           </div>
         </div>
@@ -4793,7 +4793,7 @@ async function renderCart() {
 
   // 1. Render items list
   if (state.cart.length === 0) {
-    listDiv.innerHTML = `<p class="empty-text">HenÃ¼z Ã¼rÃ¼n eklenmedi.</p>`;
+    listDiv.innerHTML = `<p class="empty-text">Henüz ürün eklenmedi.</p>`;
   } else {
     listDiv.innerHTML = state.cart.map(item => `
       <div class="cart-item ${item.checked ? "checked" : ""}">
@@ -4824,13 +4824,13 @@ async function renderCart() {
   if (!resultsDiv) return;
 
   if (state.cart.length === 0) {
-    resultsDiv.innerHTML = `<p class="empty-text">Listeye Ã¼rÃ¼n ekleyerek karÅŸÄ±laÅŸtÄ±rÄ±n.</p>`;
+    resultsDiv.innerHTML = `<p class="empty-text">Listeye ürün ekleyerek karşılaştırın.</p>`;
     return;
   }
 
   const uncheckedItems = state.cart.filter(item => !item.checked);
   if (uncheckedItems.length === 0) {
-    resultsDiv.innerHTML = `<p class="empty-text">TÃ¼m Ã¼rÃ¼nler satÄ±n alÄ±nmÄ±ÅŸ veya iÅŸaretlenmiÅŸ.</p>`;
+    resultsDiv.innerHTML = `<p class="empty-text">Tüm ürünler satın alınmış veya işaretlenmiş.</p>`;
     return;
   }
 
@@ -4838,20 +4838,20 @@ async function renderCart() {
     const overlay = document.getElementById("quantumScanOverlay");
     const progressText = document.getElementById("quantumScanProgress");
     
-    // 1. ArayÃ¼zÃ¼ anÄ±nda gÃ¼ncelle (Zero-Blocking)
+    // 1. Arayüzü anında güncelle (Zero-Blocking)
     if (overlay) overlay.style.display = "flex";
     if (progressText) {
-      progressText.innerText = "Sepet veri spektrumu Ã§Ã¶zÃ¼mleniyor...";
+      progressText.innerText = "Sepet veri spektrumu çözümleniyor...";
     }
     
-    // 2. Kuantum tarama iÅŸlemini asenkron olarak bir sonraki frame'de baÅŸlat
+    // 2. Kuantum tarama işlemini asenkron olarak bir sonraki frame'de başlat
     requestAnimationFrame(() => {
       setTimeout(async () => {
         const progressText = document.getElementById("quantumScanProgress");
-        var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Optimal kuantum daÄŸÄ±lÄ±mÄ± hesaplanÄ±yor..."; }, 600);
+        var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Optimal kuantum dağılımı hesaplanıyor..."; }, 600);
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 saniye kuralÄ±
+        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 saniye kuralı
 
         try {
           const optimized = await api("/api/cart/optimize", {
@@ -4876,22 +4876,22 @@ async function renderCart() {
             if (overlay) overlay.style.display = "none";
             return;
           }
-          resultsDiv.innerHTML = `<p class="empty-text">DoÄŸrulanmÄ±ÅŸ maÄŸaza fiyatÄ± bulunamadÄ±. Tahmini fiyat gÃ¶sterilmedi.</p>`;
+          resultsDiv.innerHTML = `<p class="empty-text">Doğrulanmış mağaza fiyatı bulunamadı. Tahmini fiyat gösterilmedi.</p>`;
           clearTimeout(t1);
           if (overlay) overlay.style.display = "none";
           return;
         } catch (error) {
           clearTimeout(timeoutId);
-          console.warn("Kuantum sepet optimizasyonu baÅŸarÄ±sÄ±z veya zaman aÅŸÄ±mÄ±na uÄŸradÄ±, hata kurtarma protokolÃ¼ devrede:", error);
+          console.warn("Kuantum sepet optimizasyonu başarısız veya zaman aşımına uğradı, hata kurtarma protokolü devrede:", error);
           
           if (overlay && progressText) {
             overlay.classList.add("recovery-mode");
             const header = overlay.querySelector("h3");
             if (header) {
               header.classList.add("glitch-active");
-              header.innerText = "SÄ°STEM KURTARMA AKTÄ°F: LOKAL ANALÄ°Z";
+              header.innerText = "SİSTEM KURTARMA AKTİF: LOKAL ANALİZ";
             }
-            progressText.innerText = "Kuantum dÃ¼ÄŸÃ¼mleri yanÄ±t vermedi. Yerel Ã§ekirdekler Ã¼zerinden sepet optimizasyonu sÃ¼rdÃ¼rÃ¼lÃ¼yor...";
+            progressText.innerText = "Kuantum düğümleri yanıt vermedi. Yerel çekirdekler üzerinden sepet optimizasyonu sürdürülüyor...";
             
             // Wait 1.5 seconds
             await new Promise(resolve => setTimeout(resolve, 1500));
@@ -4945,7 +4945,7 @@ async function renderCart() {
               header.innerText = "KUANTUM SPEKTRUMU TARANIYOR";
             }
           } else {
-            resultsDiv.innerHTML = `<p class="empty-text">CanlÄ± fiyat servisine ulaÅŸÄ±lamadÄ±. Lokal analiz devreye sokuluyor...</p>`;
+            resultsDiv.innerHTML = `<p class="empty-text">Canlı fiyat servisine ulaşılamadı. Lokal analiz devreye sokuluyor...</p>`;
           }
         } finally {
           clearTimeout(t1);
@@ -4955,7 +4955,7 @@ async function renderCart() {
     });
     return;
   } else {
-    resultsDiv.innerHTML = `<p class="empty-text">Market fiyatlarÄ±nÄ± karÅŸÄ±laÅŸtÄ±rmak iÃ§in internet baÄŸlantÄ±sÄ± gerekiyor.</p>`;
+    resultsDiv.innerHTML = `<p class="empty-text">Market fiyatlarını karşılaştırmak için internet bağlantısı gerekiyor.</p>`;
     return;
   }
 
@@ -5004,23 +5004,23 @@ async function renderCart() {
 
     // Translate category labels
     const catLabels = {
-      grocery: "GÄ±da & Market",
+      grocery: "Gıda & Market",
       electronics: "Elektronik",
       fashion: "Giyim & Moda",
-      cosmetics: "Kozmetik & KiÅŸisel BakÄ±m",
+      cosmetics: "Kozmetik & Kişisel Bakım",
       supplement: "Sporcu Takviyeleri",
-      health: "SaÄŸlÄ±k & Optik & Anne-Bebek",
-      home: "Ev YaÅŸam & YapÄ± Market"
+      health: "Sağlık & Optik & Anne-Bebek",
+      home: "Ev Yaşam & Yapı Market"
     };
 
     resultsDiv.innerHTML = `
       <div style="padding: 14px; background: rgba(40,122,80,0.06); border: 1px solid var(--green); border-radius: 8px; margin-bottom: 14px;">
-        <span style="font-size: 11px; font-weight: 800; color: var(--green);">KATEGORÄ° BAZLI EN AVANTAJLI SEÃ‡ENEK</span>
+        <span style="font-size: 11px; font-weight: 800; color: var(--green);">KATEGORİ BAZLI EN AVANTAJLI SEÇENEK</span>
         <h4 style="font-family: 'Manrope', sans-serif; font-size: 22px; font-weight: 800; margin: 4px 0 0 0; color: var(--green-dark);">
           ${currency.format(grandTotal)}
         </h4>
         <div style="font-size: 13px; margin-top: 6px; color: var(--ink);">
-          Kategorileri en ucuz tekil maÄŸazalarÄ±ndan alarak toplam <strong>${currency.format(grandTotal)}</strong> Ã¶dersiniz.
+          Kategorileri en ucuz tekil mağazalarından alarak toplam <strong>${currency.format(grandTotal)}</strong> ödersiniz.
         </div>
       </div>
       
@@ -5033,7 +5033,7 @@ async function renderCart() {
                 ${opt.best.store.toUpperCase()}: ${currency.format(opt.best.subtotal)}
               </span>
             </div>
-            ${opt.best.couponDiscount > 0 ? `<div style="font-size:11px; color:var(--green); font-weight:600; margin-bottom:6px;">-${opt.best.couponDiscount} TL Kupon UygulandÄ±</div>` : ""}
+            ${opt.best.couponDiscount > 0 ? `<div style="font-size:11px; color:var(--green); font-weight:600; margin-bottom:6px;">-${opt.best.couponDiscount} TL Kupon Uygulandı</div>` : ""}
             <div style="display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--line); padding-top: 6px;">
               ${opt.best.breakdowns.map(b => `
                 <div class="opt-item-row" style="font-size: 12px;">
@@ -5128,12 +5128,12 @@ async function renderCart() {
 
     resultsDiv.innerHTML = `
       <div style="padding: 14px; background: rgba(40,122,80,0.06); border: 1px solid var(--green); border-radius: 8px; margin-bottom: 14px;">
-        <span style="font-size: 11px; font-weight: 800; color: var(--green);">BÃ–LÃœNMÃœÅ SEPET EN Ä°YÄ° DEÄER</span>
+        <span style="font-size: 11px; font-weight: 800; color: var(--green);">BÖLÜNMÜŞ SEPET EN İYİ DEĞER</span>
         <h4 style="font-family: 'Manrope', sans-serif; font-size: 22px; font-weight: 800; margin: 4px 0 0 0; color: var(--green-dark);">
           ${currency.format(absoluteTotal)}
         </h4>
         <div style="font-size: 13px; margin-top: 6px; color: var(--ink);">
-          En iyi tekil maÄŸaza toplamÄ±na kÄ±yasla sepeti bÃ¶lerek ek olarak <strong>${currency.format(splitBenefit)}</strong> kÃ¢r ediyorsunuz.
+          En iyi tekil mağaza toplamına kıyasla sepeti bölerek ek olarak <strong>${currency.format(splitBenefit)}</strong> kâr ediyorsunuz.
         </div>
       </div>
       
@@ -5141,7 +5141,7 @@ async function renderCart() {
         ${Object.entries(grouped).map(([store, data]) => `
           <div class="opt-store-card">
             <div class="opt-store-header">
-              <span class="opt-store-name" style="color: var(--green-dark);">${escapeHtml(store.toUpperCase())} MaÄŸazasÄ±ndan AlÄ±nacaklar</span>
+              <span class="opt-store-name" style="color: var(--green-dark);">${escapeHtml(store.toUpperCase())} Mağazasından Alınacaklar</span>
               <span class="opt-store-total">${currency.format(data.total)}</span>
             </div>
             <div style="border-top: 1px solid var(--line); padding-top: 6px;">
@@ -5168,12 +5168,12 @@ function showShareLinkDialog(shareUrl) {
   
   content.innerHTML = `
     <div class="dialog-body auth-dialog">
-      <p class="eyebrow">ORTAK LÄ°STE</p>
-      <h2>Ailenizle Birlikte DÃ¼zenleyin.</h2>
-      <p class="auth-copy" style="margin-bottom: 16px; font-size: 13px; color: var(--ink-light);">AÅŸaÄŸÄ±daki baÄŸlantÄ±yÄ± kopyalayarak ailenize veya arkadaÅŸlarÄ±nÄ±za gÃ¶nderin. Herkes listeye eÅŸ zamanlÄ± Ã¼rÃ¼n ekleyip silebilir!</p>
+      <p class="eyebrow">ORTAK LİSTE</p>
+      <h2>Ailenizle Birlikte Düzenleyin.</h2>
+      <p class="auth-copy" style="margin-bottom: 16px; font-size: 13px; color: var(--ink-light);">Aşağıdaki bağlantıyı kopyalayarak ailenize veya arkadaşlarınıza gönderin. Herkes listeye eş zamanlı ürün ekleyip silebilir!</p>
       <div class="manual-fields">
         <label class="manual-field">
-          <span>PaylaÅŸÄ±m Linki</span>
+          <span>Paylaşım Linki</span>
           <input id="shareListUrlInput" type="text" value="${escapeHtml(shareUrl)}" readonly style="width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-hover); font-family: inherit; font-size: 14px; color: var(--ink);">
         </label>
       </div>
@@ -5194,18 +5194,18 @@ window.copyShareLinkInput = function() {
   const input = document.getElementById("shareListUrlInput");
   if (input) {
     input.select();
-    input.setSelectionRange(0, 99999); // Mobil iÃ§in
+    input.setSelectionRange(0, 99999); // Mobil için
     try {
       document.execCommand("copy");
-      showToast("BaÄŸlantÄ± kopyalandÄ±!");
+      showToast("Bağlantı kopyalandı!");
     } catch (err) {
-      showToast("BaÄŸlantÄ± kopyalanamadÄ±, lÃ¼tfen elle kopyalayÄ±n.");
+      showToast("Bağlantı kopyalanamadı, lütfen elle kopyalayın.");
     }
   }
 };
 
 function leaveSharedList() {
-  if (confirm("Ortak listeden ayrÄ±lmak istediÄŸinize emin misiniz? Kendi yerel sepetinize geri dÃ¶neceksiniz.")) {
+  if (confirm("Ortak listeden ayrılmak istediğinize emin misiniz? Kendi yerel sepetinize geri döneceksiniz.")) {
     if (pollingInterval) {
       clearInterval(pollingInterval);
       pollingInterval = null;
@@ -5221,17 +5221,17 @@ function leaveSharedList() {
     // Load cart back from local storage
     state.cart = JSON.parse(localStorage.getItem("almadan_cart") || "[]");
     renderCart();
-    showToast("Ortak listeden ayrÄ±lÄ±ndÄ±. Yerel sepetinize geÃ§ildi.");
+    showToast("Ortak listeden ayrılındı. Yerel sepetinize geçildi.");
   }
 }
 
 async function shareCartList() {
   if (state.cart.length === 0) {
-    showToast("Sepetiniz boÅŸ, paylaÅŸmak iÃ§in Ã¶nce Ã¼rÃ¼n ekleyin.");
+    showToast("Sepetiniz boş, paylaşmak için önce ürün ekleyin.");
     return;
   }
 
-  showToast("PaylaÅŸÄ±m linki hazÄ±rlanÄ±yor...");
+  showToast("Paylaşım linki hazırlanıyor...");
   try {
     const res = await api("/api/lists", {
       method: "POST",
@@ -5255,7 +5255,7 @@ async function shareCartList() {
     
     // Show copy result toast if auto-copied
     if (copied) {
-      showToast("BaÄŸlantÄ± panoya kopyalandÄ±!");
+      showToast("Bağlantı panoya kopyalandı!");
     }
     
     // Always open share dialog so user can see the link and copy manually if needed
@@ -5274,7 +5274,7 @@ async function checkSharedListUrl() {
   const listId = params.get("list");
   if (listId) {
     state.sharedListId = listId;
-    showToast("Ortak aile listesi yÃ¼klendi. CanlÄ± senkronizasyon aktif!");
+    showToast("Ortak aile listesi yüklendi. Canlı senkronizasyon aktif!");
     
     try {
       const res = await api(`/api/lists/${listId}`);
@@ -5286,7 +5286,7 @@ async function checkSharedListUrl() {
       
       startPolling();
     } catch (error) {
-      showToast("PaylaÅŸÄ±lan liste yÃ¼klenemedi: " + error.message);
+      showToast("Paylaşılan liste yüklenemedi: " + error.message);
     }
   }
 }
@@ -5314,7 +5314,7 @@ async function syncSharedListWithServer() {
     saveCartToLocalStorage();
     localStorage.removeItem("almadan_pending_shared_sync");
   } catch (error) {
-    console.error("Ortak liste sunucuyla eÅŸitlenemedi:", error.message);
+    console.error("Ortak liste sunucuyla eşitlenemedi:", error.message);
     localStorage.setItem("almadan_pending_shared_sync", JSON.stringify({
       listId: state.sharedListId,
       payload,
@@ -5336,9 +5336,9 @@ async function flushPendingSharedSync() {
     saveCartToLocalStorage();
     localStorage.removeItem("almadan_pending_shared_sync");
     renderCart();
-    showToast("Ã‡evrimdÄ±ÅŸÄ± liste deÄŸiÅŸiklikleri eÅŸitlendi.");
+    showToast("Çevrimdışı liste değişiklikleri eşitlendi.");
   } catch (error) {
-    console.warn("Bekleyen ortak liste eÅŸitlenemedi:", error.message);
+    console.warn("Bekleyen ortak liste eşitlenemedi:", error.message);
   }
 }
 
@@ -5358,7 +5358,7 @@ function startPolling() {
         renderCart();
       }
     } catch (error) {
-      console.warn("CanlÄ± veri eÅŸitleme baÅŸarÄ±sÄ±z:", error.message);
+      console.warn("Canlı veri eşitleme başarısız:", error.message);
     }
   }, 5000);
 }
@@ -5368,7 +5368,7 @@ function startPolling() {
 function startVoiceSearch() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
-    showToast("TarayÄ±cÄ±nÄ±z ses tanÄ±mayÄ± desteklemiyor.");
+    showToast("Tarayıcınız ses tanımayı desteklemiyor.");
     return;
   }
 
@@ -5379,20 +5379,20 @@ function startVoiceSearch() {
 
   const micBtn = document.getElementById("micButton");
   micBtn.classList.add("recording");
-  showToast("Dinleniyor... ÃœrÃ¼n adÄ±nÄ± sÃ¶yleyin.");
+  showToast("Dinleniyor... Ürün adını söyleyin.");
 
   recognition.start();
 
   recognition.onresult = (event) => {
     const result = event.results[0][0].transcript;
     document.getElementById("productUrl").value = result;
-    showToast(`TanÄ±mlandÄ±: "${result}"`);
+    showToast(`Tanımlandı: "${result}"`);
     // Automatically submit search
     document.getElementById("urlForm").dispatchEvent(new Event("submit"));
   };
 
   recognition.onerror = (event) => {
-    showToast("Ses tanÄ±namadÄ±. LÃ¼tfen tekrar deneyin.");
+    showToast("Ses tanınamadı. Lütfen tekrar deneyin.");
   };
 
   recognition.onend = () => {
@@ -5401,7 +5401,7 @@ function startVoiceSearch() {
 }
 
 
-/* KATEGORÄ° DEÄÄ°ÅÄ°MÄ° VE AI CÄ°LT ANALÄ°ZÄ° LOGIC */
+/* KATEGORİ DEĞİŞİMİ VE AI CİLT ANALİZİ LOGIC */
 let currentSkinType = null; // light, medium, dark
 
 function displaySkinAnalysis(type, showToastMsg = false) {
@@ -5418,26 +5418,26 @@ function displaySkinAnalysis(type, showToastMsg = false) {
   if (laserEl) laserEl.classList.add("hidden");
   if (cameraIcon) cameraIcon.style.animation = "";
   if (statusEl) {
-    const labels = { light: "AÃ§Ä±k Tenli Model", medium: "BuÄŸday Tenli Model", dark: "Esmer Model" };
-    statusEl.innerHTML = `<span style="color: var(--green);">KayÄ±tlÄ± Analiz YÃ¼klendi!</span> (${labels[type] || 'Kendi Analiziniz'})`;
+    const labels = { light: "Açık Tenli Model", medium: "Buğday Tenli Model", dark: "Esmer Model" };
+    statusEl.innerHTML = `<span style="color: var(--green);">Kayıtlı Analiz Yüklendi!</span> (${labels[type] || 'Kendi Analiziniz'})`;
   }
   
   let colorHex = "#fdf5e6";
-  let colorName = "AÃ§Ä±k / Porselen";
-  let undertone = "SoÄŸuk Alt Ton";
+  let colorName = "Açık / Porselen";
+  let undertone = "Soğuk Alt Ton";
   let paletteHtml = "";
   
   if (type === "light") {
     colorHex = "#fbe3d3";
-    colorName = "AÃ§Ä±k / Porselen FildiÅŸi";
-    undertone = "SoÄŸuk Alt Ton";
+    colorName = "Açık / Porselen Fildişi";
+    undertone = "Soğuk Alt Ton";
     paletteHtml = `
       <div class="floating-product-card" data-color="#e06666" data-type="lipstick" style="border-left: 4px solid #e06666 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
         <div style="background: rgba(224, 102, 102, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #e06666;">
           <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
         </div>
         <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">GÃ¼l Kurusu Kuantum Ruj</strong>
+          <strong style="font-size: 12px; color: var(--ink);">Gül Kurusu Kuantum Ruj</strong>
           <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 189,90 TL</span>
           <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#e06666" data-type="lipstick">Bu Ruju Prova Et</button>
         </div>
@@ -5447,9 +5447,9 @@ function displaySkinAnalysis(type, showToastMsg = false) {
           <i data-lucide="smile" style="width: 18px; height: 18px;"></i>
         </div>
         <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Toz Pembe Foton AllÄ±ÄŸÄ±</strong>
+          <strong style="font-size: 12px; color: var(--ink);">Toz Pembe Foton Allığı</strong>
           <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 220,00 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#ea9999" data-type="blush">Bu AllÄ±ÄŸÄ± Prova Et</button>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#ea9999" data-type="blush">Bu Allığı Prova Et</button>
         </div>
       </div>
       <div class="floating-product-card" data-color="#d5a6bd" data-type="eyeshadow" style="border-left: 4px solid #d5a6bd !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
@@ -5457,23 +5457,23 @@ function displaySkinAnalysis(type, showToastMsg = false) {
           <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
         </div>
         <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Eflatun Spektral GÃ¶z FarÄ±</strong>
+          <strong style="font-size: 12px; color: var(--ink);">Eflatun Spektral Göz Farı</strong>
           <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 145,50 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#d5a6bd" data-type="eyeshadow">Bu FarÄ± Prova Et</button>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#d5a6bd" data-type="eyeshadow">Bu Farı Prova Et</button>
         </div>
       </div>
     `;
   } else if (type === "medium") {
     colorHex = "#e8c39e";
-    colorName = "BuÄŸday / DoÄŸal Kumral";
-    undertone = "SÄ±cak Alt Ton";
+    colorName = "Buğday / Doğal Kumral";
+    undertone = "Sıcak Alt Ton";
     paletteHtml = `
       <div class="floating-product-card" data-color="#c00000" data-type="lipstick" style="border-left: 4px solid #c00000 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
         <div style="background: rgba(192, 0, 0, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #c00000;">
           <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
         </div>
         <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Kiremit KÄ±rmÄ±zÄ±sÄ± Kuantum Ruj</strong>
+          <strong style="font-size: 12px; color: var(--ink);">Kiremit Kırmızısı Kuantum Ruj</strong>
           <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 195,00 TL</span>
           <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#c00000" data-type="lipstick">Bu Ruju Prova Et</button>
         </div>
@@ -5483,9 +5483,9 @@ function displaySkinAnalysis(type, showToastMsg = false) {
           <i data-lucide="smile" style="width: 18px; height: 18px;"></i>
         </div>
         <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Åeftali IÅŸÄ±ltÄ±lÄ± Neon AllÄ±k</strong>
+          <strong style="font-size: 12px; color: var(--ink);">Şeftali Işıltılı Neon Allık</strong>
           <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 180,00 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#f6b26b" data-type="blush">Bu AllÄ±ÄŸÄ± Prova Et</button>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#f6b26b" data-type="blush">Bu Allığı Prova Et</button>
         </div>
       </div>
       <div class="floating-product-card" data-color="#b45f06" data-type="eyeshadow" style="border-left: 4px solid #b45f06 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
@@ -5493,23 +5493,23 @@ function displaySkinAnalysis(type, showToastMsg = false) {
           <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
         </div>
         <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Bronz Optik GÃ¶z FarÄ±</strong>
+          <strong style="font-size: 12px; color: var(--ink);">Bronz Optik Göz Farı</strong>
           <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 160,00 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#b45f06" data-type="eyeshadow">Bu FarÄ± Prova Et</button>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#b45f06" data-type="eyeshadow">Bu Farı Prova Et</button>
         </div>
       </div>
     `;
   } else if (type === "dark") {
     colorHex = "#a87a51";
     colorName = "Esmer / Karamel Kahve";
-    undertone = "NÃ¶tr & SÄ±cak Alt Ton";
+    undertone = "Nötr & Sıcak Alt Ton";
     paletteHtml = `
       <div class="floating-product-card" data-color="#741b47" data-type="lipstick" style="border-left: 4px solid #741b47 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
         <div style="background: rgba(116, 27, 71, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #741b47;">
           <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
         </div>
         <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">MÃ¼rdÃ¼m Kuantum Ruj</strong>
+          <strong style="font-size: 12px; color: var(--ink);">Mürdüm Kuantum Ruj</strong>
           <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 210,00 TL</span>
           <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#741b47" data-type="lipstick">Bu Ruju Prova Et</button>
         </div>
@@ -5519,9 +5519,9 @@ function displaySkinAnalysis(type, showToastMsg = false) {
           <i data-lucide="smile" style="width: 18px; height: 18px;"></i>
         </div>
         <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Koyu MÃ¼rdÃ¼m Foton AllÄ±ÄŸÄ±</strong>
+          <strong style="font-size: 12px; color: var(--ink);">Koyu Mürdüm Foton Allığı</strong>
           <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 230,00 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#a64d79" data-type="blush">Bu AllÄ±ÄŸÄ± Prova Et</button>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#a64d79" data-type="blush">Bu Allığı Prova Et</button>
         </div>
       </div>
       <div class="floating-product-card" data-color="#783f04" data-type="eyeshadow" style="border-left: 4px solid #783f04 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
@@ -5529,9 +5529,9 @@ function displaySkinAnalysis(type, showToastMsg = false) {
           <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
         </div>
         <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">BakÄ±r Spektral GÃ¶z FarÄ±</strong>
+          <strong style="font-size: 12px; color: var(--ink);">Bakır Spektral Göz Farı</strong>
           <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 175,00 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#783f04" data-type="eyeshadow">Bu FarÄ± Prova Et</button>
+          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#783f04" data-type="eyeshadow">Bu Farı Prova Et</button>
         </div>
       </div>
     `;
@@ -5642,7 +5642,7 @@ async function runAiSkinScan(type, base64Data = null) {
   }
   
   if (type === "uploaded") {
-    statusEl.innerHTML = `<span style="color: var(--green);">FotoÄŸraf YÃ¼klendi!</span> Analiz ediliyor...`;
+    statusEl.innerHTML = `<span style="color: var(--green);">Fotoğraf Yüklendi!</span> Analiz ediliyor...`;
     if (faceContainer && facePreview && base64Data) {
       window.aiFaceOriginalSrc = base64Data;
       facePreview.dataset.originalSrc = base64Data;
@@ -5651,7 +5651,7 @@ async function runAiSkinScan(type, base64Data = null) {
       window.ensureTryOnLayerVisible();
     }
   } else {
-    const labels = { light: "AÃ§Ä±k Tenli Model", medium: "BuÄŸday Tenli Model", dark: "Esmer Model" };
+    const labels = { light: "Açık Tenli Model", medium: "Buğday Tenli Model", dark: "Esmer Model" };
     statusEl.innerHTML = `<strong style="color: var(--green-dark);">${labels[type]}</strong> analiz ediliyor...`;
     if (faceContainer && facePreview) {
       const originalSrc = `/static/cosmetic_model_${type}.png`;
@@ -5665,8 +5665,8 @@ async function runAiSkinScan(type, base64Data = null) {
   
   if (facePreview) {
     facePreview.onerror = (error) => {
-      console.error("Selfie/manken Ã¶nizlemesi yÃ¼klenemedi:", facePreview.src, error);
-      window.restoreOriginalFace("selfie Ã¶nizlemesi yÃ¼klenemedi");
+      console.error("Selfie/manken önizlemesi yüklenemedi:", facePreview.src, error);
+      window.restoreOriginalFace("selfie önizlemesi yüklenemedi");
     };
   }
 
@@ -5678,7 +5678,7 @@ async function runAiSkinScan(type, base64Data = null) {
   
   try {
     if (type === "uploaded" && base64Data) {
-      showToast("[AI STATUS: YÃ¼z/cilt analizi yapÄ±lÄ±yor...]");
+      showToast("[AI STATUS: Yüz/cilt analizi yapılıyor...]");
       const response = await fetch("/api/analyze-skin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -5695,7 +5695,7 @@ async function runAiSkinScan(type, base64Data = null) {
         if (toneTag) toneTag.textContent = data.undertone;
         const toneName = document.getElementById("aiSkinToneName");
         if (toneName) {
-          const names = { light: "AÃ§Ä±k / FildiÅŸi", medium: "BuÄŸday / NÃ¶tr", dark: "Esmer / Koyu" };
+          const names = { light: "Açık / Fildişi", medium: "Buğday / Nötr", dark: "Esmer / Koyu" };
           toneName.textContent = names[data.skin_type] || "Belirlenemedi";
         }
         const indicator = document.getElementById("aiSkinToneColorIndicator");
@@ -5704,7 +5704,7 @@ async function runAiSkinScan(type, base64Data = null) {
         // Save to localStorage
         localStorage.setItem("almadan_skin_type", currentSkinType);
         
-        showToast("[AI SUCCESS: Cilt tonu analizi tamamlandÄ±.]");
+        showToast("[AI SUCCESS: Cilt tonu analizi tamamlandı.]");
       } else {
         throw new Error(data.error_message || "detection unsuccessful");
       }
@@ -5712,7 +5712,7 @@ async function runAiSkinScan(type, base64Data = null) {
       currentSkinType = type;
       displaySkinAnalysis(currentSkinType, true);
       localStorage.setItem("almadan_skin_type", currentSkinType);
-      showToast("[AI SUCCESS: Ã–rnek model yÃ¼klendi.]");
+      showToast("[AI SUCCESS: Örnek model yüklendi.]");
     }
     
     // Save to authenticated user profile
@@ -5720,7 +5720,7 @@ async function runAiSkinScan(type, base64Data = null) {
       api("/auth/profile", {
         method: "PUT",
         body: JSON.stringify({
-          gender: state.auth.user.gender || "belirtilmemiÅŸ",
+          gender: state.auth.user.gender || "belirtilmemiş",
           phone: state.auth.user.phone || "",
           notification_pref: state.auth.user.notification_pref || "both",
           skin_type: currentSkinType
@@ -5741,7 +5741,7 @@ async function runAiSkinScan(type, base64Data = null) {
     }
     displaySkinAnalysis(currentSkinType, true);
     localStorage.setItem("almadan_skin_type", currentSkinType);
-    showToast("[AI ALERT: API hatasÄ±. SimÃ¼le cilt tonu yÃ¼klendi.]");
+    showToast("[AI ALERT: API hatası. Simüle cilt tonu yüklendi.]");
   } finally {
     laserEl.classList.add("hidden");
     laserEl.style.animation = "none";
@@ -5758,20 +5758,20 @@ async function askAiColorSuitability() {
   const answerBox = document.getElementById("aiColorAnswerBox");
   
   if (!query) {
-    showToast("LÃ¼tfen analiz etmek istediÄŸiniz bir renk veya makyaj Ã¼rÃ¼nÃ¼ yazÄ±n.");
+    showToast("Lütfen analiz etmek istediğiniz bir renk veya makyaj ürünü yazın.");
     return;
   }
   
   if (!currentSkinType) {
-    showToast("LÃ¼tfen Ã¶nce bir fotoÄŸraf yÃ¼kleyin veya model seÃ§erek cilt analizi yapÄ±n.");
+    showToast("Lütfen önce bir fotoğraf yükleyin veya model seçerek cilt analizi yapın.");
     return;
   }
   
   answerBox.classList.remove("hidden");
-  answerBox.innerHTML = `<em>Yapay zeka asistanÄ± verileri sÃ¼zÃ¼yor...</em>`;
+  answerBox.innerHTML = `<em>Yapay zeka asistanı verileri süzüyor...</em>`;
   
   try {
-    const toneTag = document.getElementById("aiSkinToneTag")?.textContent || "SÄ±cak (Warm)";
+    const toneTag = document.getElementById("aiSkinToneTag")?.textContent || "Sıcak (Warm)";
     const response = await fetch("/api/analyze-cosmetic-color", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -5792,18 +5792,18 @@ async function askAiColorSuitability() {
       answerBox.innerHTML = formatted;
       answerBox.classList.add("neon-glow-active");
       setTimeout(() => answerBox.classList.remove("neon-glow-active"), 4000);
-      showToast("[AI SUCCESS: Holografik Ã¶neriler yansÄ±tÄ±ldÄ±.]");
+      showToast("[AI SUCCESS: Holografik öneriler yansıtıldı.]");
     } else {
       throw new Error("unsuccessful analysis");
     }
   } catch (err) {
     console.warn("Backend cosmetic analysis failed, using local fallback rules:", err);
     // Simple local fallback matching old logic
-    let comment = "â„¹ï¸ **[HOLOGRAFÄ°K ANALÄ°Z RAPORU]**\n\nCilt alt tonunuz analiz edildi. BelirttiÄŸiniz Ã¼rÃ¼n nÃ¶tr spektrumda kalmaktadÄ±r.";
+    let comment = "â„¹ï¸ **[HOLOGRAFİK ANALİZ RAPORU]**\n\nCilt alt tonunuz analiz edildi. Belirttiğiniz ürün nötr spektrumda kalmaktadır.";
     if (currentSkinType === "light" && (query.includes("pembe") || query.includes("mor"))) {
-      comment = "âœ¨ **[HOLOGRAFÄ°K ANALÄ°Z RAPORU]**\n\nCilt tonunuzla uyumlu! Pembe tonlarÄ± Ä±ÅŸÄ±k yansÄ±masÄ±nÄ± optimize eder.";
-    } else if (currentSkinType === "medium" && (query.includes("ÅŸeftali") || query.includes("mercan"))) {
-      comment = "âœ¨ **[HOLOGRAFÄ°K ANALÄ°Z RAPORU]**\n\nHarika uyum! Åeftali tonlarÄ± cildinize kuantum aurasÄ± kazandÄ±rÄ±r.";
+      comment = "âœ¨ **[HOLOGRAFİK ANALİZ RAPORU]**\n\nCilt tonunuzla uyumlu! Pembe tonları ışık yansımasını optimize eder.";
+    } else if (currentSkinType === "medium" && (query.includes("şeftali") || query.includes("mercan"))) {
+      comment = "âœ¨ **[HOLOGRAFİK ANALİZ RAPORU]**\n\nHarika uyum! Şeftali tonları cildinize kuantum aurası kazandırır.";
     }
     let formatted = comment;
     formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -5813,23 +5813,23 @@ async function askAiColorSuitability() {
   }
 }
 
-/* EN YAKIN MAÄAZA VE EBAT SEÃ‡Ä°MÄ° BÄ°LEÅENLERÄ° */
+/* EN YAKIN MAĞAZA VE EBAT SEÇİMİ BİLEŞENLERİ */
 const genericProductSizes = {
-  "sÃ¼t": ["200 ml", "1 L", "2 L"],
-  "yaÄŸ": ["1 L", "2 L", "5 L"],
-  "ayÃ§iÃ§ek yaÄŸÄ±": ["1 L", "2 L", "5 L"],
-  "zeytinyaÄŸÄ±": ["1 L", "2 L", "5 L"],
-  "sÄ±vÄ± yaÄŸ": ["1 L", "2 L", "5 L"],
-  "salÃ§a": ["400 gr", "830 gr", "1.5 kg", "5 kg"],
-  "domates salÃ§asÄ±": ["400 gr", "830 gr", "1.5 kg", "5 kg"],
-  "biber salÃ§asÄ±": ["400 gr", "830 gr", "1.5 kg", "5 kg"],
-  "yoÄŸurt": ["500 gr", "1 kg", "2 kg", "3 kg"],
+  "süt": ["200 ml", "1 L", "2 L"],
+  "yağ": ["1 L", "2 L", "5 L"],
+  "ayçiçek yağı": ["1 L", "2 L", "5 L"],
+  "zeytinyağı": ["1 L", "2 L", "5 L"],
+  "sıvı yağ": ["1 L", "2 L", "5 L"],
+  "salça": ["400 gr", "830 gr", "1.5 kg", "5 kg"],
+  "domates salçası": ["400 gr", "830 gr", "1.5 kg", "5 kg"],
+  "biber salçası": ["400 gr", "830 gr", "1.5 kg", "5 kg"],
+  "yoğurt": ["500 gr", "1 kg", "2 kg", "3 kg"],
   "peynir": ["500 gr", "700 gr", "1 kg"],
-  "sÃ¼zme peynir": ["500 gr", "700 gr", "1 kg"],
-  "kaÅŸar peyniri": ["500 gr", "700 gr", "1 kg"],
+  "süzme peynir": ["500 gr", "700 gr", "1 kg"],
+  "kaşar peyniri": ["500 gr", "700 gr", "1 kg"],
   "un": ["1 kg", "2 kg", "5 kg"],
-  "ÅŸeker": ["1 kg", "3 kg", "5 kg"],
-  "Ã§ay": ["500 gr", "1 kg"],
+  "şeker": ["1 kg", "3 kg", "5 kg"],
+  "çay": ["500 gr", "1 kg"],
   "yumurta": ["10'lu", "15'li", "30'lu"]
 };
 
@@ -5901,9 +5901,9 @@ function showSizeSelectorDialog(itemName) {
   const sizes = matchKey ? genericProductSizes[matchKey] : ["1 L", "1 kg", "500 gr"];
   
   content.innerHTML = `
-    <h3 style="margin-bottom: 12px; font-weight: 700; color: var(--ink);">Ebat/Miktar SeÃ§in</h3>
+    <h3 style="margin-bottom: 12px; font-weight: 700; color: var(--ink);">Ebat/Miktar Seçin</h3>
     <p style="color: var(--muted); font-size: 13px; margin-bottom: 16px;">
-      "${escapeHtml(itemName)}" iÃ§in daha doÄŸru birim fiyat karÅŸÄ±laÅŸtÄ±rmasÄ± yapÄ±labilmesi iÃ§in bir ebat seÃ§in:
+      "${escapeHtml(itemName)}" için daha doğru birim fiyat karşılaştırması yapılabilmesi için bir ebat seçin:
     </p>
     
     <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;">
@@ -5915,9 +5915,9 @@ function showSizeSelectorDialog(itemName) {
     </div>
     
     <div style="border-top: 1px solid var(--line); padding-top: 16px; margin-bottom: 16px;">
-      <label style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--muted);">Ã–zel Ebat Girin:</label>
+      <label style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--muted);">Özel Ebat Girin:</label>
       <div style="display: flex; gap: 8px;">
-        <input type="text" id="customSizeInput" placeholder="Ã–rn: 1.5 L, 800 gr, 250 ml" style="flex: 1; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px;">
+        <input type="text" id="customSizeInput" placeholder="Örn: 1.5 L, 800 gr, 250 ml" style="flex: 1; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px;">
         <button type="button" class="primary-button" style="width: auto; height: auto; padding: 8px 16px;" onclick="addGenericCartItemWithCustomSize('${escapeHtml(itemName)}')">Ekle</button>
       </div>
     </div>
@@ -5927,7 +5927,7 @@ function showSizeSelectorDialog(itemName) {
         Belirtmeden Ekle
       </button>
       <button type="button" class="text-button" style="flex: 1; text-align: center; color: var(--red);" onclick="closeSizeSelectorDialog()">
-        Ä°ptal
+        İptal
       </button>
     </div>
   `;
@@ -5999,7 +5999,7 @@ function updateGpsStatusUI() {
 
 window.triggerGpsActivation = function() {
   if (navigator.geolocation) {
-    showToast("GPS konumu sorgulanÄ±yor...");
+    showToast("GPS konumu sorgulanıyor...");
     navigator.geolocation.getCurrentPosition(
       (position) => {
         state.userCoords = {
@@ -6015,14 +6015,14 @@ window.triggerGpsActivation = function() {
         renderCart();
       },
       (error) => {
-        showToast("GPS konum izni alÄ±namadÄ± veya reddedildi: " + error.message);
+        showToast("GPS konum izni alınamadı veya reddedildi: " + error.message);
         state.userCoords = null;
         updateGpsStatusUI();
         persistQuantumState();
       }
     );
   } else {
-    showToast("TarayÄ±cÄ±nÄ±z konum servisini desteklemiyor.");
+    showToast("Tarayıcınız konum servisini desteklemiyor.");
   }
 };
 
@@ -6044,13 +6044,13 @@ async function updateUserLocation(val) {
             lat: position.coords.latitude,
             lng: position.coords.longitude
           };
-          showToast("GPS konumu alÄ±ndÄ±.");
+          showToast("GPS konumu alındı.");
           updateGpsStatusUI();
           persistQuantumState();
           renderCart();
         },
         (error) => {
-          showToast("GPS konumu alÄ±namadÄ±: " + error.message);
+          showToast("GPS konumu alınamadı: " + error.message);
           document.getElementById("userLocationSelector").value = "default";
           state.userLocation = "default";
           state.userCoords = null;
@@ -6060,7 +6060,7 @@ async function updateUserLocation(val) {
         }
       );
     } else {
-      showToast("TarayÄ±cÄ±nÄ±z konum servisini desteklemiyor.");
+      showToast("Tarayıcınız konum servisini desteklemiyor.");
       document.getElementById("userLocationSelector").value = "default";
       state.userLocation = "default";
       state.userCoords = null;
@@ -6097,10 +6097,10 @@ function toggleSupportedStores() {
 window.toggleSupportedStores = toggleSupportedStores;
 
 // ============================================================================
-// ANTIGRAVITE & KUANTUM DÄ°NAMÄ°K ARAKAYNAK VE KONTROLCÃœLERÄ°
+// ANTIGRAVITE & KUANTUM DİNAMİK ARAKAYNAK VE KONTROLCÜLERİ
 // ============================================================================
 
-// 1. Global SÃ¼zÃ¼lme KontrolcÃ¼sÃ¼ (Global Bobbing Controller)
+// 1. Global Süzülme Kontrolcüsü (Global Bobbing Controller)
 window.bobbingElements = [];
 window.bobbingTime = 0;
 window.globalBobbingActive = false;
@@ -6120,14 +6120,14 @@ window.startGlobalBobbingController = function() {
   window.globalBobbingActive = true;
   
   function step() {
-    window.bobbingTime += 0.025; // SÃ¼zÃ¼lme hÄ±zÄ±
-    const offset = Math.sin(window.bobbingTime) * 6; // +/- 6px salÄ±nÄ±m
+    window.bobbingTime += 0.025; // Süzülme hızı
+    const offset = Math.sin(window.bobbingTime) * 6; // +/- 6px salınım
     
-    // GeÃ§ersiz/silinmiÅŸ DOM elemanlarÄ±nÄ± temizle
+    // Geçersiz/silinmiş DOM elemanlarını temizle
     window.bobbingElements = window.bobbingElements.filter(el => document.body.contains(el));
     
     window.bobbingElements.forEach(el => {
-      // Senkronize dikey sÃ¼zÃ¼lme uyguluyoruz
+      // Senkronize dikey süzülme uyguluyoruz
       el.style.transform = `translateY(${offset}px)`;
     });
     
@@ -6136,7 +6136,7 @@ window.startGlobalBobbingController = function() {
   requestAnimationFrame(step);
 };
 
-// 2. Makyaj Prova KÃ¼resi UÃ§uÅŸ Animasyonu (Antigravity Drift)
+// 2. Makyaj Prova Küresi Uçuş Animasyonu (Antigravity Drift)
 window.runMakeupTryOnAnimation = function(button, color, type) {
   const facePreview = document.getElementById("aiFacePreview");
   const faceContainer = document.getElementById("aiFaceContainer");
@@ -6146,7 +6146,7 @@ window.runMakeupTryOnAnimation = function(button, color, type) {
   }
   window.ensureTryOnLayerVisible();
   if (!facePreview || !faceContainer || faceContainer.classList.contains("hidden")) {
-    showToast("LÃ¼tfen Ã¶nce bir fotoÄŸraf yÃ¼kleyin veya Ã¶rnek modellerden birini seÃ§erek cilt analizi yapÄ±n.");
+    showToast("Lütfen önce bir fotoğraf yükleyin veya örnek modellerden birini seçerek cilt analizi yapın.");
     return;
   }
   
@@ -6193,7 +6193,7 @@ window.runMakeupTryOnAnimation = function(button, color, type) {
     // Draw makeup pigments onto canvas
     window.applyMakeupOnCanvas(color, type);
     window.ensureTryOnLayerVisible();
-    console.log("Makyaj prova katmanÄ± gÃ¶rÃ¼nÃ¼rlÃ¼k kontrolÃ¼:", {
+    console.log("Makyaj prova katmanı görünürlük kontrolü:", {
       src: facePreview.getAttribute("src"),
       display: window.getComputedStyle(facePreview).display,
       visibility: window.getComputedStyle(facePreview).visibility,
@@ -6201,12 +6201,12 @@ window.runMakeupTryOnAnimation = function(button, color, type) {
     });
     
     // Interactive futuristic success notification
-    const typeLabels = { lipstick: "Kuantum Ruj", blush: "Neon AllÄ±k", eyeshadow: "Foton FarÄ±" };
-    showToast(`[AI STATUS: ${typeLabels[type] || 'Pigment'} entegrasyonu tamamlandÄ±. Foton saÃ§Ä±lÄ±mÄ± %30 arttÄ±.]`);
+    const typeLabels = { lipstick: "Kuantum Ruj", blush: "Neon Allık", eyeshadow: "Foton Farı" };
+    showToast(`[AI STATUS: ${typeLabels[type] || 'Pigment'} entegrasyonu tamamlandı. Foton saçılımı %30 arttı.]`);
   }, 900);
 };
 
-// 3. Canvas Ãœzerine YarÄ± Saydam Makyaj Ã‡izimi
+// 3. Canvas Üzerine Yarı Saydam Makyaj Çizimi
 window.applyMakeupOnCanvas = function(color, type) {
   const canvas = document.getElementById("aiMakeupCanvas");
   if (!canvas) return;
@@ -6285,7 +6285,7 @@ window.applyMakeupOnCanvas = function(color, type) {
   });
 };
 
-// 4. SÄ±fÄ±rlama Butonu TanÄ±mlamasÄ± ve Global BaÅŸlatÄ±cÄ±lar
+// 4. Sıfırlama Butonu Tanımlaması ve Global Başlatıcılar
 function initMakeupHelpers() {
   const btnResetSkin = document.getElementById("btnResetAiSkin");
   if (btnResetSkin) {
@@ -6297,7 +6297,7 @@ function initMakeupHelpers() {
       if (fileInput) fileInput.value = "";
       
       const statusEl = document.getElementById("aiUploadStatus");
-      if (statusEl) statusEl.innerHTML = "Selfie FotoÄŸrafÄ± YÃ¼kle";
+      if (statusEl) statusEl.innerHTML = "Selfie Fotoğrafı Yükle";
       
       const canvas = document.getElementById("aiMakeupCanvas");
       if (canvas) {
@@ -6316,11 +6316,11 @@ function initMakeupHelpers() {
 initMakeupHelpers();
 
 window.addEventListener("load", () => {
-  // A. YÃ¼kleme ekranÄ±nÄ± temizle (Overlay Sanitization)
+  // A. Yükleme ekranını temizle (Overlay Sanitization)
   const loader = document.getElementById("quantumScanOverlay");
   if (loader) loader.style.display = "none";
 
-  // B. HafÄ±zadan veriyi Ã§ek (Auto-Rehydrate)
+  // B. Hafızadan veriyi çek (Auto-Rehydrate)
   const savedState = localStorage.getItem("almadan_state");
   if (savedState) {
     try {
@@ -6329,36 +6329,36 @@ window.addEventListener("load", () => {
         state.userCoords = data.userCoords || null;
         state.userLocation = data.userLocation || "default";
         
-        // UI GÃ¼ncellemesi: Konum SeÃ§ici
+        // UI Güncellemesi: Konum Seçici
         const selector = document.getElementById("userLocationSelector");
         if (selector) selector.value = state.userLocation;
         
-        // UI GÃ¼ncellemesi: Global/Yerel Modu
+        // UI Güncellemesi: Global/Yerel Modu
         const globalCheckbox = document.getElementById("globalModeCheckbox");
         if (globalCheckbox) {
           globalCheckbox.checked = !!data.isGlobalActive;
         }
         
-        // UI GÃ¼ncellemesi: GPS Pill
+        // UI Güncellemesi: GPS Pill
         updateGpsStatusUI();
         
-        console.log("Kuantum HafÄ±za: Durum geri yÃ¼klendi.", data);
+        console.log("Kuantum Hafıza: Durum geri yüklendi.", data);
       }
     } catch (e) {
-      console.error("Kuantum HafÄ±za bozuldu, sÄ±fÄ±rlanÄ±yor...", e);
+      console.error("Kuantum Hafıza bozuldu, sıfırlanıyor...", e);
       localStorage.removeItem("almadan_state");
     }
   }
 
-  // Apple Privacy Bypass: Geolocation API'yi sayfa yÃ¼klenirken (load) asla otomatik Ã§aÄŸÄ±rma.
-  // Otomatik konum izni isteklerini kaldÄ±rÄ±yoruz. Ä°zin sadece Kontrol Et veya GPS pill tÄ±klandÄ±ÄŸÄ±nda istenecek.
+  // Apple Privacy Bypass: Geolocation API'yi sayfa yüklenirken (load) asla otomatik çağırma.
+  // Otomatik konum izni isteklerini kaldırıyoruz. İzin sadece Kontrol Et veya GPS pill tıklandığında istenecek.
 
   // Safe Mode: no AbortController, no timeouts, direct execution in window.onload
   try {
     loadProducts(null);
     loadReceipts("", null);
   } catch (err) {
-    console.error("BaÅŸlangÄ±Ã§ veri yÃ¼klemesinde hata:", err);
+    console.error("Başlangıç veri yüklemesinde hata:", err);
   }
 });
 
@@ -6371,9 +6371,9 @@ function showInitialLoadFallback() {
     const header = overlay.querySelector("h3");
     if (header) {
       header.classList.add("glitch-active");
-      header.innerText = "SÄ°STEM KURTARMA AKTÄ°F: MOBÄ°L HATA KURTARMA";
+      header.innerText = "SİSTEM KURTARMA AKTİF: MOBİL HATA KURTARMA";
     }
-    progressText.innerText = "Veri akÄ±ÅŸÄ±nda gecikme: Yerel Ã¶nbelleÄŸe geÃ§iliyor...";
+    progressText.innerText = "Veri akışında gecikme: Yerel önbelleğe geçiliyor...";
     
     setTimeout(() => {
       overlay.style.display = "none";

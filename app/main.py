@@ -1212,7 +1212,7 @@ def storage_health() -> dict:
 def home() -> Response:
     index_file = STATIC_DIR / "index.html"
     if index_file.is_file():
-        return FileResponse(index_file)
+        return FileResponse(index_file, media_type="text/html; charset=utf-8")
     return RedirectResponse("/index.html", status_code=307)
 
 
