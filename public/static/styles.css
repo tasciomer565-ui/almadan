@@ -2395,21 +2395,8 @@ body.dark-theme .opt-savings-tag {
   margin-bottom: 12px;
 }
 
-.receipt-review-items {
-  display: grid;
-  gap: 8px;
-}
-
-.receipt-review-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 90px 60px 36px;
-  gap: 6px;
-  align-items: center;
-}
-
 .receipt-review-panel input,
-.receipt-review-panel select,
-.receipt-review-panel textarea {
+.receipt-review-panel select {
   width: 100%;
   min-height: 38px;
   border: 1px solid var(--line);
@@ -2418,31 +2405,6 @@ body.dark-theme .opt-savings-tag {
   color: var(--ink);
   padding: 0 9px;
   font: inherit;
-}
-
-.receipt-review-panel textarea {
-  min-height: 120px;
-  padding: 10px;
-  resize: vertical;
-}
-
-.receipt-empty-items {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--green) 24%, var(--line));
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--green) 7%, transparent);
-}
-
-.receipt-empty-items p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.receipt-raw-text-hidden {
-  display: none;
 }
 
 .receipt-review-actions {
@@ -2485,14 +2447,6 @@ body.dark-theme .opt-savings-tag {
     grid-template-columns: 1fr;
   }
 
-  .receipt-review-row {
-    grid-template-columns: minmax(0, 1fr) 82px;
-  }
-
-  .receipt-review-row select,
-  .receipt-review-row button {
-    grid-row: 2;
-  }
 }
 
 .optimizer-summary {

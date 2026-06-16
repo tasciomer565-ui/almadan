@@ -3438,7 +3438,6 @@ function renderReceiptReview() {
           value="${Number(receipt.total || calculatePendingReceiptTotal()).toFixed(2)}">
       </label>
     </div>
-    <textarea class="receipt-raw-text-hidden" readonly>${escapeHtml(receipt.raw_ocr_text || "")}</textarea>
     <div class="receipt-review-actions">
       <button type="button" class="secondary-button" onclick="cancelReceiptReview()">Vazgeç</button>
       <button type="button" class="primary-button" onclick="savePendingReceipt()">
@@ -3489,13 +3488,7 @@ function cancelReceiptReview() {
 
 async function savePendingReceipt() {
   if (!state.pendingReceipt) return;
-  const rows = [...document.querySelectorAll("[data-receipt-item]")];
-  const items = rows.map((row) => ({
-    title: row.querySelector(".receipt-item-title").value.trim(),
-    price: Number(row.querySelector(".receipt-item-price").value || 0),
-    quantity: 1,
-    category: row.querySelector(".receipt-item-category").value,
-  })).filter((item) => item.title && item.price >= 0);
+  const items = [];
 
   try {
     const savedStore = document.getElementById("receiptReviewStore").value.trim();
