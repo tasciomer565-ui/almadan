@@ -314,9 +314,59 @@ def fetch_aol_urls_for_sites(query: str, sites: list[str], cart_filter: bool = T
         pass
     return found_urls
 
-def search_migros_direct(query: str) -> list[dict]:
-    """Migros arama sayfasını direkt scrape eder."""
-    url = f"https://www.migros.com.tr/arama?q={urllib.parse.quote_plus(query)}"
+def search_migros_api(query: str) -> list[dict]:
+    """Migros REST API üzerinden ürün arar — direkt JSON döner."""
+    url = f"https://www.migros.com.tr/rest/search?q={urllib.parse.quote_plus(query)}&sayfa=1"
+    headers = {
+        "User-Agent": YAHOO_USER_AGENT,
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "tr-TR,tr;q=0.9",
+        "Referer": "https://www.migros.com.tr/",
+        "Origin": "https://www.migros.com.tr",
+    }
+    results = []
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code != 200:
+            return results
+        data = r.json()
+        products = (
+            data.get("data", {}).get("products", [])
+            or data.get("storeProductInfos", [])
+            or []
+        )
+        for p in products[:10]:
+            name = p.get("name", "") or p.get("title", "")
+            price = float(p.get("salePrice", 0) or p.get("price", 0) or 0)
+            original_price = p.get("originalPrice") or p.get("listPrice")
+            imgs = p.get("images", [])
+            img = ""
+            if imgs and isinstance(imgs, list):
+                img = imgs[0].get("url", "") if isinstance(imgs[0], dict) else str(imgs[0])
+            slug = p.get("url", "") or p.get("productUrl", "")
+            product_url = (
+                f"https://www.migros.com.tr{slug}" if slug and slug.startswith("/")
+                else slug or f"https://www.migros.com.tr/arama?q={urllib.parse.quote_plus(query)}"
+            )
+            if name and price > 0:
+                results.append({
+                    "title": name,
+                    "price": price,
+                    "original_price": float(original_price) if original_price else None,
+                    "image_url": img,
+                    "source": "migros",
+                    "url": product_url,
+                    "labels": ["Önerilen"],
+                    "extra_info": {"out_of_stock": False},
+                })
+    except Exception:
+        pass
+    return results
+
+
+def search_trendyol_grocery(query: str) -> list[dict]:
+    """Trendyol market/gıda bölümünde arar."""
+    url = f"https://www.trendyol.com/sr?q={urllib.parse.quote_plus(query)}&qt={urllib.parse.quote_plus(query)}&st={urllib.parse.quote_plus(query)}&os=1"
     headers = {
         "User-Agent": YAHOO_USER_AGENT,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -327,45 +377,52 @@ def search_migros_direct(query: str) -> list[dict]:
         r = requests.get(url, headers=headers, timeout=10)
         if r.status_code != 200:
             return results
-        soup = BeautifulSoup(r.text, "html.parser")
-
-        # Migros ürün kartları — JSON-LD veya script tag'inden çek
         import json as _json
-        for script in soup.find_all("script", type="application/ld+json"):
-            try:
-                data = _json.loads(script.string or "")
-                items = data if isinstance(data, list) else [data]
-                for item in items:
-                    if item.get("@type") == "Product":
-                        name = item.get("name", "")
-                        offers = item.get("offers", {})
-                        if isinstance(offers, list):
-                            offers = offers[0] if offers else {}
-                        price_str = str(offers.get("price", "0"))
-                        try:
-                            price = float(price_str.replace(",", "."))
-                        except ValueError:
-                            price = 0.0
-                        img = item.get("image", "")
-                        if isinstance(img, list):
-                            img = img[0] if img else ""
-                        product_url = item.get("url", url)
-                        if name and price > 0:
-                            results.append({
-                                "title": name,
-                                "price": price,
-                                "original_price": None,
-                                "image_url": img,
-                                "source": "migros",
-                                "url": product_url,
-                                "labels": ["Önerilen"],
-                                "extra_info": {"out_of_stock": False},
-                            })
-            except Exception:
-                continue
+        # Trendyol verisini __NEXT_DATA__ veya window.__SEARCH_APP_INITIAL_STATE__ içinden çek
+        text = r.text
+        marker = '"products":'
+        idx = text.find(marker)
+        if idx == -1:
+            return results
+        # İlk products dizisini bul
+        start = text.index("[", idx)
+        depth = 0
+        end = start
+        for i, ch in enumerate(text[start:], start):
+            if ch == "[":
+                depth += 1
+            elif ch == "]":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+        try:
+            products = _json.loads(text[start:end])
+        except Exception:
+            return results
+        for p in products[:8]:
+            name = p.get("name", "")
+            price = float(p.get("price", {}).get("sellingPrice", 0) if isinstance(p.get("price"), dict) else p.get("price", 0) or 0)
+            original = p.get("price", {}).get("originalPrice") if isinstance(p.get("price"), dict) else None
+            img = p.get("images", [""])[0] if p.get("images") else ""
+            if img and not img.startswith("http"):
+                img = "https://cdn.dsmcdn.com" + img
+            slug = p.get("url", "")
+            product_url = f"https://www.trendyol.com{slug}" if slug else f"https://www.trendyol.com/sr?q={urllib.parse.quote_plus(query)}"
+            if name and price > 0:
+                results.append({
+                    "title": name,
+                    "price": price,
+                    "original_price": float(original) if original else None,
+                    "image_url": img,
+                    "source": "trendyol",
+                    "url": product_url,
+                    "labels": ["Önerilen"],
+                    "extra_info": {"out_of_stock": False},
+                })
     except Exception:
         pass
-    return results[:8]
+    return results
 
 
 async def scan_worker(query: str, category: str, fallback: bool = False) -> list[dict]:
@@ -560,11 +617,11 @@ async def master_search(
                 if category == "GENEL":
                     results = await marketplace_scan(query)
                 elif category == "GIDA":
-                    aol_task = scan_worker(query, category)
-                    migros_task = loop.run_in_executor(None, search_migros_direct, query)
-                    aol_res, migros_res = await asyncio.gather(aol_task, migros_task)
+                    migros_task = loop.run_in_executor(None, search_migros_api, query)
+                    trendyol_task = loop.run_in_executor(None, search_trendyol_grocery, query)
+                    migros_res, trendyol_res = await asyncio.gather(migros_task, trendyol_task)
                     seen = set()
-                    for p in aol_res + migros_res:
+                    for p in migros_res + trendyol_res:
                         key = p["url"].split("?")[0]
                         if key not in seen:
                             seen.add(key)
@@ -578,17 +635,16 @@ async def master_search(
                 if category == "GENEL":
                     results = await marketplace_scan(query)
                 elif category == "GIDA":
-                    aol_task = scan_worker(query, category)
-                    migros_task = loop.run_in_executor(None, search_migros_direct, query)
-                    aol_res, migros_res = await asyncio.gather(aol_task, migros_task)
+                    migros_task = loop.run_in_executor(None, search_migros_api, query)
+                    trendyol_task = loop.run_in_executor(None, search_trendyol_grocery, query)
+                    migros_res, trendyol_res = await asyncio.gather(migros_task, trendyol_task)
                     seen = set()
-                    for p in aol_res + migros_res:
+                    for p in migros_res + trendyol_res:
                         key = p["url"].split("?")[0]
                         if key not in seen:
                             seen.add(key)
                             results.append(p)
                 else:
-                    # Kategori belli olduğunda sadece o kategoriye ait mağazalarda ara
                     results = await scan_worker(query, category)
     except (asyncio.TimeoutError, Exception):
         results = []
