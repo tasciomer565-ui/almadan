@@ -1917,6 +1917,77 @@ body.dark-theme #barcodeOcrInputArea {
   background: rgba(255, 255, 255, 0.01);
 }
 
+#barcodeScannerArea > .scanner-upload,
+#barcodeScannerArea > .scanner-divider,
+#barcodeSelector,
+#runBarcodeScanBtn {
+  display: none;
+}
+
+.barcode-camera-shell {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  min-height: 260px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #080a0c;
+}
+
+.barcode-camera-view {
+  width: 100%;
+  min-height: 260px;
+}
+
+.barcode-camera-view video {
+  width: 100% !important;
+  min-height: 260px;
+  object-fit: cover;
+}
+
+.barcode-camera-view > div {
+  border: 0 !important;
+}
+
+.barcode-viewfinder {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: min(84%, 360px);
+  height: 96px;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 999px rgba(0, 0, 0, 0.34),
+    0 0 24px rgba(40, 122, 80, 0.35);
+  pointer-events: none;
+}
+
+.barcode-viewfinder::after {
+  position: absolute;
+  right: 10px;
+  left: 10px;
+  top: 50%;
+  height: 2px;
+  content: "";
+  background: var(--green);
+  box-shadow: 0 0 12px var(--green);
+}
+
+.barcode-scan-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.barcode-scan-status {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .form-select {
   width: 100%;
   padding: 10px;

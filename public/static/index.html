@@ -16,7 +16,8 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-    <link rel="stylesheet" href="/static/styles.css?v=20260614-fashion-hologram">
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
+    <link rel="stylesheet" href="/static/styles.css?v=20260616-barcode-camera">
   </head>
   <body>
     <header class="topbar">
@@ -533,6 +534,14 @@
               </div>
               <div id="barcodeOcrInputArea" class="hidden">
                 <div id="barcodeScannerArea" class="hidden">
+                  <div class="barcode-camera-shell">
+                    <div id="html5QrCodeReader" class="barcode-camera-view"></div>
+                    <div class="barcode-viewfinder" aria-hidden="true"></div>
+                  </div>
+                  <div class="barcode-scan-footer">
+                    <span id="barcodeScanStatus" class="barcode-scan-status">Kamera hazirlaniyor...</span>
+                    <button type="button" class="secondary-button" id="stopBarcodeScanBtn">Durdur</button>
+                  </div>
                   <label class="scanner-upload">
                     <i data-lucide="camera"></i>
                     <span>Kamera veya barkod fotoğrafı seç</span>
@@ -695,6 +704,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script defer src="/static/app.js?v=20260615-mobile-panic"></script>
+    <script defer src="/static/app.js?v=20260616-barcode-camera"></script>
   </body>
 </html>

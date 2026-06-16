@@ -1764,18 +1764,102 @@ def unit_price(name: str, price: float) -> dict:
 @app.get("/api/barcode/{code}")
 def api_barcode_lookup(code: str) -> dict:
     from app.comparator import lookup_barcode, search_products_by_name
-    match = lookup_barcode(code)
+    barcode = "".join(ch for ch in code.strip() if ch.isdigit())
+    if len(barcode) != 13:
+        raise HTTPException(status_code=400, detail="EAN-13 barkod 13 haneli olmali.")
+
+    db = load_db()
+    cached = db.setdefault("barcode_products", {}).get(barcode)
+    if cached:
+        results = search_products_by_name(cached["search_query"])
+        return {
+            "found": True,
+            "title": cached["title"],
+            "brand": cached.get("brand", ""),
+            "image_url": cached.get("image_url", ""),
+            "search_query": cached["search_query"],
+            "source": "cache",
+            "cached": True,
+            "results": results,
+        }
+
+    match = lookup_barcode(barcode)
     if not match:
-        return {"found": False, "message": "Barkod veritabanında bulunamadı."}
-    
+        try:
+            response = requests.get(
+                f"https://world.openfoodfacts.org/api/v2/product/{barcode}.json",
+                params={
+                    "fields": (
+                        "code,product_name,product_name_tr,generic_name,"
+                        "brands,image_front_url,image_url,quantity"
+                    ),
+                },
+                headers={
+                    "User-Agent": (
+                        "Almadan/1.0 (https://almadan.vercel.app; "
+                        "contact: destek@almadan.app)"
+                    ),
+                },
+                timeout=10,
+            )
+            response.raise_for_status()
+            off_data = response.json()
+        except requests.RequestException as exc:
+            raise HTTPException(
+                status_code=502,
+                detail="Open Food Facts barkod sorgusu basarisiz.",
+            ) from exc
+
+        if int(off_data.get("status") or 0) != 1:
+            return {"found": False, "message": "Barkod Open Food Facts veritabaninda bulunamadi."}
+
+        product = off_data.get("product") or {}
+        title = (
+            product.get("product_name_tr")
+            or product.get("product_name")
+            or product.get("generic_name")
+            or f"Barkodlu Urun {barcode}"
+        ).strip()
+        brand = str(product.get("brands") or "").split(",", 1)[0].strip()
+        quantity = str(product.get("quantity") or "").strip()
+        image_url = str(product.get("image_front_url") or product.get("image_url") or "").strip()
+        search_query = " ".join(part for part in (brand, title, quantity) if part).strip()
+        match = {
+            "title": title,
+            "brand": brand,
+            "quantity": quantity,
+            "image_url": image_url,
+            "search_query": search_query or title,
+            "source": "open_food_facts",
+        }
+    else:
+        match = {
+            **match,
+            "brand": match.get("brand", ""),
+            "quantity": match.get("quantity", ""),
+            "image_url": match.get("image_url", ""),
+            "source": "local_seed",
+        }
+
+    db["barcode_products"][barcode] = {
+        **match,
+        "barcode": barcode,
+        "created_at": utc_now(),
+        "updated_at": utc_now(),
+    }
+    save_db(db)
+
     results = search_products_by_name(match["search_query"])
     return {
         "found": True,
         "title": match["title"],
+        "brand": match.get("brand", ""),
+        "image_url": match.get("image_url", ""),
         "search_query": match["search_query"],
-        "results": results
+        "source": match.get("source", "local_seed"),
+        "cached": False,
+        "results": results,
     }
-
 
 RECEIPT_ITEM_CATEGORIES = (
     "grocery",

@@ -1,4 +1,4 @@
-const CACHE_VERSION = "almadan-v7";
+const CACHE_VERSION = "almadan-v8-barcode-camera";
 const APP_SHELL = [
   "/",
   "/index.html",

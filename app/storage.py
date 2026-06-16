@@ -40,6 +40,7 @@ def default_db() -> dict[str, Any]:
         "queued_notifications": [],
         "catalog_snapshots": {},
         "receipts": [],
+        "barcode_products": {},
     }
 
 
@@ -64,6 +65,8 @@ def normalize_db(db: Any) -> dict[str, Any]:
         db["catalog_snapshots"] = {}
     if not isinstance(db.get("receipts"), list):
         db["receipts"] = []
+    if not isinstance(db.get("barcode_products"), dict):
+        db["barcode_products"] = {}
     return db
 
 
