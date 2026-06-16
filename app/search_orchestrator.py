@@ -280,9 +280,12 @@ def classify_intent(query: str) -> str:
 
     return "GENEL"
 
-def fetch_aol_urls_for_sites(query: str, sites: list[str]) -> list[str]:
+def fetch_aol_urls_for_sites(query: str, sites: list[str], cart_filter: bool = True) -> list[str]:
     site_query = " OR ".join([f"site:{s}" for s in sites])
-    modified_query = f'{query} "sepete ekle" ({site_query})'
+    if cart_filter:
+        modified_query = f'{query} "sepete ekle" ({site_query})'
+    else:
+        modified_query = f'{query} ({site_query})'
     url = f"https://search.aol.com/aol/search?q={urllib.parse.quote_plus(modified_query)}"
     headers = {
         "User-Agent": YAHOO_USER_AGENT,
@@ -311,10 +314,66 @@ def fetch_aol_urls_for_sites(query: str, sites: list[str]) -> list[str]:
         pass
     return found_urls
 
+def search_migros_direct(query: str) -> list[dict]:
+    """Migros arama sayfasını direkt scrape eder."""
+    url = f"https://www.migros.com.tr/arama?q={urllib.parse.quote_plus(query)}"
+    headers = {
+        "User-Agent": YAHOO_USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "tr-TR,tr;q=0.9",
+    }
+    results = []
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code != 200:
+            return results
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        # Migros ürün kartları — JSON-LD veya script tag'inden çek
+        import json as _json
+        for script in soup.find_all("script", type="application/ld+json"):
+            try:
+                data = _json.loads(script.string or "")
+                items = data if isinstance(data, list) else [data]
+                for item in items:
+                    if item.get("@type") == "Product":
+                        name = item.get("name", "")
+                        offers = item.get("offers", {})
+                        if isinstance(offers, list):
+                            offers = offers[0] if offers else {}
+                        price_str = str(offers.get("price", "0"))
+                        try:
+                            price = float(price_str.replace(",", "."))
+                        except ValueError:
+                            price = 0.0
+                        img = item.get("image", "")
+                        if isinstance(img, list):
+                            img = img[0] if img else ""
+                        product_url = item.get("url", url)
+                        if name and price > 0:
+                            results.append({
+                                "title": name,
+                                "price": price,
+                                "original_price": None,
+                                "image_url": img,
+                                "source": "migros",
+                                "url": product_url,
+                                "labels": ["Önerilen"],
+                                "extra_info": {"out_of_stock": False},
+                            })
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return results[:8]
+
+
 async def scan_worker(query: str, category: str, fallback: bool = False) -> list[dict]:
     sites = WORKER_SITES.get(category, WORKER_SITES["MARKETPLACE"])
     loop = asyncio.get_running_loop()
-    aol_urls = await loop.run_in_executor(None, fetch_aol_urls_for_sites, query, sites)
+    # GIDA için "sepete ekle" filtresi olmadan ara — Türk market siteleri bu ifadeyle indexlenmez
+    use_cart_filter = category not in ("GIDA",)
+    aol_urls = await loop.run_in_executor(None, fetch_aol_urls_for_sites, query, sites, use_cart_filter)
     
     aol_products = []
     if aol_urls:
@@ -493,12 +552,23 @@ async def master_search(
         category = category_map.get(selected_category, "GENEL")
 
     results = []
-    
+    loop = asyncio.get_running_loop()
+
     try:
-        async with asyncio.timeout(4.5):
+        async with asyncio.timeout(8.0):
             if mode == "global" or lat is None or lon is None:
                 if category == "GENEL":
                     results = await marketplace_scan(query)
+                elif category == "GIDA":
+                    aol_task = scan_worker(query, category)
+                    migros_task = loop.run_in_executor(None, search_migros_direct, query)
+                    aol_res, migros_res = await asyncio.gather(aol_task, migros_task)
+                    seen = set()
+                    for p in aol_res + migros_res:
+                        key = p["url"].split("?")[0]
+                        if key not in seen:
+                            seen.add(key)
+                            results.append(p)
                 else:
                     results = await scan_worker(query, category)
             elif mode == "local":
@@ -507,6 +577,16 @@ async def master_search(
             else:  # hybrid
                 if category == "GENEL":
                     results = await marketplace_scan(query)
+                elif category == "GIDA":
+                    aol_task = scan_worker(query, category)
+                    migros_task = loop.run_in_executor(None, search_migros_direct, query)
+                    aol_res, migros_res = await asyncio.gather(aol_task, migros_task)
+                    seen = set()
+                    for p in aol_res + migros_res:
+                        key = p["url"].split("?")[0]
+                        if key not in seen:
+                            seen.add(key)
+                            results.append(p)
                 else:
                     # Kategori belli olduğunda sadece o kategoriye ait mağazalarda ara
                     results = await scan_worker(query, category)
