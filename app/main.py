@@ -1741,6 +1741,7 @@ class ReceiptCreateRequest(BaseModel):
     items: list[ReceiptItemPayload] = Field(min_length=1, max_length=250)
     total: float | None = Field(default=None, ge=0)
     note: str | None = Field(default=None, max_length=500)
+    raw_ocr_text: str | None = None
 
 
 @app.post("/api/cart/optimize")
@@ -2271,7 +2272,15 @@ def create_receipt(
 ) -> dict:
     owner_id = request_owner_id(request, x_device_id)
     db = load_db()
-    items = [item.model_dump() for item in payload.items]
+    raw_ocr_text = (payload.raw_ocr_text or "").strip()
+    detected_category = categorize_receipt(raw_ocr_text)
+    items = [
+        {
+            **item.model_dump(exclude={"category"}),
+            "category": detected_category,
+        }
+        for item in payload.items
+    ]
     calculated_total = receipt_total(items)
     total = (
         round(float(payload.total), 2)
@@ -2284,14 +2293,18 @@ def create_receipt(
         "store": payload.store.strip(),
         "purchased_at": normalize_receipt_date(payload.purchased_at),
         "payment_method": payload.payment_method,
+        "category": detected_category,
         "items": items,
         "subtotal": calculated_total,
         "total": total,
         "note": payload.note,
+        "raw_ocr_text": raw_ocr_text,
+        "auto_categorized": True,
         "created_at": utc_now(),
     }
     db.setdefault("receipts", []).append(receipt)
     save_db(db)
+    receipt["message"] = f"Otomatik Tespit Edildi: {detected_category}"
     return receipt
 
 
