@@ -3412,20 +3412,10 @@ function renderReceiptReview() {
   const panel = document.getElementById("receiptReviewPanel");
   const receipt = state.pendingReceipt;
   if (!panel || !receipt) return;
-  const metaInfo = Array.isArray(receipt.receipt_info) ? receipt.receipt_info : [];
-  const items = Array.isArray(receipt.items) ? receipt.items : [];
-  const rawOcrText = receipt.raw_ocr_text || "";
   panel.classList.remove("hidden");
   panel.innerHTML = `
-    <div class="receipt-review-header-card">
-      <div>
-        <span>Fiş üst bilgisi</span>
-        <strong>${escapeHtml(receipt.store || "Bilinmeyen mağaza")}</strong>
-        <small>${escapeHtml((receipt.purchased_at || "").slice(0, 10))}</small>
-      </div>
-      <p>${metaInfo.length
-        ? `${metaInfo.length} meta satır ürün listesinden ayrıldı.`
-        : "Meta gürültü bulunmadı; sadece ürün satırları listeleniyor."}</p>
+    <div class="receipt-success-card">
+      <strong>Fiş Başarıyla İşlendi ve Kaydedildi!</strong>
     </div>
     <div class="receipt-review-meta">
       <label>Mağaza
@@ -3448,29 +3438,11 @@ function renderReceiptReview() {
           value="${Number(receipt.total || calculatePendingReceiptTotal()).toFixed(2)}">
       </label>
     </div>
-    <div class="receipt-review-items">
-      ${items.length ? items.map((item, index) => `
-        <div class="receipt-review-row" data-receipt-item="${index}">
-          <input class="receipt-item-title" value="${escapeHtml(item.title)}" aria-label="Ürün adı">
-          <input class="receipt-item-price" type="number" min="0" step="0.01"
-            value="${Number(item.price).toFixed(2)}" aria-label="Fiyat">
-          <select class="receipt-item-category" aria-label="Kategori">
-            ${receiptCategoryOptions(item.category)}
-          </select>
-          <button type="button" class="icon-button light" onclick="removePendingReceiptItem(${index})"
-            title="Ürünü çıkar" aria-label="Ürünü çıkar"><i data-lucide="x"></i></button>
-        </div>
-      `).join("") : `
-        <div class="receipt-empty-items">
-          <p>Ürün listesi otomatik parse edilemedi, ancak fiş tutarı kaydedildi.</p>
-          <textarea readonly rows="8">${escapeHtml(rawOcrText)}</textarea>
-        </div>
-      `}
-    </div>
+    <textarea class="receipt-raw-text-hidden" readonly>${escapeHtml(receipt.raw_ocr_text || "")}</textarea>
     <div class="receipt-review-actions">
       <button type="button" class="secondary-button" onclick="cancelReceiptReview()">Vazgeç</button>
       <button type="button" class="primary-button" onclick="savePendingReceipt()">
-        <i data-lucide="receipt-text"></i> Harcamaya kaydet
+        <i data-lucide="receipt-text"></i> Kaydet
       </button>
     </div>
   `;

@@ -2354,6 +2354,7 @@ body.dark-theme .opt-savings-tag {
   background: var(--bg-card);
 }
 
+.receipt-success-card,
 .receipt-review-header-card {
   display: flex;
   justify-content: space-between;
@@ -2363,6 +2364,13 @@ body.dark-theme .opt-savings-tag {
   border: 1px solid color-mix(in srgb, var(--green) 24%, var(--line));
   border-radius: 8px;
   background: color-mix(in srgb, var(--green) 8%, transparent);
+}
+
+.receipt-success-card {
+  justify-content: center;
+  color: var(--green-dark);
+  font-weight: 800;
+  text-align: center;
 }
 
 .receipt-review-header-card span,
@@ -2431,6 +2439,10 @@ body.dark-theme .opt-savings-tag {
   margin: 0;
   color: var(--muted);
   font-size: 13px;
+}
+
+.receipt-raw-text-hidden {
+  display: none;
 }
 
 .receipt-review-actions {
