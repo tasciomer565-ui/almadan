@@ -510,9 +510,8 @@ async def master_search(
                 else:
                     # Kategori belli olduğunda sadece o kategoriye ait mağazalarda ara
                     results = await scan_worker(query, category)
-    except (asyncio.TimeoutError, Exception) as e:
-        await asyncio.sleep(1.5)
-        results = generate_local_fallback_results(query, category, lat, lon)
+    except (asyncio.TimeoutError, Exception):
+        results = []
 
     # 4. Boş Dönme Koruması (Zero-Fail Policy)
     # Eğer local mod seçildiyse ve sonuç çıkmadıysa, otomatik global fallback'e geç
@@ -540,8 +539,7 @@ async def master_search(
             if not results:
                 results = await scan_worker(query, "MARKETPLACE_NO_N11", fallback=True)
 
-    if not results:
-        results = get_popular_fallbacks(query)
+    # Statik fallback kaldırıldı — gerçek veri yoksa boş dön, frontend "bulunamadı" gösterir
         
     # Coğrafi alanları ve teslimat bilgilerini her ürün için ekle/güncelle
     for item in results:
