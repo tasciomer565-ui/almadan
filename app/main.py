@@ -1835,6 +1835,10 @@ def category_mapping(title: str, fallback: str | None = None) -> str:
     return "grocery"
 
 
+def categorize_receipt(text: str) -> str:
+    return category_mapping(text, "grocery")
+
+
 def parse_receipt_details(
     text: str,
     category_hint: str | None = None,
@@ -2215,28 +2219,38 @@ def ocr_receipt(payload: ReceiptOcrRequest) -> dict:
         )
         response.raise_for_status()
         parsed_results = response.json().get("ParsedResults", [])
-        if parsed_results:
-            text = parsed_results[0].get("ParsedText", "")
-            parsed_receipt = parse_receipt_details(text, category_hint)
-            detected = parsed_receipt["items"]
-            if detected:
-                return {
-                    "store": receipt_store_from_text(text, category_hint),
-                    "purchased_at": default_date,
-                    "total": receipt_total(detected),
-                    "detected_items": detected,
-                    "receipt_info": parsed_receipt["receipt_info"],
-                }
+        raw_ocr_text = "\n".join(
+            str(result.get("ParsedText") or "").strip()
+            for result in parsed_results
+            if str(result.get("ParsedText") or "").strip()
+        ).strip()
+        if not raw_ocr_text:
+            raise HTTPException(status_code=422, detail="OCR metni bulunamadı.")
+
+        detected_category = categorize_receipt(raw_ocr_text)
+        parsed_receipt = parse_receipt_details(raw_ocr_text, detected_category)
+        detected = [
+            {**item, "category": detected_category}
+            for item in parsed_receipt.get("items", [])
+        ]
+        return {
+            "status": "processed",
+            "message": f"Fiş işlendi. Otomatik Tespit Edildi: {detected_category}",
+            "store": receipt_store_from_text(raw_ocr_text, detected_category),
+            "purchased_at": default_date,
+            "total": receipt_total(detected),
+            "detected_items": detected,
+            "receipt_info": parsed_receipt.get("receipt_info", []),
+            "raw_ocr_text": raw_ocr_text,
+            "category": detected_category,
+            "auto_categorized": True,
+        }
     except Exception as exc:
+        if isinstance(exc, HTTPException):
+            raise
         print(f"OCR.space API error: {exc}")
 
-    raise HTTPException(
-        status_code=422,
-        detail=(
-            "Fişten güvenilir ürün bilgisi okunamadı. "
-            "Fişin tamamının göründüğü, net ve aydınlık bir fotoğraf yükle."
-        ),
-    )
+    raise HTTPException(status_code=422, detail="OCR metni bulunamadı.")
 
 
 @app.get("/api/receipts")
