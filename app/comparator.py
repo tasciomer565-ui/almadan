@@ -658,69 +658,7 @@ def search_products_by_name(
                         if "Önerilen" in p["labels"] and len(p["labels"]) > 1:
                             p["labels"].remove("Önerilen")
 
-    if not output:
-        popular_fallbacks = [
-            {
-                "title": "Yudum Ayçiçek Yağı 5 L",
-                "price": 182.90,
-                "original_price": 210.00,
-                "image_url": "https://images.deliveryhero.io/image/fd-tr/Products/12869502.jpg",
-                "source": "bim",
-                "url": "https://www.bim.com.tr/p/yudum-aycicek-yagi-5-l",
-                "labels": ["Önerilen Alternatif"],
-                "extra_info": {"out_of_stock": False, "fallback": True}
-            },
-            {
-                "title": "Sütaş Süzme Peynir 500 gr",
-                "price": 89.50,
-                "original_price": 99.90,
-                "image_url": "https://images.deliveryhero.io/image/fd-tr/Products/11796120.jpg",
-                "source": "migros",
-                "url": "https://www.migros.com.tr/p/sutas-suzme-peynir-500g",
-                "labels": ["Önerilen Alternatif"],
-                "extra_info": {"out_of_stock": False, "fallback": True}
-            },
-            {
-                "title": "Doğuş Filiz Çay 1 Kg",
-                "price": 135.00,
-                "original_price": 155.00,
-                "image_url": "https://images.deliveryhero.io/image/fd-tr/Products/11267812.jpg",
-                "source": "metro",
-                "url": "https://www.metro-tr.com/p/dogus-filiz-cay-1kg",
-                "labels": ["Önerilen Alternatif"],
-                "extra_info": {"out_of_stock": False, "fallback": True}
-            },
-            {
-                "title": "Hardline Whey 3 Matrix 2300 Gr",
-                "price": 2299.00,
-                "original_price": 2499.00,
-                "image_url": "https://img.supplementler.com/products/250x250/hardline-whey-3-matrix-2300-gr_10023.jpg",
-                "source": "supplementler",
-                "url": "https://www.supplementler.com/urun/hardline-whey-3-matrix-2300-gr-10023",
-                "labels": ["Önerilen Alternatif"],
-                "extra_info": {"out_of_stock": False, "fallback": True}
-            },
-            {
-                "title": "Filiz Makarna 500 Gr",
-                "price": 18.50,
-                "original_price": 22.00,
-                "image_url": "https://images.deliveryhero.io/image/fd-tr/Products/11786190.jpg",
-                "source": "a101",
-                "url": "https://www.a101.com.tr/p/filiz-makarna",
-                "labels": ["Önerilen Alternatif"],
-                "extra_info": {"out_of_stock": False, "fallback": True}
-            }
-        ]
-        
-        words = [w for w in query.lower().split() if len(w) > 2]
-        matches = []
-        if words:
-            for item in popular_fallbacks:
-                title_lower = item["title"].lower()
-                if any(w in title_lower for w in words):
-                    matches.append(item)
-                    
-        output = matches if matches else popular_fallbacks
+    # Gerçek sonuç yoksa boş dön — frontend "Arama Sonucu Bulunamadı" gösterir
 
     # Fallback items are created after the first analysis pass. Enrich the
     # final output so every supported comparison type behaves consistently.
