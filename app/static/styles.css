@@ -2400,7 +2400,8 @@ body.dark-theme .opt-savings-tag {
 }
 
 .receipt-review-panel input,
-.receipt-review-panel select {
+.receipt-review-panel select,
+.receipt-review-panel textarea {
   width: 100%;
   min-height: 38px;
   border: 1px solid var(--line);
@@ -2409,6 +2410,27 @@ body.dark-theme .opt-savings-tag {
   color: var(--ink);
   padding: 0 9px;
   font: inherit;
+}
+
+.receipt-review-panel textarea {
+  min-height: 120px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.receipt-empty-items {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--green) 24%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--green) 7%, transparent);
+}
+
+.receipt-empty-items p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .receipt-review-actions {

@@ -3301,11 +3301,6 @@ async function previewReceiptFile(event) {
   await runOcrScan(event.target);
 }
 
-function receiptReadErrorMessage(error) {
-  const detail = error?.message || "Fişten güvenilir ürün bilgisi okunamadı.";
-  return `Fiş okunamadı: ${detail} Fişin üst kısmı (mağaza bilgisi), tarih ve ürün listesi net görünmüyor olabilir. Fişi düz zeminde, ışık alan bir yerde ve tüm kenarları kadraja girecek şekilde tekrar yükle.`;
-}
-
 async function runOcrScan(sourceInput = null) {
   const cat = document.getElementById("ocrReceiptCategorySelector").value || "grocery";
   const cameraInput = document.getElementById("receiptImageInput");
@@ -3318,7 +3313,7 @@ async function runOcrScan(sourceInput = null) {
   const panel = document.getElementById("receiptReviewPanel");
   if (!receiptFile) {
     if (status) {
-      status.className = "receipt-upload-status error";
+      status.className = "receipt-upload-status";
       status.textContent = "Önce kameradan çekilmiş veya galeriden seçilmiş bir fiş görseli ekle.";
     }
     return;
@@ -3354,37 +3349,35 @@ async function runOcrScan(sourceInput = null) {
       })
     });
 
-    if (res.detected_items && res.detected_items.length > 0) {
-      state.pendingReceipt = {
-        store: res.store || "Bilinmeyen mağaza",
-        purchased_at: res.purchased_at || new Date().toISOString().slice(0, 10),
-        payment_method: "unknown",
-        total: res.total,
-        category: cat,
-        receipt_info: Array.isArray(res.receipt_info) ? res.receipt_info : [],
-        items: res.detected_items.map((item) => ({
-          title: item.title,
-          price: Number(item.price || 0),
-          quantity: Number(item.quantity || 1),
-          category: item.category || cat,
-        })),
-      };
-      renderReceiptReview();
-      if (status) {
-        status.className = "receipt-upload-status success";
-        status.textContent = `${res.store || "Mağaza"} fişi okundu: ${res.detected_items.length} ürün, ${currency.format(res.total || calculatePendingReceiptTotal())}. Bilgileri kontrol edip kaydet.`;
-      }
-      panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      showToast(`${res.detected_items.length} ürün bulundu. Kaydetmeden önce kontrol et.`);
-    } else {
-      throw new Error("Fişte okunabilir ürün bulunamadı. Daha net ve tamamı görünen bir fotoğraf dene.");
+    const detectedItems = Array.isArray(res.detected_items) ? res.detected_items : [];
+    state.pendingReceipt = {
+      store: res.store || "Bilinmeyen mağaza",
+      purchased_at: res.purchased_at || new Date().toISOString().slice(0, 10),
+      payment_method: "unknown",
+      total: Number(res.total || 0),
+      category: res.category || cat,
+      receipt_info: Array.isArray(res.receipt_info) ? res.receipt_info : [],
+      raw_ocr_text: res.raw_ocr_text || "",
+      items: detectedItems.map((item) => ({
+        title: item.title || "",
+        price: Number(item.price || 0),
+        quantity: Number(item.quantity || 1),
+        category: item.category || res.category || cat,
+      })),
+    };
+    renderReceiptReview();
+    if (status) {
+      status.className = "receipt-upload-status success";
+      status.textContent = "Fiş başarıyla işlendi";
     }
+    panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    showToast("Fiş başarıyla işlendi.");
   } catch (error) {
     if (status) {
-      status.className = "receipt-upload-status error";
-      status.textContent = receiptReadErrorMessage(error);
+      status.className = "receipt-upload-status";
+      status.textContent = error.message || "Fiş işleme tamamlanamadı.";
     }
-    showToast("Fiş okunamadı. Fişin üst kısmı ve ürün listesi net görünecek şekilde tekrar dene.");
+    showToast(error.message || "Fiş işleme tamamlanamadı.");
   } finally {
     if (button) {
       button.disabled = false;
@@ -3420,6 +3413,8 @@ function renderReceiptReview() {
   const receipt = state.pendingReceipt;
   if (!panel || !receipt) return;
   const metaInfo = Array.isArray(receipt.receipt_info) ? receipt.receipt_info : [];
+  const items = Array.isArray(receipt.items) ? receipt.items : [];
+  const rawOcrText = receipt.raw_ocr_text || "";
   panel.classList.remove("hidden");
   panel.innerHTML = `
     <div class="receipt-review-header-card">
@@ -3454,7 +3449,7 @@ function renderReceiptReview() {
       </label>
     </div>
     <div class="receipt-review-items">
-      ${receipt.items.map((item, index) => `
+      ${items.length ? items.map((item, index) => `
         <div class="receipt-review-row" data-receipt-item="${index}">
           <input class="receipt-item-title" value="${escapeHtml(item.title)}" aria-label="Ürün adı">
           <input class="receipt-item-price" type="number" min="0" step="0.01"
@@ -3465,7 +3460,12 @@ function renderReceiptReview() {
           <button type="button" class="icon-button light" onclick="removePendingReceiptItem(${index})"
             title="Ürünü çıkar" aria-label="Ürünü çıkar"><i data-lucide="x"></i></button>
         </div>
-      `).join("")}
+      `).join("") : `
+        <div class="receipt-empty-items">
+          <p>Ürün listesi otomatik parse edilemedi, ancak fiş tutarı kaydedildi.</p>
+          <textarea readonly rows="8">${escapeHtml(rawOcrText)}</textarea>
+        </div>
+      `}
     </div>
     <div class="receipt-review-actions">
       <button type="button" class="secondary-button" onclick="cancelReceiptReview()">Vazgeç</button>
@@ -3524,10 +3524,6 @@ async function savePendingReceipt() {
     quantity: 1,
     category: row.querySelector(".receipt-item-category").value,
   })).filter((item) => item.title && item.price >= 0);
-  if (!items.length) {
-    showToast("Kaydedilecek en az bir ürün olmalı.");
-    return;
-  }
 
   try {
     const savedStore = document.getElementById("receiptReviewStore").value.trim();
@@ -3540,6 +3536,7 @@ async function savePendingReceipt() {
         payment_method: document.getElementById("receiptReviewPayment").value,
         total: savedTotal,
         items,
+        raw_ocr_text: state.pendingReceipt.raw_ocr_text || "",
       }),
     });
     state.pendingReceipt = null;
