@@ -1658,10 +1658,106 @@ def cron_refresh_all(
 def list_catalog_status() -> list[dict]:
     db = load_db()
     snapshots = db.get("catalog_snapshots", {})
-    return sorted(
-        snapshots.values(),
-        key=lambda item: str(item.get("store", "")),
+    return sorted(snapshots.values(), key=lambda item: str(item.get("store", "")))
+
+
+@app.post("/api/catalogs/scan")
+async def catalog_scan(request: Request, payload: dict = None) -> dict:
+    """
+    Katalog taramasını manuel tetikle (admin veya cron).
+    store parametresi ile belirli bir markete filtre uygulanabilir.
+    """
+    cron_secret = request.headers.get("x-cron-secret", "")
+    user_id     = getattr(request.state, "user_id", None)
+    is_admin    = False
+    if user_id:
+        from app.security import _get_user_role
+        role = await _get_user_role(request)
+        is_admin = role == "admin"
+
+    if not is_admin and CRON_SECRET and cron_secret != CRON_SECRET:
+        raise HTTPException(403, "Yetkisiz erişim.")
+
+    store_filter = (payload or {}).get("store") if payload else None
+
+    from app.notification_orchestrator import catalog_automation
+    result = await asyncio.to_thread(catalog_automation.run, store_filter)
+    log_activity(request, "catalog_scan", {"store": store_filter, **result})
+    return result
+
+
+@app.post("/api/catalogs/match")
+async def catalog_match(request: Request, payload: dict) -> dict:
+    """
+    Gelen watchlist ile katalog öğelerini eşleştir.
+    Body: {"watchlist": ["Pınar Süt", "Ariel 3kg"], "store": "migros"}
+    """
+    watchlist = payload.get("watchlist", [])
+    store     = payload.get("store", "")
+    if not watchlist:
+        raise HTTPException(400, "watchlist boş olamaz.")
+
+    from app.matching_engine import matching_engine
+    from app.catalog_parser import catalog_parser
+    from app.catalogs import fetch_catalog, CATALOG_SOURCES
+
+    # İlgili mağazanın güncel katalogunu çek
+    source = next((s for s in CATALOG_SOURCES if s.store == store), None)
+    catalog_items = []
+    if source:
+        try:
+            snapshot = await asyncio.to_thread(fetch_catalog, source)
+            html_text = "\n".join(snapshot.get("items", []))
+            catalog_items = catalog_parser.parse_text(html_text, store=store)
+        except Exception:
+            pass
+
+    user_id   = getattr(request.state, "user_id", None)
+    device_id = request.cookies.get("almadan_device_id")
+    summary   = matching_engine.match(
+        watchlist=watchlist,
+        catalog_items=catalog_items,
+        store=store,
+        user_id=user_id,
+        device_id=device_id,
     )
+    return {
+        "store":          store,
+        "watchlist_count": summary.total_watchlist,
+        "catalog_count":  summary.total_catalog,
+        "match_count":    summary.match_count,
+        "deal_count":     summary.deal_count,
+        "matches": [
+            {
+                "watchlist_title": m.watchlist_title,
+                "catalog_product": m.catalog_product,
+                "store":           m.store,
+                "score":           m.score,
+                "price":           m.price,
+                "original_price":  m.original_price,
+                "discount_pct":    m.discount_pct,
+                "unit":            m.unit,
+                "is_deal":         m.is_deal,
+            }
+            for m in summary.matches
+        ],
+    }
+
+
+@app.api_route("/cron/catalog-scan", methods=["GET", "POST"])
+async def cron_catalog_scan(request: Request) -> dict:
+    """
+    Vercel Cron: Pazartesi ve Perşembe haftalık katalog taraması.
+    schedule: "0 6 * * 1,4"  (Pazartesi + Perşembe 06:00 UTC)
+    """
+    cron_secret = request.headers.get("x-vercel-cron-secret", "") or \
+                  request.headers.get("x-cron-secret", "")
+    if CRON_SECRET and cron_secret != CRON_SECRET:
+        raise HTTPException(403, "Geçersiz cron secret.")
+
+    from app.notification_orchestrator import catalog_automation
+    result = await asyncio.to_thread(catalog_automation.run)
+    return {"cron": "catalog-scan", **result}
 
 
 @app.get("/notifications")
