@@ -3519,3 +3519,345 @@ async def cron_semantic_index(request: Request):
     from app.semantic_search import semantic_search as ss
     result = await asyncio.to_thread(ss.index_catalog_items)
     return {"ok": True, **result}
+
+
+# ══════════════════════════════════════════════════════════════
+# Sprint 7 — Ekosistem & İş Ortaklığı (Madde 121-140)
+# ══════════════════════════════════════════════════════════════
+
+# ── Partner API Gateway ──────────────────────────────────────
+
+class CreatePartnerPayload(BaseModel):
+    partner_id: str   = Field(..., max_length=60)
+    display_name: str = Field(..., max_length=120)
+    scopes: list[str]
+    rate_limit_rpm: int = Field(default=60, ge=1, le=1000)
+    webhook_url: str | None = None
+    webhook_secret: str | None = None
+
+
+@app.post("/api/admin/partners")
+def create_partner_endpoint(body: CreatePartnerPayload, user=Depends(require_admin)):
+    """Admin: yeni partner ve API key oluşturur."""
+    from app.partner_gateway import create_partner
+    try:
+        result = create_partner(
+            sanitize(body.partner_id, max_length=60),
+            sanitize(body.display_name, max_length=120),
+            body.scopes,
+            rate_limit_rpm=body.rate_limit_rpm,
+            webhook_url=body.webhook_url,
+            webhook_secret=body.webhook_secret,
+        )
+        return result
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/admin/partners/{partner_id}/rotate-key")
+def rotate_partner_key(partner_id: str, user=Depends(require_admin)):
+    """Admin: partner API key'ini yeniler."""
+    from app.partner_gateway import rotate_key
+    try:
+        return rotate_key(sanitize(partner_id, max_length=60))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+# Partner API doğrulama dependency
+async def _partner_auth(request: Request, scope: str) -> "PartnerKey":
+    from app.partner_gateway import partner_gateway
+    raw_key = (
+        request.headers.get("X-Partner-Key")
+        or request.headers.get("Authorization", "").removeprefix("Bearer ")
+    )
+    try:
+        return partner_gateway.authenticate(raw_key, scope)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+
+@app.get("/api/partner/prices")
+async def partner_get_prices(
+    request: Request,
+    q: str,
+    store: str | None = None,
+):
+    """Partner API: ürün fiyatlarını sorgular (scope: read:prices)."""
+    await _partner_auth(request, "read:prices")
+    from app.search_orchestrator import search_orchestrator
+    results = await asyncio.to_thread(
+        search_orchestrator.search,
+        sanitize(q, max_length=100),
+        store=store,
+    )
+    return {"query": q, "results": results}
+
+
+@app.get("/api/partner/eco-scores/{product_key}")
+async def partner_get_eco_score(request: Request, product_key: str):
+    """Partner API: ürün eko-skorunu sorgular (scope: read:eco_scores)."""
+    await _partner_auth(request, "read:eco_scores")
+    from app.eco_score import eco_score_engine
+    result = eco_score_engine.score(
+        sanitize(product_key, max_length=150),
+        product_key.replace("-", " "),
+    )
+    return {
+        "product_key": result.product_key,
+        "eco_score":   result.eco_score,
+        "grade":       result.grade,
+        "color":       result.color,
+        "breakdown":   result.breakdown,
+    }
+
+
+# ── Kupon & Puan Dönüşümü ─────────────────────────────────────
+
+class ExchangePointsPayload(BaseModel):
+    points_to_spend: int = Field(..., ge=100, le=50000)
+    partner_id: str = Field(default="almadan", max_length=60)
+    validity_days: int = Field(default=30, ge=1, le=90)
+
+
+@app.post("/api/coupons/exchange")
+def exchange_points(
+    request: Request,
+    body: ExchangePointsPayload,
+    user=Depends(require_login),
+):
+    """Kullanıcı puanlarını indirim kuponuna dönüştürür."""
+    from app.coupon_engine import coupon_engine
+    user_id = user.get("id") or user.get("sub")
+    result = coupon_engine.exchange_points_for_coupon(
+        user_id,
+        body.points_to_spend,
+        partner_id=sanitize(body.partner_id, max_length=60),
+        validity_days=body.validity_days,
+    )
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.error)
+    return {
+        "code":            result.code,
+        "discount_amount": result.discount_amount,
+        "partner_id":      result.partner_id,
+        "expires_at":      result.expires_at,
+    }
+
+
+@app.get("/api/coupons")
+def list_user_coupons(user=Depends(require_login)):
+    """Kullanıcının aktif kuponlarını listeler."""
+    from app.coupon_engine import coupon_engine
+    user_id = user.get("id") or user.get("sub")
+    return coupon_engine.get_user_coupons(user_id)
+
+
+class ValidateCouponPayload(BaseModel):
+    code: str = Field(..., max_length=40)
+    order_total: float = Field(..., ge=0)
+
+
+@app.post("/api/coupons/validate")
+def validate_coupon(body: ValidateCouponPayload, user=Depends(require_login)):
+    """Kuponu doğrular ve indirim tutarını hesaplar (kullanmaz)."""
+    from app.coupon_engine import coupon_engine
+    user_id = user.get("id") or user.get("sub")
+    result = coupon_engine.validate_coupon(
+        sanitize(body.code, max_length=40).upper(),
+        user_id=user_id,
+        order_total=body.order_total,
+    )
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.error)
+    return {
+        "valid":           True,
+        "discount_amount": result.discount_amount,
+        "discount_pct":    result.discount_pct,
+    }
+
+
+@app.post("/api/coupons/redeem")
+def redeem_coupon(body: ValidateCouponPayload, user=Depends(require_login)):
+    """Kuponu kullanır (geri alınamaz)."""
+    from app.coupon_engine import coupon_engine
+    user_id = user.get("id") or user.get("sub")
+    result = coupon_engine.redeem_coupon(
+        sanitize(body.code, max_length=40).upper(),
+        user_id=user_id,
+        order_total=body.order_total,
+    )
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.error)
+    return {"redeemed": True, "discount_applied": result.discount_applied}
+
+
+@app.post("/api/admin/coupons")
+def admin_create_coupon(request: Request, body: dict, user=Depends(require_admin)):
+    """Admin: partner için toplu kupon oluşturur."""
+    from app.coupon_engine import coupon_engine
+    result = coupon_engine.create_partner_coupon(
+        sanitize(str(body.get("partner_id", "almadan")), max_length=60),
+        coupon_type=body.get("coupon_type", "percentage"),
+        discount_pct=body.get("discount_pct"),
+        discount_amount=body.get("discount_amount"),
+        min_spend=float(body.get("min_spend", 0)),
+        max_uses=int(body.get("max_uses", 100)),
+        validity_days=int(body.get("validity_days", 30)),
+    )
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.error)
+    return {"code": result.code, "partner_id": result.partner_id}
+
+
+# ── Grup Alışveriş ────────────────────────────────────────────
+
+class CreateGroupBuyPayload(BaseModel):
+    product_title: str  = Field(..., max_length=200)
+    store: str          = Field(..., max_length=60)
+    current_price: float= Field(..., gt=0)
+    target_price: float = Field(..., gt=0)
+    target_quantity: int= Field(..., ge=2, le=1000)
+    district: str       = Field(default="", max_length=60)
+    expiry_days: int    = Field(default=7, ge=1, le=30)
+
+
+@app.post("/api/group-buys")
+def create_group_buy(
+    body: CreateGroupBuyPayload,
+    user=Depends(require_login),
+):
+    """Yeni grup alışverişi başlatır."""
+    from app.group_buy import group_buy_engine
+    user_id = user.get("id") or user.get("sub")
+    result = group_buy_engine.create_group_buy(
+        sanitize(body.product_title, max_length=200),
+        sanitize(body.store, max_length=60),
+        current_price=body.current_price,
+        target_price=body.target_price,
+        target_quantity=body.target_quantity,
+        organizer_id=user_id,
+        district=sanitize(body.district, max_length=60),
+        expiry_days=body.expiry_days,
+    )
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.error)
+    return {"group_id": result.group_id, "ok": True}
+
+
+@app.post("/api/group-buys/{group_id}/join")
+def join_group_buy(
+    group_id: int,
+    quantity: int = 1,
+    user=Depends(require_login),
+):
+    """Grup alışverişine katıl."""
+    from app.group_buy import group_buy_engine
+    user_id = user.get("id") or user.get("sub")
+    result = group_buy_engine.join_group_buy(group_id, user_id, quantity=quantity)
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.error)
+    return {"ok": True, "group_id": group_id}
+
+
+@app.delete("/api/group-buys/{group_id}/leave")
+def leave_group_buy(group_id: int, user=Depends(require_login)):
+    """Gruptan ayrıl."""
+    from app.group_buy import group_buy_engine
+    user_id = user.get("id") or user.get("sub")
+    result = group_buy_engine.leave_group_buy(group_id, user_id)
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.error)
+    return {"ok": True}
+
+
+@app.get("/api/group-buys")
+def list_group_buys(
+    district: str = "",
+    product: str = "",
+    limit: int = 20,
+    user=Depends(require_login),
+):
+    """Bölgedeki grup alışverişlerini listeler."""
+    from app.group_buy import group_buy_engine
+    return group_buy_engine.get_nearby_groups(
+        district=sanitize(district, max_length=60),
+        product_query=sanitize(product, max_length=100),
+        limit=min(limit, 50),
+    )
+
+
+@app.get("/api/group-buys/{group_id}")
+def get_group_buy(group_id: int, user=Depends(require_login)):
+    """Grup detaylarını döndürür."""
+    from app.group_buy import group_buy_engine
+    detail = group_buy_engine.get_group_details(group_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Grup bulunamadı")
+    return detail
+
+
+@app.get("/api/group-buys/my/list")
+def my_group_buys(user=Depends(require_login)):
+    """Kullanıcının katıldığı gruplar."""
+    from app.group_buy import group_buy_engine
+    user_id = user.get("id") or user.get("sub")
+    return group_buy_engine.get_user_groups(user_id)
+
+
+# ── Eko-Skor ─────────────────────────────────────────────────
+
+@app.get("/api/eco-score/{product_key}")
+def get_eco_score(
+    product_key: str,
+    title: str = "",
+    packaging: str = "unknown",
+    origin: str = "unknown",
+    user=Depends(require_login),
+):
+    """Ürün için Eko-Skor hesaplar."""
+    from app.eco_score import eco_score_engine
+    key_clean = sanitize(product_key, max_length=150)
+    result = eco_score_engine.score(
+        key_clean,
+        sanitize(title or key_clean, max_length=200),
+        packaging_hint=packaging,
+        origin_hint=origin,
+    )
+    return {
+        "product_key":   result.product_key,
+        "eco_score":     result.eco_score,
+        "grade":         result.grade,
+        "color":         result.color,
+        "is_eco_friendly": result.is_eco_friendly,
+        "breakdown":     result.breakdown,
+        "certifications": result.certifications,
+        "packaging_type": result.packaging_type,
+    }
+
+
+class BasketEcoPayload(BaseModel):
+    product_keys: list[str] = Field(..., max_items=50)
+
+
+@app.post("/api/eco-score/basket")
+def basket_eco_score(body: BasketEcoPayload, user=Depends(require_login)):
+    """Alışveriş sepetinin ortalama Eko-Skorunu hesaplar."""
+    from app.eco_score import eco_score_engine
+    summary = eco_score_engine.get_eco_summary(
+        [sanitize(k, max_length=150) for k in body.product_keys]
+    )
+    return summary
+
+
+# ── Grup Alışveriş Expire Cron ────────────────────────────────
+
+@app.api_route("/cron/group-buy-expire", methods=["GET", "POST"])
+async def cron_group_buy_expire(request: Request):
+    """Vercel Cron: Her saat — süresi dolan grupları kapatır."""
+    secret = request.headers.get("x-cron-secret") or request.query_params.get("secret")
+    if CRON_SECRET and secret != CRON_SECRET:
+        raise HTTPException(status_code=401, detail="Yetkisiz")
+    from app.group_buy import group_buy_engine
+    count = await asyncio.to_thread(group_buy_engine.expire_old_groups)
+    return {"ok": True, "expired_count": count}

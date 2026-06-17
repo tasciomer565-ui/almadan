@@ -22,6 +22,10 @@
     {
       "path": "/cron/semantic-index",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/cron/group-buy-expire",
+      "schedule": "0 * * * *"
     }
   ]
 }
