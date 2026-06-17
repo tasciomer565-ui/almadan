@@ -1769,6 +1769,52 @@ def unit_price(name: str, price: float) -> dict:
     return {"found": bool(result), "analysis": result}
 
 
+# ── Admin Dashboard ────────────────────────────────────────────────────────
+
+@app.get("/api/admin/stats")
+def admin_stats(days: int = 7) -> dict:
+    """Performans istatistikleri — sadece geliştirici modunda kullanılır."""
+    from app.admin_metrics import get_dashboard_stats
+    return get_dashboard_stats(days=min(days, 30))
+
+
+# ── VTON Endpoints ────────────────────────────────────────────────────────
+
+@app.post("/api/vton/submit")
+def vton_submit(payload: dict, request: Request) -> dict:
+    """VTON işi kuyruğa ekle. portrait_url ve garment_url gerekli."""
+    from app.ai_processor import create_job, process_vton_job
+    portrait_url = payload.get("portrait_url", "")
+    garment_url = payload.get("garment_url", "")
+    if not portrait_url or not garment_url:
+        raise HTTPException(status_code=400, detail="portrait_url ve garment_url zorunlu.")
+    user_id = None
+    if hasattr(request.state, "user") and request.state.user:
+        user_id = request.state.user.get("id")
+    job = create_job(portrait_url, garment_url, user_id)
+    job_id = job.get("job_id", "")
+    # Vercel'de background task yok; sync işle (timeout riski var, kabul edilebilir)
+    # Üretim için Vercel Cron veya ayrı bir worker servisi önerilir.
+    import threading
+    threading.Thread(target=process_vton_job, args=(job_id,), daemon=True).start()
+    return {"job_id": job_id, "status": "queued"}
+
+
+@app.get("/api/vton/{job_id}")
+def vton_status(job_id: str) -> dict:
+    """VTON iş durumunu sorgula."""
+    from app.ai_processor import get_job
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="İş bulunamadı.")
+    return {
+        "job_id": job_id,
+        "status": job.get("status"),
+        "result_url": job.get("result_url"),
+        "error": job.get("error_msg"),
+    }
+
+
 @app.delete("/api/cache")
 def clear_search_cache(query: str | None = None, category: str | None = None) -> dict:
     """Cache'i temizle — query+category verilirse sadece o key'i sil, verilmezse etkisiz."""

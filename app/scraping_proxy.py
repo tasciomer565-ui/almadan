@@ -75,6 +75,11 @@ def proxy_get(target_url: str, render_js: bool = False, timeout: int = 10) -> st
         resp = requests.get(SCRAPINGBEE_URL, params=params, timeout=timeout + 5)
         if resp.status_code == 200:
             logger.info("ScrapingBee OK: %s", target_url[:60])
+            try:
+                from app.admin_metrics import record_event
+                record_event("proxy_used", source=target_url[:80])
+            except Exception:
+                pass
             return resp.text
         logger.warning("ScrapingBee %s: %s", resp.status_code, target_url[:60])
         return None

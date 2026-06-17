@@ -598,9 +598,16 @@ async def master_search(
     # ── Cache-first lookup ──────────────────────────────────────────────────
     from app.cache import make_cache_key, cache_get, cache_set, cache_get_stale
     _cache_key = make_cache_key(query, category)
-    cached = cache_get(_cache_key)
+    cached = cache_get(_cache_key, query=query, category=category)
     if cached:
         return cached
+    # cache miss → metrik kaydet
+    try:
+        from app.admin_metrics import record_event
+        record_event("cache_miss", query=query, category=category)
+    except Exception:
+        pass
+    # ───────────────────────────────────────────────────────────────────────
     # ───────────────────────────────────────────────────────────────────────
 
     results = []
@@ -676,12 +683,15 @@ async def master_search(
                 results = await scan_worker(query, "MARKETPLACE_NO_N11", fallback=True)
 
     # ── Son çare: Süresi dolmuş cache (stale fallback) ─────────────────────
-    # Tüm canlı kaynaklar ve fallback'lar başarısız olursa,
-    # kullanıcıyı boş ekranla bırakmak yerine eski veriyi "uyarıyla" göster.
     if not results:
         stale = cache_get_stale(_cache_key)
         if stale:
-            return stale  # Zaten "Eski veri (önbellek)" etiketi eklendi
+            try:
+                from app.admin_metrics import record_event
+                record_event("stale_fallback", query=query, category=category)
+            except Exception:
+                pass
+            return stale
     # ───────────────────────────────────────────────────────────────────────
         
     # Coğrafi alanları ve teslimat bilgilerini her ürün için ekle/güncelle
@@ -710,6 +720,16 @@ async def master_search(
         local_items.sort(key=lambda x: x.get("distance_km", 999.0))
         global_items.sort(key=lambda x: x.get("price", 999999.0))
         results = local_items + global_items
+
+    # ── Fiyat geçmişi kaydet + trendleri ekle ─────────────────────────────
+    if results:
+        try:
+            from app.price_history import record_prices, enrich_with_trends
+            record_prices(results)
+            results = enrich_with_trends(results)
+        except Exception:
+            pass
+    # ───────────────────────────────────────────────────────────────────────
 
     # ── Cache'e kaydet (boş sonuçları kaydetme) ────────────────────────────
     if results:

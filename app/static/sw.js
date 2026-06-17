@@ -1,4 +1,4 @@
-const CACHE_VERSION = "almadan-v12-fault-tolerance";
+const CACHE_VERSION = "almadan-v13-analytics";
 const APP_SHELL = [
   "/",
   "/index.html",

@@ -1760,6 +1760,100 @@ async function parseProduct(event) {
   });
 }
 
+// ── Admin Dashboard ─────────────────────────────────────────────────────────
+async function showAdminDashboard() {
+  const dialog = document.getElementById("productDialog");
+  const content = document.getElementById("dialogContent");
+  if (!dialog || !content) return;
+
+  content.innerHTML = `<div class="dialog-body" style="max-width: 560px;"><p class="eyebrow" style="color:var(--green);">YÖNETİCİ PANELİ</p><h2>Sistem İstatistikleri</h2><div id="adminStatsBody" style="margin-top:16px;"><span class="spinner"></span> Yükleniyor...</div></div>`;
+  if (!dialog.open) dialog.showModal();
+  lucide.createIcons();
+
+  try {
+    const stats = await api("/api/admin/stats?days=7");
+    const { counts = {}, cache_hit_rate_pct = 0, total_searches = 0, avg_duration_ms = {}, daily = {} } = stats;
+
+    const rows = [
+      ["Cache Hit",      counts.cache_hit      || 0, "#38a169"],
+      ["Cache Miss",     counts.cache_miss      || 0, "#e53e3e"],
+      ["Proxy Kullanım", counts.proxy_used      || 0, "#3182ce"],
+      ["Stale Fallback", counts.stale_fallback  || 0, "#d69e2e"],
+    ];
+
+    const barMax = Math.max(...rows.map(r => r[1]), 1);
+
+    const dailyKeys = Object.keys(daily).sort();
+    const dailyHtml = dailyKeys.map(day => {
+      const d = daily[day] || {};
+      const total = Object.values(d).reduce((a, b) => a + b, 0);
+      return `<tr>
+        <td style="padding:6px 8px; font-size:12px; color:var(--ink-light);">${day.slice(5)}</td>
+        <td style="padding:6px 8px; font-size:12px; text-align:right;">${total}</td>
+        <td style="padding:6px 8px; font-size:12px; text-align:right; color:#38a169;">${d.cache_hit || 0}</td>
+        <td style="padding:6px 8px; font-size:12px; text-align:right; color:#3182ce;">${d.proxy_used || 0}</td>
+      </tr>`;
+    }).join("");
+
+    document.getElementById("adminStatsBody").innerHTML = `
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
+        <div style="background:rgba(40,122,80,0.07); border-radius:10px; padding:14px; text-align:center;">
+          <div style="font-size:28px; font-weight:800; color:#287a50;">${cache_hit_rate_pct}%</div>
+          <div style="font-size:11px; color:var(--ink-light); margin-top:4px;">Cache Hit Oranı</div>
+        </div>
+        <div style="background:rgba(40,122,80,0.07); border-radius:10px; padding:14px; text-align:center;">
+          <div style="font-size:28px; font-weight:800; color:#287a50;">${total_searches}</div>
+          <div style="font-size:11px; color:var(--ink-light); margin-top:4px;">Toplam Arama (7 gün)</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        ${rows.map(([label, count, color]) => `
+          <div style="margin-bottom:8px;">
+            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;">
+              <span style="font-weight:600;">${label}</span>
+              <span style="color:var(--ink-light);">${count}</span>
+            </div>
+            <div style="height:6px; background:var(--line); border-radius:3px; overflow:hidden;">
+              <div style="height:100%; width:${Math.round(count / barMax * 100)}%; background:${color}; border-radius:3px; transition:width 0.5s;"></div>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+
+      ${dailyHtml ? `
+        <p style="font-size:11px; font-weight:700; color:var(--ink-light); text-transform:uppercase; margin-bottom:8px;">Günlük Dağılım</p>
+        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--line);">
+              <th style="padding:4px 8px; text-align:left; color:var(--ink-light);">Tarih</th>
+              <th style="padding:4px 8px; text-align:right; color:var(--ink-light);">Toplam</th>
+              <th style="padding:4px 8px; text-align:right; color:#38a169;">Hit</th>
+              <th style="padding:4px 8px; text-align:right; color:#3182ce;">Proxy</th>
+            </tr>
+          </thead>
+          <tbody>${dailyHtml}</tbody>
+        </table>
+      ` : ""}
+
+      <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--line);">
+        <p style="font-size:11px; color:var(--ink-light);">Ortalama Yanıt: Cache Hit ${avg_duration_ms.cache_hit || "—"}ms | Miss ${avg_duration_ms.cache_miss || "—"}ms</p>
+      </div>
+    `;
+    lucide.createIcons();
+  } catch (err) {
+    document.getElementById("adminStatsBody").innerHTML = `<p style="color:var(--muted);">İstatistikler yüklenemedi: ${err.message}</p>`;
+  }
+}
+
+// URL'de ?admin=1 varsa admin paneline giden kısayol tuşu
+if (new URLSearchParams(window.location.search).get("admin") === "1") {
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "F2") showAdminDashboard();
+  });
+}
+// ───────────────────────────────────────────────────────────────────────────
+
 async function forceRefreshSearch(query, cacheKey) {
   const btn = document.getElementById("forceRefreshBtn");
   if (btn) {
@@ -2048,6 +2142,14 @@ function showSearchResults(response) {
                 <div>
                   ${originalPriceHtml}
                   ${priceDisplayHtml}
+                  ${(() => {
+                    const trend = item.price_trend;
+                    if (!trend) return "";
+                    const { direction, change_pct } = trend;
+                    if (direction === "up") return `<div style="font-size: 10px; font-weight: 700; color: #e53e3e; margin-top: 2px; display: flex; align-items: center; gap: 2px;"><i data-lucide="trending-up" style="width:11px;height:11px;"></i> %${Math.abs(change_pct)} arttı</div>`;
+                    if (direction === "down") return `<div style="font-size: 10px; font-weight: 700; color: #38a169; margin-top: 2px; display: flex; align-items: center; gap: 2px;"><i data-lucide="trending-down" style="width:11px;height:11px;"></i> %${Math.abs(change_pct)} düştü</div>`;
+                    return `<div style="font-size: 10px; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 2px;"><i data-lucide="minus" style="width:11px;height:11px;"></i> Sabit</div>`;
+                  })()}
                 </div>
                 ${buttonHtml}
               </div>

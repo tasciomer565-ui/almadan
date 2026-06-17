@@ -48,10 +48,12 @@ def _enabled() -> bool:
     return bool(SUPABASE_URL and SUPABASE_KEY)
 
 
-def cache_get(cache_key: str) -> Optional[list[dict]]:
+def cache_get(cache_key: str, query: str = "", category: str = "") -> Optional[list[dict]]:
     """Cache'de taze (süresi dolmamış) veri varsa döndür, yoksa None."""
     if not _enabled():
         return None
+    import time as _time
+    t0 = _time.monotonic()
     try:
         now = datetime.now(timezone.utc).isoformat()
         url = (
@@ -64,7 +66,13 @@ def cache_get(cache_key: str) -> Optional[list[dict]]:
         resp = requests.get(url, headers=_headers(), timeout=3)
         rows = resp.json() if resp.ok else []
         if rows:
+            duration_ms = int((_time.monotonic() - t0) * 1000)
             logger.info("Cache HIT: %s (%d ürün)", cache_key, rows[0].get("source_count", 0))
+            try:
+                from app.admin_metrics import record_event
+                record_event("cache_hit", query=query, category=category, duration_ms=duration_ms)
+            except Exception:
+                pass
             return rows[0]["products"]
     except Exception as exc:
         logger.warning("cache_get error: %s", exc)
