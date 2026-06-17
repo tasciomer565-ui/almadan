@@ -6,6 +6,10 @@
     {
       "path": "/cron/refresh-all",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/ai/worker",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

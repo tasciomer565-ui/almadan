@@ -1882,38 +1882,131 @@ def admin_stats(days: int = 7) -> dict:
 # ── VTON Endpoints ────────────────────────────────────────────────────────
 
 @app.post("/api/vton/submit")
-def vton_submit(payload: dict, request: Request) -> dict:
+async def vton_submit(payload: dict, request: Request) -> dict:
     """VTON işi kuyruğa ekle. portrait_url ve garment_url gerekli."""
-    from app.ai_processor import create_job, process_vton_job
+    from app.ai_orchestrator import orchestrator
     portrait_url = payload.get("portrait_url", "")
-    garment_url = payload.get("garment_url", "")
+    garment_url  = payload.get("garment_url", "")
+    model        = payload.get("model", "vton")
     if not portrait_url or not garment_url:
         raise HTTPException(status_code=400, detail="portrait_url ve garment_url zorunlu.")
-    user_id = None
-    if hasattr(request.state, "user") and request.state.user:
-        user_id = request.state.user.get("id")
-    job = create_job(portrait_url, garment_url, user_id)
-    job_id = job.get("job_id", "")
-    # Vercel'de background task yok; sync işle (timeout riski var, kabul edilebilir)
-    # Üretim için Vercel Cron veya ayrı bir worker servisi önerilir.
-    import threading
-    threading.Thread(target=process_vton_job, args=(job_id,), daemon=True).start()
-    return {"job_id": job_id, "status": "queued"}
+    user_id   = getattr(request.state, "user_id", None)
+    device_id = request.cookies.get("almadan_device_id")
+    result = orchestrator.submit_vton(
+        portrait_url=portrait_url,
+        garment_url=garment_url,
+        user_id=user_id,
+        device_id=device_id,
+        model=model,
+    )
+    from app.security import log_activity
+    log_activity(request, "vton_submit", {"model": model})
+    return result
 
 
 @app.get("/api/vton/{job_id}")
-def vton_status(job_id: str) -> dict:
-    """VTON iş durumunu sorgula."""
-    from app.ai_processor import get_job
-    job = get_job(job_id)
-    if not job:
+async def vton_status(job_id: str) -> dict:
+    """VTON iş durumunu sorgula (eski uyumluluk endpoint'i)."""
+    from app.ai_orchestrator import orchestrator
+    result = orchestrator.get_status(job_id)
+    if result.status == "not_found":
         raise HTTPException(status_code=404, detail="İş bulunamadı.")
     return {
-        "job_id": job_id,
-        "status": job.get("status"),
-        "result_url": job.get("result_url"),
-        "error": job.get("error_msg"),
+        "job_id":     result.job_id,
+        "status":     result.status,
+        "result_url": (result.output_data or {}).get("result_url"),
+        "error":      result.error_message,
     }
+
+
+# ── Yeni Genelleştirilmiş AI Endpoint'leri ──────────────────
+
+@app.post("/api/ai/submit/vton")
+async def ai_submit_vton(payload: dict, request: Request) -> dict:
+    """VTON: Sanal kıyafet deneme işi gönder."""
+    from app.ai_orchestrator import orchestrator
+    portrait_url = sanitize(payload.get("portrait_url", ""))
+    garment_url  = sanitize(payload.get("garment_url", ""))
+    if not portrait_url or not garment_url:
+        raise HTTPException(400, "portrait_url ve garment_url zorunlu.")
+    return orchestrator.submit_vton(
+        portrait_url=portrait_url,
+        garment_url=garment_url,
+        user_id=getattr(request.state, "user_id", None),
+        device_id=request.cookies.get("almadan_device_id"),
+        model=payload.get("model", "vton"),
+        priority=int(payload.get("priority", 5)),
+    )
+
+
+@app.post("/api/ai/submit/ocr")
+async def ai_submit_ocr(payload: dict, request: Request) -> dict:
+    """OCR: Fiş veya ürün etiketi metin çıkarma işi gönder."""
+    from app.ai_orchestrator import orchestrator
+    image_url = sanitize(payload.get("image_url", ""))
+    if not image_url:
+        raise HTTPException(400, "image_url zorunlu.")
+    return orchestrator.submit_ocr(
+        image_url=image_url,
+        user_id=getattr(request.state, "user_id", None),
+        device_id=request.cookies.get("almadan_device_id"),
+        hint=payload.get("hint", "receipt"),
+    )
+
+
+@app.get("/api/ai/status/{job_id}")
+async def ai_status(job_id: str) -> dict:
+    """AI iş durumunu sorgula (polling endpoint)."""
+    from app.ai_orchestrator import orchestrator
+    import dataclasses
+    result = orchestrator.get_status(job_id)
+    if result.status == "not_found":
+        raise HTTPException(404, "İş bulunamadı.")
+    return dataclasses.asdict(result)
+
+
+@app.post("/api/ai/webhook/{job_id}")
+async def ai_webhook(job_id: str, request: Request) -> dict:
+    """
+    Replicate webhook callback.
+    Replicate prediction tamamlandığında bu endpoint'i çağırır.
+    """
+    from app.ai_orchestrator import orchestrator
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(400, "Geçersiz JSON payload.")
+
+    signature = request.headers.get("webhook-secret") or request.headers.get("x-webhook-secret")
+    result = orchestrator.handle_replicate_webhook(job_id, payload, signature)
+    if not result.get("accepted"):
+        raise HTTPException(403, result.get("error", "Webhook reddedildi."))
+    return result
+
+
+@app.post("/api/ai/worker")
+async def ai_worker(request: Request) -> dict:
+    """
+    Manuel kuyruk işleyici (Vercel cron veya admin tetikler).
+    Cron header doğrulaması: x-cron-secret
+    """
+    cron_secret = request.headers.get("x-cron-secret", "")
+    if CRON_SECRET and cron_secret != CRON_SECRET:
+        raise HTTPException(403, "Geçersiz cron secret.")
+    from app.ai_orchestrator import orchestrator
+    processed = await asyncio.to_thread(orchestrator.process_pending_jobs, 10)
+    return {"processed": len(processed), "job_ids": processed}
+
+
+@app.delete("/api/ai/{job_id}")
+async def ai_cancel(job_id: str, request: Request) -> dict:
+    """AI işi iptal et (sadece pending/queued)."""
+    from app.ai_orchestrator import orchestrator
+    user_id = getattr(request.state, "user_id", None)
+    if not user_id:
+        raise HTTPException(401, "Oturum açmanız gerekiyor.")
+    success = orchestrator.cancel_job(job_id)
+    return {"canceled": success, "job_id": job_id}
 
 
 @app.delete("/api/cache")
