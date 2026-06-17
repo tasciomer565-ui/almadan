@@ -2718,3 +2718,25 @@ body.dark-theme .quantum-node-card {
   background: linear-gradient(90deg, transparent, #00ff66, transparent) !important;
   box-shadow: 0 0 15px #00ff66 !important;
 }
+
+
+/* Page guide banners */
+.page-guide {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(40, 122, 80, 0.08);
+  border: 1px solid rgba(40, 122, 80, 0.18);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  font-size: 13px;
+  color: var(--ink-light, #666);
+  line-height: 1.45;
+}
+.page-guide svg {
+  flex-shrink: 0;
+  color: var(--green, #287a50);
+  width: 18px;
+  height: 18px;
+}

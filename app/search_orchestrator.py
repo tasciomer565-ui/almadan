@@ -556,11 +556,12 @@ async def master_search(
                 if category == "GENEL":
                     results = await marketplace_scan(query)
                 elif category == "GIDA":
-                    carrefour_task = loop.run_in_executor(None, search_carrefoursa, query)
+                    from app.comparator import search_n11_direct
+                    n11_task = loop.run_in_executor(None, search_n11_direct, query)
                     aol_task = scan_worker(query, category)
-                    carrefour_res, aol_res = await asyncio.gather(carrefour_task, aol_task)
+                    (n11_res, _), aol_res = await asyncio.gather(n11_task, aol_task)
                     seen = set()
-                    for p in carrefour_res + aol_res:
+                    for p in aol_res + n11_res:
                         key = p["url"].split("?")[0]
                         if key not in seen:
                             seen.add(key)
@@ -574,11 +575,12 @@ async def master_search(
                 if category == "GENEL":
                     results = await marketplace_scan(query)
                 elif category == "GIDA":
-                    carrefour_task = loop.run_in_executor(None, search_carrefoursa, query)
+                    from app.comparator import search_n11_direct
+                    n11_task = loop.run_in_executor(None, search_n11_direct, query)
                     aol_task = scan_worker(query, category)
-                    carrefour_res, aol_res = await asyncio.gather(carrefour_task, aol_task)
+                    (n11_res, _), aol_res = await asyncio.gather(n11_task, aol_task)
                     seen = set()
-                    for p in carrefour_res + aol_res:
+                    for p in aol_res + n11_res:
                         key = p["url"].split("?")[0]
                         if key not in seen:
                             seen.add(key)

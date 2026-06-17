@@ -748,17 +748,26 @@ function resetSmsFlow() {
   }
 }
 
+function normalizePhoneNumber(raw) {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("90") && digits.length === 12) return "+" + digits;
+  if (digits.startsWith("0") && digits.length === 11) return "+9" + digits;
+  if (digits.length === 10) return "+90" + digits;
+  return "+" + digits;
+}
+
 async function sendSmsCode() {
-  const phone = document.getElementById("authSmsPhone")?.value.trim();
-  if (!phone || phone.length < 10) {
+  const rawPhone = document.getElementById("authSmsPhone")?.value.trim();
+  if (!rawPhone || rawPhone.replace(/\D/g, "").length < 10) {
     showAuthError("Lütfen geçerli bir telefon numarası girin.");
     return;
   }
-  
+  const phone = normalizePhoneNumber(rawPhone);
+
   try {
     const errorBox = document.getElementById("authError");
     if (errorBox) errorBox.hidden = true;
-    
+
     await api("/auth/otp/send", {
       method: "POST",
       body: JSON.stringify({ phone }),
@@ -776,18 +785,19 @@ async function sendSmsCode() {
 }
 
 async function verifySmsCode() {
-  const phone = document.getElementById("authSmsPhone")?.value.trim();
+  const rawPhone = document.getElementById("authSmsPhone")?.value.trim();
   const code = document.getElementById("authSmsCode")?.value.trim();
-  
-  if (!phone || !code || code.length !== 6) {
+
+  if (!rawPhone || !code || code.length !== 6) {
     showAuthError("Lütfen 6 haneli doğrulama kodunu girin.");
     return;
   }
-  
+  const phone = normalizePhoneNumber(rawPhone);
+
   try {
     const errorBox = document.getElementById("authError");
     if (errorBox) errorBox.hidden = true;
-    
+
     const result = await api("/auth/otp/verify", {
       method: "POST",
       body: JSON.stringify({ phone, code }),
@@ -3275,7 +3285,8 @@ async function startLiveBarcodeScanner() {
       },
       async (decodedText) => {
         const code = String(decodedText || "").replace(/\D/g, "");
-        if (liveBarcodeScanLocked || code === lastLiveBarcode || code.length !== 13) return;
+        const validLen = [8, 12, 13].includes(code.length);
+        if (liveBarcodeScanLocked || code === lastLiveBarcode || !validLen) return;
         liveBarcodeScanLocked = true;
         lastLiveBarcode = code;
         updateBarcodeScanStatus(`${code} yakalandi. Urun sorgulaniyor...`);
@@ -3322,8 +3333,9 @@ async function runBarcodeScan() {
 
 async function lookupAndAddBarcode(code) {
   const cleanCode = String(code || "").replace(/\D/g, "");
-  if (cleanCode.length !== 13) {
-    showToast("EAN-13 barkod 13 haneli olmalidir.");
+  if (![8, 12, 13].includes(cleanCode.length)) {
+    showToast("Geçersiz barkod. EAN-8, EAN-13 veya UPC-A formatında olmalıdır.");
+    liveBarcodeScanLocked = false;
     return;
   }
 
@@ -3365,6 +3377,7 @@ async function lookupAndAddBarcode(code) {
     }
   } catch (error) {
     showToast(error.message);
+    liveBarcodeScanLocked = false;
   }
 }
 

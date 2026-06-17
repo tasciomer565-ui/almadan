@@ -17,7 +17,7 @@
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
-    <link rel="stylesheet" href="/static/styles.css?v=20260616-ux-fix">
+    <link rel="stylesheet" href="/static/styles.css?v=20260617-fixes">
   </head>
   <body>
     <header class="topbar">
@@ -362,6 +362,10 @@
       </section>
 
       <section class="content-section" id="discoverView">
+        <div class="page-guide">
+          <i data-lucide="search"></i>
+          <span>Ürün adı veya marka yazın — sistem online mağazaları tarayarak size en uygun fiyatı bulur. Barkod okuyarak da ürün ekleyebilirsiniz.</span>
+        </div>
         <div class="section-heading">
           <div>
             <p class="eyebrow">SANA ÖZEL</p>
@@ -393,6 +397,10 @@
       </section>
 
       <section class="content-section hidden" id="trackingView">
+        <div class="page-guide">
+          <i data-lucide="bell"></i>
+          <span>Fiyatını takip etmek istediğiniz ürünleri buraya ekleyin. Fiyat düştüğünde bildirim alırsınız.</span>
+        </div>
         <div class="section-heading">
           <div>
             <p class="eyebrow">FİYAT RADARIN</p>
@@ -404,6 +412,10 @@
       </section>
 
       <section class="content-section hidden" id="savingsView">
+        <div class="page-guide">
+          <i data-lucide="piggy-bank"></i>
+          <span>Sepetinize eklediğiniz ürünlerde yakaladığınız fiyat farklarını ve aylık tasarrufunuzu burada görürsünüz.</span>
+        </div>
         <div class="section-heading">
           <div>
             <p class="eyebrow">AYLIK ÖZET</p>
@@ -498,6 +510,10 @@
       </section>
 
       <section class="content-section hidden" id="cartView">
+        <div class="page-guide">
+          <i data-lucide="shopping-cart"></i>
+          <span>Alışveriş listenizi oluşturun, barkod okutarak ürün ekleyin veya listeyi başkalarıyla paylaşın. Paylaşılan listeler gerçek zamanlı güncellenir.</span>
+        </div>
         <div class="section-heading">
           <div>
             <p class="eyebrow">SEPETİM VE ORTAK LİSTELERİM</p>
@@ -697,6 +713,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script defer src="/static/app.js?v=20260616-ux-fix"></script>
+    <script defer src="/static/app.js?v=20260617-fixes"></script>
   </body>
 </html>
