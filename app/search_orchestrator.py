@@ -315,19 +315,17 @@ def fetch_aol_urls_for_sites(query: str, sites: list[str], cart_filter: bool = T
     return found_urls
 
 def search_carrefoursa(query: str) -> list[dict]:
-    """CarrefourSA arama sayfasını scrape eder — server-side render, güvenilir."""
+    """CarrefourSA arama sayfasını scrape eder.
+    ScrapingBee varsa proxy üzerinden çeker (Vercel IP engeli aşılır).
+    """
+    from app.scraping_proxy import proxy_get
     url = f"https://www.carrefoursa.com/search/?text={urllib.parse.quote_plus(query)}"
-    headers = {
-        "User-Agent": YAHOO_USER_AGENT,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "tr-TR,tr;q=0.9",
-    }
     results = []
     try:
-        r = requests.get(url, headers=headers, timeout=12)
-        if r.status_code != 200:
+        html = proxy_get(url, timeout=12)
+        if not html:
             return results
-        soup = BeautifulSoup(r.text, "html.parser")
+        soup = BeautifulSoup(html, "html.parser")
 
         names = soup.select(".item-name")
         prices = soup.select(".item-price")
@@ -357,6 +355,56 @@ def search_carrefoursa(query: str) -> list[dict]:
                 "source": "carrefoursa",
                 "url": product_url,
                 "labels": ["Önerilen"],
+                "extra_info": {"out_of_stock": False},
+            })
+    except Exception:
+        pass
+    return results
+
+
+def search_migros_proxy(query: str) -> list[dict]:
+    """Migros ürün araması — ScrapingBee üzerinden JSON API."""
+    from app.scraping_proxy import proxy_get_json
+    results = []
+    try:
+        api_url = (
+            f"https://www.migros.com.tr/rest/search-gateway/v2/product/search"
+            f"?query={urllib.parse.quote_plus(query)}&sayfa=0&siralamaTipi=0"
+        )
+        data = proxy_get_json(api_url, timeout=10)
+        if not data:
+            return results
+        items = (
+            data.get("data", {}).get("products", [])
+            or data.get("products", [])
+            or []
+        )
+        for item in items[:10]:
+            name = item.get("name") or item.get("title", "")
+            if not name:
+                continue
+            price_raw = (
+                item.get("salePrice")
+                or item.get("price")
+                or item.get("listPrice", 0)
+            )
+            try:
+                price = float(str(price_raw).replace(",", ".").replace("TL", "").strip())
+            except (ValueError, TypeError):
+                continue
+            slug = item.get("url") or item.get("slug", "")
+            product_url = (
+                f"https://www.migros.com.tr/{slug}" if slug and not slug.startswith("http") else slug
+            ) or "https://www.migros.com.tr"
+            img = item.get("imageUrl") or item.get("image", {}).get("url", "") if isinstance(item.get("image"), dict) else item.get("image", "")
+            results.append({
+                "title": name,
+                "price": price,
+                "original_price": None,
+                "image_url": img,
+                "source": "migros",
+                "url": product_url,
+                "labels": ["Online Sipariş"],
                 "extra_info": {"out_of_stock": False},
             })
     except Exception:
@@ -547,6 +595,14 @@ async def master_search(
         }
         category = category_map.get(selected_category, "GENEL")
 
+    # ── Cache-first lookup ──────────────────────────────────────────────────
+    from app.cache import make_cache_key, cache_get, cache_set
+    _cache_key = make_cache_key(query, category)
+    cached = cache_get(_cache_key)
+    if cached:
+        return cached
+    # ───────────────────────────────────────────────────────────────────────
+
     results = []
     loop = asyncio.get_running_loop()
 
@@ -558,10 +614,13 @@ async def master_search(
                 elif category == "GIDA":
                     from app.comparator import search_n11_direct
                     n11_task = loop.run_in_executor(None, search_n11_direct, query)
-                    aol_task = scan_worker(query, category)
-                    (n11_res, _), aol_res = await asyncio.gather(n11_task, aol_task)
+                    migros_task = loop.run_in_executor(None, search_migros_proxy, query)
+                    carrefour_task = loop.run_in_executor(None, search_carrefoursa, query)
+                    (n11_res, _), migros_res, carrefour_res = await asyncio.gather(
+                        n11_task, migros_task, carrefour_task
+                    )
                     seen = set()
-                    for p in aol_res + n11_res:
+                    for p in carrefour_res + migros_res + n11_res:
                         key = p["url"].split("?")[0]
                         if key not in seen:
                             seen.add(key)
@@ -577,10 +636,13 @@ async def master_search(
                 elif category == "GIDA":
                     from app.comparator import search_n11_direct
                     n11_task = loop.run_in_executor(None, search_n11_direct, query)
-                    aol_task = scan_worker(query, category)
-                    (n11_res, _), aol_res = await asyncio.gather(n11_task, aol_task)
+                    migros_task = loop.run_in_executor(None, search_migros_proxy, query)
+                    carrefour_task = loop.run_in_executor(None, search_carrefoursa, query)
+                    (n11_res, _), migros_res, carrefour_res = await asyncio.gather(
+                        n11_task, migros_task, carrefour_task
+                    )
                     seen = set()
-                    for p in aol_res + n11_res:
+                    for p in carrefour_res + migros_res + n11_res:
                         key = p["url"].split("?")[0]
                         if key not in seen:
                             seen.add(key)
@@ -637,14 +699,17 @@ async def master_search(
             item["longitude"] = None
             item["delivery_cost"] = "Ücretsiz Kargo"
 
-    # Sıralama: Yerel rezonans ürünleri (mesafeye göre artan) en üste, global ürünler (fiyata göre artan) alta
+    # Sıralama: Yerel ürünler (mesafeye göre) en üste, global ürünler (fiyata göre) alta
     if lat is not None and lon is not None:
         local_items = [r for r in results if r["delivery_type"] == "local"]
         global_items = [r for r in results if r["delivery_type"] != "local"]
-        
         local_items.sort(key=lambda x: x.get("distance_km", 999.0))
         global_items.sort(key=lambda x: x.get("price", 999999.0))
-        
         results = local_items + global_items
-        
+
+    # ── Cache'e kaydet (boş sonuçları kaydetme) ────────────────────────────
+    if results:
+        cache_set(_cache_key, query, category, results)
+    # ───────────────────────────────────────────────────────────────────────
+
     return results

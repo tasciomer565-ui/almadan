@@ -1761,12 +1761,23 @@ def unit_price(name: str, price: float) -> dict:
     return {"found": bool(result), "analysis": result}
 
 
+@app.delete("/api/cache")
+def clear_search_cache(query: str | None = None, category: str | None = None) -> dict:
+    """Cache'i temizle — query+category verilirse sadece o key'i sil, verilmezse etkisiz."""
+    from app.cache import make_cache_key, cache_invalidate
+    if query:
+        key = make_cache_key(query, category or "GENEL")
+        cache_invalidate(key)
+        return {"deleted": key}
+    return {"deleted": None, "message": "Tüm cache silmek için Supabase'den manuel temizleyin."}
+
+
 @app.get("/api/barcode/{code}")
 def api_barcode_lookup(code: str) -> dict:
     from app.comparator import lookup_barcode, search_products_by_name
     barcode = "".join(ch for ch in code.strip() if ch.isdigit())
-    if len(barcode) != 13:
-        raise HTTPException(status_code=400, detail="EAN-13 barkod 13 haneli olmali.")
+    if len(barcode) not in (8, 12, 13):
+        raise HTTPException(status_code=400, detail="Geçersiz barkod formatı. EAN-8, EAN-13 veya UPC-A olmalıdır.")
 
     db = load_db()
     cached = db.setdefault("barcode_products", {}).get(barcode)
