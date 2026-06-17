@@ -1,95 +1,157 @@
-# Fırsat Asistanı MVP
+# Almadan — Akıllı Fiyat Karşılaştırma Asistanı
 
-## Hesaplar
+Türkiye'deki online mağazaları gerçek zamanlı tarayarak en uygun fiyatı bulan PWA (Progressive Web App).
 
-Supabase Auth etkinleştirildiğinde kullanıcılar e-posta ve şifre ile hesap
-oluşturabilir. Giriş sırasında aynı cihazdaki mevcut takipler hesaba taşınır ve
-başka cihazlarda aynı hesapla görüntülenir. Giriş yapmayan kullanıcılar cihaz
-kimliğiyle uygulamayı kullanmaya devam eder.
+---
 
-Bu ilk MVP, mobil uygulamanın bağlanacağı backend çekirdeğidir.
+## Nasıl Çalışır?
 
-## Ne Yapar?
+Kullanıcı bir ürün adı yazar (örn: "süt", "Samsung S24", "Adidas spor ayakkabı"). Sistem:
 
-- Ürün ekler.
-- Fiyat geçmişi tutar.
-- Fırsat skoru hesaplar.
-- `al`, `düşünülebilir`, `takip et`, `bekle` kararı verir.
-- Günlük en iyi fırsatları listeler.
-- Takip edilen ürünleri 6 saatte bir yeniden kontrol eder.
-- `%5` ve üzeri fiyat düşüşlerinde uygulama içi bildirim oluşturur.
-- Otomatik fiyat bulunamazsa eski fiyatı ve geçmişi korur.
+1. **Kategori tespiti** — arama metnini analiz ederek doğru mağaza grubuna yönlendirir (market, elektronik, moda, kozmetik, ev)
+2. **Paralel arama** — seçilen grubun mağazalarını eş zamanlı tarar
+3. **Sonuç karşılaştırma** — fiyat, kargo, stok durumu ve 7 günlük fiyat trendi ile sıralar
+4. **Cache** — sonuçlar 6 saat Supabase'de tutulur; aynı sorgu saniyeler içinde yanıtlanır
 
-## Çalıştırma
+---
 
-```powershell
-cd "C:\Users\Ömer Taşcı\Documents\Codex\2026-06-10\files-mentioned-by-the-user-bot\work\firsat-asistani"
-python -m uvicorn app.main:app --reload --port 8000
+## Cache Mantığı
+
+```
+Kullanıcı arar
+    │
+    ├─ 1. Taze cache var mı?  ──→ EVET → Anında döner (< 100ms)
+    │
+    ├─ 2. HAYIR → Canlı kaynakları paralel çek (max 8 sn)
+    │   ├─ CarrefourSA  (ScrapingBee proxy)
+    │   ├─ Migros       (ScrapingBee proxy)
+    │   └─ N11          (direkt scraping)
+    │
+    ├─ 3. Hepsi başarısız → Marketplace fallback (Trendyol / Amazon)
+    │
+    └─ 4. O da başarısız → Süresi dolmuş cache (stale)
+             └─ ⚠️  "X saat önceki fiyatlar" uyarısı + "Tazele" butonu
 ```
 
-Sonra tarayıcıdan aç:
+Cache süresi: **6 saat** (`.env` ile `CACHE_TTL_HOURS` değiştirilebilir)
+Manuel tazeleme: Arama sonucundaki **"Fiyatı Güncelle"** butonu cache'i siler ve taze veri çeker.
 
-```text
-http://127.0.0.1:8000/
+---
+
+## AI Modülleri
+
+### Barkod Okuma
+- Kamera ile EAN-8, EAN-13, UPC-A, UPC-E formatlarını okur
+- Önce özel veritabanını sorgular; bulunamazsa [Open Food Facts](https://world.openfoodfacts.org/) API'sini kullanır
+- Bulunan ürün alışveriş listesine otomatik eklenir
+
+### VTON (Sanal Kıyafet Deneme)
+- Kullanıcı portre fotoğrafı + kıyafet görseli yükler
+- İş `vton_jobs` tablosuna kuyruğa alınır
+- [Replicate IDM-VTON](https://replicate.com/yisol/idm-vton) modeli kıyafeti portre üzerine giydirerek sonuç görseli üretir
+- `REPLICATE_API_TOKEN` yoksa mock mod çalışır (test için kıyafet görselini döndürür)
+- Durum: `GET /api/vton/{job_id}` ile sorgulanır
+
+### Fiyat Geçmişi
+- Her başarılı arama sonucu `price_history` tablosuna kaydedilir
+- 7 günlük veri birikince ürün kartında **"%5 düştü"** / **"%3 arttı"** göstergesi çıkar
+
+---
+
+## Teknik Yığın
+
+| Katman | Teknoloji |
+|--------|-----------|
+| Backend | Python 3.11, FastAPI, Vercel Serverless |
+| Veritabanı | Supabase (PostgreSQL) |
+| Scraping | BeautifulSoup, ScrapingBee (proxy) |
+| Arama | AOL Search, N11 direkt |
+| Auth | Supabase Auth (e-posta OTP + SMS OTP) |
+| Frontend | Vanilla JS PWA, html5-qrcode, Lucide Icons |
+| AI/ML | Replicate IDM-VTON, Open Food Facts |
+
+---
+
+## Kurulum
+
+### Gereksinimler
+- Python 3.11+
+- Supabase hesabı
+- Vercel hesabı
+
+### Environment Variables
+
+```env
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_KEY=eyJ...
+SUPABASE_PUBLISHABLE_KEY=eyJ...
+SCRAPINGBEE_API_KEY=xxx          # CarrefourSA/Migros için (opsiyonel)
+REPLICATE_API_TOKEN=r8_xxx       # VTON için (opsiyonel)
+CACHE_TTL_HOURS=6                # Cache süresi (varsayılan: 6)
 ```
 
-API test ekranı:
+### Supabase Tablolarını Oluştur
 
-```text
-http://127.0.0.1:8000/docs
+SQL Editor'dan sırasıyla çalıştırın:
+- `migrations/001_product_cache.sql`
+- `migrations/002_price_history_and_admin.sql`
+
+### Yerel Çalıştırma
+
+```bash
+pip install -r requirements.txt
+uvicorn app.main:app --reload
 ```
 
-## Önemli Uçlar
+---
 
-- `GET /health`
-- `GET /products`
-- `POST /products`
-- `POST /parse-url`
-- `POST /products/from-url`
-- `POST /products/{product_id}/prices`
-- `POST /products/{product_id}/refresh`
-- `POST /refresh-all`
-- `GET /notifications`
-- `GET /daily-deals`
+## Admin Paneli
 
-## Otomatik Takip
+`https://almadan.vercel.app?admin=1` adresini açıp **F2** tuşuna basın.
 
-Uygulama çalıştığı sürece otomatik kontrol motoru 6 saatte bir devreye girer.
-Ana ekrandaki `Fiyatları kontrol et` düğmesiyle tüm ürünler hemen kontrol edilebilir.
-Ürün detayındaki `Şimdi otomatik kontrol et` düğmesi yalnızca seçilen ürünü kontrol eder.
+Gösterir: Cache hit oranı, günlük arama sayısı, proxy kullanımı, stale fallback sayısı.
 
-## Buluta Yayınlama
+---
 
-Ücretsiz Supabase, Render ve cron-job.org kurulum adımları için `DEPLOY.md`
-dosyasını takip et.
+## Desteklenen Mağazalar
 
-## Linkten Ürün Okuma
+| Kategori | Mağazalar |
+|----------|-----------|
+| Market (GIDA) | Migros, CarrefourSA, Şok, Metro |
+| Elektronik | Teknosa, MediaMarkt, Vatan, İtopya |
+| Kozmetik | Gratis, Rossmann, Watsons, Sephora |
+| Moda | LCW, DeFacto, Koton, Mavi, Boyner, Zara |
+| Ev | Karaca, English Home, Madame Coco, IKEA, Koçtaş |
+| Pazaryeri | Trendyol, Hepsiburada, Amazon TR, N11 |
 
-`POST /parse-url` isteği:
+> BİM, A101, File Market online sipariş almadığı için sistemde yer almaz.
 
-```json
-{
-  "url": "https://magaza.example.com/urun"
-}
+---
+
+## Debug & Loglama
+
+Backend logları Vercel Dashboard → Functions → Logs'tan izlenir.
+
+Yerel debug için:
+
+```bash
+LOG_LEVEL=DEBUG uvicorn app.main:app --reload
 ```
 
-Sistem mümkünse şu bilgileri çıkarır:
+Kritik log satırları:
 
-- Ürün başlığı
-- Güncel fiyat
-- Ürün görseli
-- Kaynak site
-- Güven skoru
-- Eksik bilgi uyarıları
+| Log | Anlamı |
+|-----|--------|
+| `Cache HIT: {key}` | Cache'den döndü |
+| `Cache SET: {key}` | Yeni sonuç kaydedildi |
+| `Stale cache fallback` | Eski veri kullanıldı |
+| `ScrapingBee OK: {url}` | Proxy başarılı |
+| `ScrapingBee 403: {url}` | Proxy de engellenmiş |
 
-`POST /products/from-url` aynı işlemi yapar ve ürünü doğrudan takip listesine ekler.
-Otomatik fiyat bulunamazsa `fallback_title` ve `fallback_price` gönderilebilir.
+### Modül Bazlı Debug
 
-## Ürün Vizyonu
+**Barkod:** Tarayıcı konsolunda `html5QrCode` loglarını izleyin. Kamera açılıyor ama okumuyorsa ışığı artırın veya barkodu çerçeveye daha yakın tutun.
 
-Bu uygulama sadece indirim göstermez. Kullanıcıya alışveriş kararında yardımcı olur:
+**SMS Giriş:** `/api/auth/otp/send` isteğini Network sekmesinden kontrol edin. `phone` alanı `+90XXX...` formatında olmalıdır.
 
-- Bu fiyat gerçekten iyi mi?
-- Şimdi alınır mı?
-- Beklemek mantıklı mı?
-- Son fiyat geçmişine göre fırsat skoru kaç?
+**VTON:** `GET /api/vton/{job_id}` ile status `processing` → `done` geçişini izleyin. `failed` dönüyorsa Vercel loglarında Replicate hata mesajını görürsünüz.

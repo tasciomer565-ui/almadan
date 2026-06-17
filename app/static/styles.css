@@ -2756,3 +2756,53 @@ body.dark-theme .quantum-node-card {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ── Mobil: Arama sonucu başlığı (Force-Refresh butonu) ─────────────────── */
+@media (max-width: 600px) {
+  /* Başlık + refresh butonu dikey dizilsin, kaymaya yol açmasın */
+  .search-result-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+  .search-result-header button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Stale banner: mobilde düğme tam genişliğe geçsin */
+  .stale-banner-inner {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+  .stale-banner-inner button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Ürün kartı: fiyat + trend göstergesi taşmasın */
+  .search-result-card {
+    flex-wrap: wrap;
+    gap: 8px !important;
+  }
+  .search-result-card > div:last-child {
+    min-width: 80px;
+  }
+
+  /* Onboarding modal tam genişlik */
+  #onboardingModal {
+    max-width: 94vw !important;
+    margin: auto !important;
+  }
+}
+
+/* ── "En Ucuz" kartı — yeşil vurgu ────────────────────────────────────────── */
+.cheapest-node-glow {
+  border-color: var(--green) !important;
+  background: rgba(40, 122, 80, 0.03) !important;
+}
+
+/* ── Fiyat trendi göstergesi ─────────────────────────────────────────────── */
+.price-trend-up   { color: #e53e3e; font-size: 10px; font-weight: 700; display: flex; align-items: center; gap: 2px; margin-top: 2px; }
+.price-trend-down { color: #38a169; font-size: 10px; font-weight: 700; display: flex; align-items: center; gap: 2px; margin-top: 2px; }
+.price-trend-flat { color: var(--muted); font-size: 10px; display: flex; align-items: center; gap: 2px; margin-top: 2px; }

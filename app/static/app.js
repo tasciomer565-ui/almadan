@@ -1926,19 +1926,20 @@ function showSearchResults(response) {
 
   const fallbackNoticeHtml = isStale
     ? `
-      <div class="assistant-info-box" style="border-left: 3px solid #e6a817; background: rgba(230,168,23,0.07); margin-bottom: 16px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-          <div>
-            <div class="assistant-info-title" style="color: #b8860b; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-              <i data-lucide="clock"></i> ${staleAge} önceki fiyatlar gösteriliyor
+      <div class="assistant-info-box" style="border-left: 3px solid #e6a817; background: rgba(230,168,23,0.07); margin-bottom: 16px; padding: 12px 14px;">
+        <div class="stale-banner-inner" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 0;">
+            <div style="color: #b8860b; font-weight: 700; display: flex; align-items: center; gap: 6px; font-size: 13px;">
+              <i data-lucide="clock" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+              ${staleAge} önceki fiyatlar
             </div>
-            <div class="assistant-info-content" style="color: var(--ink); font-size: 13px; margin-top: 4px;">
-              Mağaza sunucularına şu an ulaşılamadı. Aşağıdaki fiyatlar <strong>${staleAge}</strong> önce kaydedilmiş olup güncel olmayabilir.
+            <div style="color: var(--ink); font-size: 12px; margin-top: 3px; line-height: 1.4;">
+              Mağaza sunucularına ulaşılamadı. Fiyatlar güncellenmemiş olabilir.
             </div>
           </div>
-          <button class="secondary-button" style="white-space: nowrap; font-size: 12px; padding: 6px 12px; height: auto; flex-shrink: 0;"
+          <button class="secondary-button" style="white-space: nowrap; font-size: 12px; padding: 7px 14px; height: auto; flex-shrink: 0; display: inline-flex; align-items: center;"
             onclick="forceRefreshSearch('${escapeHtml(originalQuery)}', '${escapeHtml(cacheKey)}')">
-            <i data-lucide="refresh-cw" style="width: 13px; height: 13px; margin-right: 4px;"></i>Taze Fiyat Çek
+            <i data-lucide="refresh-cw" style="width: 13px; height: 13px; margin-right: 5px;"></i>Tazele
           </button>
         </div>
       </div>
@@ -2039,14 +2040,14 @@ function showSearchResults(response) {
       }
     </style>
     <div class="dialog-body" style="max-width: 600px; width: 100%;">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px;">
+      <div class="search-result-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px;">
         <div>
           <p class="eyebrow" style="color: var(--green); font-weight: 700; margin-bottom: 4px;">ARAMA SONUÇLARI</p>
           <h2 style="margin: 0;">En Mantıklı Seçenekler</h2>
         </div>
-        <button class="secondary-button" id="forceRefreshBtn" style="font-size: 12px; padding: 6px 12px; height: auto; flex-shrink: 0; white-space: nowrap;"
+        <button class="secondary-button" id="forceRefreshBtn" style="font-size: 12px; padding: 6px 14px; height: auto; flex-shrink: 0; white-space: nowrap; display: inline-flex; align-items: center;"
           onclick="forceRefreshSearch('${escapeHtml(originalQuery)}', '${escapeHtml(cacheKey)}')">
-          <i data-lucide="refresh-cw" style="width: 13px; height: 13px; margin-right: 4px;"></i>Fiyatı Güncelle
+          <i data-lucide="refresh-cw" style="width: 13px; height: 13px; margin-right: 5px;"></i>Fiyatı Güncelle
         </button>
       </div>
       ${sizeChipsHtml}
@@ -2143,12 +2144,11 @@ function showSearchResults(response) {
                   ${originalPriceHtml}
                   ${priceDisplayHtml}
                   ${(() => {
-                    const trend = item.price_trend;
-                    if (!trend) return "";
-                    const { direction, change_pct } = trend;
-                    if (direction === "up") return `<div style="font-size: 10px; font-weight: 700; color: #e53e3e; margin-top: 2px; display: flex; align-items: center; gap: 2px;"><i data-lucide="trending-up" style="width:11px;height:11px;"></i> %${Math.abs(change_pct)} arttı</div>`;
-                    if (direction === "down") return `<div style="font-size: 10px; font-weight: 700; color: #38a169; margin-top: 2px; display: flex; align-items: center; gap: 2px;"><i data-lucide="trending-down" style="width:11px;height:11px;"></i> %${Math.abs(change_pct)} düştü</div>`;
-                    return `<div style="font-size: 10px; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 2px;"><i data-lucide="minus" style="width:11px;height:11px;"></i> Sabit</div>`;
+                    const t = item.price_trend;
+                    if (!t) return "";
+                    if (t.direction === "up")   return `<div class="price-trend-up"><i data-lucide="trending-up" style="width:11px;height:11px;flex-shrink:0;"></i>%${Math.abs(t.change_pct)} arttı (7g)</div>`;
+                    if (t.direction === "down") return `<div class="price-trend-down"><i data-lucide="trending-down" style="width:11px;height:11px;flex-shrink:0;"></i>%${Math.abs(t.change_pct)} düştü (7g)</div>`;
+                    return `<div class="price-trend-flat"><i data-lucide="minus" style="width:11px;height:11px;flex-shrink:0;"></i>Sabit (7g)</div>`;
                   })()}
                 </div>
                 ${buttonHtml}
