@@ -3024,3 +3024,266 @@ def update_shared_list(id: str, payload: SharedListPayload) -> dict:
         "updated_at": shared["updated_at"],
         "version": shared["version"],
     }
+
+
+# ══════════════════════════════════════════════════════════════
+# Sprint 5 — İşletme Analitiği & Kullanıcı Tutundurma
+# ══════════════════════════════════════════════════════════════
+
+# ── Kullanıcı Dashboard ───────────────────────────────────────
+
+@app.get("/api/dashboard")
+def get_dashboard(request: Request, user=Depends(require_login)):
+    """
+    Kullanıcının tasarruf paneli verileri.
+    Döndürür: toplam tasarruf, aylık grafik, market karşılaştırma,
+              son indirimler, fiyat uyarıları, A/B varyantları.
+    """
+    from app.analytics_engine import analytics_engine
+    from app.ab_testing import ab_engine
+
+    user_id = user.get("id") or user.get("sub")
+    device_id = request.headers.get("X-Device-ID")
+
+    data = analytics_engine.get_dashboard_data(
+        user_id,
+        device_id=device_id,
+        ab_engine=ab_engine,
+    )
+    return analytics_engine.to_dict(data)
+
+
+@app.get("/api/dashboard/savings")
+def get_savings(request: Request, user=Depends(require_login)):
+    """Kullanıcının detaylı tasarruf özetini döndürür."""
+    from app.analytics_engine import analytics_engine
+
+    user_id = user.get("id") or user.get("sub")
+    summary = analytics_engine.get_savings_summary(user_id)
+    return {
+        "total_saved": summary.total_saved,
+        "save_count": summary.save_count,
+        "points": summary.points,
+        "streak_days": summary.streak_days,
+        "monthly": summary.monthly,
+        "by_store": summary.by_store,
+    }
+
+
+@app.get("/api/dashboard/price-history")
+def get_price_history(
+    request: Request,
+    product: str,
+    user=Depends(require_login),
+):
+    """Bir ürün için fiyat geçmişi (Chart.js için zaman serisi)."""
+    from app.analytics_engine import analytics_engine
+
+    user_id = user.get("id") or user.get("sub")
+    product_clean = sanitize(product, max_length=100)
+    history = analytics_engine.get_price_history(user_id, product_clean)
+    return {"product": product_clean, "history": history}
+
+
+# ── Etkinlik Takibi ───────────────────────────────────────────
+
+class AnalyticsEventPayload(BaseModel):
+    event_type: str = Field(..., max_length=50)
+    payload: dict = Field(default_factory=dict)
+    session_id: str | None = None
+    platform: str = "web"
+
+
+@app.post("/api/analytics/event")
+def track_analytics_event(
+    request: Request,
+    body: AnalyticsEventPayload,
+    user=Depends(require_login),
+):
+    """Kullanıcı etkinliği kaydeder (arama, görüntüleme, watchlist, vb.)."""
+    from app.analytics_engine import analytics_engine
+    from app.retention_service import award_points
+
+    user_id  = user.get("id") or user.get("sub")
+    device_id = request.headers.get("X-Device-ID")
+
+    analytics_engine.track_event(
+        sanitize(body.event_type, max_length=50),
+        user_id=user_id,
+        device_id=device_id,
+        session_id=body.session_id,
+        payload=body.payload,
+        platform=body.platform,
+    )
+
+    # Uygulama açma puanı (günlük 1 kez)
+    points_earned = 0
+    if body.event_type == "open_app":
+        points_earned = award_points(user_id, "app_open")
+
+    return {"ok": True, "points_earned": points_earned}
+
+
+# ── A/B Test Yönetimi ──────────────────────────────────────────
+
+@app.get("/api/ab/variant/{experiment_key}")
+def get_ab_variant(
+    request: Request,
+    experiment_key: str,
+    user=Depends(require_login),
+):
+    """Kullanıcının deneyden aldığı varyantı döndürür."""
+    from app.ab_testing import ab_engine
+
+    user_id   = user.get("id") or user.get("sub")
+    device_id = request.headers.get("X-Device-ID")
+    key_clean = sanitize(experiment_key, max_length=60)
+    variant   = ab_engine.get_variant(user_id, key_clean, device_id=device_id)
+    return {"experiment": key_clean, "variant": variant}
+
+
+class ABEventPayload(BaseModel):
+    event_name: str = Field(..., max_length=60)
+    value: float | None = None
+
+
+@app.post("/api/ab/event/{experiment_key}")
+def track_ab_event(
+    request: Request,
+    experiment_key: str,
+    body: ABEventPayload,
+    user=Depends(require_login),
+):
+    """A/B deney olayı kaydeder (dönüşüm, tıklama vb.)."""
+    from app.ab_testing import ab_engine
+
+    user_id   = user.get("id") or user.get("sub")
+    device_id = request.headers.get("X-Device-ID")
+    ok = ab_engine.track_event(
+        sanitize(experiment_key, max_length=60),
+        sanitize(body.event_name, max_length=60),
+        user_id=user_id,
+        device_id=device_id,
+        value=body.value,
+    )
+    return {"ok": ok}
+
+
+# ── Admin A/B Paneli ──────────────────────────────────────────
+
+@app.get("/api/admin/ab/experiments")
+def list_ab_experiments(user=Depends(require_admin)):
+    from app.ab_testing import ab_engine
+    return ab_engine.list_experiments()
+
+
+class CreateExperimentPayload(BaseModel):
+    key: str = Field(..., max_length=60)
+    description: str = Field(default="", max_length=200)
+    variants: list[str] = Field(default=["control", "variant_a"])
+    traffic_pct: int = Field(default=100, ge=1, le=100)
+
+
+@app.post("/api/admin/ab/experiments")
+def create_ab_experiment(body: CreateExperimentPayload, user=Depends(require_admin)):
+    from app.ab_testing import ab_engine
+    result = ab_engine.create_experiment(
+        sanitize(body.key, max_length=60),
+        sanitize(body.description, max_length=200),
+        variants=body.variants,
+        traffic_pct=body.traffic_pct,
+    )
+    if not result:
+        raise HTTPException(status_code=500, detail="Deney oluşturulamadı")
+    return result
+
+
+@app.get("/api/admin/ab/results/{experiment_key}")
+def get_ab_results(experiment_key: str, user=Depends(require_admin)):
+    from app.ab_testing import ab_engine
+    return ab_engine.get_results(sanitize(experiment_key, max_length=60))
+
+
+@app.delete("/api/admin/ab/experiments/{experiment_key}")
+def stop_ab_experiment(
+    experiment_key: str,
+    winner: str | None = None,
+    user=Depends(require_admin),
+):
+    from app.ab_testing import ab_engine
+    ok = ab_engine.stop_experiment(
+        sanitize(experiment_key, max_length=60),
+        winner_variant=sanitize(winner, max_length=40) if winner else None,
+    )
+    return {"ok": ok}
+
+
+# ── Admin Sistem Sağlığı ──────────────────────────────────────
+
+@app.get("/api/admin/health")
+def admin_system_health(user=Depends(require_admin)):
+    """
+    Admin kontrol paneli: scraper sağlığı, AI job istatistikleri,
+    DAU ve katalog tarama geçmişi.
+    """
+    from app.analytics_engine import analytics_engine
+    return analytics_engine.get_admin_dashboard()
+
+
+@app.get("/api/admin/health/scrapers")
+def admin_scraper_health(user=Depends(require_admin)):
+    from app.analytics_engine import analytics_engine
+    return {"scrapers": analytics_engine.get_system_health()}
+
+
+# ── Puan Sistemi ──────────────────────────────────────────────
+
+@app.get("/api/points")
+def get_my_points(user=Depends(require_login)):
+    from app.retention_service import get_user_points
+    user_id = user.get("id") or user.get("sub")
+    return {"user_id": user_id, "points": get_user_points(user_id)}
+
+
+class AwardPointsPayload(BaseModel):
+    user_id: str
+    reason: str
+    custom_amount: int | None = None
+
+
+@app.post("/api/admin/points/award")
+def admin_award_points(body: AwardPointsPayload, user=Depends(require_admin)):
+    from app.retention_service import award_points
+    pts = award_points(
+        body.user_id,
+        sanitize(body.reason, max_length=60),
+        custom_amount=body.custom_amount,
+    )
+    return {"awarded": pts}
+
+
+# ── Digest Cron & Manuel Tetikleyici ─────────────────────────
+
+@app.api_route("/cron/weekly-digest", methods=["GET", "POST"])
+async def cron_weekly_digest(request: Request):
+    """Vercel Cron: Her Pazartesi 07:00 UTC."""
+    secret = request.headers.get("x-cron-secret") or request.query_params.get("secret")
+    if CRON_SECRET and secret != CRON_SECRET:
+        raise HTTPException(status_code=401, detail="Yetkisiz")
+    from app.retention_service import retention_service
+    result = await asyncio.to_thread(retention_service.run_weekly_digest)
+    return {"ok": True, **result}
+
+
+@app.post("/api/admin/digest/send")
+async def send_digest_now(
+    user=Depends(require_admin),
+    target_user_id: str | None = None,
+):
+    """Admin: belirli bir kullanıcıya anında digest gönder."""
+    from app.retention_service import retention_service
+    if target_user_id:
+        ok = await asyncio.to_thread(retention_service.send_single_digest, target_user_id)
+        return {"ok": ok}
+    result = await asyncio.to_thread(retention_service.run_weekly_digest, dry_run=False)
+    return {"ok": True, **result}
