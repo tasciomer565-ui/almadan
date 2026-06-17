@@ -1320,18 +1320,26 @@ def search_products(
     
     products = search_products_by_name(gendered_query, category=category, lat=lat, lon=lon, mode=mode)
     fallback_applied = any(p.get("extra_info", {}).get("fallback") for p in products)
-    
+    is_stale = any(p.get("stale_cache") for p in products)
+    stale_age = next((p.get("stale_age", "") for p in products if p.get("stale_cache")), "")
+
     suggestion = None
     if not products:
         suggestion = generate_search_suggestion(query)
-        
+
+    from app.cache import make_cache_key
+    cache_key = make_cache_key(gendered_query, category)
+
     return {
         "products": products,
         "suggestion": suggestion,
         "query": query,
         "effective_query": gendered_query,
         "category": category,
-        "fallback_applied": fallback_applied
+        "fallback_applied": fallback_applied,
+        "is_stale": is_stale,
+        "stale_age": stale_age,
+        "cache_key": cache_key,
     }
 
 

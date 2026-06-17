@@ -2740,3 +2740,19 @@ body.dark-theme .quantum-node-card {
   width: 18px;
   height: 18px;
 }
+
+/* Onboarding modal */
+#onboardingModal::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+}
+.onboarding-dot {
+  transition: background 0.2s;
+}
+.onboarding-step {
+  animation: fadeInStep 0.2s ease;
+}
+@keyframes fadeInStep {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

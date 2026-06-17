@@ -713,6 +713,79 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script defer src="/static/app.js?v=20260617-fault-tolerance"></script>
+    <!-- Onboarding intro modal -->
+    <dialog id="onboardingModal" style="border: none; border-radius: 16px; padding: 0; max-width: 420px; width: 90%; background: var(--bg-card, #fff); box-shadow: 0 20px 60px rgba(0,0,0,0.18);">
+      <div style="padding: 28px 24px 20px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <div style="width: 56px; height: 56px; background: rgba(40,122,80,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+            <i data-lucide="shopping-bag" style="width: 26px; height: 26px; color: #287a50;"></i>
+          </div>
+          <h2 style="margin: 0 0 6px; font-size: 20px;">Almadan'a Hoş Geldiniz</h2>
+          <p style="margin: 0; color: var(--ink-light, #666); font-size: 14px;">Online mağazalarda en iyi fiyatı bulmak artık çok kolay.</p>
+        </div>
+
+        <div id="onboardingSteps">
+          <div class="onboarding-step active" data-step="0">
+            <div style="display: flex; gap: 14px; align-items: flex-start; padding: 14px; background: rgba(40,122,80,0.05); border-radius: 10px;">
+              <div style="width: 36px; height: 36px; background: #287a50; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i data-lucide="search" style="width: 16px; height: 16px; color: #fff;"></i>
+              </div>
+              <div>
+                <strong style="font-size: 15px; display: block; margin-bottom: 4px;">Fiyat Karşılaştırma</strong>
+                <span style="font-size: 13px; color: var(--ink-light, #666);">Ürün adı yazın (örn: "süt", "Samsung S24") — sistem tüm online mağazaları tarayıp en ucuzu bulur.</span>
+              </div>
+            </div>
+          </div>
+          <div class="onboarding-step" data-step="1" style="display: none;">
+            <div style="display: flex; gap: 14px; align-items: flex-start; padding: 14px; background: rgba(40,122,80,0.05); border-radius: 10px;">
+              <div style="width: 36px; height: 36px; background: #287a50; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i data-lucide="scan-barcode" style="width: 16px; height: 16px; color: #fff;"></i>
+              </div>
+              <div>
+                <strong style="font-size: 15px; display: block; margin-bottom: 4px;">Barkod Okuma</strong>
+                <span style="font-size: 13px; color: var(--ink-light, #666);">Elinizdeki ürünün barkodunu kamerayla okutun — anında ürün bilgisi ve fiyat karşılaştırması.</span>
+              </div>
+            </div>
+          </div>
+          <div class="onboarding-step" data-step="2" style="display: none;">
+            <div style="display: flex; gap: 14px; align-items: flex-start; padding: 14px; background: rgba(40,122,80,0.05); border-radius: 10px;">
+              <div style="width: 36px; height: 36px; background: #287a50; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i data-lucide="bell" style="width: 16px; height: 16px; color: #fff;"></i>
+              </div>
+              <div>
+                <strong style="font-size: 15px; display: block; margin-bottom: 4px;">Fiyat Takibi</strong>
+                <span style="font-size: 13px; color: var(--ink-light, #666);">"Radara Ekle" ile istediğiniz ürünü takibe alın — fiyat düştüğünde bildirim alırsınız.</span>
+              </div>
+            </div>
+          </div>
+          <div class="onboarding-step" data-step="3" style="display: none;">
+            <div style="display: flex; gap: 14px; align-items: flex-start; padding: 14px; background: rgba(40,122,80,0.05); border-radius: 10px;">
+              <div style="width: 36px; height: 36px; background: #287a50; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i data-lucide="shirt" style="width: 16px; height: 16px; color: #fff;"></i>
+              </div>
+              <div>
+                <strong style="font-size: 15px; display: block; margin-bottom: 4px;">AI Kıyafet Deneme</strong>
+                <span style="font-size: 13px; color: var(--ink-light, #666);">"Kıyafet" sekmesinden fotoğrafınızı yükleyin — kıyafeti sanal olarak üzerinizde görün.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dots -->
+        <div style="display: flex; justify-content: center; gap: 6px; margin: 16px 0 20px;">
+          <span class="onboarding-dot active" data-dot="0" style="width: 8px; height: 8px; border-radius: 50%; background: #287a50; display: inline-block; cursor: pointer;" onclick="goOnboardingStep(0)"></span>
+          <span class="onboarding-dot" data-dot="1" style="width: 8px; height: 8px; border-radius: 50%; background: var(--line, #ddd); display: inline-block; cursor: pointer;" onclick="goOnboardingStep(1)"></span>
+          <span class="onboarding-dot" data-dot="2" style="width: 8px; height: 8px; border-radius: 50%; background: var(--line, #ddd); display: inline-block; cursor: pointer;" onclick="goOnboardingStep(2)"></span>
+          <span class="onboarding-dot" data-dot="3" style="width: 8px; height: 8px; border-radius: 50%; background: var(--line, #ddd); display: inline-block; cursor: pointer;" onclick="goOnboardingStep(3)"></span>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button class="secondary-button" style="flex: 1;" id="onboardingPrev" onclick="onboardingNav(-1)" disabled>Geri</button>
+          <button class="primary-button" style="flex: 2;" id="onboardingNext" onclick="onboardingNav(1)">İleri →</button>
+        </div>
+      </div>
+    </dialog>
+
+    <script defer src="/static/app.js?v=20260617-onboarding"></script>
   </body>
 </html>

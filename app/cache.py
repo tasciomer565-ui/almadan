@@ -71,7 +71,7 @@ def cache_get(cache_key: str) -> Optional[list[dict]]:
     return None
 
 
-def cache_get_stale(cache_key: str) -> Optional[list[dict]]:
+def cache_get_stale(cache_key: str) -> Optional[list[dict]]:  # noqa: C901
     """Süresi dolmuş olsa bile son başarılı veriyi döndür (fault-tolerance fallback).
     Dönen ürünlere 'stale': True etiketi eklenir — frontend uyarı gösterir.
     """
@@ -81,7 +81,7 @@ def cache_get_stale(cache_key: str) -> Optional[list[dict]]:
         url = (
             f"{SUPABASE_URL}/rest/v1/{CACHE_TABLE}"
             f"?cache_key=eq.{requests.utils.quote(cache_key)}"
-            f"&select=products,source_count,expires_at"
+            f"&select=products,source_count,expires_at,created_at"
             f"&order=created_at.desc"
             f"&limit=1"
         )
@@ -89,12 +89,21 @@ def cache_get_stale(cache_key: str) -> Optional[list[dict]]:
         rows = resp.json() if resp.ok else []
         if rows and rows[0].get("products"):
             products = rows[0]["products"]
-            # Her ürüne stale flag ekle — frontend "eski veri" uyarısı gösterir
+            created_at = rows[0].get("created_at", "")
+            # Kaç saat önce kaydedildiğini hesapla
+            try:
+                from datetime import timedelta
+                cached_time = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                age_hours = (datetime.now(timezone.utc) - cached_time).total_seconds() / 3600
+                age_label = f"{int(age_hours)} saat" if age_hours >= 1 else f"{int(age_hours * 60)} dakika"
+            except Exception:
+                age_label = "birkaç saat"
             for p in products:
                 p["stale_cache"] = True
+                p["stale_age"] = age_label
                 if "Eski veri (önbellek)" not in p.get("labels", []):
                     p.setdefault("labels", []).append("Eski veri (önbellek)")
-            logger.warning("Stale cache fallback: %s (%d ürün)", cache_key, len(products))
+            logger.warning("Stale cache fallback: %s (%d ürün, %s önce)", cache_key, len(products), age_label)
             return products
     except Exception as exc:
         logger.warning("cache_get_stale error: %s", exc)

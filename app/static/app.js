@@ -278,6 +278,14 @@ function bindEvents() {
     button.addEventListener("click", () => switchView(button.dataset.view));
   });
 
+  // Onboarding modal — backdrop tıklamasında kapat
+  const onboardingModal = document.getElementById("onboardingModal");
+  if (onboardingModal) {
+    onboardingModal.addEventListener("click", (e) => {
+      if (e.target === onboardingModal) closeOnboarding();
+    });
+  }
+
   document.getElementById("urlForm").addEventListener("submit", parseProduct);
   document.getElementById("pasteButton").addEventListener("click", pasteUrl);
   document.getElementById("refreshButton").addEventListener("click", refreshAllPrices);
@@ -589,6 +597,59 @@ async function api(path, options = {}) {
   return data;
 }
 
+// ── Onboarding ─────────────────────────────────────────────────────────────
+let _onboardingStep = 0;
+const _ONBOARDING_KEY = "almadan_onboarded_v1";
+
+function showOnboarding() {
+  if (localStorage.getItem(_ONBOARDING_KEY)) return;
+  const modal = document.getElementById("onboardingModal");
+  if (!modal) return;
+  if (!modal.open) modal.showModal();
+  lucide.createIcons();
+}
+
+function closeOnboarding() {
+  const modal = document.getElementById("onboardingModal");
+  if (modal && modal.open) modal.close();
+  localStorage.setItem(_ONBOARDING_KEY, "1");
+}
+
+function goOnboardingStep(step) {
+  const steps = document.querySelectorAll(".onboarding-step");
+  const dots = document.querySelectorAll(".onboarding-dot");
+  const prevBtn = document.getElementById("onboardingPrev");
+  const nextBtn = document.getElementById("onboardingNext");
+  if (!steps.length) return;
+
+  steps.forEach((s) => (s.style.display = "none"));
+  dots.forEach((d) => (d.style.background = "var(--line, #ddd)"));
+
+  const target = steps[step];
+  if (target) target.style.display = "block";
+  const dot = dots[step];
+  if (dot) dot.style.background = "#287a50";
+
+  _onboardingStep = step;
+  if (prevBtn) prevBtn.disabled = step === 0;
+  if (nextBtn) {
+    if (step === steps.length - 1) {
+      nextBtn.textContent = "Başlayalım!";
+      nextBtn.onclick = closeOnboarding;
+    } else {
+      nextBtn.textContent = "İleri →";
+      nextBtn.onclick = () => onboardingNav(1);
+    }
+  }
+}
+
+function onboardingNav(dir) {
+  const steps = document.querySelectorAll(".onboarding-step");
+  const next = Math.max(0, Math.min(steps.length - 1, _onboardingStep + dir));
+  goOnboardingStep(next);
+}
+// ───────────────────────────────────────────────────────────────────────────
+
 async function loadSession() {
   try {
     state.auth = await api("/auth/session");
@@ -597,6 +658,7 @@ async function loadSession() {
   }
   renderAccountButton();
   handleCategoryChange();
+  setTimeout(showOnboarding, 800);
 }
 
 function renderAccountButton() {
@@ -1682,38 +1744,9 @@ async function parseProduct(event) {
           await new Promise(resolve => setTimeout(resolve, 1500));
           
           // 3. Lokal rezonans fallback sonuçlarını oluştur
-          const localResults = {
-            products: [
-              {
-                title: val + " (Lokal Rezonans)",
-                source: "Gratis (Lokal Spektrum)",
-                price: 189.90,
-                original_price: 240.00,
-                labels: ["En Ucuz", "Lokal Fallback"],
-                extra_info: { out_of_stock: false }
-              },
-              {
-                title: val + " (Alternatif Enerji)",
-                source: "Rossmann (Lokal Spektrum)",
-                price: 199.90,
-                original_price: 220.00,
-                labels: ["Lokal Fallback"],
-                extra_info: { out_of_stock: false }
-              }
-            ],
-            query: val,
-            fallback_applied: true
-          };
-          showSearchResults(localResults);
-          
-          // Arayüzü eski haline temizle
-          overlay.classList.remove("recovery-mode");
-          if (header) {
-            header.classList.remove("glitch-active");
-            header.innerText = "KUANTUM SPEKTRUMU TARANIYOR";
-          }
+          showSearchResults({ products: [], query: val });
         } else {
-          showToast("Kuantum veri darboğazı. Yerel analiz başlatılıyor...");
+          showToast("Bağlantı hatası. Lütfen tekrar deneyin.");
         }
       } finally {
         clearTimeout(t1);
@@ -1725,6 +1758,37 @@ async function parseProduct(event) {
       }
     }, 0);
   });
+}
+
+async function forceRefreshSearch(query, cacheKey) {
+  const btn = document.getElementById("forceRefreshBtn");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner" style="width:13px;height:13px;border-width:2px;"></span> Güncelleniyor...`;
+  }
+  try {
+    // 1. Cache'i sil
+    if (cacheKey) {
+      await api(`/api/cache?query=${encodeURIComponent(query)}`, { method: "DELETE" });
+    }
+    // 2. Taze arama yap
+    const category = document.getElementById("searchCategorySelector")?.value || "general";
+    const mode = document.getElementById("globalModeCheckbox")?.checked ? "global" : "hybrid";
+    let searchUrl = `/api/search?query=${encodeURIComponent(query)}&category=${encodeURIComponent(category)}&mode=${encodeURIComponent(mode)}`;
+    if (state.userCoords && mode !== "global") {
+      searchUrl += `&lat=${state.userCoords.lat}&lon=${state.userCoords.lng}`;
+    }
+    const results = await api(searchUrl, { signal: null });
+    showSearchResults(results);
+    showToast("Fiyatlar güncellendi.");
+  } catch (err) {
+    showToast("Güncelleme başarısız, mevcut sonuçlar gösteriliyor.");
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<i data-lucide="refresh-cw" style="width:13px;height:13px;margin-right:4px;"></i>Fiyatı Güncelle`;
+      lucide.createIcons();
+    }
+  }
 }
 
 function showSearchResults(response) {
@@ -1762,15 +1826,26 @@ function showSearchResults(response) {
   }
 
   const isFallback = response.fallback_applied;
-  const isStale = products.some((p) => p.stale_cache);
+  const isStale = response.is_stale || products.some((p) => p.stale_cache);
+  const staleAge = response.stale_age || (products.find((p) => p.stale_age) || {}).stale_age || "birkaç saat";
+  const cacheKey = response.cache_key || "";
+
   const fallbackNoticeHtml = isStale
     ? `
       <div class="assistant-info-box" style="border-left: 3px solid #e6a817; background: rgba(230,168,23,0.07); margin-bottom: 16px;">
-        <div class="assistant-info-title" style="color: #b8860b; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-          <i data-lucide="clock"></i> Eski önbellekten gösteriliyor
-        </div>
-        <div class="assistant-info-content" style="color: var(--ink); font-size: 13px; margin-top: 4px;">
-          Mağaza sunucularına şu an ulaşılamadı. Fiyatlar güncel olmayabilir — biraz bekleyip tekrar arayın.
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+          <div>
+            <div class="assistant-info-title" style="color: #b8860b; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="clock"></i> ${staleAge} önceki fiyatlar gösteriliyor
+            </div>
+            <div class="assistant-info-content" style="color: var(--ink); font-size: 13px; margin-top: 4px;">
+              Mağaza sunucularına şu an ulaşılamadı. Aşağıdaki fiyatlar <strong>${staleAge}</strong> önce kaydedilmiş olup güncel olmayabilir.
+            </div>
+          </div>
+          <button class="secondary-button" style="white-space: nowrap; font-size: 12px; padding: 6px 12px; height: auto; flex-shrink: 0;"
+            onclick="forceRefreshSearch('${escapeHtml(originalQuery)}', '${escapeHtml(cacheKey)}')">
+            <i data-lucide="refresh-cw" style="width: 13px; height: 13px; margin-right: 4px;"></i>Taze Fiyat Çek
+          </button>
         </div>
       </div>
     `
@@ -1855,6 +1930,9 @@ function showSearchResults(response) {
   const validPrices = products.filter(p => !p.extra_info?.out_of_stock).map(p => p.price);
   const cheapestPrice = validPrices.length > 0 ? Math.min(...validPrices) : -1;
 
+  window._lastSearchQuery = originalQuery;
+  window._lastSearchCacheKey = cacheKey;
+
   content.innerHTML = `
     <style>
       .search-result-card {
@@ -1867,8 +1945,16 @@ function showSearchResults(response) {
       }
     </style>
     <div class="dialog-body" style="max-width: 600px; width: 100%;">
-      <p class="eyebrow" style="color: var(--green); font-weight: 700;">ARAMA SONUÇLARI</p>
-      <h2 style="margin-bottom: 16px;">En Mantıklı Seçenekler</h2>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px;">
+        <div>
+          <p class="eyebrow" style="color: var(--green); font-weight: 700; margin-bottom: 4px;">ARAMA SONUÇLARI</p>
+          <h2 style="margin: 0;">En Mantıklı Seçenekler</h2>
+        </div>
+        <button class="secondary-button" id="forceRefreshBtn" style="font-size: 12px; padding: 6px 12px; height: auto; flex-shrink: 0; white-space: nowrap;"
+          onclick="forceRefreshSearch('${escapeHtml(originalQuery)}', '${escapeHtml(cacheKey)}')">
+          <i data-lucide="refresh-cw" style="width: 13px; height: 13px; margin-right: 4px;"></i>Fiyatı Güncelle
+        </button>
+      </div>
       ${sizeChipsHtml}
       ${fallbackNoticeHtml}
       ${categoryHeaderHtml}
