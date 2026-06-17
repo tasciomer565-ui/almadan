@@ -596,7 +596,7 @@ async def master_search(
         category = category_map.get(selected_category, "GENEL")
 
     # ── Cache-first lookup ──────────────────────────────────────────────────
-    from app.cache import make_cache_key, cache_get, cache_set
+    from app.cache import make_cache_key, cache_get, cache_set, cache_get_stale
     _cache_key = make_cache_key(query, category)
     cached = cache_get(_cache_key)
     if cached:
@@ -652,8 +652,7 @@ async def master_search(
     except (asyncio.TimeoutError, Exception):
         results = []
 
-    # 4. Boş Dönme Koruması (Zero-Fail Policy)
-    # Eğer local mod seçildiyse ve sonuç çıkmadıysa, otomatik global fallback'e geç
+    # ── Canlı kaynaklar başarısız → normal fallback dene ──────────────────
     if not results and mode == "local":
         fallback_res = await scan_worker(query, "MARKETPLACE_NO_N11", fallback=True)
         for r in fallback_res:
@@ -671,14 +670,19 @@ async def master_search(
         if category == "GENEL":
             results = await marketplace_scan(query, fallback=True)
         else:
-            # Kategori belli ama sonuç yok — önce daha kısa sorgu dene
             short_query = query.split()[0] if " " in query else query
             results = await scan_worker(short_query, category, fallback=True)
-            # Hâlâ boşsa Trendyol/Hepsiburada/Amazon'a bak (N11 hariç)
             if not results:
                 results = await scan_worker(query, "MARKETPLACE_NO_N11", fallback=True)
 
-    # Statik fallback kaldırıldı — gerçek veri yoksa boş dön, frontend "bulunamadı" gösterir
+    # ── Son çare: Süresi dolmuş cache (stale fallback) ─────────────────────
+    # Tüm canlı kaynaklar ve fallback'lar başarısız olursa,
+    # kullanıcıyı boş ekranla bırakmak yerine eski veriyi "uyarıyla" göster.
+    if not results:
+        stale = cache_get_stale(_cache_key)
+        if stale:
+            return stale  # Zaten "Eski veri (önbellek)" etiketi eklendi
+    # ───────────────────────────────────────────────────────────────────────
         
     # Coğrafi alanları ve teslimat bilgilerini her ürün için ekle/güncelle
     for item in results:

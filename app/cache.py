@@ -49,7 +49,7 @@ def _enabled() -> bool:
 
 
 def cache_get(cache_key: str) -> Optional[list[dict]]:
-    """Cache'de taze veri varsa döndür, yoksa None."""
+    """Cache'de taze (süresi dolmamış) veri varsa döndür, yoksa None."""
     if not _enabled():
         return None
     try:
@@ -68,6 +68,36 @@ def cache_get(cache_key: str) -> Optional[list[dict]]:
             return rows[0]["products"]
     except Exception as exc:
         logger.warning("cache_get error: %s", exc)
+    return None
+
+
+def cache_get_stale(cache_key: str) -> Optional[list[dict]]:
+    """Süresi dolmuş olsa bile son başarılı veriyi döndür (fault-tolerance fallback).
+    Dönen ürünlere 'stale': True etiketi eklenir — frontend uyarı gösterir.
+    """
+    if not _enabled():
+        return None
+    try:
+        url = (
+            f"{SUPABASE_URL}/rest/v1/{CACHE_TABLE}"
+            f"?cache_key=eq.{requests.utils.quote(cache_key)}"
+            f"&select=products,source_count,expires_at"
+            f"&order=created_at.desc"
+            f"&limit=1"
+        )
+        resp = requests.get(url, headers=_headers(), timeout=3)
+        rows = resp.json() if resp.ok else []
+        if rows and rows[0].get("products"):
+            products = rows[0]["products"]
+            # Her ürüne stale flag ekle — frontend "eski veri" uyarısı gösterir
+            for p in products:
+                p["stale_cache"] = True
+                if "Eski veri (önbellek)" not in p.get("labels", []):
+                    p.setdefault("labels", []).append("Eski veri (önbellek)")
+            logger.warning("Stale cache fallback: %s (%d ürün)", cache_key, len(products))
+            return products
+    except Exception as exc:
+        logger.warning("cache_get_stale error: %s", exc)
     return None
 
 

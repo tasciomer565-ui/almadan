@@ -1762,7 +1762,19 @@ function showSearchResults(response) {
   }
 
   const isFallback = response.fallback_applied;
-  const fallbackNoticeHtml = isFallback
+  const isStale = products.some((p) => p.stale_cache);
+  const fallbackNoticeHtml = isStale
+    ? `
+      <div class="assistant-info-box" style="border-left: 3px solid #e6a817; background: rgba(230,168,23,0.07); margin-bottom: 16px;">
+        <div class="assistant-info-title" style="color: #b8860b; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="clock"></i> Eski önbellekten gösteriliyor
+        </div>
+        <div class="assistant-info-content" style="color: var(--ink); font-size: 13px; margin-top: 4px;">
+          Mağaza sunucularına şu an ulaşılamadı. Fiyatlar güncel olmayabilir — biraz bekleyip tekrar arayın.
+        </div>
+      </div>
+    `
+    : isFallback
     ? `
       <div class="assistant-info-box" style="border-left: 3px solid var(--red); background: rgba(248, 215, 211, 0.1); margin-bottom: 16px;">
         <div class="assistant-info-title" style="color: #d9383a; font-weight: 700;">
