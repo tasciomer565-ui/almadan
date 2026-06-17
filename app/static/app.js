@@ -3571,6 +3571,7 @@ async function lookupAndAddBarcode(code) {
         brand: res.brand || "",
         image_url: res.image_url || "",
         barcode: cleanCode,
+        category: res.suggested_category || "general",
         checked: false,
         quantity: 1,
         updated_at: new Date().toISOString(),
@@ -3581,6 +3582,20 @@ async function lookupAndAddBarcode(code) {
     renderCart();
     if (state.sharedListId) syncSharedListWithServer();
     updateBarcodeScanStatus("");
+
+    // Fiyat karşılaştırması: suggested_category kullanarak doğru mağazalarda ara
+    if (res.search_query) {
+      const hasResults = res.results && res.results.length > 0;
+      if (hasResults) {
+        showSearchResults({
+          products: res.results,
+          query: res.search_query,
+          category: res.suggested_category || "general",
+        });
+      } else {
+        showBarcodeCategoryMismatch(res.title, res.search_query, res.suggested_category || "general");
+      }
+    }
   } else {
     // Ürün hiçbir kaynakta bulunamadı → Manuel giriş seçeneği sun
     console.warn(`[Barkod] ${cleanCode} bulunamadı (allow_manual=${res.allow_manual}):`, res.message);
@@ -3592,6 +3607,88 @@ async function lookupAndAddBarcode(code) {
     }
     liveBarcodeScanLocked = false;
   }
+}
+
+const _CATEGORY_LABELS = {
+  electronics: { label: "Teknoloji mağazaları", icon: "cpu", stores: "Teknosa, Vatan, MediaMarkt, Trendyol" },
+  grocery:     { label: "Market zinciri",        icon: "shopping-basket", stores: "Migros, CarrefourSA, Trendyol" },
+  cosmetics:   { label: "Kozmetik mağazaları",   icon: "sparkles", stores: "Gratis, Rossmann, Watsons" },
+  fashion:     { label: "Moda mağazaları",        icon: "shirt", stores: "LCW, DeFacto, Trendyol" },
+  home:        { label: "Ev & yaşam mağazaları", icon: "sofa", stores: "IKEA, Karaca, Koçtaş" },
+  general:     { label: "Tüm pazaryerleri",       icon: "store", stores: "Trendyol, Hepsiburada, Amazon" },
+};
+
+function showBarcodeCategoryMismatch(productTitle, searchQuery, suggestedCategory) {
+  const dialog = document.getElementById("productDialog");
+  const content = document.getElementById("dialogContent");
+  if (!dialog || !content) return;
+
+  const catInfo = _CATEGORY_LABELS[suggestedCategory] || _CATEGORY_LABELS.general;
+  const wrongCat = suggestedCategory === "grocery" ? "teknoloji" : suggestedCategory === "electronics" ? "market" : "yanlış kategori";
+
+  content.innerHTML = `
+    <div class="dialog-body" style="max-width: 420px;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+        <div style="width: 40px; height: 40px; background: rgba(40,122,80,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <i data-lucide="${catInfo.icon}" style="width: 18px; height: 18px; color: #287a50;"></i>
+        </div>
+        <div>
+          <h3 style="margin: 0 0 2px; font-size: 16px;">Ürün sepete eklendi</h3>
+          <p style="margin: 0; font-size: 12px; color: var(--ink-light);">${escapeHtml(productTitle)}</p>
+        </div>
+      </div>
+
+      <div style="background: rgba(230,168,23,0.07); border: 1px solid rgba(230,168,23,0.2); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;">
+        <div style="font-size: 13px; font-weight: 700; color: #b8860b; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="alert-triangle" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+          Bu ürün ${wrongCat} envanterinde bulunamadı
+        </div>
+        <p style="margin: 0; font-size: 12px; color: var(--ink); line-height: 1.5;">
+          "<strong>${escapeHtml(productTitle)}</strong>" gıda marketi değil, <strong>${catInfo.label}</strong>nda satılır.
+          Fiyat karşılaştırması için doğru mağazalarda arama yapabilirsiniz.
+        </p>
+      </div>
+
+      <div style="background: rgba(40,122,80,0.05); border: 1px solid rgba(40,122,80,0.15); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 12px; color: var(--ink-light);">
+        <i data-lucide="store" style="width: 13px; height: 13px; margin-right: 4px; vertical-align: middle;"></i>
+        <strong>Taranacak mağazalar:</strong> ${catInfo.stores}
+      </div>
+
+      <div style="display: flex; gap: 10px;">
+        <button class="secondary-button" style="flex: 1;" onclick="closeDialog()">Kapat</button>
+        <button class="primary-button" style="flex: 2; display: flex; align-items: center; justify-content: center; gap: 6px;"
+          onclick="closeDialog(); triggerCategorySearch('${escapeHtml(searchQuery)}', '${suggestedCategory}')">
+          <i data-lucide="search" style="width: 14px; height: 14px;"></i>
+          ${catInfo.label}nda Ara
+        </button>
+      </div>
+    </div>
+  `;
+  if (!dialog.open) dialog.showModal();
+  lucide.createIcons();
+}
+
+function triggerCategorySearch(query, category) {
+  // Arama kutusuna yaz ve doğru kategoride aramayı başlat
+  const input = document.getElementById("productUrl");
+  const selector = document.getElementById("searchCategorySelector");
+  if (input) input.value = query;
+  if (selector) selector.value = category;
+
+  // Overlay'i göster ve aramayı tetikle
+  const overlay = document.getElementById("quantumScanOverlay");
+  if (overlay) overlay.style.display = "flex";
+
+  const searchMode = document.getElementById("globalModeCheckbox")?.checked ? "global" : "hybrid";
+  let searchUrl = `/api/search?query=${encodeURIComponent(query)}&category=${encodeURIComponent(category)}&mode=${encodeURIComponent(searchMode)}`;
+  if (state.userCoords && searchMode !== "global") {
+    searchUrl += `&lat=${state.userCoords.lat}&lon=${state.userCoords.lng}`;
+  }
+
+  api(searchUrl, { signal: null })
+    .then(results => showSearchResults(results))
+    .catch(() => showToast("Arama başarısız, lütfen tekrar deneyin."))
+    .finally(() => { if (overlay) overlay.style.display = "none"; });
 }
 
 function showBarcodeManualEntry(barcode, errorMsg) {

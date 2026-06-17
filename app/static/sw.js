@@ -1,4 +1,4 @@
-const CACHE_VERSION = "almadan-v15-barcode-resilient";
+const CACHE_VERSION = "almadan-v16-category-aware";
 const APP_SHELL = [
   "/",
   "/index.html",

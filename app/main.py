@@ -1912,13 +1912,15 @@ def api_barcode_lookup(code: str) -> dict:
     db = load_db()
     cached = db.setdefault("barcode_products", {}).get(barcode)
     if cached:
-        results = search_products_by_name(cached["search_query"])
+        suggested_category = cached.get("category", "general")
+        results = search_products_by_name(cached["search_query"], category=suggested_category)
         return {
             "found": True,
             "title": cached["title"],
             "brand": cached.get("brand", ""),
             "image_url": cached.get("image_url", ""),
             "search_query": cached["search_query"],
+            "suggested_category": suggested_category,
             "source": "cache",
             "cached": True,
             "results": results,
@@ -1945,21 +1947,36 @@ def api_barcode_lookup(code: str) -> dict:
         **match,
     }
 
+    # Ürün adından kategori tahmin et
+    receipt_cat = category_mapping(match["title"] + " " + match.get("brand", ""))
+    # receipt kategorisini API kategorisine çevir
+    _cat_map = {
+        "electronics": "electronics",
+        "cosmetics": "cosmetics",
+        "supplement": "general",
+        "fashion": "fashion",
+        "home": "home",
+        "grocery": "grocery",
+    }
+    suggested_category = _cat_map.get(receipt_cat, "general")
+
     db["barcode_products"][barcode] = {
         **match,
         "barcode": barcode,
+        "category": suggested_category,
         "created_at": utc_now(),
         "updated_at": utc_now(),
     }
     save_db(db)
 
-    results = search_products_by_name(match["search_query"])
+    results = search_products_by_name(match["search_query"], category=suggested_category)
     return {
         "found": True,
         "title": match["title"],
         "brand": match.get("brand", ""),
         "image_url": match.get("image_url", ""),
         "search_query": match["search_query"],
+        "suggested_category": suggested_category,
         "source": match.get("source", "local_seed"),
         "cached": False,
         "results": results,
