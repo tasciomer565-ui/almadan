@@ -3539,46 +3539,129 @@ async function lookupAndAddBarcode(code) {
     return;
   }
 
+  updateBarcodeScanStatus("Ürün sorgulanıyor...");
   showToast("Barkod taraniyor...");
-  try {
-    const res = await api(`/api/barcode/${cleanCode}`);
-    if (res.found) {
-      const existingIndex = state.cart.findIndex(item => item.barcode === cleanCode);
-      if (existingIndex >= 0) {
-        const existing = state.cart[existingIndex];
-        state.cart[existingIndex] = {
-          ...existing,
-          quantity: Math.min(99, Number(existing.quantity || 1) + 1),
-          updated_at: new Date().toISOString(),
-        };
-        showToast(`Bu urun zaten kayitli. Miktar artirildi: ${res.title}`);
-      } else {
-        const newItem = {
-          id: "cart-" + Date.now(),
-          name: res.title,
-          brand: res.brand || "",
-          image_url: res.image_url || "",
-          barcode: cleanCode,
-          checked: false,
-          quantity: 1,
-          updated_at: new Date().toISOString(),
-        };
-        state.cart.push(newItem);
-        showToast(`Barkod bulundu ve eklendi: ${res.title}`);
-      }
-      saveCartToLocalStorage();
-      renderCart();
 
-      if (state.sharedListId) {
-        syncSharedListWithServer();
-      }
-    } else {
-      showToast(res.message);
-    }
+  let res;
+  try {
+    res = await api(`/api/barcode/${cleanCode}`);
+    console.info(`[Barkod] ${cleanCode} → found=${res.found} source=${res.source || "?"}`);
   } catch (error) {
-    showToast(error.message);
+    console.error(`[Barkod] API hatası (${cleanCode}):`, error.message);
+    updateBarcodeScanStatus("");
+    showBarcodeManualEntry(cleanCode, `Sunucu hatası: ${error.message}`);
+    liveBarcodeScanLocked = false;
+    return;
+  }
+
+  if (res.found) {
+    const existingIndex = state.cart.findIndex(item => item.barcode === cleanCode);
+    if (existingIndex >= 0) {
+      const existing = state.cart[existingIndex];
+      state.cart[existingIndex] = {
+        ...existing,
+        quantity: Math.min(99, Number(existing.quantity || 1) + 1),
+        updated_at: new Date().toISOString(),
+      };
+      showToast(`Miktar artırıldı: ${res.title}`);
+    } else {
+      state.cart.push({
+        id: "cart-" + Date.now(),
+        name: res.title,
+        brand: res.brand || "",
+        image_url: res.image_url || "",
+        barcode: cleanCode,
+        checked: false,
+        quantity: 1,
+        updated_at: new Date().toISOString(),
+      });
+      showToast(`Eklendi: ${res.title}`);
+    }
+    saveCartToLocalStorage();
+    renderCart();
+    if (state.sharedListId) syncSharedListWithServer();
+    updateBarcodeScanStatus("");
+  } else {
+    // Ürün hiçbir kaynakta bulunamadı → Manuel giriş seçeneği sun
+    console.warn(`[Barkod] ${cleanCode} bulunamadı (allow_manual=${res.allow_manual}):`, res.message);
+    updateBarcodeScanStatus("");
+    if (res.allow_manual) {
+      showBarcodeManualEntry(cleanCode, res.message);
+    } else {
+      showToast(res.message || "Barkod bulunamadı.");
+    }
     liveBarcodeScanLocked = false;
   }
+}
+
+function showBarcodeManualEntry(barcode, errorMsg) {
+  const dialog = document.getElementById("productDialog");
+  const content = document.getElementById("dialogContent");
+  if (!dialog || !content) { showToast(errorMsg); return; }
+
+  content.innerHTML = `
+    <div class="dialog-body" style="max-width: 420px;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+        <div style="width: 40px; height: 40px; background: rgba(230,168,23,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <i data-lucide="scan-barcode" style="width: 18px; height: 18px; color: #b8860b;"></i>
+        </div>
+        <div>
+          <h3 style="margin: 0 0 2px; font-size: 16px;">Ürün Bulunamadı</h3>
+          <p style="margin: 0; font-size: 12px; color: var(--ink-light);">Barkod: <code>${escapeHtml(barcode)}</code></p>
+        </div>
+      </div>
+
+      <div class="page-guide" style="margin-bottom: 16px;">
+        <i data-lucide="info"></i>
+        <span style="font-size: 12px;">${escapeHtml(errorMsg || "Bu barkod veritabanlarımızda bulunamadı.")} Ürünü manuel olarak ekleyebilirsiniz.</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div>
+          <label style="font-size: 12px; font-weight: 700; color: var(--ink-light); display: block; margin-bottom: 4px;">ÜRÜN ADI *</label>
+          <input id="manualBarcodeTitle" class="form-input" placeholder="örn: Ülker Çikolata 80g" style="width: 100%;">
+        </div>
+        <div>
+          <label style="font-size: 12px; font-weight: 700; color: var(--ink-light); display: block; margin-bottom: 4px;">MARKA (opsiyonel)</label>
+          <input id="manualBarcodeBrand" class="form-input" placeholder="örn: Ülker" style="width: 100%;">
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 16px;">
+        <button class="secondary-button" style="flex: 1;" onclick="closeDialog()">İptal</button>
+        <button class="primary-button" style="flex: 2;" onclick="submitManualBarcodeEntry('${escapeHtml(barcode)}')">
+          <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 4px;"></i>Sepete Ekle
+        </button>
+      </div>
+    </div>
+  `;
+  if (!dialog.open) dialog.showModal();
+  lucide.createIcons();
+  setTimeout(() => document.getElementById("manualBarcodeTitle")?.focus(), 100);
+}
+
+function submitManualBarcodeEntry(barcode) {
+  const title = document.getElementById("manualBarcodeTitle")?.value.trim();
+  const brand = document.getElementById("manualBarcodeBrand")?.value.trim() || "";
+  if (!title) {
+    document.getElementById("manualBarcodeTitle")?.focus();
+    return;
+  }
+  state.cart.push({
+    id: "cart-" + Date.now(),
+    name: title,
+    brand,
+    image_url: "",
+    barcode,
+    checked: false,
+    quantity: 1,
+    updated_at: new Date().toISOString(),
+  });
+  saveCartToLocalStorage();
+  renderCart();
+  if (state.sharedListId) syncSharedListWithServer();
+  closeDialog();
+  showToast(`"${title}" sepete eklendi.`);
 }
 
 async function scanBarcodeImage(event) {

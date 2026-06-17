@@ -1826,6 +1826,82 @@ def clear_search_cache(query: str | None = None, category: str | None = None) ->
     return {"deleted": None, "message": "Tüm cache silmek için Supabase'den manuel temizleyin."}
 
 
+def _barcode_from_sources(barcode: str) -> dict | None:
+    """
+    Çoklu kaynak barkod araması.
+    Kaynak sırası: Open Food Facts → UPCitemdb → N11 ürün arama
+    Her kaynak başarısız olursa sonraki denenir; tümü başarısız olursa None döner.
+    """
+    import logging as _log
+    log = _log.getLogger(__name__)
+
+    # ── Kaynak 1: Open Food Facts ──────────────────────────────────────────
+    try:
+        r = requests.get(
+            f"https://world.openfoodfacts.org/api/v2/product/{barcode}.json",
+            params={"fields": "code,product_name,product_name_tr,generic_name,brands,image_front_url,image_url,quantity"},
+            headers={"User-Agent": "Almadan/1.0 (https://almadan.vercel.app)"},
+            timeout=6,
+        )
+        log.info("OFF status %s for barcode %s", r.status_code, barcode)
+        if r.ok:
+            data = r.json()
+            if int(data.get("status") or 0) == 1:
+                p = data.get("product") or {}
+                title = (p.get("product_name_tr") or p.get("product_name") or p.get("generic_name") or "").strip()
+                if title:
+                    brand = str(p.get("brands") or "").split(",", 1)[0].strip()
+                    qty   = str(p.get("quantity") or "").strip()
+                    img   = str(p.get("image_front_url") or p.get("image_url") or "").strip()
+                    return {"title": title, "brand": brand, "quantity": qty,
+                            "image_url": img, "search_query": " ".join(x for x in (brand, title, qty) if x),
+                            "source": "open_food_facts"}
+            log.info("OFF: product not found (status=%s)", data.get("status"))
+        else:
+            log.warning("OFF HTTP %s for barcode %s", r.status_code, barcode)
+    except Exception as exc:
+        log.warning("OFF exception for barcode %s: %s", barcode, exc)
+
+    # ── Kaynak 2: UPCitemdb (ücretsiz tier, 100 sorgu/gün) ────────────────
+    try:
+        r2 = requests.get(
+            "https://api.upcitemdb.com/prod/trial/lookup",
+            params={"upc": barcode},
+            headers={"Accept": "application/json"},
+            timeout=5,
+        )
+        log.info("UPCitemdb status %s for barcode %s", r2.status_code, barcode)
+        if r2.ok:
+            data2 = r2.json()
+            items = data2.get("items") or []
+            if items:
+                item = items[0]
+                title = item.get("title", "").strip()
+                if title:
+                    brand = item.get("brand", "").strip()
+                    img   = (item.get("images") or [""])[0]
+                    return {"title": title, "brand": brand, "quantity": "",
+                            "image_url": img, "search_query": " ".join(x for x in (brand, title) if x),
+                            "source": "upcitemdb"}
+    except Exception as exc:
+        log.warning("UPCitemdb exception for barcode %s: %s", barcode, exc)
+
+    # ── Kaynak 3: N11 ürün arama (barkod numarasını query olarak gönder) ──
+    try:
+        from app.comparator import search_n11_direct
+        n11_results, _ = search_n11_direct(barcode)
+        if n11_results:
+            first = n11_results[0]
+            return {"title": first["title"], "brand": "", "quantity": "",
+                    "image_url": first.get("image_url", ""),
+                    "search_query": first["title"],
+                    "source": "n11_search"}
+    except Exception as exc:
+        log.warning("N11 barcode fallback exception for %s: %s", barcode, exc)
+
+    return None
+
+
 @app.get("/api/barcode/{code}")
 def api_barcode_lookup(code: str) -> dict:
     from app.comparator import lookup_barcode, search_products_by_name
@@ -1850,61 +1926,24 @@ def api_barcode_lookup(code: str) -> dict:
 
     match = lookup_barcode(barcode)
     if not match:
-        try:
-            response = requests.get(
-                f"https://world.openfoodfacts.org/api/v2/product/{barcode}.json",
-                params={
-                    "fields": (
-                        "code,product_name,product_name_tr,generic_name,"
-                        "brands,image_front_url,image_url,quantity"
-                    ),
-                },
-                headers={
-                    "User-Agent": (
-                        "Almadan/1.0 (https://almadan.vercel.app; "
-                        "contact: destek@almadan.app)"
-                    ),
-                },
-                timeout=10,
-            )
-            response.raise_for_status()
-            off_data = response.json()
-        except requests.RequestException as exc:
-            raise HTTPException(
-                status_code=502,
-                detail="Open Food Facts barkod sorgusu basarisiz.",
-            ) from exc
+        match = _barcode_from_sources(barcode)
 
-        if int(off_data.get("status") or 0) != 1:
-            return {"found": False, "message": "Barkod Open Food Facts veritabaninda bulunamadi."}
+    if not match:
+        return {
+            "found": False,
+            "barcode": barcode,
+            "message": f"'{barcode}' barkodu hiçbir kaynakta bulunamadı.",
+            "allow_manual": True,
+        }
 
-        product = off_data.get("product") or {}
-        title = (
-            product.get("product_name_tr")
-            or product.get("product_name")
-            or product.get("generic_name")
-            or f"Barkodlu Urun {barcode}"
-        ).strip()
-        brand = str(product.get("brands") or "").split(",", 1)[0].strip()
-        quantity = str(product.get("quantity") or "").strip()
-        image_url = str(product.get("image_front_url") or product.get("image_url") or "").strip()
-        search_query = " ".join(part for part in (brand, title, quantity) if part).strip()
-        match = {
-            "title": title,
-            "brand": brand,
-            "quantity": quantity,
-            "image_url": image_url,
-            "search_query": search_query or title,
-            "source": "open_food_facts",
-        }
-    else:
-        match = {
-            **match,
-            "brand": match.get("brand", ""),
-            "quantity": match.get("quantity", ""),
-            "image_url": match.get("image_url", ""),
-            "source": "local_seed",
-        }
+    # local_seed match için eksik alanları tamamla
+    match = {
+        "brand": "",
+        "quantity": "",
+        "image_url": "",
+        "source": "local_seed",
+        **match,
+    }
 
     db["barcode_products"][barcode] = {
         **match,
