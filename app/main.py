@@ -3287,3 +3287,235 @@ async def send_digest_now(
         return {"ok": ok}
     result = await asyncio.to_thread(retention_service.run_weekly_digest, dry_run=False)
     return {"ok": True, **result}
+
+
+# ══════════════════════════════════════════════════════════════
+# Sprint 6 — İleri Seviye AI & Zeka Katmanı (Madde 101-120)
+# ══════════════════════════════════════════════════════════════
+
+# ── Semantik Arama ────────────────────────────────────────────
+
+class SemanticSearchRequest(BaseModel):
+    query: str = Field(..., min_length=2, max_length=200)
+    store: str | None = None
+    category: str | None = None
+    limit: int = Field(default=10, ge=1, le=50)
+    threshold: float = Field(default=0.70, ge=0.0, le=1.0)
+
+
+@app.post("/api/search/semantic")
+async def semantic_search(
+    request: Request,
+    body: SemanticSearchRequest,
+    user=Depends(require_login),
+):
+    """
+    Anlamsal ürün araması.
+    'Kışlık kahvaltılık' yazınca peynir, zeytin, reçel birlikte gelir.
+    """
+    from app.semantic_search import semantic_search as ss
+
+    user_id = user.get("id") or user.get("sub")
+    results = await asyncio.to_thread(
+        ss.search,
+        sanitize(body.query, max_length=200),
+        store=body.store,
+        category=body.category,
+        limit=body.limit,
+        threshold=body.threshold,
+        user_id=user_id,
+    )
+    return {
+        "query": body.query,
+        "results": [
+            {
+                "product_key":   r.product_key,
+                "product_title": r.product_title,
+                "store":         r.store,
+                "category":      r.category,
+                "price":         r.price,
+                "similarity":    round(r.similarity, 4),
+            }
+            for r in results
+        ],
+        "count": len(results),
+    }
+
+
+@app.post("/api/admin/search/index")
+async def index_catalog_for_search(
+    store: str | None = None,
+    user=Depends(require_admin),
+):
+    """Admin: katalog ürünlerini vektör DB'ye yazar (cron veya manuel)."""
+    from app.semantic_search import semantic_search as ss
+    result = await asyncio.to_thread(ss.index_catalog_items, store)
+    return result
+
+
+# ── Fiyat Tahmini ─────────────────────────────────────────────
+
+@app.get("/api/forecast/{product_key}")
+async def get_price_forecast(
+    product_key: str,
+    store: str = "migros",
+    days: int = 14,
+    user=Depends(require_login),
+):
+    """
+    Bir ürün için önümüzdeki N günlük fiyat tahmini.
+    Grafik için: [{forecast_date, predicted_price, confidence_low, confidence_high, trend}]
+    """
+    from app.price_forecaster import price_forecaster
+
+    key_clean = sanitize(product_key, max_length=150)
+    result = await asyncio.to_thread(
+        price_forecaster.forecast_from_db,
+        key_clean,
+        key_clean.split("::")[-1].replace("-", " ").title(),
+        store,
+        days=min(days, 30),
+    )
+    return {
+        "product_key":       result.product_key,
+        "store":             result.store,
+        "model_version":     result.model_version,
+        "historical_avg":    result.historical_avg,
+        "data_points_used":  result.data_points_used,
+        "guardrail_blocked": result.guardrail_blocked,
+        "guardrail_reason":  result.guardrail_reason,
+        "predictions": [
+            {
+                "date":             p.forecast_date.isoformat(),
+                "price":            p.predicted_price,
+                "confidence_low":   p.confidence_low,
+                "confidence_high":  p.confidence_high,
+                "trend":            p.trend,
+                "change_pct":       p.change_pct,
+            }
+            for p in result.predictions
+        ],
+    }
+
+
+# ── Buzdolabı Analizi (Computer Vision) ──────────────────────
+
+class FridgeAnalysisRequest(BaseModel):
+    image_url: str = Field(..., max_length=500)
+
+
+@app.post("/api/vision/fridge")
+async def analyze_fridge(
+    request: Request,
+    body: FridgeAnalysisRequest,
+    user=Depends(require_login),
+):
+    """
+    Buzdolabı fotoğrafından eksik ürün listesi oluşturur.
+    Döndürür: detected_items + shopping_list
+    """
+    from app.vision_analyzer import vision_analyzer
+
+    user_id   = user.get("id") or user.get("sub")
+    device_id = request.headers.get("X-Device-ID")
+
+    result = await asyncio.to_thread(
+        vision_analyzer.analyze_fridge,
+        body.image_url,
+        user_id=user_id,
+        device_id=device_id,
+    )
+    return {
+        "analysis_type":         result.analysis_type,
+        "model_used":            result.model_used,
+        "detected_items":        result.detected_items,
+        "shopping_list":         result.shopping_list,
+        "guardrail_blocked_items": result.guardrail_blocked_items,
+        "error":                 result.error,
+    }
+
+
+@app.post("/api/vision/receipt")
+async def analyze_receipt(
+    request: Request,
+    body: FridgeAnalysisRequest,
+    user=Depends(require_login),
+):
+    """Fiş/fatura fotoğrafından ürün-fiyat listesi çıkarır."""
+    from app.vision_analyzer import vision_analyzer
+
+    user_id = user.get("id") or user.get("sub")
+    result = await asyncio.to_thread(
+        vision_analyzer.analyze_receipt,
+        body.image_url,
+        user_id=user_id,
+    )
+    return {
+        "model_used":    result.model_used,
+        "items":         result.detected_items,
+        "error":         result.error,
+    }
+
+
+# ── AI İzleme (Admin) ─────────────────────────────────────────
+
+@app.get("/api/admin/ai/monitor")
+def get_ai_monitor(hours: int = 24, user=Depends(require_admin)):
+    """AI servis maliyet ve hata özeti (son N saat)."""
+    from app.ai_monitor import AIMonitor
+    return {
+        "period_hours": hours,
+        "cost_summary": AIMonitor.get_cost_summary(hours),
+        "recent_errors": AIMonitor.get_recent_errors(20),
+    }
+
+
+@app.get("/api/admin/ai/latency/{service}")
+def get_ai_latency(service: str, hours: int = 24, user=Depends(require_admin)):
+    """Belirtilen AI servisinin latency p50/p95/p99 dağılımı."""
+    from app.ai_monitor import AIMonitor
+    return AIMonitor.get_latency_percentiles(sanitize(service, max_length=40), hours)
+
+
+# ── Guardrail Kontrolü (Test/Admin) ──────────────────────────
+
+class GuardrailCheckRequest(BaseModel):
+    price: float
+    historical_avg: float = 0.0
+    forecast_series: list[float] = Field(default_factory=list)
+
+
+@app.post("/api/admin/guardrails/check-price")
+def check_price_guardrail(body: GuardrailCheckRequest, user=Depends(require_admin)):
+    """Admin: bir fiyat tahminini guardrail'dan geçirir (test için)."""
+    from app.guardrails import Guardrails
+    g = Guardrails()
+    results = g.run_all_price_checks(
+        body.price,
+        historical_avg=body.historical_avg,
+        forecast_series=body.forecast_series or None,
+    )
+    return {
+        "all_passed": g.all_passed(results),
+        "checks": [
+            {
+                "check_type": r.check_type,
+                "passed":     r.passed,
+                "reason":     r.reason,
+            }
+            for r in results
+        ],
+    }
+
+
+# ── Semantik İndeksleme Cron ──────────────────────────────────
+
+@app.api_route("/cron/semantic-index", methods=["GET", "POST"])
+async def cron_semantic_index(request: Request):
+    """Vercel Cron: Her gün 04:00 UTC — katalog → vektör DB."""
+    secret = request.headers.get("x-cron-secret") or request.query_params.get("secret")
+    if CRON_SECRET and secret != CRON_SECRET:
+        raise HTTPException(status_code=401, detail="Yetkisiz")
+    from app.semantic_search import semantic_search as ss
+    result = await asyncio.to_thread(ss.index_catalog_items)
+    return {"ok": True, **result}

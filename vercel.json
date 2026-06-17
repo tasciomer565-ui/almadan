@@ -18,6 +18,10 @@
     {
       "path": "/cron/weekly-digest",
       "schedule": "0 7 * * 1"
+    },
+    {
+      "path": "/cron/semantic-index",
+      "schedule": "0 4 * * *"
     }
   ]
 }
