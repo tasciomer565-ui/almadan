@@ -48,6 +48,18 @@ from app.storage import (
     utc_now,
 )
 from app.tracker import refresh_all_products, refresh_owner_products, refresh_product
+from app.security import (
+    apply_security_headers,
+    auth_wall_middleware,
+    csrf_middleware,
+    generate_csrf_token,
+    log_activity,
+    require_admin,
+    require_premium,
+    sanitize,
+    get_oauth_url,
+    OAUTH_PROVIDERS,
+)
 
 
 REFRESH_INTERVAL_SECONDS = 6 * 60 * 60
@@ -181,6 +193,26 @@ async def resolve_auth_session(request: Request, call_next):
     elif refreshed_tokens == {}:
         clear_auth_cookies(response)
     return response
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    apply_security_headers(response)
+    # CSRF token'ı cookie olarak sun (JS okumaz, header'dan gönderir)
+    if not request.cookies.get("csrf_token"):
+        device_id = request.cookies.get("almadan_device_id", "anonymous")
+        csrf = generate_csrf_token(device_id)
+        response.set_cookie(
+            "csrf_token", csrf,
+            max_age=7200, httponly=False, secure=True, samesite="strict"
+        )
+    return response
+
+
+@app.middleware("http")
+async def _auth_wall(request: Request, call_next):
+    return await auth_wall_middleware(request, call_next)
 
 
 @app.exception_handler(StorageError)
@@ -1196,6 +1228,75 @@ def auth_reset_password(
             "email": user.get("email"),
         },
     }
+
+
+@app.get("/api/auth/oauth/{provider}")
+def auth_oauth_redirect(provider: str, request: Request) -> RedirectResponse:
+    """Social login: Google veya Apple OAuth yönlendirmesi."""
+    if provider not in OAUTH_PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"Desteklenmeyen provider: {provider}")
+    from app.storage import supabase_base_url
+    supabase_url = supabase_base_url()
+    anon_key = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
+    redirect_to = f"{APP_URL}/auth/callback"
+    url = get_oauth_url(provider, redirect_to, supabase_url, anon_key)
+    log_activity(request, "oauth_redirect", {"provider": provider})
+    return RedirectResponse(url)
+
+
+@app.get("/api/auth/callback", include_in_schema=False)
+def auth_oauth_callback(request: Request, response: Response) -> RedirectResponse:
+    """
+    Supabase OAuth callback: URL fragment'taki token'ları cookie'ye yazar.
+    Tarayıcı JS tarafı zaten Supabase JS client ile handle eder;
+    bu endpoint /login?oauth=1 yönlendirmesidir.
+    """
+    return RedirectResponse("/?oauth=1")
+
+
+@app.get("/api/profile/me")
+def profile_me(request: Request) -> dict:
+    """Giriş yapmış kullanıcının profil bilgisi + rolü."""
+    if not request.state.user_id:
+        raise HTTPException(status_code=401, detail="Oturum açmanız gerekiyor.")
+    from app.storage import supabase_get
+    try:
+        rows = supabase_get(
+            "profiles",
+            params={"id": f"eq.{request.state.user_id}", "select": "*"},
+        )
+        profile = rows[0] if rows else {}
+    except Exception:
+        profile = {}
+    return {
+        "user_id": request.state.user_id,
+        "email": request.state.user_email,
+        "role": profile.get("role", "free"),
+        "stripe_status": profile.get("stripe_status", "inactive"),
+        "display_name": profile.get("display_name"),
+        "preferences": profile.get("preferences", {}),
+    }
+
+
+@app.get("/api/activity-log")
+async def get_activity_log(request: Request, limit: int = 50) -> dict:
+    """Kullanıcının son aktivitelerini döner (kendi kaydı)."""
+    if not request.state.user_id:
+        raise HTTPException(status_code=401, detail="Oturum açmanız gerekiyor.")
+    from app.storage import supabase_get
+    try:
+        rows = supabase_get(
+            "activity_logs",
+            params={
+                "user_id": f"eq.{request.state.user_id}",
+                "order": "created_at.desc",
+                "limit": str(min(limit, 200)),
+                "select": "event,metadata,ip_address,created_at",
+            },
+        )
+    except Exception:
+        rows = []
+    return {"events": rows}
 
 
 @app.get("/storage-health")
