@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import asyncio
 import hashlib
@@ -3861,3 +3861,123 @@ async def cron_group_buy_expire(request: Request):
     from app.group_buy import group_buy_engine
     count = await asyncio.to_thread(group_buy_engine.expire_old_groups)
     return {"ok": True, "expired_count": count}
+
+
+# -- Sprint 8: Kirilmazlik & Gozlemlenebilirlik --
+
+# -- Circuit Breaker --
+
+@app.get("/api/admin/circuit-breakers")
+async def list_circuit_breakers(request: Request, admin=Depends(require_admin)):
+    from app.resilience import get_all_circuit_states
+    return {"circuit_breakers": get_all_circuit_states()}
+
+
+@app.post("/api/admin/circuit-breakers/{service}/reset")
+async def reset_circuit_breaker_endpoint(service: str, request: Request, admin=Depends(require_admin)):
+    VALID_SERVICES = {"supabase", "replicate", "openai", "scrapers", "push"}
+    if service not in VALID_SERVICES:
+        raise HTTPException(status_code=400, detail=f"Gecersiz servis: {service}")
+    from app.resilience import reset_circuit_breaker
+    reset_circuit_breaker(service)
+    return {"ok": True, "service": service, "state": "closed"}
+
+
+# -- Performans Istatistikleri --
+
+@app.get("/api/admin/performance/latency")
+async def get_performance_stats(request: Request, hours: int = 1, admin=Depends(require_admin)):
+    from app.observability import get_latency_stats
+    stats = await asyncio.to_thread(get_latency_stats, hours)
+    return {"hours": hours, "endpoints": stats}
+
+
+@app.get("/api/admin/cache/stats")
+async def get_cache_stats_endpoint(request: Request, admin=Depends(require_admin)):
+    from app.cache_strategy import get_cache_stats
+    return get_cache_stats()
+
+
+@app.post("/api/admin/cache/invalidate")
+async def invalidate_cache_endpoint(request: Request, admin=Depends(require_admin)):
+    from app.cache_strategy import get_price_cache, get_search_cache, get_product_cache
+    get_price_cache().clear()
+    get_search_cache().clear()
+    get_product_cache().clear()
+    return {"ok": True, "message": "Tum L1 cache temizlendi"}
+
+
+# -- Chaos Engineering --
+
+class ChaosStartPayload(BaseModel):
+    scenario: str
+
+
+@app.post("/api/admin/chaos/start")
+async def chaos_start(request: Request, body: ChaosStartPayload, admin=Depends(require_admin)):
+    from app.chaos import run_scenario
+    result = await asyncio.to_thread(run_scenario, body.scenario, triggered_by="admin_api")
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/api/admin/chaos/stop/{scenario_name}")
+async def chaos_stop(scenario_name: str, request: Request, admin=Depends(require_admin)):
+    from app.chaos import get_chaos_runner
+    stopped = get_chaos_runner().stop(scenario_name)
+    return {"ok": stopped, "scenario": scenario_name}
+
+
+@app.get("/api/admin/chaos/scenarios")
+async def list_chaos_scenarios(request: Request, admin=Depends(require_admin)):
+    from app.chaos import SCENARIOS, FaultType
+    return {
+        "scenarios": [
+            {
+                "name": k,
+                "target_service": v["target_service"],
+                "fault_type": v["fault_type"].value if isinstance(v["fault_type"], FaultType) else v["fault_type"],
+                "duration_sec": v.get("duration_sec", 30),
+            }
+            for k, v in SCENARIOS.items()
+        ]
+    }
+
+
+# -- Sistem Saglik Kontrol --
+
+@app.get("/health")
+async def health_check():
+    from app.resilience import get_all_circuit_states
+    from app.cache_strategy import get_cache_stats
+    cb_states = get_all_circuit_states()
+    open_cbs = [c for c in cb_states if c["state"] == "open"]
+    return {
+        "status": "degraded" if open_cbs else "ok",
+        "open_circuit_breakers": open_cbs,
+        "cache": get_cache_stats(),
+        "region": os.getenv("VERCEL_REGION", "fra1"),
+        "ts": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# -- Cron: Metrik Temizleme --
+
+@app.api_route("/cron/cleanup-metrics", methods=["GET", "POST"])
+async def cron_cleanup_metrics(request: Request):
+    secret = request.headers.get("x-cron-secret") or request.query_params.get("secret")
+    if CRON_SECRET and secret != CRON_SECRET:
+        raise HTTPException(status_code=401, detail="Yetkisiz")
+    import requests as _req_c
+    _sb_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    _sb_key = "".join(os.getenv("SUPABASE_SERVICE_KEY", "").split())
+    if not _sb_url:
+        return {"ok": True, "skipped": True}
+    hdrs = {"apikey": _sb_key, "Authorization": f"Bearer {_sb_key}", "Content-Type": "application/json"}
+    try:
+        _req_c.post(f"{_sb_url}/rest/v1/rpc/cleanup_request_metrics", headers=hdrs, timeout=10)
+        _req_c.post(f"{_sb_url}/rest/v1/rpc/cleanup_old_logs", headers=hdrs, timeout=10)
+        return {"ok": True}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}

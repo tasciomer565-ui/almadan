@@ -26,6 +26,10 @@
     {
       "path": "/cron/group-buy-expire",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/cron/cleanup-metrics",
+      "schedule": "0 3 * * *"
     }
   ]
 }
