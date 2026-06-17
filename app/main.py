@@ -3981,3 +3981,123 @@ async def cron_cleanup_metrics(request: Request):
         return {"ok": True}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+
+
+# -- Sprint 9: Final Sprint - Uyumluluk & Dokumantasyon --
+
+# -- OpenAPI ozellestirilmis sema --
+
+from app.openapi_config import custom_openapi, APP_VERSION, APP_TITLE
+
+app.title = APP_TITLE
+app.version = APP_VERSION
+app.openapi = lambda: custom_openapi(app)
+
+# -- KVKK / GDPR Endpoint'leri --
+
+@app.delete("/api/me/forget", tags=["KVKK / GDPR"])
+async def right_to_be_forgotten(request: Request, user=Depends(require_login)):
+    """
+    KVKK Madde 7 / GDPR Article 17 - Unutulma Hakki.
+    Kullaniciya ait tum kisisel veriyi siler ve Supabase Auth hesabini kapatir.
+    Bu islem geri alinamaz.
+    """
+    from app.gdpr import gdpr_service
+    user_id = user.get("id") or user.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Kullanici kimlik bilgisi alinamadi")
+    result = await asyncio.to_thread(gdpr_service.forget, user_id)
+    status = 200 if result.success else 207
+    return JSONResponse(content=result.to_dict(), status_code=status)
+
+
+@app.get("/api/me/export", tags=["KVKK / GDPR"])
+async def data_export(request: Request, user=Depends(require_login)):
+    """
+    KVKK Madde 11 / GDPR Article 15 - Veri Erisim Hakki (SAR).
+    Kullaniciya ait tum verilerin JSON paketi olarak dondurulur.
+    """
+    from app.gdpr import gdpr_service
+    user_id = user.get("id") or user.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Kullanici kimlik bilgisi alinamadi")
+    sar = await asyncio.to_thread(gdpr_service.export, user_id)
+    return {
+        "user_id":      sar.user_id,
+        "generated_at": sar.generated_at,
+        "data":         sar.data,
+    }
+
+
+@app.put("/api/me/consent/{consent_type}", tags=["KVKK / GDPR"])
+async def update_consent(
+    consent_type: str,
+    request: Request,
+    user=Depends(require_login),
+):
+    """
+    Onay guncelleme: marketing, analytics, push, data_sharing.
+    """
+    VALID_TYPES = {"marketing", "analytics", "push", "data_sharing"}
+    if consent_type not in VALID_TYPES:
+        raise HTTPException(status_code=400, detail=f"Gecersiz onay turu: {consent_type}")
+    body = await request.json()
+    granted = bool(body.get("granted", False))
+    user_id = user.get("id") or user.get("sub")
+    import requests as _req_c
+    _sb_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    _sb_key = "".join(os.getenv("SUPABASE_SERVICE_KEY", "").split())
+    if _sb_url:
+        hdrs = {"apikey": _sb_key, "Authorization": f"Bearer {_sb_key}",
+                "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"}
+        row = {
+            "user_id": user_id,
+            "consent_type": consent_type,
+            "granted": granted,
+            "granted_at": datetime.now(timezone.utc).isoformat() if granted else None,
+            "revoked_at": datetime.now(timezone.utc).isoformat() if not granted else None,
+        }
+        _req_c.post(f"{_sb_url}/rest/v1/user_consents", headers=hdrs, json=row, timeout=5)
+    return {"ok": True, "consent_type": consent_type, "granted": granted}
+
+
+@app.get("/api/me/consents", tags=["KVKK / GDPR"])
+async def get_consents(request: Request, user=Depends(require_login)):
+    """Kullanicinin mevcut onay durumlarini listeler."""
+    user_id = user.get("id") or user.get("sub")
+    import requests as _req_c
+    _sb_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    _sb_key = "".join(os.getenv("SUPABASE_SERVICE_KEY", "").split())
+    if not _sb_url:
+        return {"consents": []}
+    hdrs = {"apikey": _sb_key, "Authorization": f"Bearer {_sb_key}",
+            "Content-Type": "application/json"}
+    try:
+        r = _req_c.get(f"{_sb_url}/rest/v1/user_consents",
+                       params={"user_id": f"eq.{user_id}", "select": "consent_type,granted,granted_at,revoked_at"},
+                       headers=hdrs, timeout=5)
+        return {"consents": r.json() if r.ok else []}
+    except Exception:
+        return {"consents": []}
+
+
+@app.get("/api/admin/gdpr/requests", tags=["Admin"])
+async def list_gdpr_requests(
+    request: Request,
+    admin=Depends(require_admin),
+    limit: int = 50,
+):
+    """Son GDPR/KVKK taleplerini listeler (admin)."""
+    import requests as _req_c
+    _sb_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    _sb_key = "".join(os.getenv("SUPABASE_SERVICE_KEY", "").split())
+    if not _sb_url:
+        return {"requests": []}
+    hdrs = {"apikey": _sb_key, "Authorization": f"Bearer {_sb_key}",
+            "Content-Type": "application/json"}
+    r = _req_c.get(
+        f"{_sb_url}/rest/v1/gdpr_requests",
+        params={"select": "*", "order": "requested_at.desc", "limit": limit},
+        headers=hdrs, timeout=5,
+    )
+    return {"requests": r.json() if r.ok else []}
