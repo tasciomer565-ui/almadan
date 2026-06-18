@@ -9,11 +9,7 @@
       "path": "/cron/refresh-all",
       "schedule": "0 5 * * *"
     },
-    {
-      "path": "/api/ai/worker",
-      "schedule": "0 10 * * *"
-    },
-    {
+{
       "path": "/cron/catalog-scan",
       "schedule": "0 6 * * 1,4"
     },

@@ -2893,3 +2893,9 @@ body.dark-theme .quantum-node-card {
   text-transform: uppercase; letter-spacing: .5px;
   margin: 20px 0 8px;
 }
+
+/* ── Takipçi Sayısı ─────────────────────────────────────────────────────── */
+.store-follower-count {
+  font-size: 11px; color: var(--ink-2); font-weight: 500;
+}
+.store-card.followed .store-follower-count { color: var(--green); }

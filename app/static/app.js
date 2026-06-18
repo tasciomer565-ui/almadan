@@ -6855,8 +6855,9 @@ function toggleReminderForm(itemId) {
 
 /* ── Mağaza Bültenleri ───────────────────────────────────────────────────── */
 
-const STORE_EMOJIS = { market: "🛒", fashion: "👗", beauty: "💄", home: "🏠" };
-const storeFollowState = {};
+const STORE_EMOJIS     = { market: "🛒", fashion: "👗", beauty: "💄", home: "🏠" };
+const storeFollowState  = {};
+const storeFollowerCounts = {};
 
 async function loadStores() {
   const list = document.getElementById("storeList");
@@ -6869,17 +6870,29 @@ async function loadStores() {
 
     if (!stores.length) { list.innerHTML = `<p class="empty-state">Henüz mağaza eklenmemiş.</p>`; return; }
 
-    const groups = {};
     stores.forEach(s => {
-      storeFollowState[s.slug] = s.followed;
-      (groups[s.category] = groups[s.category] || []).push(s);
+      storeFollowState[s.slug]    = s.followed;
+      storeFollowerCounts[s.slug] = s.follower_count || 0;
     });
 
-    const CAT_LABELS = { market: "Marketler", fashion: "Moda", beauty: "Güzellik & Kozmetik", home: "Ev & Yaşam" };
     let html = "";
+
+    // Takip Ettiklerim bölümü
+    const followed = stores.filter(s => s.followed);
+    if (followed.length) {
+      html += `<div class="store-section-title">⭐ Takip Ettiklerim</div><div class="store-grid">`;
+      html += followed.map(s => renderStoreCard(s)).join("");
+      html += `</div>`;
+    }
+
+    // Tüm mağazalar kategoriye göre
+    const groups = {};
+    stores.forEach(s => (groups[s.category] = groups[s.category] || []).push(s));
+    const CAT_LABELS = { market: "Marketler", fashion: "Moda", beauty: "Güzellik & Kozmetik", home: "Ev & Yaşam" };
+    html += `<div class="store-section-title" style="margin-top:${followed.length ? "24px" : "0"}">🏪 Tüm Mağazalar</div>`;
     ["market", "fashion", "beauty", "home"].forEach(cat => {
       if (!groups[cat]?.length) return;
-      html += `<div class="store-section-title">${CAT_LABELS[cat] || cat}</div><div class="store-grid">`;
+      html += `<div class="store-section-title" style="font-size:11px;margin-top:12px;">${CAT_LABELS[cat] || cat}</div><div class="store-grid">`;
       html += groups[cat].map(s => renderStoreCard(s)).join("");
       html += `</div>`;
     });
@@ -6891,7 +6904,9 @@ async function loadStores() {
 
 function renderStoreCard(s) {
   const followed = storeFollowState[s.slug];
+  const count    = storeFollowerCounts[s.slug] || 0;
   const emoji    = STORE_EMOJIS[s.category] || "🏪";
+  const countTxt = count > 0 ? `👥 ${count} kişi takipte` : "İlk takipçi ol!";
   return `
     <div class="store-card ${followed ? "followed" : ""}" id="scard-${s.slug}">
       <div class="store-card-header">
@@ -6902,6 +6917,7 @@ function renderStoreCard(s) {
         </div>
       </div>
       ${s.publication_note ? `<div class="store-note">📅 ${escapeHtml(s.publication_note)}</div>` : ""}
+      <div class="store-follower-count" id="scount-${s.slug}">${countTxt}</div>
       <button class="btn-follow ${followed ? "active" : ""}" onclick="toggleFollow('${s.slug}', '${escapeHtml(s.name)}')" id="sfbtn-${s.slug}">
         ${followed ? "✓ Takip Ediliyor" : "+ Takibe Al"}
       </button>
@@ -6909,26 +6925,41 @@ function renderStoreCard(s) {
 }
 
 async function toggleFollow(slug, name) {
-  const btn  = document.getElementById(`sfbtn-${slug}`);
-  const card = document.getElementById(`scard-${slug}`);
+  const btn      = document.getElementById(`sfbtn-${slug}`);
+  const card     = document.getElementById(`scard-${slug}`);
+  const countEl  = document.getElementById(`scount-${slug}`);
   const isFollowed = storeFollowState[slug];
 
+  // Optimistic UI
   storeFollowState[slug] = !isFollowed;
+  storeFollowerCounts[slug] = Math.max(0, (storeFollowerCounts[slug] || 0) + (isFollowed ? -1 : 1));
   btn.textContent = isFollowed ? "+ Takibe Al" : "✓ Takip Ediliyor";
   btn.classList.toggle("active", !isFollowed);
   card.classList.toggle("followed", !isFollowed);
+  if (countEl) {
+    const c = storeFollowerCounts[slug];
+    countEl.textContent = c > 0 ? `👥 ${c} kişi takipte` : "İlk takipçi ol!";
+  }
 
   try {
     const res = await fetch(`/api/stores/${slug}/follow`, { method: isFollowed ? "DELETE" : "POST" });
     if (res.status === 401) {
       toast("Takip için giriş yapman gerekiyor.");
+      // Geri al
       storeFollowState[slug] = isFollowed;
+      storeFollowerCounts[slug] = Math.max(0, (storeFollowerCounts[slug] || 0) + (isFollowed ? 1 : -1));
       btn.textContent = isFollowed ? "✓ Takip Ediliyor" : "+ Takibe Al";
       btn.classList.toggle("active", isFollowed);
       card.classList.toggle("followed", isFollowed);
+      if (countEl) {
+        const c = storeFollowerCounts[slug];
+        countEl.textContent = c > 0 ? `👥 ${c} kişi takipte` : "İlk takipçi ol!";
+      }
       return;
     }
     toast(isFollowed ? `${name} takipten çıkarıldı.` : `${name} takibe alındı ✓`);
+    // Takip değişince bültenleri yeniden yükle (liste güncellensin)
+    if (!isFollowed) loadStores();
   } catch {
     toast("Bağlantı hatası, tekrar dene.");
   }
