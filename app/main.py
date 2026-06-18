@@ -4235,6 +4235,12 @@ async def notifier_test(
       1. Admin oturumu (JWT ile giriş yapılmış kullanıcı, role='admin')
       2. X-Cron-Secret: <CRON_SECRET> header'ı
     """
+    # Geçici tanı logları — sorun çözülünce kaldırılacak
+    import sys
+    print(f"DEBUG: Gelen header X-Cron-Secret: {x_cron_secret!r}", file=sys.stderr, flush=True)
+    print(f"DEBUG: Sistemdeki CRON_SECRET: {os.getenv('CRON_SECRET')!r}", file=sys.stderr, flush=True)
+    print(f"DEBUG: Modül düzeyinde CRON_SECRET sabiti: {CRON_SECRET!r}", file=sys.stderr, flush=True)
+
     # CRON_SECRET header bypass
     secret_ok = CRON_SECRET and x_cron_secret == CRON_SECRET
     if not secret_ok:
