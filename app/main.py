@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 import requests
-from fastapi import FastAPI, Header, HTTPException, Request, BackgroundTasks
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -55,6 +55,7 @@ from app.security import (
     generate_csrf_token,
     log_activity,
     require_admin,
+    require_login,
     require_premium,
     sanitize,
     get_oauth_url,
@@ -4196,8 +4197,39 @@ async def run_health_check_endpoint(request: Request, admin=Depends(require_admi
                 f.write(f"\n[{result_data['ts']}] Health check FAILED\n")
                 f.write(result_data["error"] or "")
                 f.write("\n" + "-"*60 + "\n")
+        # Bildirim gönder (hata → her zaman; düzelme → önceki hata ise)
+        prev = _read_last_test().get("result")
+        from app.notifier import notify_health_result
+        notify_sent = await asyncio.to_thread(
+            notify_health_result,
+            result_data["result"],
+            error=result_data.get("error"),
+            prev_result=prev,
+        )
+        result_data["notify_sent"] = notify_sent
         return result_data
     except subprocess.TimeoutExpired:
         return {"result": "timeout", "ts": datetime.now(timezone.utc).isoformat(), "error": "Test 60s timeout"}
     except Exception as exc:
         return {"result": "error", "ts": datetime.now(timezone.utc).isoformat(), "error": str(exc)}
+
+
+# -- Notifier Entegrasyonu --
+
+@app.get("/api/admin/notifier/status")
+async def notifier_status_endpoint(request: Request, admin=Depends(require_admin)):
+    """Bildirim kanallarinin yapilandirilip yapilandirilmadigini gosterir."""
+    from app.notifier import notifier_status
+    return notifier_status()
+
+
+@app.post("/api/admin/notifier/test")
+async def notifier_test(request: Request, admin=Depends(require_admin)):
+    """Yapılandırılmış bildirim kanallarına test mesajı gönderir."""
+    from app.notifier import notify_failure
+    result = await asyncio.to_thread(
+        notify_failure,
+        "Bu bir test bildirimidir. Sistem normal çalışıyor.",
+        test_name="manual_test",
+    )
+    return {"sent": result, "any_sent": any(result.values())}

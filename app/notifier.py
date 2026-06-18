@@ -1,0 +1,201 @@
+"""
+Error Notifier — Almadan
+
+Hata bildirimi için iki kanal:
+  1. Telegram Bot  — TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID env ile aktif
+  2. SMTP Email    — SMTP_HOST + NOTIFY_EMAIL env ile aktif
+
+Kullanım:
+    from app.notifier import notify_failure, notify_health_result
+    notify_failure("Barkod API timeout: 12s > 10s")
+
+Ortam değişkenleri (Vercel'e ekle):
+    TELEGRAM_BOT_TOKEN   — BotFather'dan alınan token (ör: 7123456789:AAH...)
+    TELEGRAM_CHAT_ID     — Mesajın gideceği chat/grup ID (ör: -1001234567890)
+    NOTIFY_EMAIL         — Bildirimlerin gideceği e-posta adresi
+    SMTP_HOST            — Mail sunucusu
+    SMTP_PORT            — 587 (TLS) veya 465 (SSL)
+    SMTP_USER            — SMTP kullanıcı adı
+    SMTP_PASS            — SMTP şifresi
+    NOTIFY_MIN_LEVEL     — "error" (varsayılan) veya "warning" — ne zaman bildir
+"""
+from __future__ import annotations
+
+import logging
+import os
+import smtplib
+import socket
+from datetime import datetime, timezone
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from typing import Literal
+
+import requests as _req
+
+logger = logging.getLogger(__name__)
+
+# ── Ortam Değişkenleri ────────────────────────────────────────
+
+_TG_TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+_TG_CHAT     = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+_NOTIFY_EMAIL = os.getenv("NOTIFY_EMAIL", "").strip()
+_SMTP_HOST   = os.getenv("SMTP_HOST", "").strip()
+_SMTP_PORT   = int(os.getenv("SMTP_PORT", "587"))
+_SMTP_USER   = os.getenv("SMTP_USER", "").strip()
+_SMTP_PASS   = os.getenv("SMTP_PASS", "").strip()
+_APP_URL     = os.getenv("ALMADAN_APP_URL", "https://almadan.vercel.app").rstrip("/")
+_HOST        = socket.gethostname()
+
+
+# ── Ana Arayüz ────────────────────────────────────────────────
+
+def notify_failure(reason: str, *, test_name: str = "health_check") -> dict[str, bool]:
+    """
+    Test/sistem hatası için bildirim gönderir.
+    Returns: {"telegram": bool, "email": bool}
+    """
+    ts  = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    msg = _build_message(
+        title="🔴 Almadan — Test Başarısız",
+        body=reason,
+        test_name=test_name,
+        ts=ts,
+        level="error",
+    )
+    return _dispatch(msg, subject=f"[Almadan] HATA: {test_name}")
+
+
+def notify_recovery(test_name: str = "health_check") -> dict[str, bool]:
+    """Bir önceki hata sonrasında sistem düzeldiğinde bildirir."""
+    ts  = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    msg = _build_message(
+        title="🟢 Almadan — Sistem Normale Döndü",
+        body="Health check tüm testleri geçti.",
+        test_name=test_name,
+        ts=ts,
+        level="recovery",
+    )
+    return _dispatch(msg, subject=f"[Almadan] Sistem normale döndü")
+
+
+def notify_health_result(
+    result: Literal["success", "failure"],
+    *,
+    error: str | None = None,
+    prev_result: str | None = None,
+) -> dict[str, bool]:
+    """
+    Health check sonucuna göre uygun bildirimi gönderir.
+
+    Mantık:
+      - failure          → her zaman bildir
+      - success (prev=failure) → recovery bildirimi gönder
+      - success (prev=success) → sessiz kal
+    """
+    if result == "failure":
+        return notify_failure(error or "Bilinmeyen hata", test_name="health_check")
+    if result == "success" and prev_result == "failure":
+        return notify_recovery()
+    return {"telegram": False, "email": False}
+
+
+# ── Kanal Göndericileri ───────────────────────────────────────
+
+def _dispatch(message: str, *, subject: str) -> dict[str, bool]:
+    tg_ok    = _send_telegram(message) if _TG_TOKEN and _TG_CHAT else False
+    email_ok = _send_email(subject, message) if _SMTP_HOST and _NOTIFY_EMAIL else False
+
+    if not tg_ok and not email_ok:
+        logger.warning(
+            "Notifier: Hiçbir kanal yapılandırılmamış. "
+            "TELEGRAM_BOT_TOKEN veya SMTP_HOST env değişkenlerini ayarlayın."
+        )
+    return {"telegram": tg_ok, "email": email_ok}
+
+
+def _send_telegram(text: str) -> bool:
+    """Telegram Bot API üzerinden mesaj gönderir."""
+    url = f"https://api.telegram.org/bot{_TG_TOKEN}/sendMessage"
+    try:
+        r = _req.post(
+            url,
+            json={
+                "chat_id":    _TG_CHAT,
+                "text":       text,
+                "parse_mode": "HTML",
+            },
+            timeout=8,
+        )
+        if r.ok:
+            logger.info("Telegram bildirimi gönderildi.")
+            return True
+        logger.warning("Telegram HTTP %s: %s", r.status_code, r.text[:200])
+    except Exception as exc:
+        logger.warning("Telegram gönderilemedi: %s", exc)
+    return False
+
+
+def _send_email(subject: str, body: str) -> bool:
+    """SMTP üzerinden plain-text + HTML e-posta gönderir."""
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = _SMTP_USER
+        msg["To"]      = _NOTIFY_EMAIL
+
+        # Plain text
+        plain = _strip_html_tags(body)
+        msg.attach(MIMEText(plain, "plain", "utf-8"))
+
+        # HTML (Telegram mesajı zaten HTML-ish)
+        html = f"<pre style='font-family:monospace;font-size:13px;'>{body}</pre>"
+        msg.attach(MIMEText(html, "html", "utf-8"))
+
+        with smtplib.SMTP(_SMTP_HOST, _SMTP_PORT, timeout=10) as srv:
+            srv.starttls()
+            srv.login(_SMTP_USER, _SMTP_PASS)
+            srv.sendmail(_SMTP_USER, _NOTIFY_EMAIL, msg.as_string())
+
+        logger.info("Email bildirimi gönderildi: %s", _NOTIFY_EMAIL)
+        return True
+    except Exception as exc:
+        logger.warning("Email gönderilemedi: %s", exc)
+    return False
+
+
+# ── Mesaj Şablonu ─────────────────────────────────────────────
+
+def _build_message(
+    title: str,
+    body: str,
+    *,
+    test_name: str,
+    ts: str,
+    level: str,
+) -> str:
+    icon = {"error": "🔴", "warning": "🟡", "recovery": "🟢"}.get(level, "⚪")
+    return (
+        f"<b>{title}</b>\n\n"
+        f"<b>Test:</b> {test_name}\n"
+        f"<b>Zaman:</b> {ts}\n"
+        f"<b>Sunucu:</b> {_HOST}\n"
+        f"<b>URL:</b> <a href='{_APP_URL}/api/status'>{_APP_URL}/api/status</a>\n\n"
+        f"<b>Detay:</b>\n<code>{body[:800]}</code>"
+    )
+
+
+def _strip_html_tags(text: str) -> str:
+    import re
+    return re.sub(r"<[^>]+>", "", text)
+
+
+# ── Yapılandırma Durumu ───────────────────────────────────────
+
+def notifier_status() -> dict:
+    """Admin dashboard için notifier yapılandırma durumu."""
+    return {
+        "telegram_configured": bool(_TG_TOKEN and _TG_CHAT),
+        "email_configured":    bool(_SMTP_HOST and _NOTIFY_EMAIL),
+        "notify_email":        _NOTIFY_EMAIL or None,
+        "telegram_chat":       _TG_CHAT or None,
+    }
