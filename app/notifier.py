@@ -78,6 +78,36 @@ def notify_recovery(test_name: str = "health_check") -> dict[str, bool]:
     return _dispatch(msg, subject=f"[Almadan] Sistem normale döndü")
 
 
+def notify_restock_reminder(
+    product_title: str,
+    *,
+    current_price: str | None = None,
+    days_until_empty: int = 0,
+    product_url: str = "",
+) -> dict[str, bool]:
+    """
+    Ürün stoku bitmek üzereyken hatırlatıcı bildirimi gönderir.
+    Notifier'ın tek kanalı yoksa sessiz döner — ürün takip bildirimi
+    sisteme bağlı olmayan kullanıcılar için gönderilmez.
+    """
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    price_line = f"\n<b>Şu anki en iyi fiyat:</b> {current_price}" if current_price else ""
+    url_line   = f"\n<b>Ürün:</b> <a href='{product_url}'>{product_url[:60]}</a>" if product_url else ""
+    body = (
+        f"<b>{product_title}</b> stokun bitmek üzere — "
+        f"yaklaşık <b>{days_until_empty} gün</b> kaldı."
+        f"{price_line}{url_line}\n\n"
+        "Almadan'dan fiyat karşılaştırması yapmak ister misin?"
+    )
+    msg = (
+        f"🛒 <b>Stok Hatırlatıcısı — Almadan</b>\n\n"
+        f"{body}\n\n"
+        f"<b>Zaman:</b> {ts}\n"
+        f"<b>URL:</b> <a href='{_APP_URL}'>{_APP_URL}</a>"
+    )
+    return _dispatch(msg, subject=f"[Almadan] {product_title} stokun bitmek üzere")
+
+
 def notify_health_result(
     result: Literal["success", "failure"],
     *,

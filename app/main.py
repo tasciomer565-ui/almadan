@@ -4233,3 +4233,115 @@ async def notifier_test(request: Request, admin=Depends(require_admin)):
         test_name="manual_test",
     )
     return {"sent": result, "any_sent": any(result.values())}
+
+
+# ── Tüketim & Hatırlatıcı Modülü ─────────────────────────────────────────────
+
+class ReminderPayload(BaseModel):
+    product_url:        str
+    product_title:      str = ""
+    last_purchase_date: str          # ISO date "YYYY-MM-DD"
+    reorder_days:       int          # Tekrar alma periyodu (gün)
+    remind_before_days: int = 5      # Kaç gün önce hatırlat
+
+
+def _calc_reminder_dates(last_purchase_date: str, reorder_days: int, remind_before_days: int) -> dict:
+    """Tahmini bitiş ve hatırlatıcı tarihini hesaplar."""
+    from datetime import date, timedelta
+    purchase = date.fromisoformat(last_purchase_date)
+    end_date      = purchase + timedelta(days=reorder_days)
+    reminder_date = end_date - timedelta(days=remind_before_days)
+    today         = date.today()
+    days_left     = (end_date - today).days
+    return {
+        "estimated_end_date": end_date.isoformat(),
+        "reminder_date":      reminder_date.isoformat(),
+        "days_until_empty":   days_left,
+    }
+
+
+@app.post("/api/reminders")
+async def create_reminder(payload: ReminderPayload, request: Request, user=Depends(require_login)):
+    """Ürün için tüketim hatırlatıcısı oluşturur."""
+    dates = _calc_reminder_dates(
+        payload.last_purchase_date, payload.reorder_days, payload.remind_before_days
+    )
+    row = {
+        "user_id":            user["id"],
+        "product_url":        payload.product_url,
+        "product_title":      payload.product_title,
+        "last_purchase_date": payload.last_purchase_date,
+        "reorder_days":       payload.reorder_days,
+        "remind_before_days": payload.remind_before_days,
+        "notified":           False,
+    }
+    result = supabase.table("product_reminders").insert(row).execute()
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Hatırlatıcı kaydedilemedi.")
+    return {**result.data[0], **dates}
+
+
+@app.get("/api/reminders")
+async def list_reminders(request: Request, user=Depends(require_login)):
+    """Kullanıcının tüm hatırlatıcılarını listeler, tarih hesaplamalarıyla birlikte."""
+    rows = (
+        supabase.table("product_reminders")
+        .select("*")
+        .eq("user_id", user["id"])
+        .order("last_purchase_date", desc=False)
+        .execute()
+    ).data or []
+    enriched = []
+    for r in rows:
+        dates = _calc_reminder_dates(r["last_purchase_date"], r["reorder_days"], r["remind_before_days"])
+        enriched.append({**r, **dates})
+    return {"reminders": enriched}
+
+
+@app.delete("/api/reminders/{reminder_id}")
+async def delete_reminder(reminder_id: str, request: Request, user=Depends(require_login)):
+    """Hatırlatıcıyı siler (sadece kendi kaydı)."""
+    supabase.table("product_reminders").delete().eq("id", reminder_id).eq("user_id", user["id"]).execute()
+    return {"deleted": reminder_id}
+
+
+@app.get("/cron/check-reminders")
+async def cron_check_reminders(request: Request):
+    """
+    Vercel Cron: Her gün sabah 08:00'de çalışır.
+    Hatırlatıcı tarihi gelen ürünler için bildirim gönderir.
+    """
+    from datetime import date
+    from app.notifier import notify_restock_reminder
+
+    today = date.today().isoformat()
+
+    # reminder_date <= bugün AND notified = false
+    # Hesaplanan tarihler DB'de değil — uygulama katmanında filtreleriz
+    rows = (
+        supabase.table("product_reminders")
+        .select("*")
+        .eq("notified", False)
+        .execute()
+    ).data or []
+
+    sent = 0
+    for r in rows:
+        try:
+            dates = _calc_reminder_dates(r["last_purchase_date"], r["reorder_days"], r["remind_before_days"])
+            if dates["reminder_date"] > today:
+                continue  # henüz hatırlatma günü değil
+
+            result = await asyncio.to_thread(
+                notify_restock_reminder,
+                r.get("product_title") or r["product_url"],
+                days_until_empty=max(0, dates["days_until_empty"]),
+                product_url=r["product_url"],
+            )
+            if any(result.values()):
+                supabase.table("product_reminders").update({"notified": True}).eq("id", r["id"]).execute()
+                sent += 1
+        except Exception:
+            pass
+
+    return {"checked": len(rows), "notified": sent, "date": today}

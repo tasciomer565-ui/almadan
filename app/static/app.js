@@ -224,21 +224,145 @@ function removeFromWatchlist(id) {
   renderTracking();
 }
 
+/* ── Hatırlatıcı Hesaplama (saf, sıfır API) ─────────────────── */
+
+function calcReminderDates(lastPurchaseDate, reorderDays, remindBeforeDays) {
+  const purchase     = new Date(lastPurchaseDate);
+  const endDate      = new Date(purchase);
+  endDate.setDate(endDate.getDate() + Number(reorderDays));
+
+  const reminderDate = new Date(endDate);
+  reminderDate.setDate(reminderDate.getDate() - Number(remindBeforeDays));
+
+  const today     = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysLeft  = Math.round((endDate - today) / 86400000);
+
+  const fmtDate = d => d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+
+  return {
+    endDateStr:      fmtDate(endDate),
+    reminderDateStr: fmtDate(reminderDate),
+    daysLeft,
+  };
+}
+
+function onReminderInput(itemId) {
+  const form       = document.getElementById(`rform-${itemId}`);
+  const resultEl   = document.getElementById(`rresult-${itemId}`);
+  const dateInput  = form.querySelector(".r-date");
+  const daysInput  = form.querySelector(".r-days");
+  const beforeInput= form.querySelector(".r-before");
+
+  if (!dateInput.value || !daysInput.value) { resultEl.classList.remove("show"); return; }
+
+  const { endDateStr, daysLeft } = calcReminderDates(
+    dateInput.value, daysInput.value, beforeInput.value || 5
+  );
+
+  resultEl.textContent = daysLeft >= 0
+    ? `📅 Ürün yaklaşık ${endDateStr} tarihinde biter — ${daysLeft} gün kaldı.`
+    : `⚠️ Tahmini bitiş tarihi (${endDateStr}) geçti.`;
+  resultEl.classList.add("show");
+}
+
+async function saveReminder(itemId) {
+  const form        = document.getElementById(`rform-${itemId}`);
+  const item        = state.watchlist.find(w => w.id === itemId);
+  const dateInput   = form.querySelector(".r-date");
+  const daysInput   = form.querySelector(".r-days");
+  const beforeInput = form.querySelector(".r-before");
+  const saveBtn     = form.querySelector(".btn-reminder-save");
+
+  if (!dateInput.value || !daysInput.value) { toast("Tarih ve periyot alanlarını doldur."); return; }
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Kaydediliyor…";
+
+  try {
+    const res = await fetch("/api/reminders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product_url:        item.url,
+        product_title:      item.title,
+        last_purchase_date: dateInput.value,
+        reorder_days:       Number(daysInput.value),
+        remind_before_days: Number(beforeInput.value || 5),
+      }),
+    });
+
+    if (res.status === 401) { toast("Hatırlatıcı için giriş yapman gerekiyor."); return; }
+    if (!res.ok) throw new Error(await res.text());
+
+    toast("Hatırlatıcı kaydedildi ✓");
+    form.classList.remove("open");
+    saveBtn.textContent = "✓ Kaydedildi";
+  } catch {
+    toast("Kaydedilemedi — giriş yapmadan yerel olarak tutuldu.");
+    // Giriş yoksa locale kaydet
+    const local = JSON.parse(localStorage.getItem("almadan_reminders") || "[]");
+    local.push({
+      itemId, url: item.url, title: item.title,
+      lastPurchaseDate: dateInput.value,
+      reorderDays: Number(daysInput.value),
+      remindBeforeDays: Number(beforeInput.value || 5),
+      savedAt: new Date().toISOString(),
+    });
+    localStorage.setItem("almadan_reminders", JSON.stringify(local));
+    saveBtn.textContent = "✓ Yerel kaydedildi";
+  } finally {
+    saveBtn.disabled = false;
+  }
+}
+
+function toggleReminderForm(itemId) {
+  const form = document.getElementById(`rform-${itemId}`);
+  form.classList.toggle("open");
+}
+
 function renderTracking() {
   const list = document.getElementById("trackingList");
   if (!list) return;
   if (!state.watchlist.length) {
-    list.innerHTML = `<p class="empty-state">Henüz takip edilen ürün yok.<br>Arama sonuçlarından "Takibe Al" butonunu kullan.</p>`;
+    list.innerHTML = `<p class="empty-state">Henüz takip edilen ürün yok.<br>Arama sonuçlarında "Takibe Al" butonunu kullan.</p>`;
     return;
   }
   list.innerHTML = state.watchlist.map(w => `
-    <div class="tracking-item">
-      <div class="tracking-info">
-        <div class="tracking-name">${esc(w.title)}</div>
-        <div class="tracking-price">${w.store ? esc(w.store) + " · " : ""}${w.price != null ? fmt(w.price) : "Fiyat yok"}</div>
+    <div class="tracking-item" style="flex-direction:column;align-items:stretch;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="tracking-info">
+          <div class="tracking-name">${esc(w.title)}</div>
+          <div class="tracking-price">${w.store ? esc(w.store) + " · " : ""}${w.price != null ? fmt(w.price) : "Fiyat yok"}</div>
+        </div>
+        <a class="btn-sm" href="${esc(w.url)}" target="_blank" rel="noopener" style="white-space:nowrap;">Görüntüle</a>
+        <button class="btn-danger-sm" onclick="removeFromWatchlist(${w.id})">Kaldır</button>
       </div>
-      <a class="btn-sm" href="${esc(w.url)}" target="_blank" rel="noopener" style="white-space:nowrap;">Görüntüle</a>
-      <button class="btn-danger-sm" onclick="removeFromWatchlist(${w.id})">Kaldır</button>
+
+      <button class="reminder-toggle" onclick="toggleReminderForm(${w.id})">
+        ⏰ Hatırlatıcı kur
+      </button>
+
+      <div class="reminder-form" id="rform-${w.id}">
+        <div class="reminder-row">
+          <div class="reminder-field">
+            <label>Son Satın Alma Tarihi</label>
+            <input class="r-date" type="date" oninput="onReminderInput(${w.id})">
+          </div>
+          <div class="reminder-field">
+            <label>Tekrar Alma Periyodu (gün)</label>
+            <input class="r-days" type="number" min="1" max="365" placeholder="30" oninput="onReminderInput(${w.id})">
+          </div>
+          <div class="reminder-field" style="max-width:110px;">
+            <label>Kaç gün önce</label>
+            <input class="r-before" type="number" min="0" max="30" placeholder="5" oninput="onReminderInput(${w.id})">
+          </div>
+        </div>
+        <div class="reminder-result" id="rresult-${w.id}"></div>
+        <button class="btn-reminder-save" onclick="saveReminder(${w.id})" style="margin-top:8px;">
+          Hatırlatıcıyı Kaydet
+        </button>
+      </div>
     </div>`).join("");
 }
 
