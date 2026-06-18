@@ -213,12 +213,31 @@ _PROTECTED_API_PATHS = {
 }
 
 
+_CRON_BYPASS_PATHS = {
+    "/api/admin/notifier/status",
+    "/api/admin/notifier/test",
+    "/api/admin/run-health-check",
+}
+
+
 async def auth_wall_middleware(request: Request, call_next):
     """
     Korumalı API yollarına oturumsuz erişimi 401 ile engelle.
     Frontend bu 401'i alınca /login'e yönlendirir.
+
+    İstisna: X-Cron-Secret header'ı ile gelen istekler
+    _CRON_BYPASS_PATHS listesindeyse middleware'i geçer.
+    Gerçek doğrulama endpoint içinde yapılır.
     """
     path = request.url.path
+
+    # Cron/secret bypass — önce kontrol et
+    if path in _CRON_BYPASS_PATHS:
+        cron_secret = request.headers.get("x-cron-secret", "").strip()
+        env_secret  = os.getenv("CRON_SECRET", "").strip()
+        if cron_secret and env_secret and hmac.compare_digest(env_secret, cron_secret):
+            return await call_next(request)
+
     if any(path.startswith(p) for p in _PROTECTED_API_PATHS):
         user_id = getattr(request.state, "user_id", None)
         if not user_id:
