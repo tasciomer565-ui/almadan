@@ -17,7 +17,7 @@
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
-    <link rel="stylesheet" href="/static/styles.css?v=20260617-fault-tolerance">
+    <link rel="stylesheet" href="/static/styles.css?v=20260619-sprint11">
   </head>
   <body>
     <header class="topbar">
@@ -30,6 +30,7 @@
         <button class="nav-item" data-view="tracking">Takiptekiler</button>
         <button class="nav-item" data-view="cart">Sepetim & Listelerim</button>
         <button class="nav-item" data-view="savings">Tasarrufum</button>
+        <button class="nav-item" data-view="bulletins">Bültenler</button>
       </nav>
       <div class="topbar-actions">
         <span class="network-status" id="networkStatus" role="status" aria-live="polite">
@@ -509,6 +510,21 @@
         </div>
       </section>
 
+      <section class="content-section hidden" id="bulletinsView">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">MAĞAZA TAKİBİ</p>
+            <h2>Mağaza Bültenleri</h2>
+          </div>
+        </div>
+        <p style="font-size:13px;color:var(--ink-2);margin-bottom:16px;">
+          Takip ettiğin mağazalar kampanya başlattığında seni haberdar edelim.
+        </p>
+        <div id="storeList">
+          <div class="loading-row"><span class="spinner"></span><span>Mağazalar yükleniyor…</span></div>
+        </div>
+      </section>
+
       <section class="content-section hidden" id="cartView">
         <div class="page-guide">
           <i data-lucide="shopping-cart"></i>
@@ -675,6 +691,10 @@
       <button class="mobile-nav-item" data-view="savings">
         <i data-lucide="wallet-cards"></i>
         <span>Tasarruf</span>
+      </button>
+      <button class="mobile-nav-item" data-view="bulletins">
+        <i data-lucide="newspaper"></i>
+        <span>Bülten</span>
       </button>
     </nav>
 

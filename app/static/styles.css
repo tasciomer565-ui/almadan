@@ -2806,3 +2806,90 @@ body.dark-theme .quantum-node-card {
 .price-trend-up   { color: #e53e3e; font-size: 10px; font-weight: 700; display: flex; align-items: center; gap: 2px; margin-top: 2px; }
 .price-trend-down { color: #38a169; font-size: 10px; font-weight: 700; display: flex; align-items: center; gap: 2px; margin-top: 2px; }
 .price-trend-flat { color: var(--muted); font-size: 10px; display: flex; align-items: center; gap: 2px; margin-top: 2px; }
+
+/* ── Hatırlatıcı Formu ───────────────────────────────────────────────────── */
+.reminder-toggle {
+  margin-top: 8px;
+  background: none; border: none; cursor: pointer;
+  font-size: 11px; color: var(--ink-2);
+  padding: 0; text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.reminder-toggle:hover { color: var(--green); }
+
+.reminder-form {
+  display: none;
+  margin-top: 10px; padding: 12px;
+  background: var(--bg-card); border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+}
+.reminder-form.open { display: block; }
+
+.reminder-row {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  align-items: flex-end; margin-bottom: 8px;
+}
+.reminder-field { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 110px; }
+.reminder-field label { font-size: 10px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: .4px; }
+.reminder-field input {
+  padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 12px; font-family: var(--font); outline: none;
+  background: var(--bg);
+}
+.reminder-field input:focus { border-color: var(--green); }
+
+.reminder-result {
+  margin-top: 6px; padding: 8px 10px;
+  background: var(--green-bg); border-radius: 6px;
+  font-size: 12px; color: var(--green); font-weight: 500;
+  display: none;
+}
+.reminder-result.show { display: block; }
+
+.btn-reminder-save {
+  padding: 6px 14px; font-size: 12px; font-weight: 600;
+  background: var(--green); color: #fff;
+  border: none; border-radius: 6px; cursor: pointer;
+  white-space: nowrap; transition: opacity .15s;
+}
+.btn-reminder-save:hover { opacity: .85; }
+.btn-reminder-save:disabled { opacity: .45; cursor: default; }
+
+/* ── Mağaza Bülten Kartları ──────────────────────────────────────────────── */
+.store-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+.store-card {
+  border: 1.5px solid var(--border); border-radius: var(--radius);
+  padding: 16px 14px;
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--bg); transition: box-shadow .15s;
+}
+.store-card.followed { border-color: var(--green); background: var(--green-bg); }
+.store-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.07); }
+
+.store-card-header { display: flex; align-items: center; gap: 10px; }
+.store-emoji { font-size: 22px; line-height: 1; }
+.store-name  { font-size: 14px; font-weight: 700; color: var(--ink); }
+.store-cat   { font-size: 10px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .4px; }
+.store-note  { font-size: 11px; color: var(--ink-2); }
+
+.btn-follow {
+  padding: 6px 14px; font-size: 12px; font-weight: 600;
+  border: 1.5px solid var(--green); border-radius: 6px;
+  background: var(--bg); color: var(--green);
+  cursor: pointer; transition: all .15s; margin-top: auto;
+}
+.btn-follow:hover   { background: var(--green); color: #fff; }
+.btn-follow.active  { background: var(--green); color: #fff; }
+.btn-follow.active:hover { background: #1f6040; }
+
+.store-section-title {
+  font-size: 12px; font-weight: 700; color: var(--ink-2);
+  text-transform: uppercase; letter-spacing: .5px;
+  margin: 20px 0 8px;
+}

@@ -3134,10 +3134,11 @@ function productImage(product) {
 function switchView(view) {
   state.activeView = view;
   const sections = {
-    discover: document.getElementById("discoverView"),
-    tracking: document.getElementById("trackingView"),
-    savings: document.getElementById("savingsView"),
-    cart: document.getElementById("cartView"),
+    discover:  document.getElementById("discoverView"),
+    tracking:  document.getElementById("trackingView"),
+    savings:   document.getElementById("savingsView"),
+    bulletins: document.getElementById("bulletinsView"),
+    cart:      document.getElementById("cartView"),
   };
 
   Object.entries(sections).forEach(([name, section]) => {
@@ -3150,6 +3151,9 @@ function switchView(view) {
 
   if (view === "cart") {
     renderCart();
+  }
+  if (view === "bulletins") {
+    loadStores();
   }
   if (view === "savings") {
     loadReceipts(document.getElementById("receiptMonthFilter")?.value || "");
@@ -6769,5 +6773,163 @@ function showInitialLoadFallback() {
     }, 1500);
   } else {
     renderFallbackOpportunities();
+  }
+}
+
+/* ── Hatırlatıcı Hesaplama ───────────────────────────────────────────────── */
+
+function calcReminderDates(lastPurchaseDate, reorderDays, remindBeforeDays) {
+  const purchase = new Date(lastPurchaseDate);
+  const endDate  = new Date(purchase);
+  endDate.setDate(endDate.getDate() + Number(reorderDays));
+
+  const reminderDate = new Date(endDate);
+  reminderDate.setDate(reminderDate.getDate() - Number(remindBeforeDays));
+
+  const today    = new Date(); today.setHours(0, 0, 0, 0);
+  const daysLeft = Math.round((endDate - today) / 86400000);
+  const fmtDate  = d => d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+
+  return { endDateStr: fmtDate(endDate), reminderDateStr: fmtDate(reminderDate), daysLeft };
+}
+
+function onReminderInput(itemId) {
+  const form      = document.getElementById(`rform-${itemId}`);
+  const resultEl  = document.getElementById(`rresult-${itemId}`);
+  const dateInput = form.querySelector(".r-date");
+  const daysInput = form.querySelector(".r-days");
+  const beforeInput = form.querySelector(".r-before");
+
+  if (!dateInput.value || !daysInput.value) { resultEl.classList.remove("show"); return; }
+
+  const { endDateStr, daysLeft } = calcReminderDates(dateInput.value, daysInput.value, beforeInput.value || 5);
+  resultEl.textContent = daysLeft >= 0
+    ? `📅 Ürün yaklaşık ${endDateStr} tarihinde biter — ${daysLeft} gün kaldı.`
+    : `⚠️ Tahmini bitiş tarihi (${endDateStr}) geçti.`;
+  resultEl.classList.add("show");
+}
+
+async function saveReminder(itemId) {
+  const form        = document.getElementById(`rform-${itemId}`);
+  const item        = state.products.find(w => w.id === itemId);
+  const dateInput   = form.querySelector(".r-date");
+  const daysInput   = form.querySelector(".r-days");
+  const beforeInput = form.querySelector(".r-before");
+  const saveBtn     = form.querySelector(".btn-reminder-save");
+
+  if (!dateInput.value || !daysInput.value) { toast("Tarih ve periyot alanlarını doldur."); return; }
+
+  saveBtn.disabled = true; saveBtn.textContent = "Kaydediliyor…";
+
+  try {
+    const res = await fetch("/api/reminders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product_url:        item?.url || "",
+        product_title:      item?.title || String(itemId),
+        last_purchase_date: dateInput.value,
+        reorder_days:       Number(daysInput.value),
+        remind_before_days: Number(beforeInput.value || 5),
+      }),
+    });
+    if (res.status === 401) { toast("Hatırlatıcı için giriş yapman gerekiyor."); return; }
+    if (!res.ok) throw new Error(await res.text());
+    toast("Hatırlatıcı kaydedildi ✓");
+    form.classList.remove("open");
+    saveBtn.textContent = "✓ Kaydedildi";
+  } catch {
+    toast("Kaydedilemedi — yerel olarak saklandı.");
+    const local = JSON.parse(localStorage.getItem("almadan_reminders") || "[]");
+    local.push({ itemId, lastPurchaseDate: dateInput.value, reorderDays: Number(daysInput.value), remindBeforeDays: Number(beforeInput.value || 5), savedAt: new Date().toISOString() });
+    localStorage.setItem("almadan_reminders", JSON.stringify(local));
+    saveBtn.textContent = "✓ Yerel kaydedildi";
+  } finally {
+    saveBtn.disabled = false;
+  }
+}
+
+function toggleReminderForm(itemId) {
+  document.getElementById(`rform-${itemId}`)?.classList.toggle("open");
+}
+
+/* ── Mağaza Bültenleri ───────────────────────────────────────────────────── */
+
+const STORE_EMOJIS = { market: "🛒", fashion: "👗", beauty: "💄", home: "🏠" };
+const storeFollowState = {};
+
+async function loadStores() {
+  const list = document.getElementById("storeList");
+  if (!list) return;
+  list.innerHTML = `<div class="loading-row"><span class="spinner"></span><span>Mağazalar yükleniyor…</span></div>`;
+  try {
+    const res    = await fetch("/api/stores");
+    const data   = await res.json();
+    const stores = data.stores || [];
+
+    if (!stores.length) { list.innerHTML = `<p class="empty-state">Henüz mağaza eklenmemiş.</p>`; return; }
+
+    const groups = {};
+    stores.forEach(s => {
+      storeFollowState[s.slug] = s.followed;
+      (groups[s.category] = groups[s.category] || []).push(s);
+    });
+
+    const CAT_LABELS = { market: "Marketler", fashion: "Moda", beauty: "Güzellik & Kozmetik", home: "Ev & Yaşam" };
+    let html = "";
+    ["market", "fashion", "beauty", "home"].forEach(cat => {
+      if (!groups[cat]?.length) return;
+      html += `<div class="store-section-title">${CAT_LABELS[cat] || cat}</div><div class="store-grid">`;
+      html += groups[cat].map(s => renderStoreCard(s)).join("");
+      html += `</div>`;
+    });
+    list.innerHTML = html;
+  } catch {
+    list.innerHTML = `<p class="empty-state">Mağazalar yüklenemedi. Tekrar dene.</p>`;
+  }
+}
+
+function renderStoreCard(s) {
+  const followed = storeFollowState[s.slug];
+  const emoji    = STORE_EMOJIS[s.category] || "🏪";
+  return `
+    <div class="store-card ${followed ? "followed" : ""}" id="scard-${s.slug}">
+      <div class="store-card-header">
+        <span class="store-emoji">${emoji}</span>
+        <div>
+          <div class="store-name">${escapeHtml(s.name)}</div>
+          <div class="store-cat">${escapeHtml(s.category)}</div>
+        </div>
+      </div>
+      ${s.publication_note ? `<div class="store-note">📅 ${escapeHtml(s.publication_note)}</div>` : ""}
+      <button class="btn-follow ${followed ? "active" : ""}" onclick="toggleFollow('${s.slug}', '${escapeHtml(s.name)}')" id="sfbtn-${s.slug}">
+        ${followed ? "✓ Takip Ediliyor" : "+ Takibe Al"}
+      </button>
+    </div>`;
+}
+
+async function toggleFollow(slug, name) {
+  const btn  = document.getElementById(`sfbtn-${slug}`);
+  const card = document.getElementById(`scard-${slug}`);
+  const isFollowed = storeFollowState[slug];
+
+  storeFollowState[slug] = !isFollowed;
+  btn.textContent = isFollowed ? "+ Takibe Al" : "✓ Takip Ediliyor";
+  btn.classList.toggle("active", !isFollowed);
+  card.classList.toggle("followed", !isFollowed);
+
+  try {
+    const res = await fetch(`/api/stores/${slug}/follow`, { method: isFollowed ? "DELETE" : "POST" });
+    if (res.status === 401) {
+      toast("Takip için giriş yapman gerekiyor.");
+      storeFollowState[slug] = isFollowed;
+      btn.textContent = isFollowed ? "✓ Takip Ediliyor" : "+ Takibe Al";
+      btn.classList.toggle("active", isFollowed);
+      card.classList.toggle("followed", isFollowed);
+      return;
+    }
+    toast(isFollowed ? `${name} takipten çıkarıldı.` : `${name} takibe alındı ✓`);
+  } catch {
+    toast("Bağlantı hatası, tekrar dene.");
   }
 }
