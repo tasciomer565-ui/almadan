@@ -3002,3 +3002,28 @@ body.dark-theme .quantum-node-card {
   background: var(--green-bg); border-radius: 8px;
   font-size: 12px; color: var(--green); font-weight: 500;
 }
+
+/* ── Ana Arama Barkod Butonu & Scanner ──────────────────────────────────── */
+.barcode-search-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 20px; font-size: 14px; font-weight: 600;
+  background: var(--bg-card); color: var(--ink);
+  border: 1.5px solid var(--border); border-radius: var(--radius);
+  cursor: pointer; white-space: nowrap; transition: all .15s;
+  flex-shrink: 0;
+}
+.barcode-search-btn:hover { border-color: var(--green); color: var(--green); }
+.barcode-search-btn i { width: 18px; height: 18px; }
+
+.main-barcode-scan-area {
+  margin-top: 16px; padding: 16px;
+  background: var(--bg-card); border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  animation: guideSlideIn .25s cubic-bezier(.22,1,.36,1);
+}
+.main-barcode-scan-area.hidden { display: none; }
+.main-barcode-header {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; font-weight: 600; color: var(--ink);
+  margin-bottom: 12px;
+}

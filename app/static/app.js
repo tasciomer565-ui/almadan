@@ -7152,3 +7152,104 @@ function _isValidProductUrl(val) {
     return false;
   }
 }
+
+/* ── Ana Arama Barkod Tarayıcısı ─────────────────────────────────────────── */
+
+let _mainScanner = null;
+let _mainScannerRunning = false;
+let _mainScanLocked = false;
+
+function openMainBarcodeScanner() {
+  const area = document.getElementById("mainBarcodeScanArea");
+  if (!area) return;
+  area.classList.remove("hidden");
+  document.getElementById("mainBarcodeBtn").style.display = "none";
+  _startMainScanner();
+}
+
+function closeMainBarcodeScanner() {
+  _stopMainScanner();
+  const area = document.getElementById("mainBarcodeScanArea");
+  if (area) area.classList.add("hidden");
+  const btn = document.getElementById("mainBarcodeBtn");
+  if (btn) btn.style.display = "";
+}
+
+async function _startMainScanner() {
+  if (!window.Html5Qrcode) {
+    showToast("Kamera kütüphanesi yükleniyor, biraz bekle...");
+    return;
+  }
+  if (_mainScannerRunning) return;
+  try {
+    _mainScanner = new Html5Qrcode("mainHtml5QrReader", { verbose: false });
+    await _mainScanner.start(
+      { facingMode: "environment" },
+      {
+        fps: 10,
+        qrbox: (w, h) => ({ width: Math.floor(Math.min(w * 0.8, 280)), height: Math.floor(Math.min(h * 0.35, 120)) }),
+        aspectRatio: 1.777778,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+        ],
+      },
+      async (decoded) => {
+        const code = String(decoded || "").replace(/\D/g, "");
+        if (_mainScanLocked || ![8, 12, 13].includes(code.length)) return;
+        _mainScanLocked = true;
+        await _stopMainScanner();
+        closeMainBarcodeScanner();
+        await searchByBarcode(code);
+        _mainScanLocked = false;
+      },
+      () => {},
+    );
+    _mainScannerRunning = true;
+  } catch (e) {
+    showToast("Kamera açılamadı: " + (e.message || e));
+    closeMainBarcodeScanner();
+  }
+}
+
+async function _stopMainScanner() {
+  if (!_mainScanner || !_mainScannerRunning) return;
+  try { await _mainScanner.stop(); _mainScanner.clear(); } catch {}
+  _mainScannerRunning = false;
+}
+
+async function searchByBarcode(code) {
+  showToast("Barkod aranıyor: " + code);
+  const overlay = document.getElementById("quantumScanOverlay");
+  const progressText = document.getElementById("quantumScanProgress");
+  if (overlay) overlay.style.display = "flex";
+  if (progressText) progressText.innerText = "Barkod ürünü tanımlanıyor...";
+
+  try {
+    const res = await api(`/api/barcode/${code}`);
+    if (overlay) overlay.style.display = "none";
+
+    if (res.found && res.results && res.results.length > 0) {
+      switchView("discover");
+      showSearchResults({
+        products: res.results,
+        query: res.search_query || res.title || code,
+        category: res.suggested_category || "general",
+      });
+      showToast("✓ " + (res.title || "Ürün bulundu"));
+    } else if (res.found) {
+      // Ürün bilgisi var ama fiyat karşılaştırma sonucu yok
+      switchView("discover");
+      showToast(res.title + " — fiyat karşılaştırması bulunamadı.");
+      showBarcodeManualEntry && showBarcodeManualEntry(code, res.message || "Sonuç bulunamadı.");
+    } else {
+      if (overlay) overlay.style.display = "none";
+      showToast("Barkod bulunamadı: " + code);
+    }
+  } catch (e) {
+    if (overlay) overlay.style.display = "none";
+    showToast("Barkod sorgulanamadı: " + (e.message || e));
+  }
+}

@@ -84,11 +84,27 @@
                 <i data-lucide="map-pin-off" style="width: 12px; height: 12px;"></i> GPS Konumu Pasif
               </span>
             </div>
-            <button class="primary-button" type="submit">
-              <i data-lucide="scan-search"></i>
-              Kontrol et
-            </button>
+            <div style="display:flex;gap:10px;align-items:stretch;width:100%;">
+              <button class="primary-button" type="submit" style="flex:1;">
+                <i data-lucide="scan-search"></i>
+                Kontrol et
+              </button>
+              <button type="button" class="barcode-search-btn" id="mainBarcodeBtn" onclick="openMainBarcodeScanner()" title="Barkod tara ve fiyat karşılaştır">
+                <i data-lucide="barcode"></i>
+                Barkod Tara
+              </button>
+            </div>
           </form>
+
+          <!-- Ana arama barkod tarayıcısı -->
+          <div id="mainBarcodeScanArea" class="main-barcode-scan-area hidden">
+            <div class="main-barcode-header">
+              <span>📷 Ürün barkodunu kameraya göster</span>
+              <button type="button" onclick="closeMainBarcodeScanner()" class="guide-close">✕</button>
+            </div>
+            <div id="mainHtml5QrReader" style="width:100%;max-width:420px;margin:0 auto;"></div>
+            <p style="font-size:11px;color:var(--ink-2);text-align:center;margin-top:8px;">EAN-8, EAN-13, UPC-A desteklenir</p>
+          </div>
 
           <div class="supported-stores-container">
             <button type="button" class="supported-stores-toggle" onclick="toggleSupportedStores()" aria-expanded="false" aria-controls="supportedStoresPanel">
