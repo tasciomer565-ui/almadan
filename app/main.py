@@ -4217,9 +4217,49 @@ async def run_health_check_endpoint(request: Request, admin=Depends(require_admi
 
 # -- Notifier Entegrasyonu --
 
+def _verify_cron_secret(x_cron_secret: str | None) -> tuple[bool, str]:
+    """
+    X-Cron-Secret header'ını doğrular.
+    Returns: (ok: bool, reason: str)
+    reason asla secret değerini içermez — loglarda görünmesi güvenlidir.
+    """
+    env_secret = os.getenv("CRON_SECRET", "").strip()
+    if not env_secret:
+        return False, "CRON_SECRET env var tanımlı değil"
+    if not x_cron_secret:
+        return False, "X-Cron-Secret header eksik"
+    if len(x_cron_secret.strip()) != len(env_secret):
+        return False, "Secret uzunluğu eşleşmiyor"
+    if not hmac.compare_digest(env_secret, x_cron_secret.strip()):
+        return False, "Secret değeri eşleşmiyor"
+    return True, "ok"
+
+
+def _require_cron_or_admin_sync(x_cron_secret: str | None) -> None:
+    """Secret doğrulamasını senkron olarak yapar (admin session olmadan)."""
+    ok, reason = _verify_cron_secret(x_cron_secret)
+    if not ok:
+        _IS_DEV = os.getenv("VERCEL_ENV", "development") != "production"
+        detail = f"Yetkisiz erişim. Sebep: {reason}" if _IS_DEV else "Yetkisiz erişim."
+        raise HTTPException(status_code=403, detail=detail)
+
+
 @app.get("/api/admin/notifier/status")
-async def notifier_status_endpoint(request: Request, admin=Depends(require_admin)):
-    """Bildirim kanallarinin yapilandirilip yapilandirilmadigini gosterir."""
+async def notifier_status_endpoint(
+    request: Request,
+    x_cron_secret: str | None = Header(default=None),
+):
+    """
+    Bildirim kanallarının yapılandırılıp yapılandırılmadığını gösterir.
+    GET — X-Cron-Secret header'ı veya admin oturumu ile erişilir.
+    """
+    ok, _ = _verify_cron_secret(x_cron_secret)
+    if not ok:
+        try:
+            await require_admin(request)
+        except HTTPException:
+            _require_cron_or_admin_sync(x_cron_secret)  # detaylı hata fırlatır
+
     from app.notifier import notifier_status
     return notifier_status()
 
@@ -4231,22 +4271,14 @@ async def notifier_test(
 ):
     """
     Yapılandırılmış bildirim kanallarına test mesajı gönderir.
-
-    Yetkilendirme — ikisinden biri yeterli:
-      1. Admin oturumu (JWT ile giriş yapılmış kullanıcı, role='admin')
-      2. X-Cron-Secret: <CRON_SECRET> header'ı
+    POST — X-Cron-Secret header'ı veya admin oturumu ile erişilir.
     """
-    # 1. Admin oturumu var mı? — varsa secret'a bakmadan geç
-    try:
-        await require_admin(request)
-    except HTTPException:
-        # 2. Oturum yok — X-Cron-Secret header'ı ile doğrula
-        _secret = os.getenv("CRON_SECRET", "").strip()
-        if not _secret or not x_cron_secret or not hmac.compare_digest(_secret, x_cron_secret.strip()):
-            raise HTTPException(
-                status_code=403,
-                detail="Admin oturumu veya geçerli X-Cron-Secret header'ı gerekli.",
-            )
+    ok, _ = _verify_cron_secret(x_cron_secret)
+    if not ok:
+        try:
+            await require_admin(request)
+        except HTTPException:
+            _require_cron_or_admin_sync(x_cron_secret)  # detaylı hata fırlatır
 
     from app.notifier import notify_failure
     result = await asyncio.to_thread(
