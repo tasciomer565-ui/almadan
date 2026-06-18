@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import html
+import logging
 import os
 import re
 import secrets
@@ -22,6 +23,8 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 from app.storage import supabase_base_url, supabase_headers, supabase_enabled
+
+logger = logging.getLogger(__name__)
 
 # ── Ortam değişkenleri ──────────────────────────────────────
 _CSRF_SECRET = os.getenv("CSRF_SECRET", secrets.token_hex(32))
@@ -232,15 +235,16 @@ async def auth_wall_middleware(request: Request, call_next):
     path = request.url.path
 
     # --- GEÇİCİ TANI LOGU — sorun çözülünce silinecek ---
-    import sys
     _dbg_secret = request.headers.get("x-cron-secret")
     _dbg_env    = os.getenv("CRON_SECRET", "")
-    print(
-        f"DEBUG middleware | path={path!r} "
-        f"| header={'<mevcut>' if _dbg_secret else '<YOK>'} "
-        f"| env={'<tanimi>' if _dbg_env else '<YOK>'} "
-        f"| uzunluklar: header={len(_dbg_secret or '')} env={len(_dbg_env)}",
-        file=sys.stderr, flush=True,
+    logger.error(
+        "ALMADAN_DEBUG | path=%r | x-cron-secret=%s | CRON_SECRET_env=%s "
+        "| uzunluklar: header=%d env=%d",
+        path,
+        "<MEVCUT>" if _dbg_secret else "<YOK>",
+        "<TANIMI>" if _dbg_env    else "<YOK>",
+        len(_dbg_secret or ""),
+        len(_dbg_env),
     )
     # --- TANI SONU ---
 
