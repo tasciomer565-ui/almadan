@@ -2260,6 +2260,39 @@ def api_barcode_lookup(code: str) -> dict:
     save_db(db)
 
     results = search_products_by_name(match["search_query"], category=suggested_category)
+
+    # ── Fuzzy Match Kapısı (%60 eşik) ──────────────────────────────────────
+    # Barkoddan gelen ürün adı ile market sonuçlarını karşılaştır.
+    # Yeterince eşleşmeyen sonuç varsa kullanıcıya gösterme.
+    from app.matching_engine import FuzzyMatcher
+    _fm = FuzzyMatcher()
+    barcode_title = match["title"]
+
+    validated_results = []
+    for r in results:
+        candidate_title = r.get("title") or r.get("name") or ""
+        match_score = _fm.score(barcode_title, candidate_title)
+        if match_score >= 0.60:
+            r["_match_score"] = match_score
+            validated_results.append(r)
+
+    if not validated_results:
+        # Hiçbir sonuç eşik üzerinde değil → güvenli hata
+        return {
+            "found": False,
+            "barcode": barcode,
+            "barcode_title": barcode_title,
+            "match_score": None,
+            "message": (
+                f"'{barcode_title}' barkodu tanımlandı ancak markette güvenilir "
+                "eşleşme bulunamadı. Lütfen ürün linkini yapıştırın."
+            ),
+            "allow_manual": True,
+        }
+
+    # En yüksek skora göre sırala
+    validated_results.sort(key=lambda x: x.get("_match_score", 0), reverse=True)
+
     return {
         "found": True,
         "title": match["title"],
@@ -2269,7 +2302,7 @@ def api_barcode_lookup(code: str) -> dict:
         "suggested_category": suggested_category,
         "source": match.get("source", "local_seed"),
         "cached": False,
-        "results": results,
+        "results": validated_results,
     }
 
 RECEIPT_ITEM_CATEGORIES = (
@@ -4101,3 +4134,70 @@ async def list_gdpr_requests(
         headers=hdrs, timeout=5,
     )
     return {"requests": r.json() if r.ok else []}
+
+
+# -- /api/status + Health Check --
+
+import json as _json
+import pathlib as _pathlib
+
+_LOG_DIR  = _pathlib.Path("app_logs")
+_LAST_TEST = _LOG_DIR / "last_test.json"
+_FAIL_LOG  = _LOG_DIR / "failure.log"
+
+def _read_last_test() -> dict:
+    try:
+        if _LAST_TEST.exists():
+            return _json.loads(_LAST_TEST.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+@app.get("/api/status")
+async def api_status():
+    """
+    Sistem saglik durumunu dondurur.
+    last_test.json dosyasindaki son health-check sonucunu okur.
+    """
+    last = _read_last_test()
+    from app.resilience import get_all_circuit_states
+    cb_states = get_all_circuit_states()
+    open_cbs  = [c["service"] for c in cb_states if c["state"] == "open"]
+    return {
+        "status":        "degraded" if open_cbs else "ok",
+        "last_test":     last.get("result", "never_run"),
+        "last_run":      last.get("ts"),
+        "open_circuits": open_cbs,
+        "error":         last.get("error"),
+        "version":       "9.0.0",
+    }
+
+
+@app.post("/api/admin/run-health-check")
+async def run_health_check_endpoint(request: Request, admin=Depends(require_admin)):
+    """Health check testlerini tetikler ve sonucu last_test.json'a yazar."""
+    import subprocess, sys
+    _LOG_DIR.mkdir(exist_ok=True)
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "pytest", "tests/health_check_test.py", "-v", "--tb=short"],
+            capture_output=True, text=True, timeout=60,
+        )
+        passed = proc.returncode == 0
+        result_data = {
+            "result": "success" if passed else "failure",
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "stdout": proc.stdout[-3000:],
+            "error": None if passed else proc.stdout[-1000:] + proc.stderr[-500:],
+        }
+        _LAST_TEST.write_text(_json.dumps(result_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        if not passed:
+            with open(_FAIL_LOG, "a", encoding="utf-8") as f:
+                f.write(f"\n[{result_data['ts']}] Health check FAILED\n")
+                f.write(result_data["error"] or "")
+                f.write("\n" + "-"*60 + "\n")
+        return result_data
+    except subprocess.TimeoutExpired:
+        return {"result": "timeout", "ts": datetime.now(timezone.utc).isoformat(), "error": "Test 60s timeout"}
+    except Exception as exc:
+        return {"result": "error", "ts": datetime.now(timezone.utc).isoformat(), "error": str(exc)}
