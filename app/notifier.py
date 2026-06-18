@@ -34,17 +34,22 @@ import requests as _req
 
 logger = logging.getLogger(__name__)
 
-# ── Ortam Değişkenleri ────────────────────────────────────────
+# ── Sabit (restart gerektirmeyen) ────────────────────────────
+_APP_URL = os.getenv("ALMADAN_APP_URL", "https://almadan.vercel.app").rstrip("/")
+_HOST    = socket.gethostname()
 
-_TG_TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-_TG_CHAT     = os.getenv("TELEGRAM_CHAT_ID", "").strip()
-_NOTIFY_EMAIL = os.getenv("NOTIFY_EMAIL", "").strip()
-_SMTP_HOST   = os.getenv("SMTP_HOST", "").strip()
-_SMTP_PORT   = int(os.getenv("SMTP_PORT", "587"))
-_SMTP_USER   = os.getenv("SMTP_USER", "").strip()
-_SMTP_PASS   = os.getenv("SMTP_PASS", "").strip()
-_APP_URL     = os.getenv("ALMADAN_APP_URL", "https://almadan.vercel.app").rstrip("/")
-_HOST        = socket.gethostname()
+
+def _cfg() -> dict:
+    """Her istek anında env var'ları taze okur — redeploy gerekmez."""
+    return {
+        "tg_token":     os.getenv("TELEGRAM_BOT_TOKEN", "").strip(),
+        "tg_chat":      os.getenv("TELEGRAM_CHAT_ID",   "").strip(),
+        "notify_email": os.getenv("NOTIFY_EMAIL",       "").strip(),
+        "smtp_host":    os.getenv("SMTP_HOST",          "").strip(),
+        "smtp_port":    int(os.getenv("SMTP_PORT", "587")),
+        "smtp_user":    os.getenv("SMTP_USER",          "").strip(),
+        "smtp_pass":    os.getenv("SMTP_PASS",          "").strip(),
+    }
 
 
 # ── Ana Arayüz ────────────────────────────────────────────────
@@ -164,8 +169,9 @@ def notify_health_result(
 # ── Kanal Göndericileri ───────────────────────────────────────
 
 def _dispatch(message: str, *, subject: str) -> dict[str, bool]:
-    tg_ok    = _send_telegram(message) if _TG_TOKEN and _TG_CHAT else False
-    email_ok = _send_email(subject, message) if _SMTP_HOST and _NOTIFY_EMAIL else False
+    c = _cfg()
+    tg_ok    = _send_telegram(message, c) if c["tg_token"] and c["tg_chat"] else False
+    email_ok = _send_email(subject, message, c) if c["smtp_host"] and c["notify_email"] else False
 
     if not tg_ok and not email_ok:
         logger.warning(
@@ -175,17 +181,13 @@ def _dispatch(message: str, *, subject: str) -> dict[str, bool]:
     return {"telegram": tg_ok, "email": email_ok}
 
 
-def _send_telegram(text: str) -> bool:
+def _send_telegram(text: str, c: dict) -> bool:
     """Telegram Bot API üzerinden mesaj gönderir."""
-    url = f"https://api.telegram.org/bot{_TG_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{c['tg_token']}/sendMessage"
     try:
         r = _req.post(
             url,
-            json={
-                "chat_id":    _TG_CHAT,
-                "text":       text,
-                "parse_mode": "HTML",
-            },
+            json={"chat_id": c["tg_chat"], "text": text, "parse_mode": "HTML"},
             timeout=8,
         )
         if r.ok:
@@ -197,28 +199,25 @@ def _send_telegram(text: str) -> bool:
     return False
 
 
-def _send_email(subject: str, body: str) -> bool:
+def _send_email(subject: str, body: str, c: dict) -> bool:
     """SMTP üzerinden plain-text + HTML e-posta gönderir."""
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"]    = _SMTP_USER
-        msg["To"]      = _NOTIFY_EMAIL
+        msg["From"]    = c["smtp_user"]
+        msg["To"]      = c["notify_email"]
 
-        # Plain text
         plain = _strip_html_tags(body)
         msg.attach(MIMEText(plain, "plain", "utf-8"))
+        html_body = f"<pre style='font-family:monospace;font-size:13px;'>{body}</pre>"
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-        # HTML (Telegram mesajı zaten HTML-ish)
-        html = f"<pre style='font-family:monospace;font-size:13px;'>{body}</pre>"
-        msg.attach(MIMEText(html, "html", "utf-8"))
-
-        with smtplib.SMTP(_SMTP_HOST, _SMTP_PORT, timeout=10) as srv:
+        with smtplib.SMTP(c["smtp_host"], c["smtp_port"], timeout=10) as srv:
             srv.starttls()
-            srv.login(_SMTP_USER, _SMTP_PASS)
-            srv.sendmail(_SMTP_USER, _NOTIFY_EMAIL, msg.as_string())
+            srv.login(c["smtp_user"], c["smtp_pass"])
+            srv.sendmail(c["smtp_user"], c["notify_email"], msg.as_string())
 
-        logger.info("Email bildirimi gönderildi: %s", _NOTIFY_EMAIL)
+        logger.info("Email bildirimi gönderildi: %s", c["notify_email"])
         return True
     except Exception as exc:
         logger.warning("Email gönderilemedi: %s", exc)
@@ -254,10 +253,12 @@ def _strip_html_tags(text: str) -> str:
 # ── Yapılandırma Durumu ───────────────────────────────────────
 
 def notifier_status() -> dict:
-    """Admin dashboard için notifier yapılandırma durumu."""
+    """Admin dashboard için notifier yapılandırma durumu (canlı env okur)."""
+    c = _cfg()
     return {
-        "telegram_configured": bool(_TG_TOKEN and _TG_CHAT),
-        "email_configured":    bool(_SMTP_HOST and _NOTIFY_EMAIL),
-        "notify_email":        _NOTIFY_EMAIL or None,
-        "telegram_chat":       _TG_CHAT or None,
+        "telegram_configured": bool(c["tg_token"] and c["tg_chat"]),
+        "email_configured":    bool(c["smtp_host"] and c["notify_email"]),
+        "notify_email":        c["notify_email"] or None,
+        "telegram_chat":       c["tg_chat"] or None,
+        "smtp_host":           c["smtp_host"] or None,
     }
