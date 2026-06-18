@@ -2950,3 +2950,55 @@ body.dark-theme .quantum-node-card {
   transition: color .15s;
 }
 .guide-close:hover { color: var(--ink); }
+
+/* ── Link Kılavuzu Popup ─────────────────────────────────────────────────── */
+.inline-help-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--green); font-size: inherit; font-family: inherit;
+  text-decoration: underline dotted; text-underline-offset: 3px;
+  padding: 0; font-weight: 600;
+}
+.inline-help-btn:hover { opacity: .75; }
+
+.link-guide-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  backdrop-filter: blur(4px); z-index: 9000;
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn .18s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.link-guide-modal {
+  background: var(--bg-card); border: 1.5px solid var(--border);
+  border-radius: 16px; padding: 28px 28px 24px;
+  max-width: 440px; width: 92%; position: relative;
+  animation: popIn .22s cubic-bezier(.22,1,.36,1);
+  max-height: 90vh; overflow-y: auto;
+}
+@keyframes popIn { from { opacity:0; transform: scale(.93) translateY(10px); } to { opacity:1; transform: none; } }
+
+.link-guide-modal h3 { font-size: 16px; font-weight: 700; margin: 0 0 6px; }
+.link-guide-modal .subtitle { font-size: 12px; color: var(--ink-2); margin-bottom: 20px; }
+
+.link-guide-app {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.link-guide-app:last-child { border-bottom: none; }
+.link-guide-app-icon { font-size: 26px; flex-shrink: 0; width: 36px; text-align: center; }
+.link-guide-app-name { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 3px; }
+.link-guide-app-steps { font-size: 12px; color: var(--ink-2); line-height: 1.6; }
+.link-guide-app-steps b { color: var(--ink); }
+
+.link-guide-close {
+  position: absolute; top: 14px; right: 16px;
+  background: none; border: none; cursor: pointer;
+  font-size: 20px; color: var(--ink-2); line-height: 1;
+}
+.link-guide-close:hover { color: var(--ink); }
+
+.link-guide-tip {
+  margin-top: 16px; padding: 10px 14px;
+  background: var(--green-bg); border-radius: 8px;
+  font-size: 12px; color: var(--green); font-weight: 500;
+}

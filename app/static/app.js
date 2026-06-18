@@ -1707,27 +1707,21 @@ async function parseProduct(event) {
             body: JSON.stringify({ url: val }),
             signal: null
           });
+          // Link parse edilemediyse rehber popup aç
+          if (!parsed.title && !parsed.price) {
+            if (overlay) overlay.style.display = "none";
+            submit.disabled = false;
+            submit.innerHTML = `<span>Kontrol et</span>`;
+            showLinkGuide(true);
+            return;
+          }
           showParsedProduct(parsed);
         } else {
-          const category = document.getElementById("searchCategorySelector")?.value || "general";
-          const globalCheckbox = document.getElementById("globalModeCheckbox");
-          const isGlobalActive = globalCheckbox ? globalCheckbox.checked : false;
-          
-          let searchMode = "hybrid";
-          if (isGlobalActive) {
-            searchMode = "global";
-          }
-          
-          let searchUrl = "/api/search?query=" + encodeURIComponent(val)
-            + "&category=" + encodeURIComponent(category)
-            + "&mode=" + encodeURIComponent(searchMode);
-            
-          if (state.userCoords && searchMode !== "global") {
-            searchUrl += "&lat=" + state.userCoords.lat + "&lon=" + state.userCoords.lng;
-          }
-          
-          const results = await api(searchUrl, { signal: null });
-          showSearchResults(results);
+          // URL değil — rehber popup göster
+          if (overlay) overlay.style.display = "none";
+          submit.disabled = false;
+          submit.innerHTML = `<span>Kontrol et</span>`;
+          showLinkGuide(true);
         }
       } catch (error) {
         console.error("parseProduct hatası:", error);
@@ -7072,4 +7066,89 @@ function dismissGuide(view) {
 function resetGuides() {
   localStorage.removeItem(GUIDE_KEY);
   toast("Rehberler sıfırlandı — sekmeleri ziyaret et.");
+}
+
+/* ── Link Kılavuzu Popup ─────────────────────────────────────────────────── */
+
+const LINK_GUIDE_APPS = [
+  {
+    icon: "🛒",
+    name: "Migros, CarrefourSA, A101, BİM",
+    steps: "Ürün sayfasını aç → tarayıcının <b>adres çubuğuna</b> dokun → linki kopyala → Almadan'a yapıştır.",
+  },
+  {
+    icon: "📦",
+    name: "Trendyol",
+    steps: "Ürün sayfası → sağ üstteki <b>paylaş</b> simgesi → <b>Bağlantıyı Kopyala</b> → Almadan'a yapıştır.",
+  },
+  {
+    icon: "🌐",
+    name: "Hepsiburada",
+    steps: "Ürün sayfası → üstteki <b>⋯ Daha Fazla</b> → <b>Linki Kopyala</b> → Almadan'a yapıştır.",
+  },
+  {
+    icon: "🛍️",
+    name: "n11, GittiGidiyor, diğer siteler",
+    steps: "Ürün sayfasını aç → tarayıcı adres çubuğundaki <b>URL'yi</b> kopyala → Almadan'a yapıştır.",
+  },
+  {
+    icon: "📱",
+    name: "Mobil uygulama kullanıyorsan",
+    steps: "Ürün sayfası → uygulamanın <b>Paylaş</b> butonu → <b>Bağlantıyı Kopyala</b> seç → Almadan'a gel, kutuya basılı tut → Yapıştır.",
+  },
+];
+
+function showLinkGuide(autoTriggered = false) {
+  if (document.getElementById("linkGuideOverlay")) return;
+
+  const overlay = document.createElement("div");
+  overlay.className = "link-guide-overlay";
+  overlay.id = "linkGuideOverlay";
+  overlay.onclick = e => { if (e.target === overlay) closeLinkGuide(); };
+
+  overlay.innerHTML = `
+    <div class="link-guide-modal" role="dialog" aria-modal="true" aria-labelledby="lgTitle">
+      <button class="link-guide-close" onclick="closeLinkGuide()" aria-label="Kapat">✕</button>
+      <h3 id="lgTitle">${autoTriggered ? "⚠️ Geçersiz link girildi" : "🔗 Ürün linki nasıl bulunur?"}</h3>
+      <p class="subtitle">${autoTriggered
+        ? "Girdiğin adres bir ürün linki gibi görünmüyor. Aşağıdan doğru linki nasıl kopyalayacağını öğren:"
+        : "Alışveriş uygulamasından ürün linkini şu şekilde kopyalayabilirsin:"
+      }</p>
+      ${LINK_GUIDE_APPS.map(a => `
+        <div class="link-guide-app">
+          <div class="link-guide-app-icon">${a.icon}</div>
+          <div>
+            <div class="link-guide-app-name">${a.name}</div>
+            <div class="link-guide-app-steps">${a.steps}</div>
+          </div>
+        </div>
+      `).join("")}
+      <div class="link-guide-tip">💡 İpucu: Barkod butonu ile kameranı açıp ürün barkodunu taratabilirsin — link gerekmez!</div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  document.addEventListener("keydown", _lgEscHandler);
+}
+
+function closeLinkGuide() {
+  const overlay = document.getElementById("linkGuideOverlay");
+  if (!overlay) return;
+  overlay.style.animation = "fadeOut .15s ease forwards";
+  overlay.style.setProperty("--tw-opacity", "0");
+  overlay.style.opacity = "0";
+  setTimeout(() => overlay.remove(), 160);
+  document.removeEventListener("keydown", _lgEscHandler);
+}
+
+function _lgEscHandler(e) { if (e.key === "Escape") closeLinkGuide(); }
+
+function _isValidProductUrl(val) {
+  if (!val) return false;
+  try {
+    const url = new URL(val);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
