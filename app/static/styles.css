@@ -1,11 +1,15 @@
 :root {
   --ink: #171a17;
+  --ink-2: #687068;
+  --ink-light: #888;
   --muted: #687068;
   --paper: #f7f8f5;
   --surface: #ffffff;
   --line: #dfe3dc;
+  --border: #dfe3dc;
   --green: #287a50;
   --green-dark: #1e5e3e;
+  --green-bg: rgba(40, 122, 80, 0.07);
   --lime: #d9ef57;
   --yellow: #f5c84c;
   --red: #c45243;
@@ -13,6 +17,8 @@
   --shadow: 0 16px 40px rgba(27, 35, 28, 0.09);
   --bg-app: var(--paper);
   --bg-card: var(--surface);
+  --radius: 12px;
+  --font: "DM Sans", sans-serif;
 }
 
 * {
@@ -1703,9 +1709,13 @@ body.dark-theme {
   --bg-app: #0d0e10;
   --bg-card: #181b20;
   --ink: #e2e4e9;
+  --ink-2: #848c96;
+  --ink-light: #6b7280;
   --muted: #848c96;
   --line: #262930;
+  --border: #2e3240;
   --green-dark: #8ed7aa;
+  --green-bg: rgba(142, 215, 170, 0.07);
   background-color: var(--bg);
   color: var(--ink);
 }

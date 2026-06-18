@@ -1246,63 +1246,12 @@ async function loadProducts(signal = null) {
 function renderFallbackOpportunities() {
   const grid = document.getElementById("dealGrid");
   if (!grid) return;
-  
-  // Fütüristik simulated yerel/çevrimdışı fırsat ürünleri
-  const fallbackProducts = [
-    {
-      id: "fallback-1",
-      title: "Nutella 750g (Lokal Fırsat)",
-      source: "Migros",
-      price: 119.90,
-      original_price: 159.90,
-      deal_score: 85,
-      image_url: "",
-      discount_analysis: { discount_percent: 25 }
-    },
-    {
-      id: "fallback-2",
-      title: "İpana Diş Macunu 75ml",
-      source: "Gratis",
-      price: 59.90,
-      original_price: 99.90,
-      deal_score: 90,
-      image_url: "",
-      discount_analysis: { discount_percent: 40 }
-    },
-    {
-      id: "fallback-3",
-      title: "Sütaş Kaşar Peyniri 700g",
-      source: "CarrefourSA",
-      price: 189.90,
-      original_price: 239.90,
-      deal_score: 80,
-      image_url: "",
-      discount_analysis: { discount_percent: 20 }
-    }
-  ];
-  
-  state.products = fallbackProducts;
-  renderAll();
-  
-  // Arayüze fütüristik uyarı banner'ı ekleme
-  const banner = document.createElement("div");
-  banner.className = "fallback-alert-banner";
-  banner.style.gridColumn = "1 / -1";
-  banner.style.padding = "12px 16px";
-  banner.style.borderRadius = "8px";
-  banner.style.background = "rgba(16, 185, 129, 0.08)";
-  banner.style.border = "1px solid rgba(16, 185, 129, 0.3)";
-  banner.style.color = "var(--green)";
-  banner.style.fontSize = "12px";
-  banner.style.fontWeight = "700";
-  banner.style.display = "flex";
-  banner.style.alignItems = "center";
-  banner.style.gap = "8px";
-  banner.style.boxShadow = "0 0 10px rgba(16, 185, 129, 0.1)";
-  
-  banner.innerHTML = `<i data-lucide="shield-alert" style="width:16px; height:16px;"></i> MOBİL OPTİMİZASYON AKTİF: Çevrimdışı/Yerel fırsatlar listeleniyor.`;
-  grid.prepend(banner);
-  if (window.lucide) lucide.createIcons();
+  grid.innerHTML = `
+    <div style="grid-column:1/-1;padding:48px 24px;text-align:center;">
+      <div style="font-size:40px;margin-bottom:12px;">🛒</div>
+      <p style="font-size:15px;font-weight:600;color:var(--ink);margin:0 0 6px;">Henüz takip edilen ürün yok</p>
+      <p style="font-size:13px;color:var(--ink-2);margin:0;">Üst kısımdan ürün linki yapıştır veya barkod tara — fiyatları karşılaştıralım.</p>
+    </div>`;
 }
 
 function renderAll() {
