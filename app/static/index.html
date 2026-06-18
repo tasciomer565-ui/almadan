@@ -56,55 +56,43 @@
         <div class="intro-content">
           <p class="eyebrow">ALIŞVERİŞ KARAR ASİSTANI</p>
           <h1>Satın almadan önce kontrol et.</h1>
-          <p class="intro-copy">Ürün linkini yapıştır — hangi mağazada en ucuz, hemen göster. <button type="button" class="inline-help-btn" onclick="showLinkGuide()">Link nasıl bulunur? →</button></p>          <form class="url-form" id="urlForm">
-            <div class="url-field">
-              <i data-lucide="search"></i>
-              <select id="searchCategorySelector" class="search-category-select">
-                <option value="general">Genel / Hepsi</option>
-                <option value="grocery">Market & Gıda</option>
-                <option value="electronics">Elektronik</option>
-                <option value="fashion">Giyim & Moda</option>
-                <option value="cosmetics">Kozmetik & Bakım</option>
-                <option value="home">Züccaciye & Ev</option>
-              </select>
-              <input id="productUrl" type="url" placeholder="https://market.com/urun/... linkini buraya yapıştır" required>
-              <button class="mic-button" id="micButton" type="button" aria-label="Sesle ara" title="Sesle ara">
-                <i data-lucide="mic"></i>
-              </button>
-              <button class="paste-button" id="pasteButton" type="button" aria-label="Panodan yapıştır" title="Panodan yapıştır">
+          <p class="intro-copy">Ürün linkini yapıştır veya barkodunu tara — hangi mağazada en ucuz, hemen göster.</p>
+
+          <form class="url-form" id="urlForm">
+            <div class="clean-search-box">
+              <input id="productUrl" type="url" placeholder="Ürün linkini buraya yapıştır…" autocomplete="off" required>
+              <button type="button" class="paste-btn-inline" id="pasteButton" aria-label="Yapıştır">
                 <i data-lucide="clipboard"></i>
               </button>
             </div>
-            <div class="search-options-row" style="display: flex; gap: 16px; margin: 10px 0 15px 4px; flex-wrap: wrap; align-items: center; justify-content: flex-start; width: 100%;">
-              <label class="global-mode-toggle" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; font-weight: 700; color: var(--ink); user-select: none;">
-                <input type="checkbox" id="globalModeCheckbox" style="accent-color: var(--green); width: 14px; height: 14px; cursor: pointer;">
-                <span>GLOBAL SPEKTRUM (KARGO)</span>
-              </label>
-              <span id="gpsStatusIndicator" class="gps-status-pill" style="font-size: 10px; font-weight: 800; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--line); background: rgba(0,0,0,0.02); transition: all 0.2s;" title="Konumu Etkinleştirmek İçin Tıkla">
-                <i data-lucide="map-pin-off" style="width: 12px; height: 12px;"></i> GPS Konumu Pasif
-              </span>
-            </div>
-            <div style="display:flex;gap:10px;align-items:stretch;width:100%;">
-              <button class="primary-button" type="submit" style="flex:1;">
-                <i data-lucide="scan-search"></i>
-                Kontrol et
+
+            <div class="clean-search-actions">
+              <button class="primary-button" type="submit">
+                <i data-lucide="scan-search"></i> Fiyatları Karşılaştır
               </button>
-              <button type="button" class="barcode-search-btn" id="mainBarcodeBtn" onclick="openMainBarcodeScanner()" title="Barkod tara ve fiyat karşılaştır">
-                <i data-lucide="barcode"></i>
-                Barkod Tara
+              <button type="button" class="barcode-btn-clean" id="mainBarcodeBtn" onclick="openMainBarcodeScanner()">
+                <i data-lucide="scan-barcode"></i> Barkod Tara
               </button>
             </div>
+
+            <button type="button" class="link-hint-btn" onclick="showLinkGuide()">
+              <i data-lucide="info"></i> Ürün linki nasıl kopyalanır?
+            </button>
           </form>
 
-          <!-- Ana arama barkod tarayıcısı -->
+          <!-- Barkod tarayıcı -->
           <div id="mainBarcodeScanArea" class="main-barcode-scan-area hidden">
             <div class="main-barcode-header">
-              <span>📷 Ürün barkodunu kameraya göster</span>
+              <span>📷 Barkodu kameraya göster</span>
               <button type="button" onclick="closeMainBarcodeScanner()" class="guide-close">✕</button>
             </div>
-            <div id="mainHtml5QrReader" style="width:100%;max-width:420px;margin:0 auto;"></div>
-            <p style="font-size:11px;color:var(--ink-2);text-align:center;margin-top:8px;">EAN-8, EAN-13, UPC-A desteklenir</p>
+            <div id="mainHtml5QrReader" style="width:100%;max-width:420px;margin:0 auto;border-radius:10px;overflow:hidden;"></div>
+            <p style="font-size:11px;color:var(--ink-2);text-align:center;margin-top:8px;">EAN-8 · EAN-13 · UPC-A desteklenir</p>
           </div>
+
+          <!-- Gizli — JS uyumluluğu için -->
+          <input type="checkbox" id="globalModeCheckbox" style="display:none">
+          <span id="gpsStatusIndicator" style="display:none"></span>
 
           <div class="supported-stores-container">
             <button type="button" class="supported-stores-toggle" onclick="toggleSupportedStores()" aria-expanded="false" aria-controls="supportedStoresPanel">
