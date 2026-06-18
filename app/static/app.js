@@ -72,7 +72,7 @@ async function runSearch(query) {
   showResults({ loading: true });
 
   try {
-    // URL mi, arama terimi mi?
+    // Link mi, ürün adı mı?
     const isUrl = /^https?:\/\//i.test(query);
     let endpoint, payload;
 
@@ -80,7 +80,7 @@ async function runSearch(query) {
       endpoint = "/api/track";
       payload  = { url: query };
     } else {
-      // Genel ürün araması
+      // Link değil: yine de ürün adıyla dene
       endpoint = "/api/search";
       payload  = { query, category: "general" };
     }
@@ -341,6 +341,32 @@ async function lookupBarcode(code) {
     showResults({ error: err.message, query: code });
   }
 }
+
+/* ── "Link nasıl kopyalanır?" Pop-up ─────────────────────────── */
+
+const linkHelpOverlay = document.getElementById("linkHelpOverlay");
+
+function openLinkHelp() {
+  linkHelpOverlay.classList.add("open");
+  document.getElementById("linkHelpClose").focus();
+}
+
+function closeLinkHelp() {
+  linkHelpOverlay.classList.remove("open");
+}
+
+document.getElementById("linkHelpBtn").addEventListener("click", openLinkHelp);
+document.getElementById("linkHelpClose").addEventListener("click", closeLinkHelp);
+
+// Overlay'e (arka plan) tıklayınca kapat
+linkHelpOverlay.addEventListener("click", e => {
+  if (e.target === linkHelpOverlay) closeLinkHelp();
+});
+
+// ESC tuşuyla kapat
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && linkHelpOverlay.classList.contains("open")) closeLinkHelp();
+});
 
 /* ── Hesap butonu (basit) ─────────────────────────────────────── */
 

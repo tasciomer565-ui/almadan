@@ -77,7 +77,7 @@
     .view { display: none; }
     .view.active { display: block; }
 
-    /* ── Hero Search ── */
+    /* ── Hero (Link odaklı) ── */
     .hero {
       max-width: 640px; margin: 0 auto;
       padding: 48px 20px 32px;
@@ -120,6 +120,93 @@
       display: flex; align-items: center; gap: 6px;
     }
     .btn-barcode:hover { background: var(--green); color: #fff; }
+
+    /* ── "Link nasıl alınır?" yardım satırı ── */
+    .link-help-row {
+      margin-top: 10px;
+      text-align: left;
+    }
+    .link-help-btn {
+      background: none; border: none; cursor: pointer;
+      font-size: 12px; color: var(--ink-2);
+      padding: 2px 0;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 3px;
+      transition: color .15s;
+    }
+    .link-help-btn:hover { color: var(--green); }
+
+    /* ── Yardım Pop-up ── */
+    .popup-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .popup-overlay.open { display: flex; }
+
+    .popup-box {
+      background: var(--bg);
+      border-radius: 14px;
+      width: 100%;
+      max-width: 360px;
+      padding: 28px 24px 24px;
+      position: relative;
+      box-shadow: 0 8px 40px rgba(0,0,0,.18);
+      animation: popIn .18s ease;
+    }
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(.95) translateY(6px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    .popup-close {
+      position: absolute; top: 14px; right: 14px;
+      background: none; border: none; cursor: pointer;
+      color: var(--ink-2); font-size: 20px; line-height: 1;
+      padding: 4px; border-radius: 6px;
+      transition: background .15s;
+    }
+    .popup-close:hover { background: var(--bg-card); }
+
+    .popup-title {
+      font-size: 16px; font-weight: 700; margin-bottom: 20px;
+      color: var(--ink);
+    }
+
+    .popup-steps { display: flex; flex-direction: column; gap: 16px; }
+    .popup-step  { display: flex; align-items: flex-start; gap: 14px; }
+
+    .step-icon {
+      flex-shrink: 0;
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      background: var(--green-bg);
+      color: var(--green);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px;
+    }
+
+    .step-body { flex: 1; }
+    .step-num  { font-size: 10px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
+    .step-text { font-size: 13px; color: var(--ink); line-height: 1.45; }
+
+    .popup-share-note {
+      margin-top: 20px; padding: 12px 14px;
+      background: var(--bg-card); border-radius: 8px;
+      display: flex; align-items: center; gap: 10px;
+      font-size: 12px; color: var(--ink-2); line-height: 1.4;
+    }
+    .share-icon-box {
+      flex-shrink: 0;
+      width: 36px; height: 36px; border-radius: 8px;
+      background: #fff; border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+    }
 
     /* ── Barcode Scanner ── */
     .scanner-wrapper {
@@ -321,16 +408,17 @@
   <div class="view active" id="view-search">
     <div class="hero">
       <h1>Satın almadan önce kontrol et.</h1>
-      <p>Ürün adı veya link yaz — ya da barkod tarat.</p>
+      <p>Ürün linkini yapıştır — ya da barkod tarat.</p>
 
       <div class="search-box">
         <input
           id="searchInput"
           class="search-input"
-          type="text"
-          placeholder="Ürün adı veya link yapıştır..."
+          type="url"
+          inputmode="url"
+          placeholder="https://market.com/urun/... linkini buraya yapıştır"
           autocomplete="off"
-          aria-label="Ürün ara"
+          aria-label="Ürün linki"
         >
         <button class="btn-barcode" id="barcodeToggleBtn" type="button" aria-label="Barkod tarat">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -338,7 +426,14 @@
           </svg>
           Barkod
         </button>
-        <button class="btn-primary" id="searchBtn" type="button">Ara</button>
+        <button class="btn-primary" id="searchBtn" type="button">Fiyat Bul</button>
+      </div>
+
+      <!-- "Link nasıl alınır?" yardım butonu -->
+      <div class="link-help-row">
+        <button class="link-help-btn" id="linkHelpBtn" type="button" aria-haspopup="dialog">
+          🔗 Link nasıl kopyalanır?
+        </button>
       </div>
 
       <!-- Barkod tarayıcı (gizli başlar) -->
@@ -411,6 +506,67 @@
 <!-- ── Toast ── -->
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script defer src="/static/app.js?v=20260618-minimal"></script>
+<!-- ── "Link nasıl kopyalanır?" Pop-up ── -->
+<div class="popup-overlay" id="linkHelpOverlay" role="dialog" aria-modal="true" aria-labelledby="linkHelpTitle">
+  <div class="popup-box">
+    <button class="popup-close" id="linkHelpClose" aria-label="Kapat">&#x2715;</button>
+    <div class="popup-title" id="linkHelpTitle">🔗 Link nasıl kopyalanır?</div>
+    <div class="popup-steps">
+
+      <div class="popup-step">
+        <div class="step-icon">🛍️</div>
+        <div class="step-body">
+          <div class="step-num">Adım 1</div>
+          <div class="step-text">Marketin uygulamasını veya web sitesini aç.</div>
+        </div>
+      </div>
+
+      <div class="popup-step">
+        <div class="step-icon">
+          <!-- İkonik "Paylaş" görseli — inline SVG -->
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"/>
+            <circle cx="6"  cy="12" r="3"/>
+            <circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
+        </div>
+        <div class="step-body">
+          <div class="step-num">Adım 2</div>
+          <div class="step-text">İlgilendiğin ürün sayfasındaki <strong>Paylaş</strong> ikonuna dokun.</div>
+        </div>
+      </div>
+
+      <div class="popup-step">
+        <div class="step-icon">📋</div>
+        <div class="step-body">
+          <div class="step-num">Adım 3</div>
+          <div class="step-text"><strong>Bağlantıyı Kopyala</strong> seçeneğine bas ve buraya yapıştır!</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Görsel ipucu notu -->
+    <div class="popup-share-note">
+      <div class="share-icon-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+             stroke="#287a50" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="18" cy="5" r="3"/>
+          <circle cx="6"  cy="12" r="3"/>
+          <circle cx="18" cy="19" r="3"/>
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+        </svg>
+      </div>
+      <span>Paylaş ikonu genellikle bu şekilde görünür — ürün sayfasının sağ üst köşesinde veya menüde bulunur.</span>
+    </div>
+
+  </div>
+</div>
+
+<script defer src="/static/app.js?v=20260618-link"></script>
 </body>
 </html>
