@@ -4224,8 +4224,29 @@ async def notifier_status_endpoint(request: Request, admin=Depends(require_admin
 
 
 @app.post("/api/admin/notifier/test")
-async def notifier_test(request: Request, admin=Depends(require_admin)):
-    """Yapılandırılmış bildirim kanallarına test mesajı gönderir."""
+async def notifier_test(
+    request: Request,
+    x_cron_secret: str | None = Header(default=None),
+):
+    """
+    Yapılandırılmış bildirim kanallarına test mesajı gönderir.
+
+    Yetkilendirme — ikisinden biri yeterli:
+      1. Admin oturumu (JWT ile giriş yapılmış kullanıcı, role='admin')
+      2. X-Cron-Secret: <CRON_SECRET> header'ı
+    """
+    # CRON_SECRET header bypass
+    secret_ok = CRON_SECRET and x_cron_secret == CRON_SECRET
+    if not secret_ok:
+        # Admin oturum kontrolü
+        try:
+            await require_admin(request)
+        except HTTPException:
+            raise HTTPException(
+                status_code=403,
+                detail="Admin oturumu veya geçerli X-Cron-Secret header'ı gerekli.",
+            )
+
     from app.notifier import notify_failure
     result = await asyncio.to_thread(
         notify_failure,
