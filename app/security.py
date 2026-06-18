@@ -231,6 +231,19 @@ async def auth_wall_middleware(request: Request, call_next):
     """
     path = request.url.path
 
+    # --- GEÇİCİ TANI LOGU — sorun çözülünce silinecek ---
+    import sys
+    _dbg_secret = request.headers.get("x-cron-secret")
+    _dbg_env    = os.getenv("CRON_SECRET", "")
+    print(
+        f"DEBUG middleware | path={path!r} "
+        f"| header={'<mevcut>' if _dbg_secret else '<YOK>'} "
+        f"| env={'<tanimi>' if _dbg_env else '<YOK>'} "
+        f"| uzunluklar: header={len(_dbg_secret or '')} env={len(_dbg_env)}",
+        file=sys.stderr, flush=True,
+    )
+    # --- TANI SONU ---
+
     # Cron/secret bypass — önce kontrol et
     if path in _CRON_BYPASS_PATHS:
         cron_secret = request.headers.get("x-cron-secret", "").strip()
