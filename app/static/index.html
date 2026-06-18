@@ -58,23 +58,22 @@
           <h1>Satın almadan önce kontrol et.</h1>
           <p class="intro-copy">Ürün linkini yapıştır veya barkodunu tara — hangi mağazada en ucuz, hemen göster.</p>
 
-          <form class="url-form" id="urlForm">
-            <div class="clean-search-box">
-              <input id="productUrl" type="url" placeholder="Ürün linkini buraya yapıştır…" autocomplete="off" required>
-              <button type="button" class="paste-btn-inline" id="pasteButton" aria-label="Yapıştır">
-                <i data-lucide="clipboard"></i>
-              </button>
-            </div>
-
-            <div class="clean-search-actions">
+          <form class="url-form" id="urlForm" style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;gap:10px;width:min(800px,100%);">
+              <div class="url-field" style="flex:1;grid-template-columns:auto minmax(0,1fr) auto;">
+                <i data-lucide="link"></i>
+                <input id="productUrl" type="url" placeholder="Ürün linkini buraya yapıştır…" autocomplete="off" required>
+                <button type="button" class="paste-button" id="pasteButton" aria-label="Yapıştır" title="Panodan yapıştır">
+                  <i data-lucide="clipboard"></i>
+                </button>
+              </div>
               <button class="primary-button" type="submit">
                 <i data-lucide="scan-search"></i> Fiyatları Karşılaştır
               </button>
-              <button type="button" class="barcode-btn-clean" id="mainBarcodeBtn" onclick="openMainBarcodeScanner()">
+              <button type="button" id="mainBarcodeBtn" onclick="openMainBarcodeScanner()" class="barcode-outline-btn">
                 <i data-lucide="scan-barcode"></i> Barkod Tara
               </button>
             </div>
-
             <button type="button" class="link-hint-btn" onclick="showLinkGuide()">
               <i data-lucide="info"></i> Ürün linki nasıl kopyalanır?
             </button>
@@ -92,6 +91,7 @@
 
           <!-- Gizli — JS uyumluluğu için -->
           <input type="checkbox" id="globalModeCheckbox" style="display:none">
+          <select id="searchCategorySelector" style="display:none"><option value="general">Genel</option></select>
           <span id="gpsStatusIndicator" style="display:none"></span>
 
           <div class="supported-stores-container">

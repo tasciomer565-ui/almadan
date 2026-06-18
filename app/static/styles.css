@@ -3083,3 +3083,26 @@ body.dark-theme .quantum-node-card {
 }
 .link-hint-btn:hover { color: var(--green); }
 .link-hint-btn i { width: 13px; height: 13px; }
+
+/* ── Barkod Outline Butonu (arama alanı) ────────────────────────────────── */
+.barcode-outline-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 56px; padding: 0 20px;
+  font-size: 14px; font-weight: 700; font-family: var(--font);
+  color: var(--ink); background: var(--bg-card);
+  border: 1.5px solid var(--border); border-radius: 7px;
+  cursor: pointer; white-space: nowrap; transition: all .15s;
+  flex-shrink: 0;
+}
+.barcode-outline-btn:hover { border-color: var(--lime); color: var(--ink); }
+.barcode-outline-btn svg { width: 19px; height: 19px; }
+
+/* ── Link Hint Butonu ────────────────────────────────────────────────────── */
+.link-hint-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 12px; font-family: var(--font);
+  padding: 0; transition: color .15s; width: fit-content;
+}
+.link-hint-btn:hover { color: var(--green); }
+.link-hint-btn svg { width: 13px; height: 13px; }
