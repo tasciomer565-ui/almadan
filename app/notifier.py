@@ -200,11 +200,17 @@ def _send_telegram(text: str, c: dict) -> bool:
 
 
 def _send_email(subject: str, body: str, c: dict) -> bool:
-    """SMTP üzerinden plain-text + HTML e-posta gönderir."""
+    """
+    SMTP üzerinden plain-text + HTML e-posta gönderir.
+    Port 465 → SMTP_SSL (Resend, vb.)
+    Port 587 → SMTP + STARTTLS (Gmail, vb.)
+    """
     try:
+        from_addr = os.getenv("SMTP_FROM", c["smtp_user"]).strip() or c["smtp_user"]
+
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"]    = c["smtp_user"]
+        msg["From"]    = f"Almadan <{from_addr}>"
         msg["To"]      = c["notify_email"]
 
         plain = _strip_html_tags(body)
@@ -212,12 +218,19 @@ def _send_email(subject: str, body: str, c: dict) -> bool:
         html_body = f"<pre style='font-family:monospace;font-size:13px;'>{body}</pre>"
         msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-        with smtplib.SMTP(c["smtp_host"], c["smtp_port"], timeout=10) as srv:
-            srv.starttls()
-            srv.login(c["smtp_user"], c["smtp_pass"])
-            srv.sendmail(c["smtp_user"], c["notify_email"], msg.as_string())
+        if c["smtp_port"] == 465:
+            # SSL — Resend ve benzeri servisler
+            with smtplib.SMTP_SSL(c["smtp_host"], 465, timeout=10) as srv:
+                srv.login(c["smtp_user"], c["smtp_pass"])
+                srv.sendmail(from_addr, c["notify_email"], msg.as_string())
+        else:
+            # STARTTLS — Gmail (587) ve benzeri
+            with smtplib.SMTP(c["smtp_host"], c["smtp_port"], timeout=10) as srv:
+                srv.starttls()
+                srv.login(c["smtp_user"], c["smtp_pass"])
+                srv.sendmail(from_addr, c["notify_email"], msg.as_string())
 
-        logger.info("Email bildirimi gönderildi: %s", c["notify_email"])
+        logger.info("Email bildirimi gönderildi: %s → %s", from_addr, c["notify_email"])
         return True
     except Exception as exc:
         logger.warning("Email gönderilemedi: %s", exc)
