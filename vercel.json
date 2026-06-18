@@ -1,7 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "fastapi",
-  "regions": ["fra1"],
+  "regions": [
+    "fra1"
+  ],
   "crons": [
     {
       "path": "/cron/refresh-all",
@@ -9,7 +11,7 @@
     },
     {
       "path": "/api/ai/worker",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 10 * * *"
     },
     {
       "path": "/cron/catalog-scan",
@@ -25,7 +27,7 @@
     },
     {
       "path": "/cron/group-buy-expire",
-      "schedule": "0 * * * *"
+      "schedule": "0 11 * * *"
     },
     {
       "path": "/cron/cleanup-metrics",
