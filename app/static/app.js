@@ -50,8 +50,9 @@ function showView(name) {
   document.querySelectorAll("[data-view]").forEach(b => b.classList.toggle("active", b.dataset.view === name));
   const el = document.getElementById("view-" + name);
   if (el) el.classList.add("active");
-  if (name === "tracking") renderTracking();
-  if (name === "savings")  renderSavings();
+  if (name === "tracking")  renderTracking();
+  if (name === "bulletins") loadStores();
+  if (name === "savings")   renderSavings();
 }
 
 document.querySelectorAll("[data-view]").forEach(btn => {
@@ -463,6 +464,105 @@ async function lookupBarcode(code) {
     });
   } catch (err) {
     showResults({ error: err.message, query: code });
+  }
+}
+
+/* ── Mağaza Bültenleri ────────────────────────────────────────── */
+
+const STORE_EMOJIS = {
+  market: "🛒", fashion: "👗", beauty: "💄", home: "🏠",
+};
+
+// Takip durumunu hafızada tut (API çağrısı olmadan anında toggle)
+const storeFollowState = {};
+
+async function loadStores() {
+  const list = document.getElementById("storeList");
+  if (!list) return;
+
+  try {
+    const res  = await fetch("/api/stores");
+    const data = await res.json();
+    const stores = data.stores || [];
+
+    if (!stores.length) {
+      list.innerHTML = `<p class="empty-state">Henüz mağaza eklenmemiş.</p>`;
+      return;
+    }
+
+    // Kategoriye göre grupla
+    const groups = {};
+    stores.forEach(s => {
+      const cat = s.category || "other";
+      (groups[cat] = groups[cat] || []).push(s);
+      storeFollowState[s.slug] = s.followed;
+    });
+
+    const CAT_LABELS = { market: "Marketler", fashion: "Moda", beauty: "Güzellik & Kozmetik", home: "Ev & Yaşam" };
+    const catOrder   = ["market", "fashion", "beauty", "home"];
+
+    let html = "";
+    catOrder.forEach(cat => {
+      if (!groups[cat]?.length) return;
+      html += `<div class="store-section-title">${CAT_LABELS[cat] || cat}</div>`;
+      html += `<div class="store-grid">`;
+      html += groups[cat].map(s => renderStoreCard(s)).join("");
+      html += `</div>`;
+    });
+
+    list.innerHTML = html;
+  } catch {
+    list.innerHTML = `<p class="empty-state">Mağazalar yüklenemedi. Tekrar dene.</p>`;
+  }
+}
+
+function renderStoreCard(s) {
+  const followed = storeFollowState[s.slug];
+  const emoji    = STORE_EMOJIS[s.category] || "🏪";
+  return `
+    <div class="store-card ${followed ? "followed" : ""}" id="scard-${s.slug}">
+      <div class="store-card-header">
+        <span class="store-emoji">${emoji}</span>
+        <div>
+          <div class="store-name">${esc(s.name)}</div>
+          <div class="store-cat">${esc(s.category)}</div>
+        </div>
+      </div>
+      ${s.publication_note ? `<div class="store-note">📅 ${esc(s.publication_note)}</div>` : ""}
+      <button
+        class="btn-follow ${followed ? "active" : ""}"
+        onclick="toggleFollow('${s.slug}', '${esc(s.name)}')"
+        id="sfbtn-${s.slug}"
+      >${followed ? "✓ Takip Ediliyor" : "+ Takibe Al"}</button>
+    </div>`;
+}
+
+async function toggleFollow(slug, name) {
+  const btn  = document.getElementById(`sfbtn-${slug}`);
+  const card = document.getElementById(`scard-${slug}`);
+  const isFollowed = storeFollowState[slug];
+
+  // Anında UI güncelle (optimistic)
+  storeFollowState[slug] = !isFollowed;
+  btn.textContent  = isFollowed ? "+ Takibe Al" : "✓ Takip Ediliyor";
+  btn.classList.toggle("active", !isFollowed);
+  card.classList.toggle("followed", !isFollowed);
+
+  try {
+    const method = isFollowed ? "DELETE" : "POST";
+    const res    = await fetch(`/api/stores/${slug}/follow`, { method });
+    if (res.status === 401) {
+      toast("Takip için giriş yapman gerekiyor.");
+      // Geri al
+      storeFollowState[slug] = isFollowed;
+      btn.textContent  = isFollowed ? "✓ Takip Ediliyor" : "+ Takibe Al";
+      btn.classList.toggle("active", isFollowed);
+      card.classList.toggle("followed", isFollowed);
+      return;
+    }
+    toast(isFollowed ? `${name} takipten çıkarıldı.` : `${name} takibe alındı ✓`);
+  } catch {
+    toast("Bağlantı hatası, tekrar dene.");
   }
 }
 

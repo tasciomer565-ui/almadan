@@ -4345,3 +4345,174 @@ async def cron_check_reminders(request: Request):
             pass
 
     return {"checked": len(rows), "notified": sent, "date": today}
+
+
+# ── Mağaza Bülten & Takip Modülü ─────────────────────────────────────────────
+
+# Türkçe gün adı → İngilizce slug eşlemesi (publication_day DB'de İngilizce saklanıyor)
+_WEEKDAY_MAP = {
+    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+    "friday": 4, "saturday": 5, "sunday": 6,
+}
+
+
+@app.get("/api/stores")
+async def list_stores(request: Request):
+    """
+    Tüm aktif mağazaları döndürür.
+    Giriş yapan kullanıcı için hangileri takip edildiğini de işaretler.
+    """
+    stores = (
+        supabase.table("store_newsletters")
+        .select("*")
+        .eq("active", True)
+        .order("name")
+        .execute()
+    ).data or []
+
+    # Oturum varsa takip listesini çek
+    followed_slugs: set[str] = set()
+    try:
+        token = request.cookies.get("access_token") or request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+        if token:
+            user_resp = supabase.auth.get_user(token)
+            if user_resp and user_resp.user:
+                rows = (
+                    supabase.table("followed_stores")
+                    .select("store_slug")
+                    .eq("user_id", user_resp.user.id)
+                    .execute()
+                ).data or []
+                followed_slugs = {r["store_slug"] for r in rows}
+    except Exception:
+        pass
+
+    for s in stores:
+        s["followed"] = s["slug"] in followed_slugs
+
+    return {"stores": stores}
+
+
+@app.post("/api/stores/{slug}/follow")
+async def follow_store(slug: str, request: Request, user=Depends(require_login)):
+    """Mağazayı takip et (idempotent — zaten takip ediliyorsa sessiz döner)."""
+    store = (
+        supabase.table("store_newsletters").select("slug").eq("slug", slug).eq("active", True).execute()
+    ).data
+    if not store:
+        raise HTTPException(status_code=404, detail="Mağaza bulunamadı.")
+
+    supabase.table("followed_stores").upsert(
+        {"user_id": user["id"], "store_slug": slug},
+        on_conflict="user_id,store_slug",
+    ).execute()
+    return {"followed": slug}
+
+
+@app.delete("/api/stores/{slug}/follow")
+async def unfollow_store(slug: str, request: Request, user=Depends(require_login)):
+    """Mağaza takibini bırak."""
+    supabase.table("followed_stores").delete().eq("user_id", user["id"]).eq("store_slug", slug).execute()
+    return {"unfollowed": slug}
+
+
+@app.get("/api/stores/{slug}/campaigns")
+async def store_campaigns(slug: str):
+    """Mağazanın aktif kampanyalarını döndürür (herkes görebilir)."""
+    from datetime import date
+    today = date.today().isoformat()
+    rows = (
+        supabase.table("store_campaigns")
+        .select("*")
+        .eq("store_slug", slug)
+        .or_(f"valid_until.is.null,valid_until.gte.{today}")
+        .order("created_at", desc=True)
+        .limit(20)
+        .execute()
+    ).data or []
+    return {"slug": slug, "campaigns": rows}
+
+
+@app.post("/api/admin/stores/{slug}/campaign")
+async def create_campaign(slug: str, request: Request, admin=Depends(require_admin)):
+    """Admin: mağaza için yeni kampanya kaydı ekler."""
+    body = await request.json()
+    row = {
+        "store_slug":  slug,
+        "title":       body.get("title", ""),
+        "description": body.get("description", ""),
+        "catalog_url": body.get("catalog_url", ""),
+        "valid_from":  body.get("valid_from"),
+        "valid_until": body.get("valid_until"),
+        "notified":    False,
+    }
+    result = supabase.table("store_campaigns").insert(row).execute()
+    return result.data[0] if result.data else {}
+
+
+@app.get("/cron/store-newsletters")
+async def cron_store_newsletters(request: Request):
+    """
+    Vercel Cron: Her gün 09:00'da çalışır.
+
+    Mantık:
+      1. Bugünün haftanın gününe göre publication_day eşleşen mağazaları bul.
+      2. O mağazaların notified=False kampanyaları varsa bildirim gönder.
+      3. Takipçi sayısını hesapla, notify_store_update() çağır.
+      4. Kampanyayı notified=True yap.
+    """
+    from datetime import date
+    from app.notifier import notify_store_update
+
+    today_weekday = date.today().weekday()  # 0=Pzt … 6=Paz
+    today_str     = date.today().isoformat()
+
+    # Bugün yayın günü olan mağazalar
+    active_stores = (
+        supabase.table("store_newsletters")
+        .select("slug,name")
+        .eq("active", True)
+        .execute()
+    ).data or []
+
+    triggered = []
+    for store in active_stores:
+        slug = store["slug"]
+
+        # Bu mağazanın bildirilmemiş kampanyaları var mı?
+        campaigns = (
+            supabase.table("store_campaigns")
+            .select("*")
+            .eq("store_slug", slug)
+            .eq("notified", False)
+            .or_(f"valid_from.is.null,valid_from.lte.{today_str}")
+            .execute()
+        ).data or []
+
+        if not campaigns:
+            continue
+
+        # Kaç takipçi var?
+        follower_count = len(
+            (supabase.table("followed_stores").select("user_id").eq("store_slug", slug).execute()).data or []
+        )
+
+        # En güncel kampanyayı al
+        latest = campaigns[0]
+        result = await asyncio.to_thread(
+            notify_store_update,
+            store["name"],
+            campaign_title=latest.get("title", ""),
+            catalog_url=latest.get("catalog_url", ""),
+            valid_until=latest.get("valid_until", ""),
+            follower_count=follower_count,
+        )
+
+        if any(result.values()):
+            # Tüm bu kampanyaları notified=True yap
+            ids = [c["id"] for c in campaigns]
+            for cid in ids:
+                supabase.table("store_campaigns").update({"notified": True}).eq("id", cid).execute()
+            triggered.append({"slug": slug, "campaigns_notified": len(ids), "followers": follower_count})
+
+    return {"date": today_str, "triggered": triggered, "total_stores_checked": len(active_stores)}

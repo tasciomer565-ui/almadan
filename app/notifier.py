@@ -108,6 +108,38 @@ def notify_restock_reminder(
     return _dispatch(msg, subject=f"[Almadan] {product_title} stokun bitmek üzere")
 
 
+def notify_store_update(
+    store_name: str,
+    *,
+    campaign_title: str = "",
+    catalog_url: str = "",
+    valid_until: str = "",
+    follower_count: int = 0,
+) -> dict[str, bool]:
+    """
+    Mağaza kampanya/bülten bildirimi gönderir.
+    Cron job tarafından çağrılır: o mağazayı takip eden tüm kullanıcılar için.
+    Kanal başına tek bir mesaj gider (grup bildirimi) — kişi başına değil.
+    """
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    until_line   = f"\n<b>Son geçerlilik:</b> {valid_until}" if valid_until else ""
+    catalog_line = f"\n\n🔗 <a href='{catalog_url}'>Kataloğu İncele</a>" if catalog_url else ""
+    title_line   = f"\n<b>Kampanya:</b> {campaign_title}" if campaign_title else ""
+    followers_line = f"\n<b>Bilgilendirilen takipçi:</b> {follower_count} kişi" if follower_count else ""
+
+    msg = (
+        f"🏪 <b>{store_name} — Yeni Kampanya Başladı!</b>\n"
+        f"{title_line}{until_line}{followers_line}\n\n"
+        f"Almadan ile en iyi fiyatları karşılaştır."
+        f"{catalog_line}\n\n"
+        f"<b>Zaman:</b> {ts}"
+    )
+    return _dispatch(
+        msg,
+        subject=f"[Almadan] {store_name}'de yeni kampanya başladı!",
+    )
+
+
 def notify_health_result(
     result: Literal["success", "failure"],
     *,

@@ -426,6 +426,44 @@
       .hero h1 { font-size: 22px; }
     }
 
+    /* ── Mağaza Bülten Kartları ── */
+    .store-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 4px;
+    }
+    .store-card {
+      border: 1.5px solid var(--border); border-radius: var(--radius);
+      padding: 16px 14px;
+      display: flex; flex-direction: column; gap: 8px;
+      background: var(--bg); transition: box-shadow .15s;
+    }
+    .store-card.followed { border-color: var(--green); background: var(--green-bg); }
+    .store-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.07); }
+
+    .store-card-header { display: flex; align-items: center; gap: 10px; }
+    .store-emoji { font-size: 22px; line-height: 1; }
+    .store-name  { font-size: 14px; font-weight: 700; color: var(--ink); }
+    .store-cat   { font-size: 10px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .4px; }
+    .store-note  { font-size: 11px; color: var(--ink-2); }
+
+    .btn-follow {
+      padding: 6px 14px; font-size: 12px; font-weight: 600;
+      border: 1.5px solid var(--green); border-radius: 6px;
+      background: var(--bg); color: var(--green);
+      cursor: pointer; transition: all .15s; margin-top: auto;
+    }
+    .btn-follow:hover   { background: var(--green); color: #fff; }
+    .btn-follow.active  { background: var(--green); color: #fff; }
+    .btn-follow.active:hover { background: #1f6040; }
+
+    .store-section-title {
+      font-size: 12px; font-weight: 700; color: var(--ink-2);
+      text-transform: uppercase; letter-spacing: .5px;
+      margin: 20px 0 8px;
+    }
+
     /* ── Scrollbar ── */
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
@@ -439,6 +477,7 @@
   <nav class="header-nav" aria-label="Ana menü">
     <button class="nav-btn active" data-view="search">Fiyat Ara</button>
     <button class="nav-btn" data-view="tracking">Takip</button>
+    <button class="nav-btn" data-view="bulletins">Bültenler</button>
     <button class="nav-btn" data-view="savings">Tasarruf</button>
   </nav>
   <div class="header-right">
@@ -510,6 +549,19 @@
     </div>
   </div>
 
+  <!-- ── VIEW: Bültenler ── -->
+  <div class="view" id="view-bulletins">
+    <div class="page-body">
+      <h2 class="page-title">Mağaza Bültenleri</h2>
+      <p style="font-size:13px;color:var(--ink-2);margin-bottom:16px;">
+        Takip ettiğin mağazalar kampanya başlattığında seni haberdar edelim.
+      </p>
+      <div id="storeList">
+        <div class="loading-row"><span class="spinner"></span><span>Mağazalar yükleniyor…</span></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── VIEW: Tasarruf ── -->
   <div class="view" id="view-savings">
     <div class="page-body">
@@ -544,6 +596,10 @@
     <button class="mob-btn" data-view="tracking">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
       Takip
+    </button>
+    <button class="mob-btn" data-view="bulletins">
+      <svg viewBox="0 0 24 24"><path d="M4 4h16v2.5L12 13 4 6.5V4z"/><rect x="4" y="13" width="16" height="7" rx="1"/></svg>
+      Bülten
     </button>
     <button class="mob-btn" data-view="savings">
       <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-4H9l3-6 3 6h-2v4z"/></svg>

@@ -34,6 +34,10 @@
     {
       "path": "/cron/check-reminders",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/cron/store-newsletters",
+      "schedule": "0 9 * * *"
     }
   ]
 }
