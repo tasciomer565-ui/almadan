@@ -135,6 +135,11 @@ def public_image_url(url: str) -> bool:
 
 
 @app.middleware("http")
+async def _auth_wall(request: Request, call_next):
+    return await auth_wall_middleware(request, call_next)
+
+
+@app.middleware("http")
 async def ensure_device_id(request: Request, call_next):
     device_id = request.headers.get("x-device-id") or request.cookies.get(
         "almadan_device_id"
@@ -210,11 +215,6 @@ async def security_headers_middleware(request: Request, call_next):
             max_age=7200, httponly=False, secure=True, samesite="strict"
         )
     return response
-
-
-@app.middleware("http")
-async def _auth_wall(request: Request, call_next):
-    return await auth_wall_middleware(request, call_next)
 
 
 @app.exception_handler(StorageError)
