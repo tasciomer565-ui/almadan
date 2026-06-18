@@ -3171,6 +3171,9 @@ function switchView(view) {
   }
 
   window.scrollTo({ top: view === "discover" ? 0 : 180, behavior: "smooth" });
+
+  // Rehber popup — ilk ziyarette göster
+  setTimeout(() => showGuide(view), 150);
 }
 
 async function pasteUrl() {
@@ -6963,4 +6966,110 @@ async function toggleFollow(slug, name) {
   } catch {
     toast("Bağlantı hatası, tekrar dene.");
   }
+}
+
+/* ── Rehber Popup Sistemi ────────────────────────────────────────────────── */
+
+const GUIDES = {
+  discover: {
+    icon: "🔍",
+    title: "Fiyat karşılaştırması nasıl yapılır?",
+    steps: [
+      "Herhangi bir marketten ürünün linkini kopyala",
+      "Yukarıdaki kutuya yapıştır ve Fiyat Bul'a bas",
+      "Ya da barkod butonuyla ürünü tara — anında karşılaştır",
+    ],
+  },
+  tracking: {
+    icon: "📡",
+    title: "Fiyat takibi nasıl çalışır?",
+    steps: [
+      "Fiyat Bul sonuçlarında 'Takibe Al' butonuna bas",
+      "Fiyat düşünce otomatik bildirim alırsın",
+      "Hatırlatıcı kurarak stok bitmeden seni uyaralım",
+    ],
+  },
+  bulletins: {
+    icon: "🏪",
+    title: "Mağaza bültenleri nasıl çalışır?",
+    steps: [
+      "Takip etmek istediğin mağazanın kartına tıkla",
+      "Mağaza kampanya başlatınca sana mail gönderilir",
+      "Birden fazla mağazayı aynı anda takip edebilirsin",
+    ],
+  },
+  savings: {
+    icon: "💰",
+    title: "Tasarruf sayfası ne gösterir?",
+    steps: [
+      "Takip ettiğin ürünlerde yakaladığın fiyat farklarını görürsün",
+      "Harcamalarını kategorilere göre analiz eder",
+      "Fişlerini ekleyerek aylık bütçeni takip et",
+    ],
+  },
+  cart: {
+    icon: "🛒",
+    title: "Sepet ve listeler nasıl kullanılır?",
+    steps: [
+      "Almak istediğin ürünleri sepetine ekle",
+      "Listeyi bir bağlantı ile arkadaşlarınla paylaş",
+      "Toplu alışverişte en uygun mağazayı hesaplar",
+    ],
+  },
+};
+
+const GUIDE_KEY = "almadan_guide_dismissed_v1";
+
+function _getDismissed() {
+  try { return JSON.parse(localStorage.getItem(GUIDE_KEY) || "{}"); } catch { return {}; }
+}
+function _setDismissed(view) {
+  const d = _getDismissed(); d[view] = true;
+  localStorage.setItem(GUIDE_KEY, JSON.stringify(d));
+}
+
+function showGuide(view) {
+  const guide = GUIDES[view];
+  if (!guide || _getDismissed()[view]) return;
+
+  // Önce eski varsa kaldır
+  document.getElementById(`guide-${view}`)?.remove();
+
+  const el = document.createElement("div");
+  el.className = "guide-popup";
+  el.id = `guide-${view}`;
+  el.innerHTML = `
+    <div class="guide-icon">${guide.icon}</div>
+    <div class="guide-body">
+      <div class="guide-title">${guide.title}</div>
+      <ul class="guide-steps">
+        ${guide.steps.map((s, i) => `<li data-step="${i + 1}">${s}</li>`).join("")}
+      </ul>
+    </div>
+    <button class="guide-close" onclick="dismissGuide('${view}')" aria-label="Kapat">✕</button>
+  `;
+
+  // Her view'in ilk container'ına ekle
+  const viewId = view === "bulletins" ? "bulletinsView" : `${view}View`;
+  const viewEl = document.getElementById(viewId);
+  if (!viewEl) return;
+  const target = viewEl.querySelector(".section-heading, .page-guide, .intro-band");
+  if (target) {
+    target.insertAdjacentElement("afterend", el);
+  } else {
+    viewEl.prepend(el);
+  }
+}
+
+function dismissGuide(view) {
+  _setDismissed(view);
+  const el = document.getElementById(`guide-${view}`);
+  if (!el) return;
+  el.classList.add("hiding");
+  setTimeout(() => el.remove(), 230);
+}
+
+function resetGuides() {
+  localStorage.removeItem(GUIDE_KEY);
+  toast("Rehberler sıfırlandı — sekmeleri ziyaret et.");
 }
