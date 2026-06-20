@@ -1,4 +1,4 @@
-﻿window.__almadanPanicModeActive = false;
+window.__almadanPanicModeActive = false;
 window.onerror = function (message, source, lineno, colno, error) {
   console.error("Almadan global hata yakalayıcı:", {
     message,
@@ -2261,10 +2261,6 @@ function showParsedProduct(parsed) {
           <input id="parsedTargetPrice" type="text" inputmode="decimal" placeholder="Bu fiyata düşünce haber ver (İsteğe bağlı)">
         </label>
         <label class="manual-field">
-          <span>Fiyat Düşüş Alarmı (%)</span>
-          <input id="parsedAlertThreshold" type="number" min="1" max="100" value="5">
-        </label>
-        <label class="manual-field">
           <span>Son Satın Alma Tarihi</span>
           <input id="parsedLastPurchasedDate" type="date">
         </label>
@@ -2373,10 +2369,6 @@ async function trackParsedProduct() {
 
   const targetPriceInput = document.getElementById("parsedTargetPrice");
   const targetPrice = targetPriceInput ? parseUserPrice(targetPriceInput.value) : null;
-  const alertThresholdInput = document.getElementById("parsedAlertThreshold");
-  const alertThreshold = alertThresholdInput
-    ? Number(alertThresholdInput.value)
-    : 5;
   const lastPurchasedDate = document.getElementById("parsedLastPurchasedDate")?.value || "";
   const restockPeriod = Number(document.getElementById("parsedRestockPeriod")?.value || 0);
 

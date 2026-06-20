@@ -618,36 +618,6 @@ def refresh_product(product_id: str) -> dict[str, Any]:
             }
         )
 
-    # Calculate custom threshold
-    drop_threshold = DROP_THRESHOLD
-    try:
-        custom_thresh = product.get("extra_info", {}).get("alert_threshold")
-        if custom_thresh is not None:
-            custom_thresh = float(custom_thresh)
-            if custom_thresh >= 1.0:
-                drop_threshold = custom_thresh / 100.0
-            elif custom_thresh > 0:
-                drop_threshold = custom_thresh
-    except (ValueError, TypeError):
-        pass
-
-    if not was_out_of_stock and drop_rate >= drop_threshold:
-        notification = {
-            "id": str(uuid4()),
-            "product_id": product["id"],
-            "owner_id": product.get("owner_id"),
-            "title": "Fiyat düştü",
-            "message": (
-                f"{product['title']} fiyatı %{drop_rate * 100:.0f} düştü: "
-                f"{old_price:.2f} TL → {new_price:.2f} TL"
-            ),
-            "created_at": checked_at,
-            "read": False,
-            "type": "price_drop",
-        }
-        db["notifications"].insert(0, notification)
-        push_notifications.append(notification)
-
     target_price = product.get("extra_info", {}).get("target_price")
     if target_price:
         try:
@@ -673,6 +643,21 @@ def refresh_product(product_id: str) -> dict[str, Any]:
                 }
                 db["notifications"].insert(0, notification)
                 push_notifications.append(notification)
+                
+                owner_id = product.get("owner_id")
+                if owner_id and owner_id.startswith("user:"):
+                    user_info = db.get("users", {}).get(owner_id, {})
+                    email = user_info.get("email")
+                    pref = user_info.get("notification_pref", "both")
+                    if email and pref in ("email", "both"):
+                        from app.notifier import send_user_email
+                        html_body = f"""<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#287a50;margin:0 0 8px;">🎯 Hedef Fiyata Ulaşıldı!</h2>
+  <p style="color:#444;margin:0 0 16px;">Takip ettiğin <strong>{product['title']}</strong> ürünü, hedeflediğin <strong>{target_price:.2f} TL</strong> fiyatına ulaştı!</p>
+  <p style="color:#444;margin:0 0 16px;">Şu anki fiyatı: <strong style="color:#287a50;font-size:18px;">{new_price:.2f} TL</strong></p>
+  <a href="{product.get('url', '#')}" style="display:inline-block;padding:10px 20px;background:#287a50;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;">Hemen Satın Al →</a>
+</div>"""
+                        send_user_email(email, "🎯 Hedef Fiyata Ulaşıldı!", html_body)
         except (ValueError, TypeError):
             pass
 

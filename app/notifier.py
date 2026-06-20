@@ -237,6 +237,37 @@ def _send_email(subject: str, body: str, c: dict) -> bool:
     return False
 
 
+def send_user_email(to_email: str, subject: str, html_body: str) -> bool:
+    """Belirli bir kullanıcıya SMTP üzerinden email gönderir."""
+    c = _load_config()
+    if not c["smtp_host"] or not c["smtp_user"] or not to_email:
+        return False
+
+    try:
+        from_addr = os.getenv("SMTP_FROM", c["smtp_user"]).strip() or c["smtp_user"]
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = f"Almadan <{from_addr}>"
+        msg["To"]      = to_email
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        if c["smtp_port"] == 465:
+            with smtplib.SMTP_SSL(c["smtp_host"], 465, timeout=10) as srv:
+                srv.login(c["smtp_user"], c["smtp_pass"])
+                srv.sendmail(from_addr, to_email, msg.as_string())
+        else:
+            with smtplib.SMTP(c["smtp_host"], c["smtp_port"], timeout=10) as srv:
+                srv.starttls()
+                srv.login(c["smtp_user"], c["smtp_pass"])
+                srv.sendmail(from_addr, to_email, msg.as_string())
+
+        logger.info("Kullanıcı emaili gönderildi: %s → %s", from_addr, to_email)
+        return True
+    except Exception as exc:
+        logger.warning("Kullanıcı emaili gönderilemedi (%s): %s", to_email, exc)
+    return False
+
+
 # ── Mesaj Şablonu ─────────────────────────────────────────────
 
 def _build_message(
