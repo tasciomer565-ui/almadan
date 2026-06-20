@@ -64,7 +64,7 @@ from app.security import (
 )
 
 
-REFRESH_INTERVAL_SECONDS = 6 * 60 * 60
+REFRESH_INTERVAL_SECONDS = 6 * 60 * 60  # sprint12
 CRON_SECRET = os.getenv("CRON_SECRET", "")
 APP_URL = os.getenv("ALMADAN_APP_URL", "https://almadan.vercel.app").rstrip("/")
 PASSWORD_RESET_LIMIT = 2
