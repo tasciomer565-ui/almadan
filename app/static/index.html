@@ -985,6 +985,35 @@
           }, 50);
         });
 
+        /* toggleFollow — eski app.js'de yok, burda tanimla */
+        if (typeof toggleFollow === 'undefined') {
+          window.storeFollowState = window.storeFollowState || {};
+          window.toggleFollow = async function(slug, name) {
+            var btn  = document.getElementById('sfbtn-' + slug);
+            var card = document.getElementById('scard-' + slug);
+            if (!btn || !card) return;
+            var isFollowed = window.storeFollowState[slug];
+            window.storeFollowState[slug] = !isFollowed;
+            btn.textContent  = isFollowed ? '+ Takibe Al' : '✓ Takip Ediliyor';
+            btn.classList.toggle('active', !isFollowed);
+            card.classList.toggle('followed', !isFollowed);
+            try {
+              var res = await fetch('/api/stores/' + slug + '/follow', { method: isFollowed ? 'DELETE' : 'POST' });
+              if (res.status === 401) {
+                window.storeFollowState[slug] = isFollowed;
+                btn.textContent = isFollowed ? '✓ Takip Ediliyor' : '+ Takibe Al';
+                btn.classList.toggle('active', isFollowed);
+                card.classList.toggle('followed', isFollowed);
+                if (typeof toast === 'function') toast('Takip için giriş yapman gerekiyor.');
+                return;
+              }
+              if (typeof toast === 'function') toast(isFollowed ? (name + ' takipten çıkarıldı.') : (name + ' takibe alındı ✓'));
+            } catch(e) {
+              if (typeof toast === 'function') toast('Bağlantı hatası, tekrar dene.');
+            }
+          };
+        }
+
         /* showInitialLoadFallback override — kurtarma ekranini markaya uygun yap */
         window.showInitialLoadFallback = function() {
           var overlay = document.getElementById('quantumScanOverlay');
