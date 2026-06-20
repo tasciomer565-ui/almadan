@@ -985,6 +985,21 @@
           }, 50);
         });
 
+        /* showInitialLoadFallback override — kurtarma ekranini markaya uygun yap */
+        window.showInitialLoadFallback = function() {
+          var overlay = document.getElementById('quantumScanOverlay');
+          var progress = document.getElementById('quantumScanProgress');
+          if (!overlay) { window.renderFallbackOpportunities && window.renderFallbackOpportunities(); return; }
+          overlay.style.display = 'flex';
+          var h3 = overlay.querySelector('h3');
+          if (h3) { h3.classList.remove('glitch-active'); h3.innerText = 'Almadan'; }
+          if (progress) progress.innerText = 'Daha akıllıca alışveriş için hazırlanıyor…';
+          setTimeout(function() {
+            overlay.style.display = 'none';
+            window.renderFallbackOpportunities && window.renderFallbackOpportunities();
+          }, 1800);
+        };
+
         /* Sprint 12 — intro-band sadece Kesfet sekmesinde goster */
         var introBand = document.querySelector('.intro-band');
         function updateIntroBand(view) {
