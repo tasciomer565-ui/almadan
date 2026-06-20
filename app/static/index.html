@@ -95,15 +95,15 @@
                   <i data-lucide="clipboard"></i>
                 </button>
               </div>
-              <button class="primary-button" type="submit">
+              <button class="primary-button" type="submit" style="background:#287a50;color:#fff;border:none;min-height:52px;padding:0 22px;border-radius:10px;font-size:14px;font-weight:700;display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;transition:background .15s;" onmouseover="this.style.background='#1f6040'" onmouseout="this.style.background='#287a50'">
                 <i data-lucide="scan-search"></i> Fiyatları Karşılaştır
               </button>
-              <button type="button" id="mainBarcodeBtn" onclick="openMainBarcodeScanner()" class="barcode-outline-btn">
+              <button type="button" id="mainBarcodeBtn" onclick="openMainBarcodeScanner()" style="background:rgba(255,255,255,.08);color:#fff;border:1.5px solid rgba(255,255,255,.2);min-height:52px;padding:0 20px;border-radius:10px;font-size:14px;font-weight:600;font-family:var(--font);display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0;" onmouseover="this.style.background='rgba(255,255,255,.14)'" onmouseout="this.style.background='rgba(255,255,255,.08)'">
                 <i data-lucide="scan-barcode"></i> Barkod Tara
               </button>
             </div>
-            <button type="button" class="link-hint-btn" onclick="showLinkGuide()">
-              <i data-lucide="info"></i> Ürün linki nasıl kopyalanır?
+            <button type="button" onclick="showLinkGuide()" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:12px;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:0;margin-top:4px;transition:color .15s;" onmouseover="this.style.color='rgba(255,255,255,.85)'" onmouseout="this.style.color='rgba(255,255,255,.5)'">
+              <i data-lucide="info" style="width:13px;height:13px;"></i> Ürün linki nasıl kopyalanır?
             </button>
           </form>
 
@@ -417,15 +417,17 @@
           </div>
         </div>
 
-        <aside class="sponsor-strip">
-          <div>
-            <span class="sponsor-label">SPONSORLU</span>
-            <strong>Akıllı bütçe, daha iyi seçim.</strong>
-            <p>Burada kullanıcıyla ilgili, sade ve güvenli reklamlar gösterilebilir.</p>
+        <aside style="background:linear-gradient(135deg,#1a3d2a 0%,#0f2419 100%);border:1px solid rgba(40,122,80,.3);border-radius:14px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:8px;">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:40px;height:40px;background:rgba(40,122,80,.25);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i data-lucide="bell-ring" style="width:20px;height:20px;color:#4ade80;"></i>
+            </div>
+            <div>
+              <p style="margin:0 0 3px;font-size:13px;font-weight:700;color:#e8ede8;">BİM aktüel çıktı mı? Trendyol flaş indirimi mi?</p>
+              <p style="margin:0;font-size:12px;color:rgba(232,237,232,.55);">100+ mağazayı takibe al — kampanya başlar başlamaz bildirim al.</p>
+            </div>
           </div>
-          <button class="icon-button light" aria-label="Sponsorlu içeriği aç" title="İncele">
-            <i data-lucide="arrow-up-right"></i>
-          </button>
+          <button onclick="document.querySelector('[data-view=\'bulletins\']').click()" style="background:#287a50;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s;" onmouseover="this.style.background='#1f6040'" onmouseout="this.style.background='#287a50'">Mağazaları Takip Et →</button>
         </aside>
       </section>
 
