@@ -1,4 +1,4 @@
-const CACHE_VERSION = "almadan-v16-category-aware";
+const CACHE_VERSION = "almadan-v17";
 const APP_SHELL = [
   "/",
   "/index.html",

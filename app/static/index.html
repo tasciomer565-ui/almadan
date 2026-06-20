@@ -836,6 +836,19 @@
           if (!grid) return;
           grid.innerHTML = '<div style="grid-column:1/-1;padding:48px 24px;text-align:center;"><div style="font-size:40px;margin-bottom:12px;">🛒</div><p style="font-size:15px;font-weight:600;color:var(--ink);margin:0 0 6px;">Henüz takip edilen ürün yok</p><p style="font-size:13px;color:var(--ink-2);margin:0;">Üst kısımdan ürün linki yapıştır veya barkod tara — fiyatları karşılaştıralım.</p></div>';
         };
+
+        /* Sprint 12 — intro-band sadece Kesfet sekmesinde goster */
+        var introBand = document.querySelector('.intro-band');
+        function updateIntroBand(view) {
+          if (!introBand) return;
+          introBand.style.display = (view === 'discover') ? '' : 'none';
+        }
+        document.querySelectorAll('[data-view]').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            updateIntroBand(btn.dataset.view);
+          });
+        });
+        updateIntroBand('discover');
       });
     </script>
   </body>
