@@ -870,15 +870,26 @@
           });
           list.innerHTML=html;
         };
-        var _storeTimer = setInterval(function() {
-          var bv = document.getElementById('bulletinsView');
-          var list = document.getElementById('storeList');
-          if (!bv || !list) return;
-          var bvActive = !bv.classList.contains('hidden');
-          var needsFallback = bvActive && (!!list.querySelector('.loading-row') || list.innerHTML.includes('eklenmemiş') || list.innerHTML.includes('yüklenemedi'));
-          if (needsFallback) { clearInterval(_storeTimer); window._almadanShowStores(); }
-          if (!needsFallback && bvActive && list.querySelector('.store-card')) clearInterval(_storeTimer);
-        }, 500);
+        /* switchView'da bulletins eksik — click'te manuel duzelt */
+        var _bBtn = document.querySelector('[data-view="bulletins"]');
+        if (_bBtn) _bBtn.addEventListener('click', function() {
+          setTimeout(function() {
+            var bv = document.getElementById('bulletinsView');
+            if (!bv) return;
+            /* Eski app.js bulletinsView'i saklamıyor — manuel goster */
+            ['discoverView','trackingView','savingsView','cartView'].forEach(function(id){
+              var el=document.getElementById(id); if(el) el.classList.add('hidden');
+            });
+            bv.classList.remove('hidden');
+            /* 2s sonra hala loading var ise fallback goster */
+            setTimeout(function(){
+              var list=document.getElementById('storeList');
+              if(list && (list.querySelector('.loading-row')||list.innerHTML.includes('eklenmemiş')||list.innerHTML.includes('yüklenemedi'))){
+                window._almadanShowStores();
+              }
+            }, 2000);
+          }, 50);
+        });
 
         /* Sprint 12 — intro-band sadece Kesfet sekmesinde goster */
         var introBand = document.querySelector('.intro-band');
