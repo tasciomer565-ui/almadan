@@ -18,6 +18,23 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
     <link rel="stylesheet" href="/static/styles.css?v=20260619-sprint12">
+    <style>
+      /* Sprint 12 — eksik CSS degiskenleri (cache bypass) */
+      :root {
+        --border: #dfe3dc;
+        --ink-2: #687068;
+        --ink-light: #888;
+        --green-bg: rgba(40,122,80,.07);
+        --radius: 12px;
+        --font: "DM Sans", sans-serif;
+      }
+      html.dark-theme, body.dark-theme {
+        --border: #2e3240;
+        --ink-2: #848c96;
+        --ink-light: #6b7280;
+        --green-bg: rgba(142,215,170,.07);
+      }
+    </style>
   </head>
   <body>
     <header class="topbar">
