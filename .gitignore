@@ -10,3 +10,5 @@ test-output/
 last_parsed.html
 n11_test.html
 n11_typo.html
+
+.vercel

@@ -1,0 +1,4 @@
+
+[2026-06-18T16:38:00.593481+00:00] test_fuzzy_match_above_threshold FAILED
+Neden: API Yanıtı Eşleşmedi: Skor 0.47 (eşik: 0.6) | Barkod başlığı: 'Ülker Çikolatalı Gofret' | Market başlığı: 'Ülker Çikolata Gofret 45g'
+------------------------------------------------------------

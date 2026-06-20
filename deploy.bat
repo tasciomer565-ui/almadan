@@ -61,7 +61,13 @@ if errorlevel 1 goto :error
 
 echo.
 echo [2/3] Paket (Commit) olusturuluyor...
-git commit -m "Asistan Guncellemeleri"
+for /f "tokens=1-3 delims=/" %%a in ("%date%") do set "GUN=%%a.%%b.%%c"
+for /f "tokens=1-2 delims=:" %%a in ("%time%") do set "SAAT=%%a:%%b"
+for /f %%c in ('git diff --cached --name-only ^| find /c /v ""') do set "DOSYA_SAYISI=%%c"
+if "%DOSYA_SAYISI%"=="0" set "DOSYA_SAYISI=?"
+set "COMMIT_MSG=Guncelleme %GUN% %SAAT% - %DOSYA_SAYISI% dosya degisti"
+echo Commit mesaji: %COMMIT_MSG%
+git commit -m "%COMMIT_MSG%"
 if errorlevel 1 (
     git diff --cached --quiet
     if errorlevel 1 goto :error
