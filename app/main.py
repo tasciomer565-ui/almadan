@@ -4371,13 +4371,62 @@ async def follow_store(slug: str, request: Request, user=Depends(require_login))
     if not chk.ok or not chk.json():
         raise HTTPException(status_code=404, detail="Mağaza bulunamadı.")
 
+    user_email = getattr(request.state, "user_email", None)
     requests.post(
         f"{sb_url}/rest/v1/followed_stores",
         headers={**sb_hdrs, "Prefer": "resolution=merge-duplicates"},
-        json={"user_id": user["id"], "store_slug": slug},
+        json={"user_id": user["id"], "store_slug": slug, "email": user_email},
         timeout=10,
     )
     return {"followed": slug}
+
+
+# ── Bildirimler ──────────────────────────────────────────────────────────────
+
+@app.get("/api/notifications")
+async def list_notifications(request: Request, user=Depends(require_login)):
+    """Kullanıcının okunmamış + son 30 bildirimini döner."""
+    sb_url = supabase_base_url()
+    r = requests.get(
+        f"{sb_url}/rest/v1/user_notifications",
+        headers=supabase_headers(),
+        params={
+            "user_id": f"eq.{user['user_id']}",
+            "select": "id,store_slug,title,body,url,is_read,created_at",
+            "order": "created_at.desc",
+            "limit": "30",
+        },
+        timeout=10,
+    )
+    return {"notifications": r.json() if r.ok else []}
+
+
+@app.patch("/api/notifications/{notif_id}/read")
+async def mark_notification_read(notif_id: str, request: Request, user=Depends(require_login)):
+    """Bildirimi okundu olarak işaretle."""
+    sb_url = supabase_base_url()
+    requests.patch(
+        f"{sb_url}/rest/v1/user_notifications",
+        headers=supabase_headers(),
+        params={"id": f"eq.{notif_id}", "user_id": f"eq.{user['user_id']}"},
+        json={"is_read": True},
+        timeout=10,
+    )
+    return {"ok": True}
+
+
+@app.post("/api/notifications/read-all")
+async def mark_all_notifications_read(request: Request, user=Depends(require_login)):
+    """Tüm bildirimleri okundu işaretle."""
+    sb_url = supabase_base_url()
+    requests.patch(
+        f"{sb_url}/rest/v1/user_notifications",
+        headers=supabase_headers(),
+        params={"user_id": f"eq.{user['user_id']}", "is_read": "eq.false"},
+        json={"is_read": True},
+        timeout=10,
+    )
+    return {"ok": True}
 
 
 @app.delete("/api/stores/{slug}/follow")
@@ -4483,22 +4532,91 @@ async def cron_store_newsletters(request: Request):
         fr = requests.get(
             f"{sb_url}/rest/v1/followed_stores",
             headers=sb_hdrs,
-            params={"store_slug": f"eq.{slug}", "select": "user_id"},
+            params={"store_slug": f"eq.{slug}", "select": "user_id,email"},
             timeout=10,
         )
-        follower_count = len(fr.json() if fr.ok else [])
+        followers = fr.json() if fr.ok else []
+        follower_count = len(followers)
 
         latest = campaigns[0]
+        campaign_title = latest.get("title", "")
+        catalog_url    = latest.get("catalog_url", "")
+        valid_until    = latest.get("valid_until", "")
+
+        # 1) Admin/sistem bildirimi (Telegram/SMTP) — mevcut kanal
         result = await asyncio.to_thread(
             notify_store_update,
             store["name"],
-            campaign_title=latest.get("title", ""),
-            catalog_url=latest.get("catalog_url", ""),
-            valid_until=latest.get("valid_until", ""),
+            campaign_title=campaign_title,
+            catalog_url=catalog_url,
+            valid_until=valid_until,
             follower_count=follower_count,
         )
 
-        if any(result.values()):
+        notif_title = f"{store['name']} — Yeni Kampanya!"
+        notif_body  = campaign_title or f"{store['name']}'de yeni bir kampanya başladı."
+
+        # 2) Her takipçiye uygulama-içi bildirim + email
+        for follower in followers:
+            uid   = follower.get("user_id")
+            email = follower.get("email") or ""
+
+            # Uygulama-içi bildirim kaydı
+            if uid:
+                requests.post(
+                    f"{sb_url}/rest/v1/user_notifications",
+                    headers=sb_hdrs,
+                    json={
+                        "user_id":    uid,
+                        "store_slug": slug,
+                        "title":      notif_title,
+                        "body":       notif_body,
+                        "url":        catalog_url or "/",
+                        "is_read":    False,
+                    },
+                    timeout=10,
+                )
+
+            # Takipçi emaili varsa bireysel mail gönder
+            if email:
+                try:
+                    import os, smtplib
+                    from email.mime.multipart import MIMEMultipart
+                    from email.mime.text import MIMEText
+                    smtp_host = os.getenv("SMTP_HOST", "").strip()
+                    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+                    smtp_user = os.getenv("SMTP_USER", "").strip()
+                    smtp_pass = os.getenv("SMTP_PASS", "").strip()
+                    from_addr = os.getenv("SMTP_FROM", smtp_user).strip() or smtp_user
+                    if smtp_host and smtp_user:
+                        until_txt = f" (Son geçerlilik: {valid_until})" if valid_until else ""
+                        catalog_btn = f'<a href="{catalog_url}" style="display:inline-block;margin-top:16px;padding:10px 20px;background:#287a50;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;">Kampanyayı İncele →</a>' if catalog_url else ""
+                        html = f"""<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#287a50;margin:0 0 8px;">🏪 {store['name']} — Yeni Kampanya!</h2>
+  <p style="color:#444;margin:0 0 4px;">{notif_body}{until_txt}</p>
+  {catalog_btn}
+  <hr style="margin:24px 0;border:none;border-top:1px solid #eee;">
+  <p style="font-size:11px;color:#888;">Bu bildirim, <a href="https://www.almadan.app">Almadan</a>'dan {store['name']} mağazasını takip ettiğin için gönderildi.</p>
+</div>"""
+                        msg = MIMEMultipart("alternative")
+                        msg["Subject"] = f"[Almadan] {store['name']}'de yeni kampanya!"
+                        msg["From"]    = f"Almadan <{from_addr}>"
+                        msg["To"]      = email
+                        msg.attach(MIMEText(notif_body, "plain", "utf-8"))
+                        msg.attach(MIMEText(html, "html", "utf-8"))
+                        if smtp_port == 465:
+                            with smtplib.SMTP_SSL(smtp_host, 465, timeout=8) as srv:
+                                srv.login(smtp_user, smtp_pass)
+                                srv.sendmail(from_addr, email, msg.as_string())
+                        else:
+                            with smtplib.SMTP(smtp_host, smtp_port, timeout=8) as srv:
+                                srv.starttls()
+                                srv.login(smtp_user, smtp_pass)
+                                srv.sendmail(from_addr, email, msg.as_string())
+                except Exception as mail_err:
+                    logger.warning("Follower email gönderilemedi %s: %s", email, mail_err)
+
+        if follower_count > 0 or any(result.values()):
             ids = [c["id"] for c in campaigns]
             for cid in ids:
                 requests.patch(

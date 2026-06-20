@@ -1098,6 +1098,65 @@
           });
         });
         updateIntroBand('discover');
+
+        /* Bildirim paneline mağaza bildirimleri ekle */
+        var _notifBtn = document.getElementById('notificationButton');
+        if (_notifBtn) {
+          _notifBtn.addEventListener('click', function() {
+            var _dialogContent = document.getElementById('dialogContent');
+            if (!_dialogContent) return;
+            var _obs = new MutationObserver(function() {
+              if (!_dialogContent.querySelector('.eyebrow')) return;
+              if (_dialogContent.querySelector('[data-store-notifs]')) return;
+              _obs.disconnect();
+              /* Mağaza bildirimlerini çek ve ekle */
+              fetch('/api/notifications', { credentials: 'same-origin' })
+                .then(function(r){ return r.json(); })
+                .then(function(data){
+                  var notifs = data.notifications || [];
+                  var unread = notifs.filter(function(n){ return !n.is_read; });
+                  var section = document.createElement('div');
+                  section.setAttribute('data-store-notifs', '1');
+                  section.style.cssText = 'margin-top:20px;border-top:1px solid var(--border);padding-top:16px;';
+                  var html = '<p style="font-size:10px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;margin:0 0 10px;">MAĞAZA BİLDİRİMLERİ</p>';
+                  if (notifs.length === 0) {
+                    html += '<p style="font-size:13px;color:var(--ink-2);margin:0;">Henüz mağaza kampanya bildirimi yok. Bültenlere git ve mağaza takip et.</p>';
+                    html += '<button onclick="document.getElementById(\'productDialog\').close(); document.querySelector(\'[data-view=\\\'bulletins\\\']\').click();" style="margin-top:10px;padding:8px 16px;background:#287a50;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;">Mağaza Takip Et →</button>';
+                  } else {
+                    var toShow = notifs.slice(0, 8);
+                    toShow.forEach(function(n){
+                      var dot = n.is_read ? '' : '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#287a50;margin-right:6px;flex-shrink:0;margin-top:3px;"></span>';
+                      html += '<div style="display:flex;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);">'
+                        + dot
+                        + '<div><div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:2px;">'+n.title+'</div>'
+                        + '<div style="font-size:12px;color:var(--ink-2);">'+n.body+'</div>'
+                        + (n.url && n.url!=='/'?'<a href="'+n.url+'" target="_blank" style="font-size:11px;color:#287a50;text-decoration:none;">Kampanyayı İncele →</a>':'')
+                        + '</div></div>';
+                    });
+                    if (unread.length > 0) {
+                      fetch('/api/notifications/read-all', { method:'POST', credentials:'same-origin' });
+                    }
+                  }
+                  section.innerHTML = html;
+                  _dialogContent.querySelector('.dialog-body')?.appendChild(section);
+                  /* Bildirim dot güncelle */
+                  var dot = document.querySelector('.notification-dot');
+                  if (dot) dot.style.display = 'none';
+                }).catch(function(){});
+            });
+            _obs.observe(_dialogContent, { childList: true, subtree: false });
+          });
+        }
+
+        /* Sayfa yüklenince okunmamış bildirim varsa dot göster */
+        fetch('/api/notifications', { credentials: 'same-origin' })
+          .then(function(r){ return r.ok ? r.json() : null; })
+          .then(function(data){
+            if (!data) return;
+            var unread = (data.notifications||[]).filter(function(n){ return !n.is_read; });
+            var dot = document.querySelector('.notification-dot');
+            if (dot) dot.style.display = unread.length ? '' : 'none';
+          }).catch(function(){});
       });
     </script>
   </body>
