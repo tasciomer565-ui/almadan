@@ -34,6 +34,17 @@
         --ink-light: #6b7280;
         --green-bg: rgba(142,215,170,.07);
       }
+      /* store-grid/card — styles.css Vercel cache bypass */
+      .store-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; margin-top:4px; }
+      .store-card { border:1.5px solid var(--border); border-radius:var(--radius); padding:16px 14px; display:flex; flex-direction:column; gap:8px; background:var(--bg); transition:box-shadow .15s; }
+      .store-card:hover { box-shadow:0 2px 10px rgba(0,0,0,.07); }
+      .store-card.followed { border-color:var(--green); background:var(--green-bg); }
+      .store-card-header { display:flex; align-items:center; gap:10px; }
+      .store-emoji { font-size:22px; line-height:1; }
+      .store-name  { font-size:14px; font-weight:700; color:var(--ink); }
+      .store-note  { font-size:11px; color:var(--ink-2); }
+      .btn-follow  { padding:6px 14px; font-size:12px; font-weight:600; border:1.5px solid var(--green); border-radius:6px; background:var(--bg); color:var(--green); cursor:pointer; transition:all .15s; margin-top:auto; }
+      .btn-follow:hover,.btn-follow.active { background:var(--green); color:#fff; }
     </style>
   </head>
   <body>
