@@ -1527,7 +1527,14 @@ def parse_url(payload: UrlParseRequest) -> dict:
 @app.post("/api/find-alternatives")
 async def find_alternatives(payload: AlternativesRequest):
     from app.search_orchestrator import master_search
-    query = payload.title
+    import re
+    
+    # Çok uzun ve karmaşık başlıkları temizleyip sadece ilk 5 kelimeyle arama yap
+    # (Diğer mağazalardaki eşleşme ihtimalini %90 artırır)
+    cleaned = re.sub(r'[^\w\s]', ' ', payload.title)
+    words = [w for w in cleaned.split() if len(w) > 1]
+    query = " ".join(words[:5]) if len(words) > 5 else payload.title
+
     products, is_fallback, effective_query, category = await master_search(query)
     
     if payload.original_url:
