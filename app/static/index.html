@@ -17,7 +17,7 @@
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
-    <link rel="stylesheet" href="/static/styles.css?v=20260619-sprint12">
+    <link rel="stylesheet" href="/static/styles.css?v=20260620-url-fix">
     <style>
       /* Sprint 12 — eksik CSS degiskenleri (cache bypass) */
       :root {
@@ -840,7 +840,7 @@
       </div>
     </dialog>
 
-    <script defer src="/static/app.js?v=20260617-barcode"></script>
+    <script defer src="/static/app.js?v=20260620-url-fix"></script>
     <script>
       /* Sprint 12 — auth fix: DOMContentLoaded sonrasi state.auth guncelle */
       document.addEventListener('DOMContentLoaded', function() {
@@ -1015,7 +1015,7 @@
                 +'<div class="store-card-header">'+_storeLogo(s[1],s[2])
                 +'<div class="store-name">'+s[1]+'</div></div>'
                 +(s[3]?'<div class="store-note">'+s[3]+'</div>':'')
-                +'<button class="btn-follow" id="sfbtn-'+s[0]+'" onclick="toggleFollow(\''+s[0]+'\',\''+s[1]+'\')">+ Takibe Al</button></div>';
+                +'<button type="button" class="btn-follow" id="sfbtn-'+s[0]+'" onclick="toggleFollow(\''+s[0]+'\',\''+s[1]+'\')">+ Takibe Al</button></div>';
             });
             html+='</div>';
           });
@@ -1098,6 +1098,28 @@
           });
         });
         updateIntroBand('discover');
+
+        /* Takip edilen mağazaları yükle ve UI'yi güncelle */
+        function _loadFollowedStores() {
+          fetch('/api/stores/followed', { credentials: 'same-origin' })
+            .then(function(r){ return r.ok ? r.json() : null; })
+            .then(function(data){
+              if (!data || !data.followed) return;
+              data.followed.forEach(function(slug) {
+                window.storeFollowState = window.storeFollowState || {};
+                window.storeFollowState[slug] = true;
+                var btn  = document.getElementById('sfbtn-' + slug);
+                var card = document.getElementById('scard-' + slug);
+                if (btn)  { btn.textContent = '✓ Takip Ediliyor'; btn.classList.add('active'); }
+                if (card) { card.classList.add('followed'); }
+              });
+            }).catch(function(){});
+        }
+        /* Bültenler sekmesi açılınca takip durumunu yükle (mağazalar render olduktan sonra) */
+        var _bBtnFollow = document.querySelector('[data-view="bulletins"]');
+        if (_bBtnFollow) _bBtnFollow.addEventListener('click', function() {
+          setTimeout(_loadFollowedStores, 600);
+        });
 
         /* Bildirim paneline mağaza bildirimleri ekle */
         var _notifBtn = document.getElementById('notificationButton');

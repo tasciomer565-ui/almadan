@@ -27,7 +27,11 @@ from app.storage import supabase_base_url, supabase_headers, supabase_enabled
 logger = logging.getLogger(__name__)
 
 # ── Ortam değişkenleri ──────────────────────────────────────
-_CSRF_SECRET = os.getenv("CSRF_SECRET", secrets.token_hex(32))
+_CSRF_SECRET = (
+    os.getenv("CSRF_SECRET", "").strip()
+    or os.getenv("CRON_SECRET", "").strip()
+    or secrets.token_hex(32)
+)
 _ENV = os.getenv("VERCEL_ENV", "development")
 _IS_PROD = _ENV == "production"
 
@@ -95,7 +99,13 @@ def verify_csrf_token(token: str, session_id: str, max_age_seconds: int = 7200) 
     return hmac.compare_digest(expected, sig)
 
 
-CSRF_EXEMPT_PATHS = {"/api/auth/", "/api/barcode/", "/api/search", "/api/vton/"}
+CSRF_EXEMPT_PATHS = {
+    "/api/auth/",
+    "/api/barcode/",
+    "/api/search",
+    "/api/vton/",
+    "/cron/",
+}
 CSRF_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
@@ -109,10 +119,10 @@ async def csrf_middleware(request: Request, call_next):
     Muaf yollar: auth, barcode, search (GET-benzeri semantik POST'lar).
     """
     if request.method in CSRF_MUTATING_METHODS and not _csrf_exempt(request.url.path):
-        token = (
-            request.headers.get("x-csrf-token")
-            or request.cookies.get("csrf_token")
-        )
+        # Cookie'yi tek başına kabul etmek CSRF korumasını etkisizleştirir;
+        # tarayıcı cookie'yi saldırgan isteğine de otomatik ekler. İstemci aynı
+        # değeri açıkça header olarak göndermek zorunda (double-submit).
+        token = request.headers.get("x-csrf-token")
         session_id = request.cookies.get("almadan_device_id", "")
         if not verify_csrf_token(token or "", session_id):
             return JSONResponse(
@@ -195,7 +205,17 @@ class RequireRole:
                     "current_role": role,
                 },
             )
-        return {"user_id": getattr(request.state, "user_id", None), "role": role}
+        user_id = getattr(request.state, "user_id", None)
+        # Eski ve yeni endpoint'ler farklı anahtarlar bekliyordu. Tek dependency
+        # tüm çağrılara aynı kimliği sağlayarak None/KeyError kaynaklı veri
+        # karışmasını ve oturum açmış kullanıcının 401 almasını önler.
+        return {
+            "id": user_id,
+            "sub": user_id,
+            "user_id": user_id,
+            "email": getattr(request.state, "user_email", None),
+            "role": role,
+        }
 
 
 # Kısayollar

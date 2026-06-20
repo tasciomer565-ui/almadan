@@ -1,11 +1,15 @@
-:root {
+/* ALMADAN-CSS-V18-MARKER */ :root {
   --ink: #171a17;
+  --ink-2: #687068;
+  --ink-light: #888;
   --muted: #687068;
   --paper: #f7f8f5;
   --surface: #ffffff;
   --line: #dfe3dc;
+  --border: #dfe3dc;
   --green: #287a50;
   --green-dark: #1e5e3e;
+  --green-bg: rgba(40, 122, 80, 0.07);
   --lime: #d9ef57;
   --yellow: #f5c84c;
   --red: #c45243;
@@ -13,6 +17,8 @@
   --shadow: 0 16px 40px rgba(27, 35, 28, 0.09);
   --bg-app: var(--paper);
   --bg-card: var(--surface);
+  --radius: 12px;
+  --font: "DM Sans", sans-serif;
 }
 
 * {
@@ -1703,9 +1709,13 @@ body.dark-theme {
   --bg-app: #0d0e10;
   --bg-card: #181b20;
   --ink: #e2e4e9;
+  --ink-2: #848c96;
+  --ink-light: #6b7280;
   --muted: #848c96;
   --line: #262930;
+  --border: #2e3240;
   --green-dark: #8ed7aa;
+  --green-bg: rgba(142, 215, 170, 0.07);
   background-color: var(--bg);
   color: var(--ink);
 }
@@ -2718,3 +2728,391 @@ body.dark-theme .quantum-node-card {
   background: linear-gradient(90deg, transparent, #00ff66, transparent) !important;
   box-shadow: 0 0 15px #00ff66 !important;
 }
+
+
+/* Page guide banners */
+.page-guide {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(40, 122, 80, 0.08);
+  border: 1px solid rgba(40, 122, 80, 0.18);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  font-size: 13px;
+  color: var(--ink-light, #666);
+  line-height: 1.45;
+}
+.page-guide svg {
+  flex-shrink: 0;
+  color: var(--green, #287a50);
+  width: 18px;
+  height: 18px;
+}
+
+/* Onboarding modal */
+#onboardingModal::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+}
+.onboarding-dot {
+  transition: background 0.2s;
+}
+.onboarding-step {
+  animation: fadeInStep 0.2s ease;
+}
+@keyframes fadeInStep {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Mobil: Arama sonucu başlığı (Force-Refresh butonu) ─────────────────── */
+@media (max-width: 600px) {
+  /* Başlık + refresh butonu dikey dizilsin, kaymaya yol açmasın */
+  .search-result-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+  .search-result-header button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Stale banner: mobilde düğme tam genişliğe geçsin */
+  .stale-banner-inner {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+  .stale-banner-inner button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Ürün kartı: fiyat + trend göstergesi taşmasın */
+  .search-result-card {
+    flex-wrap: wrap;
+    gap: 8px !important;
+  }
+  .search-result-card > div:last-child {
+    min-width: 80px;
+  }
+
+  /* Onboarding modal tam genişlik */
+  #onboardingModal {
+    max-width: 94vw !important;
+    margin: auto !important;
+  }
+}
+
+/* ── "En Ucuz" kartı — yeşil vurgu ────────────────────────────────────────── */
+.cheapest-node-glow {
+  border-color: var(--green) !important;
+  background: rgba(40, 122, 80, 0.03) !important;
+}
+
+/* ── Fiyat trendi göstergesi ─────────────────────────────────────────────── */
+.price-trend-up   { color: #e53e3e; font-size: 10px; font-weight: 700; display: flex; align-items: center; gap: 2px; margin-top: 2px; }
+.price-trend-down { color: #38a169; font-size: 10px; font-weight: 700; display: flex; align-items: center; gap: 2px; margin-top: 2px; }
+.price-trend-flat { color: var(--muted); font-size: 10px; display: flex; align-items: center; gap: 2px; margin-top: 2px; }
+
+/* ── Hatırlatıcı Formu ───────────────────────────────────────────────────── */
+.reminder-toggle {
+  margin-top: 8px;
+  background: none; border: none; cursor: pointer;
+  font-size: 11px; color: var(--ink-2);
+  padding: 0; text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.reminder-toggle:hover { color: var(--green); }
+
+.reminder-form {
+  display: none;
+  margin-top: 10px; padding: 12px;
+  background: var(--bg-card); border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+}
+.reminder-form.open { display: block; }
+
+.reminder-row {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  align-items: flex-end; margin-bottom: 8px;
+}
+.reminder-field { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 110px; }
+.reminder-field label { font-size: 10px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: .4px; }
+.reminder-field input {
+  padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 12px; font-family: var(--font); outline: none;
+  background: var(--bg);
+}
+.reminder-field input:focus { border-color: var(--green); }
+
+.reminder-result {
+  margin-top: 6px; padding: 8px 10px;
+  background: var(--green-bg); border-radius: 6px;
+  font-size: 12px; color: var(--green); font-weight: 500;
+  display: none;
+}
+.reminder-result.show { display: block; }
+
+.btn-reminder-save {
+  padding: 6px 14px; font-size: 12px; font-weight: 600;
+  background: var(--green); color: #fff;
+  border: none; border-radius: 6px; cursor: pointer;
+  white-space: nowrap; transition: opacity .15s;
+}
+.btn-reminder-save:hover { opacity: .85; }
+.btn-reminder-save:disabled { opacity: .45; cursor: default; }
+
+/* ── Mağaza Bülten Kartları ──────────────────────────────────────────────── */
+.store-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+.store-card {
+  border: 1.5px solid var(--border); border-radius: var(--radius);
+  padding: 16px 14px;
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--bg); transition: box-shadow .15s;
+}
+.store-card.followed { border-color: var(--green); background: var(--green-bg); }
+.store-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.07); }
+
+.store-card-header { display: flex; align-items: center; gap: 10px; }
+.store-emoji { font-size: 22px; line-height: 1; }
+.store-name  { font-size: 14px; font-weight: 700; color: var(--ink); }
+.store-cat   { font-size: 10px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .4px; }
+.store-note  { font-size: 11px; color: var(--ink-2); }
+
+.btn-follow {
+  padding: 6px 14px; font-size: 12px; font-weight: 600;
+  border: 1.5px solid var(--green); border-radius: 6px;
+  background: var(--bg); color: var(--green);
+  cursor: pointer; transition: all .15s; margin-top: auto;
+}
+.btn-follow:hover   { background: var(--green); color: #fff; }
+.btn-follow.active  { background: var(--green); color: #fff; }
+.btn-follow.active:hover { background: #1f6040; }
+
+.store-section-title {
+  font-size: 12px; font-weight: 700; color: var(--ink-2);
+  text-transform: uppercase; letter-spacing: .5px;
+  margin: 20px 0 8px;
+}
+
+/* ── Takipçi Sayısı ─────────────────────────────────────────────────────── */
+.store-follower-count {
+  font-size: 11px; color: var(--ink-2); font-weight: 500;
+}
+.store-card.followed .store-follower-count { color: var(--green); }
+
+/* ── Rehber Popup'ları ──────────────────────────────────────────────────── */
+.guide-popup {
+  display: flex; align-items: flex-start; gap: 14px;
+  background: linear-gradient(135deg, var(--green-bg) 0%, var(--bg-card) 100%);
+  border: 1.5px solid var(--green);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 24px;
+  position: relative;
+  animation: guideSlideIn .3s cubic-bezier(.22,1,.36,1);
+}
+.guide-popup.hiding {
+  animation: guideSlideOut .22s ease-in forwards;
+}
+@keyframes guideSlideIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes guideSlideOut {
+  to { opacity: 0; transform: translateY(-8px); max-height: 0; padding: 0; margin: 0; overflow: hidden; }
+}
+.guide-icon {
+  font-size: 28px; line-height: 1; flex-shrink: 0; margin-top: 2px;
+}
+.guide-body { flex: 1; }
+.guide-title {
+  font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 4px;
+}
+.guide-steps {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.guide-steps li {
+  font-size: 12px; color: var(--ink-2); display: flex; align-items: center; gap: 6px;
+}
+.guide-steps li::before {
+  content: attr(data-step);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--green); color: #fff;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+}
+.guide-close {
+  position: absolute; top: 10px; right: 12px;
+  background: none; border: none; cursor: pointer;
+  font-size: 16px; color: var(--ink-2); line-height: 1;
+  padding: 2px 4px; border-radius: 4px;
+  transition: color .15s;
+}
+.guide-close:hover { color: var(--ink); }
+
+/* ── Link Kılavuzu Popup ─────────────────────────────────────────────────── */
+.inline-help-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--green); font-size: inherit; font-family: inherit;
+  text-decoration: underline dotted; text-underline-offset: 3px;
+  padding: 0; font-weight: 600;
+}
+.inline-help-btn:hover { opacity: .75; }
+
+.link-guide-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  backdrop-filter: blur(4px); z-index: 9000;
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn .18s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.link-guide-modal {
+  background: var(--bg-card); border: 1.5px solid var(--border);
+  border-radius: 16px; padding: 28px 28px 24px;
+  max-width: 440px; width: 92%; position: relative;
+  animation: popIn .22s cubic-bezier(.22,1,.36,1);
+  max-height: 90vh; overflow-y: auto;
+}
+@keyframes popIn { from { opacity:0; transform: scale(.93) translateY(10px); } to { opacity:1; transform: none; } }
+
+.link-guide-modal h3 { font-size: 16px; font-weight: 700; margin: 0 0 6px; }
+.link-guide-modal .subtitle { font-size: 12px; color: var(--ink-2); margin-bottom: 20px; }
+
+.link-guide-app {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.link-guide-app:last-child { border-bottom: none; }
+.link-guide-app-icon { font-size: 26px; flex-shrink: 0; width: 36px; text-align: center; }
+.link-guide-app-name { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 3px; }
+.link-guide-app-steps { font-size: 12px; color: var(--ink-2); line-height: 1.6; }
+.link-guide-app-steps b { color: var(--ink); }
+
+.link-guide-close {
+  position: absolute; top: 14px; right: 16px;
+  background: none; border: none; cursor: pointer;
+  font-size: 20px; color: var(--ink-2); line-height: 1;
+}
+.link-guide-close:hover { color: var(--ink); }
+
+.link-guide-tip {
+  margin-top: 16px; padding: 10px 14px;
+  background: var(--green-bg); border-radius: 8px;
+  font-size: 12px; color: var(--green); font-weight: 500;
+}
+
+/* ── Ana Arama Barkod Butonu & Scanner ──────────────────────────────────── */
+.barcode-search-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 20px; font-size: 14px; font-weight: 600;
+  background: var(--bg-card); color: var(--ink);
+  border: 1.5px solid var(--border); border-radius: var(--radius);
+  cursor: pointer; white-space: nowrap; transition: all .15s;
+  flex-shrink: 0;
+}
+.barcode-search-btn:hover { border-color: var(--green); color: var(--green); }
+.barcode-search-btn i { width: 18px; height: 18px; }
+
+.main-barcode-scan-area {
+  margin-top: 16px; padding: 16px;
+  background: var(--bg-card); border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  animation: guideSlideIn .25s cubic-bezier(.22,1,.36,1);
+}
+.main-barcode-scan-area.hidden { display: none; }
+.main-barcode-header {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; font-weight: 600; color: var(--ink);
+  margin-bottom: 12px;
+}
+
+/* ── Temiz Arama Kutusu ──────────────────────────────────────────────────── */
+.clean-search-box {
+  display: flex; align-items: center;
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 0 12px 0 16px;
+  transition: border-color .15s;
+  width: 100%;
+}
+.clean-search-box:focus-within { border-color: var(--green); }
+
+.clean-search-box input {
+  flex: 1; border: none; background: transparent;
+  font-size: 15px; font-family: var(--font); color: var(--ink);
+  padding: 14px 0; outline: none;
+}
+.clean-search-box input::placeholder { color: var(--ink-2); }
+
+.paste-btn-inline {
+  background: none; border: none; cursor: pointer;
+  color: var(--ink-2); padding: 6px; border-radius: 6px;
+  display: flex; align-items: center;
+  transition: color .15s;
+}
+.paste-btn-inline:hover { color: var(--green); }
+.paste-btn-inline i { width: 18px; height: 18px; }
+
+.clean-search-actions {
+  display: flex; gap: 10px; margin-top: 10px; width: 100%;
+}
+.clean-search-actions .primary-button {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 15px;
+}
+
+.barcode-btn-clean {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 20px; font-size: 14px; font-weight: 600;
+  background: var(--bg-card); color: var(--ink);
+  border: 2px solid var(--border); border-radius: 12px;
+  cursor: pointer; white-space: nowrap; transition: all .15s;
+  flex-shrink: 0;
+}
+.barcode-btn-clean:hover { border-color: var(--green); color: var(--green); }
+.barcode-btn-clean i { width: 18px; height: 18px; }
+
+.link-hint-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 10px; background: none; border: none;
+  color: var(--ink-2); font-size: 12px; font-family: var(--font);
+  cursor: pointer; padding: 0; transition: color .15s;
+}
+.link-hint-btn:hover { color: var(--green); }
+.link-hint-btn i { width: 13px; height: 13px; }
+
+/* ── Barkod Outline Butonu (arama alanı) ────────────────────────────────── */
+.barcode-outline-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 56px; padding: 0 20px;
+  font-size: 14px; font-weight: 700; font-family: var(--font);
+  color: var(--ink); background: var(--bg-card);
+  border: 1.5px solid var(--border); border-radius: 7px;
+  cursor: pointer; white-space: nowrap; transition: all .15s;
+  flex-shrink: 0;
+}
+.barcode-outline-btn:hover { border-color: var(--lime); color: var(--ink); }
+.barcode-outline-btn svg { width: 19px; height: 19px; }
+
+/* ── Link Hint Butonu ────────────────────────────────────────────────────── */
+.link-hint-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 12px; font-family: var(--font);
+  padding: 0; transition: color .15s; width: fit-content;
+}
+.link-hint-btn:hover { color: var(--green); }
+.link-hint-btn svg { width: 13px; height: 13px; }

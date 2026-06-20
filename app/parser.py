@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import ipaddress
 import re
+import socket
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, unquote, urlencode, urljoin, urlparse, urlsplit, urlunsplit
 
 import requests
 from bs4 import BeautifulSoup
@@ -15,6 +17,95 @@ USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/126.0 Safari/537.36"
 )
+
+TRACKING_QUERY_KEYS = {
+    "adjust_campaign",
+    "adjust_t",
+    "gads",
+    "savetranslate",
+    "utm_campaign",
+    "utm_content",
+    "utm_medium",
+    "utm_source",
+    "utm_term",
+}
+
+
+def normalize_product_url(url: str) -> str:
+    """Kopyalanmış/deep-link ürün adresini kararlı bir HTTPS adresine çevir."""
+    value = translate_deep_link(str(url or "").strip())
+    if not value:
+        return value
+    if "://" not in value and "." in value:
+        value = f"https://{value.lstrip('/')}"
+
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https"}:
+        return value
+
+    host = parsed.netloc.lower()
+    if host == "trendyol.com":
+        host = "www.trendyol.com"
+
+    query = [
+        (key, val)
+        for key, val in parse_qsl(parsed.query, keep_blank_values=False)
+        if key.casefold() not in TRACKING_QUERY_KEYS
+    ]
+    return urlunsplit(("https", host, parsed.path or "/", urlencode(query), ""))
+
+
+def product_fetch_url(url: str, source: str) -> str:
+    """Mağazanın sunucu bölgesine göre yanlış locale'e yönlenmesini engelle."""
+    if source != "trendyol":
+        return url
+    parsed = urlsplit(url)
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    query.update({"countryCode": "TR", "language": "tr", "storefrontId": "1"})
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urlencode(query), ""))
+
+
+def title_from_product_url(url: str) -> str | None:
+    """Mağaza HTML'i engellenirse ürün slug'ından güvenli başlık üret."""
+    path = unquote(urlsplit(url).path).strip("/")
+    if not path:
+        return None
+    slug = path.split("/")[-1]
+    slug = re.sub(r"-p-\d+(?:/.*)?$", "", slug, flags=re.IGNORECASE)
+    words = [word for word in slug.replace("_", "-").split("-") if word]
+    if len(words) < 2:
+        return None
+    return " ".join(words).title()
+
+
+def is_public_product_url(url: str) -> bool:
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    try:
+        addresses = socket.getaddrinfo(parsed.hostname, parsed.port or 443)
+    except (OSError, ValueError):
+        return False
+    return bool(addresses) and all(
+        ipaddress.ip_address(address[4][0]).is_global
+        for address in addresses
+    )
+
+
+def safe_product_get(url: str, **kwargs):
+    """SSRF ve redirect ile özel ağa geçişi engelleyerek sayfayı indir."""
+    current = url
+    for _ in range(5):
+        if not is_public_product_url(current):
+            raise requests.RequestException("Güvenli olmayan ürün adresi")
+        response = requests.get(current, allow_redirects=False, **kwargs)
+        if response.status_code not in {301, 302, 303, 307, 308}:
+            return response
+        location = response.headers.get("location")
+        if not location:
+            return response
+        current = urljoin(current, location)
+    raise requests.TooManyRedirects("Çok fazla yönlendirme")
 
 
 @dataclass
@@ -75,12 +166,10 @@ def resolve_short_url(url: str) -> str:
         }
         
         is_short = host in short_domains or any(host.endswith("." + d) for d in short_domains)
-        if is_short or (len(urlparse(url).path) < 15 and host not in {"www.trendyol.com", "www.hepsiburada.com", "www.amazon.com.tr", "www.n11.com"}):
+        if is_short:
             headers = {"User-Agent": USER_AGENT}
-            response = requests.head(url, headers=headers, allow_redirects=True, timeout=8)
-            if response.status_code >= 400 or response.url == url:
-                response = requests.get(url, headers=headers, allow_redirects=True, stream=True, timeout=8)
-            return response.url
+            response = safe_product_get(url, headers=headers, stream=True, timeout=8)
+            return response.url or url
     except Exception:
         pass
     return url
@@ -615,6 +704,21 @@ def extract_extra_info(title: str, source: str, soup: BeautifulSoup = None) -> d
     return info
 
 
+def is_generic_title(title_str: str | None) -> bool:
+    if not title_str:
+        return True
+    title_lower = title_str.lower()
+    blocked_words = {
+        "cloudflare", "just a moment", "attention required", "access denied", 
+        "access forbidden", "robot olmadığınızı", "güvenlik doğrulaması",
+        "hata", "error", "403 forbidden", "404 not found", "distil networks",
+        "yasak", "güvenlik önlemi", "geçici olarak engellendi"
+    }
+    if any(word in title_lower for word in blocked_words):
+        return True
+    return title_lower.strip() in {"trendyol", "hepsiburada", "amazon", "n11", "gratis", "rossmann"}
+
+
 def is_challenge_page(soup: BeautifulSoup) -> bool:
     text = soup.get_text(" ", strip=True).lower()
     signals = (
@@ -628,33 +732,41 @@ def is_challenge_page(soup: BeautifulSoup) -> bool:
 
 
 def parse_product_url(url: str) -> ParsedProduct:
-    url = translate_deep_link(url.strip())
-    url = resolve_short_url(url)
+    url = normalize_product_url(url)
+    url = normalize_product_url(resolve_short_url(url))
     
     warnings: list[str] = []
     source = detect_source(url)
 
     try:
-        response = requests.get(
-            url,
-            headers={"User-Agent": USER_AGENT, "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8"},
+        fetch_url = product_fetch_url(url, source)
+        response = safe_product_get(
+            fetch_url,
+            headers={
+                "User-Agent": USER_AGENT,
+                "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+                "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
+                "Cache-Control": "no-cache",
+                "Referer": "https://www.google.com/",
+            },
+            cookies={"countryCode": "TR", "language": "tr", "storefrontId": "1"},
             timeout=20,
         )
         response.raise_for_status()
-        try:
-            with open("last_parsed.html", "w", encoding="utf-8") as f:
-                f.write(response.text)
-        except Exception:
-            pass
     except requests.RequestException as e:
+        fallback_title = title_from_product_url(url)
         return ParsedProduct(
-            title=None,
+            title=fallback_title,
             price=None,
             image_url=None,
             source=source,
             canonical_url=url,
-            confidence=0,
-            warnings=[f"Sayfa alınamadı: {e}"],
+            confidence=30 if fallback_title else 0,
+            warnings=[
+                "Mağaza sayfasına şu anda ulaşılamadı. Ürün adı linkten çıkarıldı; fiyatı elle tamamlayabilirsin."
+                if fallback_title
+                else "Mağaza sayfasına şu anda ulaşılamadı. Bağlantıyı kontrol edip tekrar deneyebilirsin."
+            ],
             original_price=None,
             extra_info={},
         )
@@ -666,6 +778,9 @@ def parse_product_url(url: str) -> ParsedProduct:
     embedded_title, embedded_price, embedded_image = extract_from_embedded_json(soup)
 
     title = title or embedded_title or first_meta(soup, ["og:title", "twitter:title", "title"])
+    if is_generic_title(title):
+        title = None
+
     price = price or parse_price(
         first_meta(
             soup,
@@ -684,8 +799,15 @@ def parse_product_url(url: str) -> ParsedProduct:
         or first_meta(soup, ["og:image", "twitter:image", "image"])
     )
 
-    if not title and soup.title:
+    if is_generic_title(title) and soup.title:
         title = soup.title.get_text(" ", strip=True)
+        if is_generic_title(title):
+            title = None
+
+    if not title:
+        title = title_from_product_url(url)
+        if title:
+            warnings.append("Ürün adı bağlantı adresinden çıkarıldı.")
 
     # Orijinal üstü çizili fiyatı çek
     original_price = extract_original_price(soup, source)

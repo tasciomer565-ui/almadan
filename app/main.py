@@ -1,10 +1,11 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import asyncio
 import hashlib
 import hmac
 import ipaddress
 import os
+import re
 import socket
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timedelta, timezone
@@ -71,6 +72,27 @@ CRON_SECRET = os.getenv("CRON_SECRET", "")
 APP_URL = os.getenv("ALMADAN_APP_URL", "https://almadan.vercel.app").rstrip("/")
 PASSWORD_RESET_LIMIT = 2
 PASSWORD_RESET_WINDOW = timedelta(minutes=15)
+COOKIE_SECURE = bool(os.getenv("VERCEL")) or os.getenv("VERCEL_ENV") == "production"
+
+
+def cron_request_authorized(request: Request) -> bool:
+    """Vercel'in Bearer başlığıyla ve manuel X-Cron-Secret ile doğrula."""
+    if not CRON_SECRET:
+        return False
+    candidates = (
+        request.headers.get("authorization", "").removeprefix("Bearer ").strip(),
+        request.headers.get("x-cron-secret", "").strip(),
+        request.headers.get("x-vercel-cron-secret", "").strip(),
+    )
+    return any(
+        candidate and hmac.compare_digest(candidate, CRON_SECRET)
+        for candidate in candidates
+    )
+
+
+def require_cron_request(request: Request) -> None:
+    if not cron_request_authorized(request):
+        raise HTTPException(status_code=401, detail="Geçersiz cron anahtarı")
 
 
 async def automatic_refresh_loop() -> None:
@@ -150,6 +172,8 @@ async def ensure_device_id(request: Request, call_next):
     if not device_id or len(device_id) < 8:
         device_id = str(uuid4())
 
+    request.state.device_id = device_id
+
     if not request.headers.get("x-device-id"):
         request.scope["headers"].append(
             (b"x-device-id", device_id.encode("ascii"))
@@ -161,7 +185,7 @@ async def ensure_device_id(request: Request, call_next):
         value=device_id,
         max_age=60 * 60 * 24 * 365,
         httponly=True,
-        secure=True,
+        secure=COOKIE_SECURE,
         samesite="lax",
     )
     return response
@@ -210,13 +234,22 @@ async def security_headers_middleware(request: Request, call_next):
     apply_security_headers(response)
     # CSRF token'ı cookie olarak sun (JS okumaz, header'dan gönderir)
     if not request.cookies.get("csrf_token"):
-        device_id = request.cookies.get("almadan_device_id", "anonymous")
+        device_id = (
+            getattr(request.state, "device_id", None)
+            or request.headers.get("x-device-id")
+            or request.cookies.get("almadan_device_id", "anonymous")
+        )
         csrf = generate_csrf_token(device_id)
         response.set_cookie(
             "csrf_token", csrf,
-            max_age=7200, httponly=False, secure=True, samesite="strict"
+            max_age=7200, httponly=False, secure=COOKIE_SECURE, samesite="strict"
         )
     return response
+
+
+@app.middleware("http")
+async def csrf_protection_middleware(request: Request, call_next):
+    return await csrf_middleware(request, call_next)
 
 
 @app.exception_handler(StorageError)
@@ -685,7 +718,7 @@ def set_auth_cookies(response: Response, session: dict) -> None:
             access_token,
             max_age=expires_in,
             httponly=True,
-            secure=True,
+            secure=COOKIE_SECURE,
             samesite="lax",
         )
     if refresh_token:
@@ -694,7 +727,7 @@ def set_auth_cookies(response: Response, session: dict) -> None:
             refresh_token,
             max_age=60 * 60 * 24 * 30,
             httponly=True,
-            secure=True,
+            secure=COOKIE_SECURE,
             samesite="lax",
         )
 
@@ -1391,6 +1424,14 @@ def add_product(
             status_code=500,
             detail=f"Ürün veritabanına kaydedilemedi: {type(exc).__name__}: {exc}",
         ) from exc
+
+    _log_event(owner_id, "product_track", {
+        "title": payload.title,
+        "url": payload.url,
+        "price": payload.price,
+        "source": payload.source,
+        "email": getattr(request.state, "user_email", None) or "Anonymous"
+    })
     
     from app.comparator import update_product_comparison
     background_tasks.add_task(update_product_comparison, product["id"])
@@ -1416,11 +1457,17 @@ def search_products(
     if hasattr(request.state, "user_metadata") and request.state.user_metadata:
         user_gender = request.state.user_metadata.get("gender")
         
-    from app.comparator import apply_gender_to_query, search_products_by_name, generate_search_suggestion
+    from app.comparator import (
+        apply_gender_to_query,
+        generate_search_suggestion,
+        normalize_turkish_search_query,
+        search_products_by_name,
+    )
+    normalized_query = normalize_turkish_search_query(query)
     gendered_query = (
-        apply_gender_to_query(query, user_gender)
+        apply_gender_to_query(normalized_query, user_gender)
         if category == "fashion"
-        else query
+        else normalized_query
     )
     
     products = search_products_by_name(gendered_query, category=category, lat=lat, lon=lon, mode=mode)
@@ -1434,6 +1481,15 @@ def search_products(
 
     from app.cache import make_cache_key
     cache_key = make_cache_key(gendered_query, category)
+
+    uid = getattr(request.state, "user_id", None)
+    _log_event(uid, "url_search", {
+        "query": query,
+        "category": category,
+        "result_count": len(products),
+        "fallback": fallback_applied,
+        "email": getattr(request.state, "user_email", None) or "Anonymous"
+    })
 
     return {
         "products": products,
@@ -1514,6 +1570,14 @@ def add_product_from_url(
             status_code=500,
             detail=f"Ürün veritabanına kaydedilemedi: {type(exc).__name__}: {exc}",
         ) from exc
+
+    _log_event(owner_id, "product_track", {
+        "title": title,
+        "url": parsed.canonical_url,
+        "price": price,
+        "source": parsed.source,
+        "email": getattr(request.state, "user_email", None) or "Anonymous"
+    })
     
     from app.comparator import update_product_comparison
     background_tasks.add_task(update_product_comparison, product["id"])
@@ -1642,19 +1706,12 @@ def refresh_all(
     return refresh_owner_products(owner_id)
 
 
-@app.api_route("/cron/refresh-all", methods=["GET", "POST"])
+@app.get("/cron/refresh-all")
 def cron_refresh_all(
     request: Request,
     x_cron_secret: str | None = Header(default=None),
 ) -> dict:
-    authorization = request.headers.get("authorization", "")
-    valid_secret = (
-        x_cron_secret == CRON_SECRET
-        or authorization == f"Bearer {CRON_SECRET}"
-    )
-    if not CRON_SECRET or not valid_secret:
-        raise HTTPException(status_code=401, detail="Geçersiz cron anahtarı")
-
+    require_cron_request(request)
     return refresh_all_products()
 
 
@@ -1679,7 +1736,7 @@ async def catalog_scan(request: Request, payload: dict = None) -> dict:
         role = await _get_user_role(request)
         is_admin = role == "admin"
 
-    if not is_admin and CRON_SECRET and cron_secret != CRON_SECRET:
+    if not is_admin and not cron_request_authorized(request):
         raise HTTPException(403, "Yetkisiz erişim.")
 
     store_filter = (payload or {}).get("store") if payload else None
@@ -1748,16 +1805,13 @@ async def catalog_match(request: Request, payload: dict) -> dict:
     }
 
 
-@app.api_route("/cron/catalog-scan", methods=["GET", "POST"])
+@app.get("/cron/catalog-scan")
 async def cron_catalog_scan(request: Request) -> dict:
     """
     Vercel Cron: Pazartesi ve Perşembe haftalık katalog taraması.
     schedule: "0 6 * * 1,4"  (Pazartesi + Perşembe 06:00 UTC)
     """
-    cron_secret = request.headers.get("x-vercel-cron-secret", "") or \
-                  request.headers.get("x-cron-secret", "")
-    if CRON_SECRET and cron_secret != CRON_SECRET:
-        raise HTTPException(403, "Geçersiz cron secret.")
+    require_cron_request(request)
 
     from app.notification_orchestrator import catalog_automation
     result = await asyncio.to_thread(catalog_automation.run)
@@ -2772,13 +2826,17 @@ def create_receipt(
     raw_ocr_text = (payload.raw_ocr_text or "").strip()
     detected_category = categorize_receipt(raw_ocr_text)
     try:
-        items = [
-            {
-                **item.model_dump(exclude={"category"}),
-                "category": detected_category,
-            }
-            for item in payload.items
-        ]
+        items = []
+        for item in payload.items:
+            row = item.model_dump()
+            # Kullanıcının/OCR inceleme ekranının verdiği kategori korunur.
+            # Yalnızca "other" ise ürün adından veya fiş genelinden tahmin et.
+            if row.get("category") == "other":
+                row["category"] = category_mapping(
+                    str(row.get("title") or ""),
+                    detected_category,
+                )
+            items.append(row)
     except Exception:
         items = []
     try:
@@ -3174,12 +3232,10 @@ def admin_award_points(body: AwardPointsPayload, user=Depends(require_admin)):
 
 # ── Digest Cron & Manuel Tetikleyici ─────────────────────────
 
-@app.api_route("/cron/weekly-digest", methods=["GET", "POST"])
+@app.get("/cron/weekly-digest")
 async def cron_weekly_digest(request: Request):
     """Vercel Cron: Her Pazartesi 07:00 UTC."""
-    secret = request.headers.get("x-cron-secret") or request.query_params.get("secret")
-    if CRON_SECRET and secret != CRON_SECRET:
-        raise HTTPException(status_code=401, detail="Yetkisiz")
+    require_cron_request(request)
     from app.retention_service import retention_service
     result = await asyncio.to_thread(retention_service.run_weekly_digest)
     return {"ok": True, **result}
@@ -3420,12 +3476,10 @@ def check_price_guardrail(body: GuardrailCheckRequest, user=Depends(require_admi
 
 # ── Semantik İndeksleme Cron ──────────────────────────────────
 
-@app.api_route("/cron/semantic-index", methods=["GET", "POST"])
+@app.get("/cron/semantic-index")
 async def cron_semantic_index(request: Request):
     """Vercel Cron: Her gün 04:00 UTC — katalog → vektör DB."""
-    secret = request.headers.get("x-cron-secret") or request.query_params.get("secret")
-    if CRON_SECRET and secret != CRON_SECRET:
-        raise HTTPException(status_code=401, detail="Yetkisiz")
+    require_cron_request(request)
     from app.semantic_search import semantic_search as ss
     result = await asyncio.to_thread(ss.index_catalog_items)
     return {"ok": True, **result}
@@ -3747,7 +3801,7 @@ def get_eco_score(
 
 
 class BasketEcoPayload(BaseModel):
-    product_keys: list[str] = Field(..., max_items=50)
+    product_keys: list[str] = Field(..., max_length=50)
 
 
 @app.post("/api/eco-score/basket")
@@ -3762,12 +3816,10 @@ def basket_eco_score(body: BasketEcoPayload, user=Depends(require_login)):
 
 # ── Grup Alışveriş Expire Cron ────────────────────────────────
 
-@app.api_route("/cron/group-buy-expire", methods=["GET", "POST"])
+@app.get("/cron/group-buy-expire")
 async def cron_group_buy_expire(request: Request):
     """Vercel Cron: Her saat — süresi dolan grupları kapatır."""
-    secret = request.headers.get("x-cron-secret") or request.query_params.get("secret")
-    if CRON_SECRET and secret != CRON_SECRET:
-        raise HTTPException(status_code=401, detail="Yetkisiz")
+    require_cron_request(request)
     from app.group_buy import group_buy_engine
     count = await asyncio.to_thread(group_buy_engine.expire_old_groups)
     return {"ok": True, "expired_count": count}
@@ -3874,11 +3926,9 @@ async def health_check():
 
 # -- Cron: Metrik Temizleme --
 
-@app.api_route("/cron/cleanup-metrics", methods=["GET", "POST"])
+@app.get("/cron/cleanup-metrics")
 async def cron_cleanup_metrics(request: Request):
-    secret = request.headers.get("x-cron-secret") or request.query_params.get("secret")
-    if CRON_SECRET and secret != CRON_SECRET:
-        raise HTTPException(status_code=401, detail="Yetkisiz")
+    require_cron_request(request)
     import requests as _req_c
     _sb_url = os.getenv("SUPABASE_URL", "").rstrip("/")
     _sb_key = "".join(os.getenv("SUPABASE_SERVICE_KEY", "").split())
@@ -4251,6 +4301,7 @@ async def cron_check_reminders(request: Request):
     Vercel Cron: Her gün sabah 08:00'de çalışır.
     Hatırlatıcı tarihi gelen ürünler için bildirim gönderir.
     """
+    require_cron_request(request)
     from datetime import date
     from app.notifier import notify_restock_reminder
 
@@ -4302,6 +4353,19 @@ _WEEKDAY_MAP = {
     "friday": 4, "saturday": 5, "sunday": 6,
 }
 
+DEFAULT_STORE_NEWSLETTERS = [
+    {"slug": "bim", "name": "BİM", "category": "market", "publication_note": "Her Cuma yeni kampanya"},
+    {"slug": "a101", "name": "A101", "category": "market", "publication_note": "Her Perşembe indirimler"},
+    {"slug": "sok", "name": "ŞOK", "category": "market", "publication_note": "Her Çarşamba fırsatlar"},
+    {"slug": "migros", "name": "Migros", "category": "market", "publication_note": "Haftalık kampanyalar"},
+    {"slug": "carrefour", "name": "CarrefourSA", "category": "market", "publication_note": "Haftalık kampanyalar"},
+    {"slug": "karaca", "name": "Karaca", "category": "home", "publication_note": "Sezon kampanyaları"},
+    {"slug": "gratis", "name": "Gratis", "category": "beauty", "publication_note": "Kampanya dönemlerinde"},
+    {"slug": "hepsiburada", "name": "Hepsiburada", "category": "fashion", "publication_note": "Büyük indirim günlerinde"},
+    {"slug": "trendyol", "name": "Trendyol", "category": "fashion", "publication_note": "Flaş indirimler"},
+    {"slug": "lcwaikiki", "name": "LC Waikiki", "category": "fashion", "publication_note": "Sezon geçişlerinde"},
+]
+
 
 @app.get("/api/stores")
 async def list_stores(request: Request):
@@ -4309,22 +4373,30 @@ async def list_stores(request: Request):
     Tüm aktif mağazaları döndürür.
     Giriş yapan kullanıcı için hangileri takip edildiğini de işaretler.
     """
-    sb_url = supabase_base_url()
-    sb_hdrs = supabase_headers()
-
-    r = requests.get(
-        f"{sb_url}/rest/v1/store_newsletters",
-        headers=sb_hdrs,
-        params={"active": "eq.true", "select": "*", "order": "name.asc"},
-        timeout=10,
-    )
-    stores = r.json() if r.ok else []
+    stores = [dict(store) for store in DEFAULT_STORE_NEWSLETTERS]
+    sb_url = ""
+    sb_hdrs: dict[str, str] = {}
+    if supabase_enabled():
+        try:
+            sb_url = supabase_base_url()
+            sb_hdrs = supabase_headers()
+            r = requests.get(
+                f"{sb_url}/rest/v1/store_newsletters",
+                headers=sb_hdrs,
+                params={"active": "eq.true", "select": "*", "order": "name.asc"},
+                timeout=10,
+            )
+            rows = r.json() if r.ok else []
+            if rows:
+                stores = rows
+        except Exception:
+            pass
 
     # Oturum varsa takip listesini çek
     followed_slugs: set[str] = set()
     try:
         user_id = getattr(request.state, "user_id", None)
-        if user_id:
+        if user_id and sb_url:
             fr = requests.get(
                 f"{sb_url}/rest/v1/followed_stores",
                 headers=sb_hdrs,
@@ -4337,6 +4409,8 @@ async def list_stores(request: Request):
 
     # Takipçi sayılarını çek
     try:
+        if not sb_url:
+            raise RuntimeError("Supabase devre dışı")
         cr = requests.get(
             f"{sb_url}/rest/v1/followed_stores",
             headers=sb_hdrs,
@@ -4357,27 +4431,97 @@ async def list_stores(request: Request):
     return {"stores": stores}
 
 
+@app.get("/api/stores/followed")
+async def get_followed_stores(request: Request, user=Depends(require_login)):
+    """Kullanıcının takip ettiği mağaza slug listesini döner."""
+    r = requests.get(
+        f"{supabase_base_url()}/rest/v1/followed_stores",
+        headers=supabase_headers(),
+        params={"user_id": f"eq.{user['user_id']}", "select": "store_slug"},
+        timeout=10,
+    )
+    slugs = [row["store_slug"] for row in (r.json() if r.ok else [])]
+    return {"followed": slugs}
+
+
+def _log_event(user_id: str | None, event_type: str, payload: dict, session_id: str | None = None):
+    """Kullanıcı davranış eventi Supabase'e kaydet (hata sessizce yutulur)."""
+    # 1. Supabase'e kaydet
+    try:
+        requests.post(
+            f"{supabase_base_url()}/rest/v1/user_events",
+            headers=supabase_headers(),
+            json={"user_id": user_id, "session_id": session_id, "event_type": event_type, "payload": payload},
+            timeout=5,
+        )
+    except Exception:
+        pass
+
+    # 2. Yerel JSONL log dosyasına kaydet
+    try:
+        from pathlib import Path
+        import json
+        from datetime import datetime, timezone
+        
+        data_dir = Path(__file__).resolve().parent.parent / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        log_file = data_dir / "user_activity_logs.jsonl"
+        
+        email = payload.get("email") or "Anonymous"
+        
+        log_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "user_id": user_id or "Anonymous",
+            "email": email,
+            "event_type": event_type,
+            "payload": payload,
+            "session_id": session_id
+        }
+        
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+            
+        # 3. Google Drive Webhook tanımlıysa arka planda gönder
+        webhook_url = os.getenv("GOOGLE_DRIVE_WEBHOOK_URL", "").strip()
+        if webhook_url:
+            import threading
+            
+            def _send_webhook():
+                try:
+                    requests.post(webhook_url, json=log_entry, timeout=5)
+                except Exception:
+                    pass
+            
+            threading.Thread(target=_send_webhook, daemon=True).start()
+    except Exception:
+        pass
+
+
+def validated_store_slug(slug: str) -> str:
+    value = str(slug or "").strip().lower()
+    if not re.fullmatch(r"[a-z0-9-]{1,80}", value):
+        raise HTTPException(status_code=400, detail="Geçersiz mağaza.")
+    return value
+
+
 @app.post("/api/stores/{slug}/follow")
 async def follow_store(slug: str, request: Request, user=Depends(require_login)):
     """Mağazayı takip et (idempotent — zaten takip ediliyorsa sessiz döner)."""
-    sb_url = supabase_base_url()
-    sb_hdrs = supabase_headers()
-    chk = requests.get(
-        f"{sb_url}/rest/v1/store_newsletters",
-        headers=sb_hdrs,
-        params={"slug": f"eq.{slug}", "active": "eq.true", "select": "slug"},
-        timeout=10,
-    )
-    if not chk.ok or not chk.json():
-        raise HTTPException(status_code=404, detail="Mağaza bulunamadı.")
-
+    slug = validated_store_slug(slug)
     user_email = getattr(request.state, "user_email", None)
-    requests.post(
-        f"{sb_url}/rest/v1/followed_stores",
-        headers={**sb_hdrs, "Prefer": "resolution=merge-duplicates"},
-        json={"user_id": user["id"], "store_slug": slug, "email": user_email},
-        timeout=10,
-    )
+    uid = user["user_id"]
+    try:
+        response = requests.post(
+            f"{supabase_base_url()}/rest/v1/followed_stores",
+            headers={**supabase_headers(), "Prefer": "resolution=merge-duplicates"},
+            params={"on_conflict": "user_id,store_slug"},
+            json={"user_id": uid, "store_slug": slug, "email": user_email},
+            timeout=10,
+        )
+        response.raise_for_status()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Mağaza takibi şu anda kaydedilemedi.") from exc
+    _log_event(uid, "store_follow", {"store_slug": slug, "action": "follow", "email": user_email})
     return {"followed": slug}
 
 
@@ -4432,12 +4576,20 @@ async def mark_all_notifications_read(request: Request, user=Depends(require_log
 @app.delete("/api/stores/{slug}/follow")
 async def unfollow_store(slug: str, request: Request, user=Depends(require_login)):
     """Mağaza takibini bırak."""
-    requests.delete(
-        f"{supabase_base_url()}/rest/v1/followed_stores",
-        headers=supabase_headers(),
-        params={"user_id": f"eq.{user['id']}", "store_slug": f"eq.{slug}"},
-        timeout=10,
-    )
+    slug = validated_store_slug(slug)
+    uid = user["user_id"]
+    try:
+        response = requests.delete(
+            f"{supabase_base_url()}/rest/v1/followed_stores",
+            headers=supabase_headers(),
+            params={"user_id": f"eq.{uid}", "store_slug": f"eq.{slug}"},
+            timeout=10,
+        )
+        response.raise_for_status()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Mağaza takibi şu anda güncellenemedi.") from exc
+    user_email = getattr(request.state, "user_email", None)
+    _log_event(uid, "store_follow", {"store_slug": slug, "action": "unfollow", "email": user_email})
     return {"unfollowed": slug}
 
 
@@ -4495,6 +4647,7 @@ async def cron_store_newsletters(request: Request):
       3. Takipçi sayısını hesapla, notify_store_update() çağır.
       4. Kampanyayı notified=True yap.
     """
+    require_cron_request(request)
     from datetime import date
     from app.notifier import notify_store_update
 

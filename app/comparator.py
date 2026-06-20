@@ -357,6 +357,34 @@ def apply_gender_to_query(query: str, user_gender: str | None) -> str:
             return query
     return f"{user_gender} {query}"
 
+
+def normalize_turkish_search_query(query: str) -> str:
+    """Sık yazılan ASCII Türkçe ürün kelimelerini arama biçimine getir."""
+    replacements = {
+        "sut": "süt",
+        "sampuan": "şampuan",
+        "camasir": "çamaşır",
+        "bulasik": "bulaşık",
+        "yogurt": "yoğurt",
+        "peynir": "peynir",
+        "pirinc": "pirinç",
+        "seker": "şeker",
+        "cay": "çay",
+        "kahvaltilik": "kahvaltılık",
+        "kulaklik": "kulaklık",
+        "ayakkabi": "ayakkabı",
+        "gomlek": "gömlek",
+    }
+    normalized = str(query or "").strip()
+    for plain, turkish in replacements.items():
+        normalized = re.sub(
+            rf"(?<!\w){re.escape(plain)}(?!\w)",
+            turkish,
+            normalized,
+            flags=re.IGNORECASE,
+        )
+    return normalized
+
 def detect_brand_in_query(query: str) -> str | None:
     query_lower = query.lower()
     brands = [
@@ -702,6 +730,12 @@ def generate_search_suggestion(query: str) -> str | None:
         return None
         
     synonyms = {
+        "sut": "süt",
+        "sampuan": "şampuan",
+        "yogurt": "yoğurt",
+        "pirinc": "pirinç",
+        "seker": "şeker",
+        "cay": "çay",
         "ipone": "iphone",
         "iphne": "iphone",
         "ipon": "iphone",

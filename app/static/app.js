@@ -575,15 +575,29 @@ function bindEvents() {
   }
 }
 
+function requestHeaders(extra = {}, method = "GET") {
+  const csrfToken = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith("csrf_token="))
+    ?.split("=")
+    .slice(1)
+    .join("=");
+  return {
+    "Content-Type": "application/json",
+    "X-Device-ID": state.deviceId,
+    ...(["POST", "PUT", "PATCH", "DELETE"].includes(String(method).toUpperCase()) && csrfToken
+      ? { "X-CSRF-Token": decodeURIComponent(csrfToken) }
+      : {}),
+    ...extra,
+  };
+}
+
 async function api(path, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
   const response = await fetch(path, {
     ...options,
     credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Device-ID": state.deviceId,
-      ...(options.headers || {}),
-    },
+    headers: requestHeaders(options.headers || {}, method),
   });
 
   const contentType = response.headers.get("content-type") || "";
@@ -1785,7 +1799,11 @@ async function showAdminDashboard() {
     `;
     lucide.createIcons();
   } catch (err) {
-    document.getElementById("adminStatsBody").innerHTML = `<p style="color:var(--muted);">İstatistikler yüklenemedi: ${err.message}</p>`;
+    const statsBody = document.getElementById("adminStatsBody");
+    if (statsBody) {
+      statsBody.textContent = `İstatistikler yüklenemedi: ${err.message}`;
+      statsBody.style.color = "var(--muted)";
+    }
   }
 }
 
@@ -1842,7 +1860,7 @@ function showSearchResults(response) {
       suggestionHtml = `
         <p style="margin-top: 16px; font-size: 15px; color: var(--ink);">
           Bunu mu demek istediniz: 
-          <a href="#" style="color: var(--green); font-weight: 700; text-decoration: underline;" onclick="event.preventDefault(); triggerSuggestionSearch('${escapeHtml(suggestion)}');">
+          <a href="#" style="color: var(--green); font-weight: 700; text-decoration: underline;" onclick="event.preventDefault(); triggerSuggestionSearch(${inlineJsArg(suggestion)});">
             ${escapeHtml(suggestion)}
           </a>
         </p>
@@ -1881,7 +1899,7 @@ function showSearchResults(response) {
             </div>
           </div>
           <button class="secondary-button" style="white-space: nowrap; font-size: 12px; padding: 7px 14px; height: auto; flex-shrink: 0; display: inline-flex; align-items: center;"
-            onclick="forceRefreshSearch('${escapeHtml(originalQuery)}', '${escapeHtml(cacheKey)}')">
+            onclick="forceRefreshSearch(${inlineJsArg(originalQuery)}, ${inlineJsArg(cacheKey)})">
             <i data-lucide="refresh-cw" style="width: 13px; height: 13px; margin-right: 5px;"></i>Tazele
           </button>
         </div>
@@ -1911,7 +1929,7 @@ function showSearchResults(response) {
       <div class="search-refinement-chips" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; background: rgba(40, 122, 80, 0.05); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(40, 122, 80, 0.15);">
         <span style="font-size: 11px; font-weight: 700; color: var(--green); margin-right: 4px;">EBAT HIZLI FİLTRE:</span>
         ${chips.map(sz => `
-          <button type="button" class="secondary-button" style="padding: 4px 10px; border-radius: 12px; font-size: 10px; font-weight: 700; height: auto;" onclick="event.preventDefault(); triggerSuggestionSearch('${escapeHtml(matchingKey)} ${escapeHtml(sz)}');">
+          <button type="button" class="secondary-button" style="padding: 4px 10px; border-radius: 12px; font-size: 10px; font-weight: 700; height: auto;" onclick="event.preventDefault(); triggerSuggestionSearch(${inlineJsArg(`${matchingKey} ${sz}`)});">
             ${escapeHtml(sz)}
           </button>
         `).join("")}
@@ -1989,7 +2007,7 @@ function showSearchResults(response) {
           <h2 style="margin: 0;">En Mantıklı Seçenekler</h2>
         </div>
         <button class="secondary-button" id="forceRefreshBtn" style="font-size: 12px; padding: 6px 14px; height: auto; flex-shrink: 0; white-space: nowrap; display: inline-flex; align-items: center;"
-          onclick="forceRefreshSearch('${escapeHtml(originalQuery)}', '${escapeHtml(cacheKey)}')">
+          onclick="forceRefreshSearch(${inlineJsArg(originalQuery)}, ${inlineJsArg(cacheKey)})">
           <i data-lucide="refresh-cw" style="width: 13px; height: 13px; margin-right: 5px;"></i>Fiyatı Güncelle
         </button>
       </div>
@@ -2629,7 +2647,7 @@ function openProduct(id) {
               <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
                 <strong style="color: ${isCheapest ? "var(--green-dark)" : "var(--ink)"}; font-size: 13px;">${currency.format(item.price)}</strong>
                 ${isCheapest ? `<span style="${badgeStyle}">EN UCUZ</span>` : ""}
-                <a href="${escapeHtml(item.url)}" target="_blank" style="color: var(--muted); display: inline-grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 4px; background: white;" title="Mağazaya git">
+          <a href="${escapeHtml(safeHttpUrl(item.url))}" target="_blank" rel="noopener noreferrer" style="color: var(--muted); display: inline-grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 4px; background: white;" title="Mağazaya git">
                   <i data-lucide="external-link" style="width: 14px; height: 14px; color: var(--ink);"></i>
                 </a>
               </div>
@@ -2716,7 +2734,7 @@ function openProduct(id) {
           <i data-lucide="trash-2"></i>
           Takipten çıkar
         </button>
-        <button class="primary-button" onclick="window.open('${escapeHtml(product.url)}', '_blank')">
+        <button class="primary-button" onclick="window.open(${inlineJsArg(safeHttpUrl(product.url))}, '_blank', 'noopener,noreferrer')">
           <i data-lucide="external-link"></i>
           Mağazaya git
         </button>
@@ -3178,7 +3196,22 @@ function escapeHtml(value) {
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function inlineJsArg(value) {
+  // JSON'in çift tırnaklı JS stringini HTML attribute bağlamında kaçırır.
+  return escapeHtml(JSON.stringify(String(value ?? "")));
+}
+
+function safeHttpUrl(value) {
+  try {
+    const url = new URL(String(value || ""), window.location.origin);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "#";
+  } catch {
+    return "#";
+  }
 }
 
 function getOrCreateDeviceId() {
@@ -3607,7 +3640,7 @@ function showBarcodeCategoryMismatch(productTitle, searchQuery, suggestedCategor
       <div style="display: flex; gap: 10px;">
         <button class="secondary-button" style="flex: 1;" onclick="closeDialog()">Kapat</button>
         <button class="primary-button" style="flex: 2; display: flex; align-items: center; justify-content: center; gap: 6px;"
-          onclick="closeDialog(); triggerCategorySearch('${escapeHtml(searchQuery)}', '${suggestedCategory}')">
+          onclick="closeDialog(); triggerCategorySearch(${inlineJsArg(searchQuery)}, ${inlineJsArg(suggestedCategory)})">
           <i data-lucide="search" style="width: 14px; height: 14px;"></i>
           ${catInfo.label}nda Ara
         </button>
@@ -3676,7 +3709,7 @@ function showBarcodeManualEntry(barcode, errorMsg) {
 
       <div style="display: flex; gap: 10px; margin-top: 16px;">
         <button class="secondary-button" style="flex: 1;" onclick="closeDialog()">İptal</button>
-        <button class="primary-button" style="flex: 2;" onclick="submitManualBarcodeEntry('${escapeHtml(barcode)}')">
+        <button class="primary-button" style="flex: 2;" onclick="submitManualBarcodeEntry(${inlineJsArg(barcode)})">
           <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 4px;"></i>Sepete Ekle
         </button>
       </div>
@@ -4260,9 +4293,8 @@ window.detectPoseAndFitGarment = async function(photoBase64) {
   try {
     const response = await fetch("/api/detect-pose", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      credentials: "same-origin",
+      headers: requestHeaders({}, "POST"),
       body: JSON.stringify({ image_base64: photoBase64 })
     });
     if (!response.ok) throw new Error("API response error");
@@ -6014,7 +6046,8 @@ async function runAiSkinScan(type, base64Data = null) {
       showToast("[AI STATUS: Yüz/cilt analizi yapılıyor...]");
       const response = await fetch("/api/analyze-skin", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        headers: requestHeaders({}, "POST"),
         body: JSON.stringify({ image_base64: base64Data })
       });
       if (!response.ok) throw new Error("Skin analysis API failed");
@@ -6107,7 +6140,8 @@ async function askAiColorSuitability() {
     const toneTag = document.getElementById("aiSkinToneTag")?.textContent || "Sıcak (Warm)";
     const response = await fetch("/api/analyze-cosmetic-color", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      headers: requestHeaders({}, "POST"),
       body: JSON.stringify({
         skin_type: currentSkinType,
         undertone: toneTag,
@@ -6241,7 +6275,7 @@ function showSizeSelectorDialog(itemName) {
     
     <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;">
       ${sizes.map(sz => `
-        <button type="button" class="secondary-button" style="padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; height: auto;" onclick="addGenericCartItemWithSize('${escapeHtml(itemName)}', '${escapeHtml(sz)}')">
+        <button type="button" class="secondary-button" style="padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; height: auto;" onclick="addGenericCartItemWithSize(${inlineJsArg(itemName)}, ${inlineJsArg(sz)})">
           ${escapeHtml(sz)}
         </button>
       `).join("")}
@@ -6251,12 +6285,12 @@ function showSizeSelectorDialog(itemName) {
       <label style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--muted);">Özel Ebat Girin:</label>
       <div style="display: flex; gap: 8px;">
         <input type="text" id="customSizeInput" placeholder="Örn: 1.5 L, 800 gr, 250 ml" style="flex: 1; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px;">
-        <button type="button" class="primary-button" style="width: auto; height: auto; padding: 8px 16px;" onclick="addGenericCartItemWithCustomSize('${escapeHtml(itemName)}')">Ekle</button>
+        <button type="button" class="primary-button" style="width: auto; height: auto; padding: 8px 16px;" onclick="addGenericCartItemWithCustomSize(${inlineJsArg(itemName)})">Ekle</button>
       </div>
     </div>
     
     <div style="display: flex; gap: 8px;">
-      <button type="button" class="text-button" style="flex: 1; text-align: center; color: var(--muted);" onclick="addGenericCartItemWithoutSize('${escapeHtml(itemName)}')">
+      <button type="button" class="text-button" style="flex: 1; text-align: center; color: var(--muted);" onclick="addGenericCartItemWithoutSize(${inlineJsArg(itemName)})">
         Belirtmeden Ekle
       </button>
       <button type="button" class="text-button" style="flex: 1; text-align: center; color: var(--red);" onclick="closeSizeSelectorDialog()">
@@ -6768,9 +6802,8 @@ async function saveReminder(itemId) {
   saveBtn.disabled = true; saveBtn.textContent = "Kaydediliyor…";
 
   try {
-    const res = await fetch("/api/reminders", {
+    await api("/api/reminders", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         product_url:        item?.url || "",
         product_title:      item?.title || String(itemId),
@@ -6779,8 +6812,6 @@ async function saveReminder(itemId) {
         remind_before_days: Number(beforeInput.value || 5),
       }),
     });
-    if (res.status === 401) { toast("Hatırlatıcı için giriş yapman gerekiyor."); return; }
-    if (!res.ok) throw new Error(await res.text());
     toast("Hatırlatıcı kaydedildi ✓");
     form.classList.remove("open");
     saveBtn.textContent = "✓ Kaydedildi";
@@ -6864,7 +6895,7 @@ function renderStoreCard(s) {
       </div>
       ${s.publication_note ? `<div class="store-note">📅 ${escapeHtml(s.publication_note)}</div>` : ""}
       <div class="store-follower-count" id="scount-${s.slug}">${countTxt}</div>
-      <button class="btn-follow ${followed ? "active" : ""}" onclick="toggleFollow('${s.slug}', '${escapeHtml(s.name)}')" id="sfbtn-${s.slug}">
+      <button class="btn-follow ${followed ? "active" : ""}" onclick="toggleFollow(${inlineJsArg(s.slug)}, ${inlineJsArg(s.name)})" id="sfbtn-${escapeHtml(s.slug)}">
         ${followed ? "✓ Takip Ediliyor" : "+ Takibe Al"}
       </button>
     </div>`;
@@ -6888,26 +6919,23 @@ async function toggleFollow(slug, name) {
   }
 
   try {
-    const res = await fetch(`/api/stores/${slug}/follow`, { method: isFollowed ? "DELETE" : "POST" });
-    if (res.status === 401) {
-      toast("Takip için giriş yapman gerekiyor.");
-      // Geri al
-      storeFollowState[slug] = isFollowed;
-      storeFollowerCounts[slug] = Math.max(0, (storeFollowerCounts[slug] || 0) + (isFollowed ? 1 : -1));
-      btn.textContent = isFollowed ? "✓ Takip Ediliyor" : "+ Takibe Al";
-      btn.classList.toggle("active", isFollowed);
-      card.classList.toggle("followed", isFollowed);
-      if (countEl) {
-        const c = storeFollowerCounts[slug];
-        countEl.textContent = c > 0 ? `👥 ${c} kişi takipte` : "İlk takipçi ol!";
-      }
-      return;
-    }
+    await api(`/api/stores/${encodeURIComponent(slug)}/follow`, {
+      method: isFollowed ? "DELETE" : "POST",
+    });
     toast(isFollowed ? `${name} takipten çıkarıldı.` : `${name} takibe alındı ✓`);
     // Takip değişince bültenleri yeniden yükle (liste güncellensin)
     if (!isFollowed) loadStores();
-  } catch {
-    toast("Bağlantı hatası, tekrar dene.");
+  } catch (error) {
+    storeFollowState[slug] = isFollowed;
+    storeFollowerCounts[slug] = Math.max(0, (storeFollowerCounts[slug] || 0) + (isFollowed ? 1 : -1));
+    btn.textContent = isFollowed ? "✓ Takip Ediliyor" : "+ Takibe Al";
+    btn.classList.toggle("active", isFollowed);
+    card.classList.toggle("followed", isFollowed);
+    if (countEl) {
+      const c = storeFollowerCounts[slug];
+      countEl.textContent = c > 0 ? `👥 ${c} kişi takipte` : "İlk takipçi ol!";
+    }
+    toast(error?.message || "Bağlantı hatası, tekrar dene.");
   }
 }
 

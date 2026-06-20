@@ -278,6 +278,14 @@ function bindEvents() {
     button.addEventListener("click", () => switchView(button.dataset.view));
   });
 
+  // Onboarding modal — backdrop tıklamasında kapat
+  const onboardingModal = document.getElementById("onboardingModal");
+  if (onboardingModal) {
+    onboardingModal.addEventListener("click", (e) => {
+      if (e.target === onboardingModal) closeOnboarding();
+    });
+  }
+
   document.getElementById("urlForm").addEventListener("submit", parseProduct);
   document.getElementById("pasteButton").addEventListener("click", pasteUrl);
   document.getElementById("refreshButton").addEventListener("click", refreshAllPrices);
@@ -567,15 +575,29 @@ function bindEvents() {
   }
 }
 
+function requestHeaders(extra = {}, method = "GET") {
+  const csrfToken = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith("csrf_token="))
+    ?.split("=")
+    .slice(1)
+    .join("=");
+  return {
+    "Content-Type": "application/json",
+    "X-Device-ID": state.deviceId,
+    ...(["POST", "PUT", "PATCH", "DELETE"].includes(String(method).toUpperCase()) && csrfToken
+      ? { "X-CSRF-Token": decodeURIComponent(csrfToken) }
+      : {}),
+    ...extra,
+  };
+}
+
 async function api(path, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
   const response = await fetch(path, {
     ...options,
     credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Device-ID": state.deviceId,
-      ...(options.headers || {}),
-    },
+    headers: requestHeaders(options.headers || {}, method),
   });
 
   const contentType = response.headers.get("content-type") || "";
@@ -589,6 +611,59 @@ async function api(path, options = {}) {
   return data;
 }
 
+// ── Onboarding ─────────────────────────────────────────────────────────────
+let _onboardingStep = 0;
+const _ONBOARDING_KEY = "almadan_onboarded_v1";
+
+function showOnboarding() {
+  if (localStorage.getItem(_ONBOARDING_KEY)) return;
+  const modal = document.getElementById("onboardingModal");
+  if (!modal) return;
+  if (!modal.open) modal.showModal();
+  lucide.createIcons();
+}
+
+function closeOnboarding() {
+  const modal = document.getElementById("onboardingModal");
+  if (modal && modal.open) modal.close();
+  localStorage.setItem(_ONBOARDING_KEY, "1");
+}
+
+function goOnboardingStep(step) {
+  const steps = document.querySelectorAll(".onboarding-step");
+  const dots = document.querySelectorAll(".onboarding-dot");
+  const prevBtn = document.getElementById("onboardingPrev");
+  const nextBtn = document.getElementById("onboardingNext");
+  if (!steps.length) return;
+
+  steps.forEach((s) => (s.style.display = "none"));
+  dots.forEach((d) => (d.style.background = "var(--line, #ddd)"));
+
+  const target = steps[step];
+  if (target) target.style.display = "block";
+  const dot = dots[step];
+  if (dot) dot.style.background = "#287a50";
+
+  _onboardingStep = step;
+  if (prevBtn) prevBtn.disabled = step === 0;
+  if (nextBtn) {
+    if (step === steps.length - 1) {
+      nextBtn.textContent = "Başlayalım!";
+      nextBtn.onclick = closeOnboarding;
+    } else {
+      nextBtn.textContent = "İleri →";
+      nextBtn.onclick = () => onboardingNav(1);
+    }
+  }
+}
+
+function onboardingNav(dir) {
+  const steps = document.querySelectorAll(".onboarding-step");
+  const next = Math.max(0, Math.min(steps.length - 1, _onboardingStep + dir));
+  goOnboardingStep(next);
+}
+// ───────────────────────────────────────────────────────────────────────────
+
 async function loadSession() {
   try {
     state.auth = await api("/auth/session");
@@ -597,6 +672,7 @@ async function loadSession() {
   }
   renderAccountButton();
   handleCategoryChange();
+  setTimeout(showOnboarding, 800);
 }
 
 function renderAccountButton() {
@@ -748,17 +824,26 @@ function resetSmsFlow() {
   }
 }
 
+function normalizePhoneNumber(raw) {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("90") && digits.length === 12) return "+" + digits;
+  if (digits.startsWith("0") && digits.length === 11) return "+9" + digits;
+  if (digits.length === 10) return "+90" + digits;
+  return "+" + digits;
+}
+
 async function sendSmsCode() {
-  const phone = document.getElementById("authSmsPhone")?.value.trim();
-  if (!phone || phone.length < 10) {
+  const rawPhone = document.getElementById("authSmsPhone")?.value.trim();
+  if (!rawPhone || rawPhone.replace(/\D/g, "").length < 10) {
     showAuthError("Lütfen geçerli bir telefon numarası girin.");
     return;
   }
-  
+  const phone = normalizePhoneNumber(rawPhone);
+
   try {
     const errorBox = document.getElementById("authError");
     if (errorBox) errorBox.hidden = true;
-    
+
     await api("/auth/otp/send", {
       method: "POST",
       body: JSON.stringify({ phone }),
@@ -776,18 +861,19 @@ async function sendSmsCode() {
 }
 
 async function verifySmsCode() {
-  const phone = document.getElementById("authSmsPhone")?.value.trim();
+  const rawPhone = document.getElementById("authSmsPhone")?.value.trim();
   const code = document.getElementById("authSmsCode")?.value.trim();
-  
-  if (!phone || !code || code.length !== 6) {
+
+  if (!rawPhone || !code || code.length !== 6) {
     showAuthError("Lütfen 6 haneli doğrulama kodunu girin.");
     return;
   }
-  
+  const phone = normalizePhoneNumber(rawPhone);
+
   try {
     const errorBox = document.getElementById("authError");
     if (errorBox) errorBox.hidden = true;
-    
+
     const result = await api("/auth/otp/verify", {
       method: "POST",
       body: JSON.stringify({ phone, code }),
@@ -1174,63 +1260,12 @@ async function loadProducts(signal = null) {
 function renderFallbackOpportunities() {
   const grid = document.getElementById("dealGrid");
   if (!grid) return;
-  
-  // Fütüristik simulated yerel/çevrimdışı fırsat ürünleri
-  const fallbackProducts = [
-    {
-      id: "fallback-1",
-      title: "Nutella 750g (Lokal Fırsat)",
-      source: "Migros",
-      price: 119.90,
-      original_price: 159.90,
-      deal_score: 85,
-      image_url: "",
-      discount_analysis: { discount_percent: 25 }
-    },
-    {
-      id: "fallback-2",
-      title: "İpana Diş Macunu 75ml",
-      source: "Gratis",
-      price: 59.90,
-      original_price: 99.90,
-      deal_score: 90,
-      image_url: "",
-      discount_analysis: { discount_percent: 40 }
-    },
-    {
-      id: "fallback-3",
-      title: "Sütaş Kaşar Peyniri 700g",
-      source: "CarrefourSA",
-      price: 189.90,
-      original_price: 239.90,
-      deal_score: 80,
-      image_url: "",
-      discount_analysis: { discount_percent: 20 }
-    }
-  ];
-  
-  state.products = fallbackProducts;
-  renderAll();
-  
-  // Arayüze fütüristik uyarı banner'ı ekleme
-  const banner = document.createElement("div");
-  banner.className = "fallback-alert-banner";
-  banner.style.gridColumn = "1 / -1";
-  banner.style.padding = "12px 16px";
-  banner.style.borderRadius = "8px";
-  banner.style.background = "rgba(16, 185, 129, 0.08)";
-  banner.style.border = "1px solid rgba(16, 185, 129, 0.3)";
-  banner.style.color = "var(--green)";
-  banner.style.fontSize = "12px";
-  banner.style.fontWeight = "700";
-  banner.style.display = "flex";
-  banner.style.alignItems = "center";
-  banner.style.gap = "8px";
-  banner.style.boxShadow = "0 0 10px rgba(16, 185, 129, 0.1)";
-  
-  banner.innerHTML = `<i data-lucide="shield-alert" style="width:16px; height:16px;"></i> MOBİL OPTİMİZASYON AKTİF: Çevrimdışı/Yerel fırsatlar listeleniyor.`;
-  grid.prepend(banner);
-  if (window.lucide) lucide.createIcons();
+  grid.innerHTML = `
+    <div style="grid-column:1/-1;padding:48px 24px;text-align:center;">
+      <div style="font-size:40px;margin-bottom:12px;">🛒</div>
+      <p style="font-size:15px;font-weight:600;color:var(--ink);margin:0 0 6px;">Henüz takip edilen ürün yok</p>
+      <p style="font-size:13px;color:var(--ink-2);margin:0;">Üst kısımdan ürün linki yapıştır veya barkod tara — fiyatları karşılaştıralım.</p>
+    </div>`;
 }
 
 function renderAll() {
@@ -1635,27 +1670,21 @@ async function parseProduct(event) {
             body: JSON.stringify({ url: val }),
             signal: null
           });
+          // Link parse edilemediyse rehber popup aç
+          if (!parsed.title && !parsed.price) {
+            if (overlay) overlay.style.display = "none";
+            submit.disabled = false;
+            submit.innerHTML = `<span>Kontrol et</span>`;
+            showLinkGuide(true);
+            return;
+          }
           showParsedProduct(parsed);
         } else {
-          const category = document.getElementById("searchCategorySelector")?.value || "general";
-          const globalCheckbox = document.getElementById("globalModeCheckbox");
-          const isGlobalActive = globalCheckbox ? globalCheckbox.checked : false;
-          
-          let searchMode = "hybrid";
-          if (isGlobalActive) {
-            searchMode = "global";
-          }
-          
-          let searchUrl = "/api/search?query=" + encodeURIComponent(val)
-            + "&category=" + encodeURIComponent(category)
-            + "&mode=" + encodeURIComponent(searchMode);
-            
-          if (state.userCoords && searchMode !== "global") {
-            searchUrl += "&lat=" + state.userCoords.lat + "&lon=" + state.userCoords.lng;
-          }
-          
-          const results = await api(searchUrl, { signal: null });
-          showSearchResults(results);
+          // URL değil — rehber popup göster
+          if (overlay) overlay.style.display = "none";
+          submit.disabled = false;
+          submit.innerHTML = `<span>Kontrol et</span>`;
+          showLinkGuide(true);
         }
       } catch (error) {
         console.error("parseProduct hatası:", error);
@@ -1672,38 +1701,9 @@ async function parseProduct(event) {
           await new Promise(resolve => setTimeout(resolve, 1500));
           
           // 3. Lokal rezonans fallback sonuçlarını oluştur
-          const localResults = {
-            products: [
-              {
-                title: val + " (Lokal Rezonans)",
-                source: "Gratis (Lokal Spektrum)",
-                price: 189.90,
-                original_price: 240.00,
-                labels: ["En Ucuz", "Lokal Fallback"],
-                extra_info: { out_of_stock: false }
-              },
-              {
-                title: val + " (Alternatif Enerji)",
-                source: "Rossmann (Lokal Spektrum)",
-                price: 199.90,
-                original_price: 220.00,
-                labels: ["Lokal Fallback"],
-                extra_info: { out_of_stock: false }
-              }
-            ],
-            query: val,
-            fallback_applied: true
-          };
-          showSearchResults(localResults);
-          
-          // Arayüzü eski haline temizle
-          overlay.classList.remove("recovery-mode");
-          if (header) {
-            header.classList.remove("glitch-active");
-            header.innerText = "KUANTUM SPEKTRUMU TARANIYOR";
-          }
+          showSearchResults({ products: [], query: val });
         } else {
-          showToast("Kuantum veri darboğazı. Yerel analiz başlatılıyor...");
+          showToast("Bağlantı hatası. Lütfen tekrar deneyin.");
         }
       } finally {
         clearTimeout(t1);
@@ -1715,6 +1715,135 @@ async function parseProduct(event) {
       }
     }, 0);
   });
+}
+
+// ── Admin Dashboard ─────────────────────────────────────────────────────────
+async function showAdminDashboard() {
+  const dialog = document.getElementById("productDialog");
+  const content = document.getElementById("dialogContent");
+  if (!dialog || !content) return;
+
+  content.innerHTML = `<div class="dialog-body" style="max-width: 560px;"><p class="eyebrow" style="color:var(--green);">YÖNETİCİ PANELİ</p><h2>Sistem İstatistikleri</h2><div id="adminStatsBody" style="margin-top:16px;"><span class="spinner"></span> Yükleniyor...</div></div>`;
+  if (!dialog.open) dialog.showModal();
+  lucide.createIcons();
+
+  try {
+    const stats = await api("/api/admin/stats?days=7");
+    const { counts = {}, cache_hit_rate_pct = 0, total_searches = 0, avg_duration_ms = {}, daily = {} } = stats;
+
+    const rows = [
+      ["Cache Hit",      counts.cache_hit      || 0, "#38a169"],
+      ["Cache Miss",     counts.cache_miss      || 0, "#e53e3e"],
+      ["Proxy Kullanım", counts.proxy_used      || 0, "#3182ce"],
+      ["Stale Fallback", counts.stale_fallback  || 0, "#d69e2e"],
+    ];
+
+    const barMax = Math.max(...rows.map(r => r[1]), 1);
+
+    const dailyKeys = Object.keys(daily).sort();
+    const dailyHtml = dailyKeys.map(day => {
+      const d = daily[day] || {};
+      const total = Object.values(d).reduce((a, b) => a + b, 0);
+      return `<tr>
+        <td style="padding:6px 8px; font-size:12px; color:var(--ink-light);">${day.slice(5)}</td>
+        <td style="padding:6px 8px; font-size:12px; text-align:right;">${total}</td>
+        <td style="padding:6px 8px; font-size:12px; text-align:right; color:#38a169;">${d.cache_hit || 0}</td>
+        <td style="padding:6px 8px; font-size:12px; text-align:right; color:#3182ce;">${d.proxy_used || 0}</td>
+      </tr>`;
+    }).join("");
+
+    document.getElementById("adminStatsBody").innerHTML = `
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
+        <div style="background:rgba(40,122,80,0.07); border-radius:10px; padding:14px; text-align:center;">
+          <div style="font-size:28px; font-weight:800; color:#287a50;">${cache_hit_rate_pct}%</div>
+          <div style="font-size:11px; color:var(--ink-light); margin-top:4px;">Cache Hit Oranı</div>
+        </div>
+        <div style="background:rgba(40,122,80,0.07); border-radius:10px; padding:14px; text-align:center;">
+          <div style="font-size:28px; font-weight:800; color:#287a50;">${total_searches}</div>
+          <div style="font-size:11px; color:var(--ink-light); margin-top:4px;">Toplam Arama (7 gün)</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        ${rows.map(([label, count, color]) => `
+          <div style="margin-bottom:8px;">
+            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;">
+              <span style="font-weight:600;">${label}</span>
+              <span style="color:var(--ink-light);">${count}</span>
+            </div>
+            <div style="height:6px; background:var(--line); border-radius:3px; overflow:hidden;">
+              <div style="height:100%; width:${Math.round(count / barMax * 100)}%; background:${color}; border-radius:3px; transition:width 0.5s;"></div>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+
+      ${dailyHtml ? `
+        <p style="font-size:11px; font-weight:700; color:var(--ink-light); text-transform:uppercase; margin-bottom:8px;">Günlük Dağılım</p>
+        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--line);">
+              <th style="padding:4px 8px; text-align:left; color:var(--ink-light);">Tarih</th>
+              <th style="padding:4px 8px; text-align:right; color:var(--ink-light);">Toplam</th>
+              <th style="padding:4px 8px; text-align:right; color:#38a169;">Hit</th>
+              <th style="padding:4px 8px; text-align:right; color:#3182ce;">Proxy</th>
+            </tr>
+          </thead>
+          <tbody>${dailyHtml}</tbody>
+        </table>
+      ` : ""}
+
+      <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--line);">
+        <p style="font-size:11px; color:var(--ink-light);">Ortalama Yanıt: Cache Hit ${avg_duration_ms.cache_hit || "—"}ms | Miss ${avg_duration_ms.cache_miss || "—"}ms</p>
+      </div>
+    `;
+    lucide.createIcons();
+  } catch (err) {
+    const statsBody = document.getElementById("adminStatsBody");
+    if (statsBody) {
+      statsBody.textContent = `İstatistikler yüklenemedi: ${err.message}`;
+      statsBody.style.color = "var(--muted)";
+    }
+  }
+}
+
+// URL'de ?admin=1 varsa admin paneline giden kısayol tuşu
+if (new URLSearchParams(window.location.search).get("admin") === "1") {
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "F2") showAdminDashboard();
+  });
+}
+// ───────────────────────────────────────────────────────────────────────────
+
+async function forceRefreshSearch(query, cacheKey) {
+  const btn = document.getElementById("forceRefreshBtn");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner" style="width:13px;height:13px;border-width:2px;"></span> Güncelleniyor...`;
+  }
+  try {
+    // 1. Cache'i sil
+    if (cacheKey) {
+      await api(`/api/cache?query=${encodeURIComponent(query)}`, { method: "DELETE" });
+    }
+    // 2. Taze arama yap
+    const category = document.getElementById("searchCategorySelector")?.value || "general";
+    const mode = document.getElementById("globalModeCheckbox")?.checked ? "global" : "hybrid";
+    let searchUrl = `/api/search?query=${encodeURIComponent(query)}&category=${encodeURIComponent(category)}&mode=${encodeURIComponent(mode)}`;
+    if (state.userCoords && mode !== "global") {
+      searchUrl += `&lat=${state.userCoords.lat}&lon=${state.userCoords.lng}`;
+    }
+    const results = await api(searchUrl, { signal: null });
+    showSearchResults(results);
+    showToast("Fiyatlar güncellendi.");
+  } catch (err) {
+    showToast("Güncelleme başarısız, mevcut sonuçlar gösteriliyor.");
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<i data-lucide="refresh-cw" style="width:13px;height:13px;margin-right:4px;"></i>Fiyatı Güncelle`;
+      lucide.createIcons();
+    }
+  }
 }
 
 function showSearchResults(response) {
@@ -1731,7 +1860,7 @@ function showSearchResults(response) {
       suggestionHtml = `
         <p style="margin-top: 16px; font-size: 15px; color: var(--ink);">
           Bunu mu demek istediniz: 
-          <a href="#" style="color: var(--green); font-weight: 700; text-decoration: underline;" onclick="event.preventDefault(); triggerSuggestionSearch('${escapeHtml(suggestion)}');">
+          <a href="#" style="color: var(--green); font-weight: 700; text-decoration: underline;" onclick="event.preventDefault(); triggerSuggestionSearch(${inlineJsArg(suggestion)});">
             ${escapeHtml(suggestion)}
           </a>
         </p>
@@ -1752,7 +1881,31 @@ function showSearchResults(response) {
   }
 
   const isFallback = response.fallback_applied;
-  const fallbackNoticeHtml = isFallback
+  const isStale = response.is_stale || products.some((p) => p.stale_cache);
+  const staleAge = response.stale_age || (products.find((p) => p.stale_age) || {}).stale_age || "birkaç saat";
+  const cacheKey = response.cache_key || "";
+
+  const fallbackNoticeHtml = isStale
+    ? `
+      <div class="assistant-info-box" style="border-left: 3px solid #e6a817; background: rgba(230,168,23,0.07); margin-bottom: 16px; padding: 12px 14px;">
+        <div class="stale-banner-inner" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 0;">
+            <div style="color: #b8860b; font-weight: 700; display: flex; align-items: center; gap: 6px; font-size: 13px;">
+              <i data-lucide="clock" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+              ${staleAge} önceki fiyatlar
+            </div>
+            <div style="color: var(--ink); font-size: 12px; margin-top: 3px; line-height: 1.4;">
+              Mağaza sunucularına ulaşılamadı. Fiyatlar güncellenmemiş olabilir.
+            </div>
+          </div>
+          <button class="secondary-button" style="white-space: nowrap; font-size: 12px; padding: 7px 14px; height: auto; flex-shrink: 0; display: inline-flex; align-items: center;"
+            onclick="forceRefreshSearch(${inlineJsArg(originalQuery)}, ${inlineJsArg(cacheKey)})">
+            <i data-lucide="refresh-cw" style="width: 13px; height: 13px; margin-right: 5px;"></i>Tazele
+          </button>
+        </div>
+      </div>
+    `
+    : isFallback
     ? `
       <div class="assistant-info-box" style="border-left: 3px solid var(--red); background: rgba(248, 215, 211, 0.1); margin-bottom: 16px;">
         <div class="assistant-info-title" style="color: #d9383a; font-weight: 700;">
@@ -1776,7 +1929,7 @@ function showSearchResults(response) {
       <div class="search-refinement-chips" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; background: rgba(40, 122, 80, 0.05); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(40, 122, 80, 0.15);">
         <span style="font-size: 11px; font-weight: 700; color: var(--green); margin-right: 4px;">EBAT HIZLI FİLTRE:</span>
         ${chips.map(sz => `
-          <button type="button" class="secondary-button" style="padding: 4px 10px; border-radius: 12px; font-size: 10px; font-weight: 700; height: auto;" onclick="event.preventDefault(); triggerSuggestionSearch('${escapeHtml(matchingKey)} ${escapeHtml(sz)}');">
+          <button type="button" class="secondary-button" style="padding: 4px 10px; border-radius: 12px; font-size: 10px; font-weight: 700; height: auto;" onclick="event.preventDefault(); triggerSuggestionSearch(${inlineJsArg(`${matchingKey} ${sz}`)});">
             ${escapeHtml(sz)}
           </button>
         `).join("")}
@@ -1833,6 +1986,9 @@ function showSearchResults(response) {
   const validPrices = products.filter(p => !p.extra_info?.out_of_stock).map(p => p.price);
   const cheapestPrice = validPrices.length > 0 ? Math.min(...validPrices) : -1;
 
+  window._lastSearchQuery = originalQuery;
+  window._lastSearchCacheKey = cacheKey;
+
   content.innerHTML = `
     <style>
       .search-result-card {
@@ -1845,8 +2001,16 @@ function showSearchResults(response) {
       }
     </style>
     <div class="dialog-body" style="max-width: 600px; width: 100%;">
-      <p class="eyebrow" style="color: var(--green); font-weight: 700;">ARAMA SONUÇLARI</p>
-      <h2 style="margin-bottom: 16px;">En Mantıklı Seçenekler</h2>
+      <div class="search-result-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px;">
+        <div>
+          <p class="eyebrow" style="color: var(--green); font-weight: 700; margin-bottom: 4px;">ARAMA SONUÇLARI</p>
+          <h2 style="margin: 0;">En Mantıklı Seçenekler</h2>
+        </div>
+        <button class="secondary-button" id="forceRefreshBtn" style="font-size: 12px; padding: 6px 14px; height: auto; flex-shrink: 0; white-space: nowrap; display: inline-flex; align-items: center;"
+          onclick="forceRefreshSearch(${inlineJsArg(originalQuery)}, ${inlineJsArg(cacheKey)})">
+          <i data-lucide="refresh-cw" style="width: 13px; height: 13px; margin-right: 5px;"></i>Fiyatı Güncelle
+        </button>
+      </div>
       ${sizeChipsHtml}
       ${fallbackNoticeHtml}
       ${categoryHeaderHtml}
@@ -1940,6 +2104,13 @@ function showSearchResults(response) {
                 <div>
                   ${originalPriceHtml}
                   ${priceDisplayHtml}
+                  ${(() => {
+                    const t = item.price_trend;
+                    if (!t) return "";
+                    if (t.direction === "up")   return `<div class="price-trend-up"><i data-lucide="trending-up" style="width:11px;height:11px;flex-shrink:0;"></i>%${Math.abs(t.change_pct)} arttı (7g)</div>`;
+                    if (t.direction === "down") return `<div class="price-trend-down"><i data-lucide="trending-down" style="width:11px;height:11px;flex-shrink:0;"></i>%${Math.abs(t.change_pct)} düştü (7g)</div>`;
+                    return `<div class="price-trend-flat"><i data-lucide="minus" style="width:11px;height:11px;flex-shrink:0;"></i>Sabit (7g)</div>`;
+                  })()}
                 </div>
                 ${buttonHtml}
               </div>
@@ -2476,7 +2647,7 @@ function openProduct(id) {
               <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
                 <strong style="color: ${isCheapest ? "var(--green-dark)" : "var(--ink)"}; font-size: 13px;">${currency.format(item.price)}</strong>
                 ${isCheapest ? `<span style="${badgeStyle}">EN UCUZ</span>` : ""}
-                <a href="${escapeHtml(item.url)}" target="_blank" style="color: var(--muted); display: inline-grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 4px; background: white;" title="Mağazaya git">
+          <a href="${escapeHtml(safeHttpUrl(item.url))}" target="_blank" rel="noopener noreferrer" style="color: var(--muted); display: inline-grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 4px; background: white;" title="Mağazaya git">
                   <i data-lucide="external-link" style="width: 14px; height: 14px; color: var(--ink);"></i>
                 </a>
               </div>
@@ -2563,7 +2734,7 @@ function openProduct(id) {
           <i data-lucide="trash-2"></i>
           Takipten çıkar
         </button>
-        <button class="primary-button" onclick="window.open('${escapeHtml(product.url)}', '_blank')">
+        <button class="primary-button" onclick="window.open(${inlineJsArg(safeHttpUrl(product.url))}, '_blank', 'noopener,noreferrer')">
           <i data-lucide="external-link"></i>
           Mağazaya git
         </button>
@@ -2924,10 +3095,11 @@ function productImage(product) {
 function switchView(view) {
   state.activeView = view;
   const sections = {
-    discover: document.getElementById("discoverView"),
-    tracking: document.getElementById("trackingView"),
-    savings: document.getElementById("savingsView"),
-    cart: document.getElementById("cartView"),
+    discover:  document.getElementById("discoverView"),
+    tracking:  document.getElementById("trackingView"),
+    savings:   document.getElementById("savingsView"),
+    bulletins: document.getElementById("bulletinsView"),
+    cart:      document.getElementById("cartView"),
   };
 
   Object.entries(sections).forEach(([name, section]) => {
@@ -2940,6 +3112,9 @@ function switchView(view) {
 
   if (view === "cart") {
     renderCart();
+  }
+  if (view === "bulletins") {
+    loadStores();
   }
   if (view === "savings") {
     loadReceipts(document.getElementById("receiptMonthFilter")?.value || "");
@@ -2957,6 +3132,9 @@ function switchView(view) {
   }
 
   window.scrollTo({ top: view === "discover" ? 0 : 180, behavior: "smooth" });
+
+  // Rehber popup — ilk ziyarette göster
+  setTimeout(() => showGuide(view), 150);
 }
 
 async function pasteUrl() {
@@ -3018,7 +3196,22 @@ function escapeHtml(value) {
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function inlineJsArg(value) {
+  // JSON'in çift tırnaklı JS stringini HTML attribute bağlamında kaçırır.
+  return escapeHtml(JSON.stringify(String(value ?? "")));
+}
+
+function safeHttpUrl(value) {
+  try {
+    const url = new URL(String(value || ""), window.location.origin);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "#";
+  } catch {
+    return "#";
+  }
 }
 
 function getOrCreateDeviceId() {
@@ -3275,7 +3468,8 @@ async function startLiveBarcodeScanner() {
       },
       async (decodedText) => {
         const code = String(decodedText || "").replace(/\D/g, "");
-        if (liveBarcodeScanLocked || code === lastLiveBarcode || code.length !== 13) return;
+        const validLen = [8, 12, 13].includes(code.length);
+        if (liveBarcodeScanLocked || code === lastLiveBarcode || !validLen) return;
         liveBarcodeScanLocked = true;
         lastLiveBarcode = code;
         updateBarcodeScanStatus(`${code} yakalandi. Urun sorgulaniyor...`);
@@ -3322,50 +3516,232 @@ async function runBarcodeScan() {
 
 async function lookupAndAddBarcode(code) {
   const cleanCode = String(code || "").replace(/\D/g, "");
-  if (cleanCode.length !== 13) {
-    showToast("EAN-13 barkod 13 haneli olmalidir.");
+  if (![8, 12, 13].includes(cleanCode.length)) {
+    showToast("Geçersiz barkod. EAN-8, EAN-13 veya UPC-A formatında olmalıdır.");
+    liveBarcodeScanLocked = false;
     return;
   }
 
+  updateBarcodeScanStatus("Ürün sorgulanıyor...");
   showToast("Barkod taraniyor...");
-  try {
-    const res = await api(`/api/barcode/${cleanCode}`);
-    if (res.found) {
-      const existingIndex = state.cart.findIndex(item => item.barcode === cleanCode);
-      if (existingIndex >= 0) {
-        const existing = state.cart[existingIndex];
-        state.cart[existingIndex] = {
-          ...existing,
-          quantity: Math.min(99, Number(existing.quantity || 1) + 1),
-          updated_at: new Date().toISOString(),
-        };
-        showToast(`Bu urun zaten kayitli. Miktar artirildi: ${res.title}`);
-      } else {
-        const newItem = {
-          id: "cart-" + Date.now(),
-          name: res.title,
-          brand: res.brand || "",
-          image_url: res.image_url || "",
-          barcode: cleanCode,
-          checked: false,
-          quantity: 1,
-          updated_at: new Date().toISOString(),
-        };
-        state.cart.push(newItem);
-        showToast(`Barkod bulundu ve eklendi: ${res.title}`);
-      }
-      saveCartToLocalStorage();
-      renderCart();
 
-      if (state.sharedListId) {
-        syncSharedListWithServer();
-      }
-    } else {
-      showToast(res.message);
-    }
+  let res;
+  try {
+    res = await api(`/api/barcode/${cleanCode}`);
+    console.info(`[Barkod] ${cleanCode} → found=${res.found} source=${res.source || "?"}`);
   } catch (error) {
-    showToast(error.message);
+    console.error(`[Barkod] API hatası (${cleanCode}):`, error.message);
+    updateBarcodeScanStatus("");
+    showBarcodeManualEntry(cleanCode, `Sunucu hatası: ${error.message}`);
+    liveBarcodeScanLocked = false;
+    return;
   }
+
+  if (res.found) {
+    const existingIndex = state.cart.findIndex(item => item.barcode === cleanCode);
+    if (existingIndex >= 0) {
+      const existing = state.cart[existingIndex];
+      state.cart[existingIndex] = {
+        ...existing,
+        quantity: Math.min(99, Number(existing.quantity || 1) + 1),
+        updated_at: new Date().toISOString(),
+      };
+      showToast(`Miktar artırıldı: ${res.title}`);
+    } else {
+      state.cart.push({
+        id: "cart-" + Date.now(),
+        name: res.title,
+        brand: res.brand || "",
+        image_url: res.image_url || "",
+        barcode: cleanCode,
+        category: res.suggested_category || "general",
+        checked: false,
+        quantity: 1,
+        updated_at: new Date().toISOString(),
+      });
+      showToast(`Eklendi: ${res.title}`);
+    }
+    saveCartToLocalStorage();
+    renderCart();
+    if (state.sharedListId) syncSharedListWithServer();
+    updateBarcodeScanStatus("");
+
+    // Fiyat karşılaştırması: suggested_category kullanarak doğru mağazalarda ara
+    if (res.search_query) {
+      const hasResults = res.results && res.results.length > 0;
+      if (hasResults) {
+        showSearchResults({
+          products: res.results,
+          query: res.search_query,
+          category: res.suggested_category || "general",
+        });
+      } else {
+        showBarcodeCategoryMismatch(res.title, res.search_query, res.suggested_category || "general");
+      }
+    }
+  } else {
+    // Ürün hiçbir kaynakta bulunamadı → Manuel giriş seçeneği sun
+    console.warn(`[Barkod] ${cleanCode} bulunamadı (allow_manual=${res.allow_manual}):`, res.message);
+    updateBarcodeScanStatus("");
+    if (res.allow_manual) {
+      showBarcodeManualEntry(cleanCode, res.message);
+    } else {
+      showToast(res.message || "Barkod bulunamadı.");
+    }
+    liveBarcodeScanLocked = false;
+  }
+}
+
+const _CATEGORY_LABELS = {
+  electronics: { label: "Teknoloji mağazaları", icon: "cpu", stores: "Teknosa, Vatan, MediaMarkt, Trendyol" },
+  grocery:     { label: "Market zinciri",        icon: "shopping-basket", stores: "Migros, CarrefourSA, Trendyol" },
+  cosmetics:   { label: "Kozmetik mağazaları",   icon: "sparkles", stores: "Gratis, Rossmann, Watsons" },
+  fashion:     { label: "Moda mağazaları",        icon: "shirt", stores: "LCW, DeFacto, Trendyol" },
+  home:        { label: "Ev & yaşam mağazaları", icon: "sofa", stores: "IKEA, Karaca, Koçtaş" },
+  general:     { label: "Tüm pazaryerleri",       icon: "store", stores: "Trendyol, Hepsiburada, Amazon" },
+};
+
+function showBarcodeCategoryMismatch(productTitle, searchQuery, suggestedCategory) {
+  const dialog = document.getElementById("productDialog");
+  const content = document.getElementById("dialogContent");
+  if (!dialog || !content) return;
+
+  const catInfo = _CATEGORY_LABELS[suggestedCategory] || _CATEGORY_LABELS.general;
+  const wrongCat = suggestedCategory === "grocery" ? "teknoloji" : suggestedCategory === "electronics" ? "market" : "yanlış kategori";
+
+  content.innerHTML = `
+    <div class="dialog-body" style="max-width: 420px;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+        <div style="width: 40px; height: 40px; background: rgba(40,122,80,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <i data-lucide="${catInfo.icon}" style="width: 18px; height: 18px; color: #287a50;"></i>
+        </div>
+        <div>
+          <h3 style="margin: 0 0 2px; font-size: 16px;">Ürün sepete eklendi</h3>
+          <p style="margin: 0; font-size: 12px; color: var(--ink-light);">${escapeHtml(productTitle)}</p>
+        </div>
+      </div>
+
+      <div style="background: rgba(230,168,23,0.07); border: 1px solid rgba(230,168,23,0.2); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;">
+        <div style="font-size: 13px; font-weight: 700; color: #b8860b; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="alert-triangle" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+          Bu ürün ${wrongCat} envanterinde bulunamadı
+        </div>
+        <p style="margin: 0; font-size: 12px; color: var(--ink); line-height: 1.5;">
+          "<strong>${escapeHtml(productTitle)}</strong>" gıda marketi değil, <strong>${catInfo.label}</strong>nda satılır.
+          Fiyat karşılaştırması için doğru mağazalarda arama yapabilirsiniz.
+        </p>
+      </div>
+
+      <div style="background: rgba(40,122,80,0.05); border: 1px solid rgba(40,122,80,0.15); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 12px; color: var(--ink-light);">
+        <i data-lucide="store" style="width: 13px; height: 13px; margin-right: 4px; vertical-align: middle;"></i>
+        <strong>Taranacak mağazalar:</strong> ${catInfo.stores}
+      </div>
+
+      <div style="display: flex; gap: 10px;">
+        <button class="secondary-button" style="flex: 1;" onclick="closeDialog()">Kapat</button>
+        <button class="primary-button" style="flex: 2; display: flex; align-items: center; justify-content: center; gap: 6px;"
+          onclick="closeDialog(); triggerCategorySearch(${inlineJsArg(searchQuery)}, ${inlineJsArg(suggestedCategory)})">
+          <i data-lucide="search" style="width: 14px; height: 14px;"></i>
+          ${catInfo.label}nda Ara
+        </button>
+      </div>
+    </div>
+  `;
+  if (!dialog.open) dialog.showModal();
+  lucide.createIcons();
+}
+
+function triggerCategorySearch(query, category) {
+  // Arama kutusuna yaz ve doğru kategoride aramayı başlat
+  const input = document.getElementById("productUrl");
+  const selector = document.getElementById("searchCategorySelector");
+  if (input) input.value = query;
+  if (selector) selector.value = category;
+
+  // Overlay'i göster ve aramayı tetikle
+  const overlay = document.getElementById("quantumScanOverlay");
+  if (overlay) overlay.style.display = "flex";
+
+  const searchMode = document.getElementById("globalModeCheckbox")?.checked ? "global" : "hybrid";
+  let searchUrl = `/api/search?query=${encodeURIComponent(query)}&category=${encodeURIComponent(category)}&mode=${encodeURIComponent(searchMode)}`;
+  if (state.userCoords && searchMode !== "global") {
+    searchUrl += `&lat=${state.userCoords.lat}&lon=${state.userCoords.lng}`;
+  }
+
+  api(searchUrl, { signal: null })
+    .then(results => showSearchResults(results))
+    .catch(() => showToast("Arama başarısız, lütfen tekrar deneyin."))
+    .finally(() => { if (overlay) overlay.style.display = "none"; });
+}
+
+function showBarcodeManualEntry(barcode, errorMsg) {
+  const dialog = document.getElementById("productDialog");
+  const content = document.getElementById("dialogContent");
+  if (!dialog || !content) { showToast(errorMsg); return; }
+
+  content.innerHTML = `
+    <div class="dialog-body" style="max-width: 420px;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+        <div style="width: 40px; height: 40px; background: rgba(230,168,23,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <i data-lucide="scan-barcode" style="width: 18px; height: 18px; color: #b8860b;"></i>
+        </div>
+        <div>
+          <h3 style="margin: 0 0 2px; font-size: 16px;">Ürün Bulunamadı</h3>
+          <p style="margin: 0; font-size: 12px; color: var(--ink-light);">Barkod: <code>${escapeHtml(barcode)}</code></p>
+        </div>
+      </div>
+
+      <div class="page-guide" style="margin-bottom: 16px;">
+        <i data-lucide="info"></i>
+        <span style="font-size: 12px;">${escapeHtml(errorMsg || "Bu barkod veritabanlarımızda bulunamadı.")} Ürünü manuel olarak ekleyebilirsiniz.</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div>
+          <label style="font-size: 12px; font-weight: 700; color: var(--ink-light); display: block; margin-bottom: 4px;">ÜRÜN ADI *</label>
+          <input id="manualBarcodeTitle" class="form-input" placeholder="örn: Ülker Çikolata 80g" style="width: 100%;">
+        </div>
+        <div>
+          <label style="font-size: 12px; font-weight: 700; color: var(--ink-light); display: block; margin-bottom: 4px;">MARKA (opsiyonel)</label>
+          <input id="manualBarcodeBrand" class="form-input" placeholder="örn: Ülker" style="width: 100%;">
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 16px;">
+        <button class="secondary-button" style="flex: 1;" onclick="closeDialog()">İptal</button>
+        <button class="primary-button" style="flex: 2;" onclick="submitManualBarcodeEntry(${inlineJsArg(barcode)})">
+          <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 4px;"></i>Sepete Ekle
+        </button>
+      </div>
+    </div>
+  `;
+  if (!dialog.open) dialog.showModal();
+  lucide.createIcons();
+  setTimeout(() => document.getElementById("manualBarcodeTitle")?.focus(), 100);
+}
+
+function submitManualBarcodeEntry(barcode) {
+  const title = document.getElementById("manualBarcodeTitle")?.value.trim();
+  const brand = document.getElementById("manualBarcodeBrand")?.value.trim() || "";
+  if (!title) {
+    document.getElementById("manualBarcodeTitle")?.focus();
+    return;
+  }
+  state.cart.push({
+    id: "cart-" + Date.now(),
+    name: title,
+    brand,
+    image_url: "",
+    barcode,
+    checked: false,
+    quantity: 1,
+    updated_at: new Date().toISOString(),
+  });
+  saveCartToLocalStorage();
+  renderCart();
+  if (state.sharedListId) syncSharedListWithServer();
+  closeDialog();
+  showToast(`"${title}" sepete eklendi.`);
 }
 
 async function scanBarcodeImage(event) {
@@ -3917,9 +4293,8 @@ window.detectPoseAndFitGarment = async function(photoBase64) {
   try {
     const response = await fetch("/api/detect-pose", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      credentials: "same-origin",
+      headers: requestHeaders({}, "POST"),
       body: JSON.stringify({ image_base64: photoBase64 })
     });
     if (!response.ok) throw new Error("API response error");
@@ -5671,7 +6046,8 @@ async function runAiSkinScan(type, base64Data = null) {
       showToast("[AI STATUS: Yüz/cilt analizi yapılıyor...]");
       const response = await fetch("/api/analyze-skin", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        headers: requestHeaders({}, "POST"),
         body: JSON.stringify({ image_base64: base64Data })
       });
       if (!response.ok) throw new Error("Skin analysis API failed");
@@ -5764,7 +6140,8 @@ async function askAiColorSuitability() {
     const toneTag = document.getElementById("aiSkinToneTag")?.textContent || "Sıcak (Warm)";
     const response = await fetch("/api/analyze-cosmetic-color", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      headers: requestHeaders({}, "POST"),
       body: JSON.stringify({
         skin_type: currentSkinType,
         undertone: toneTag,
@@ -5898,7 +6275,7 @@ function showSizeSelectorDialog(itemName) {
     
     <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;">
       ${sizes.map(sz => `
-        <button type="button" class="secondary-button" style="padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; height: auto;" onclick="addGenericCartItemWithSize('${escapeHtml(itemName)}', '${escapeHtml(sz)}')">
+        <button type="button" class="secondary-button" style="padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; height: auto;" onclick="addGenericCartItemWithSize(${inlineJsArg(itemName)}, ${inlineJsArg(sz)})">
           ${escapeHtml(sz)}
         </button>
       `).join("")}
@@ -5908,12 +6285,12 @@ function showSizeSelectorDialog(itemName) {
       <label style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--muted);">Özel Ebat Girin:</label>
       <div style="display: flex; gap: 8px;">
         <input type="text" id="customSizeInput" placeholder="Örn: 1.5 L, 800 gr, 250 ml" style="flex: 1; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px;">
-        <button type="button" class="primary-button" style="width: auto; height: auto; padding: 8px 16px;" onclick="addGenericCartItemWithCustomSize('${escapeHtml(itemName)}')">Ekle</button>
+        <button type="button" class="primary-button" style="width: auto; height: auto; padding: 8px 16px;" onclick="addGenericCartItemWithCustomSize(${inlineJsArg(itemName)})">Ekle</button>
       </div>
     </div>
     
     <div style="display: flex; gap: 8px;">
-      <button type="button" class="text-button" style="flex: 1; text-align: center; color: var(--muted);" onclick="addGenericCartItemWithoutSize('${escapeHtml(itemName)}')">
+      <button type="button" class="text-button" style="flex: 1; text-align: center; color: var(--muted);" onclick="addGenericCartItemWithoutSize(${inlineJsArg(itemName)})">
         Belirtmeden Ekle
       </button>
       <button type="button" class="text-button" style="flex: 1; text-align: center; color: var(--red);" onclick="closeSizeSelectorDialog()">
@@ -6376,5 +6753,480 @@ function showInitialLoadFallback() {
     }, 1500);
   } else {
     renderFallbackOpportunities();
+  }
+}
+
+/* ── Hatırlatıcı Hesaplama ───────────────────────────────────────────────── */
+
+function calcReminderDates(lastPurchaseDate, reorderDays, remindBeforeDays) {
+  const purchase = new Date(lastPurchaseDate);
+  const endDate  = new Date(purchase);
+  endDate.setDate(endDate.getDate() + Number(reorderDays));
+
+  const reminderDate = new Date(endDate);
+  reminderDate.setDate(reminderDate.getDate() - Number(remindBeforeDays));
+
+  const today    = new Date(); today.setHours(0, 0, 0, 0);
+  const daysLeft = Math.round((endDate - today) / 86400000);
+  const fmtDate  = d => d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+
+  return { endDateStr: fmtDate(endDate), reminderDateStr: fmtDate(reminderDate), daysLeft };
+}
+
+function onReminderInput(itemId) {
+  const form      = document.getElementById(`rform-${itemId}`);
+  const resultEl  = document.getElementById(`rresult-${itemId}`);
+  const dateInput = form.querySelector(".r-date");
+  const daysInput = form.querySelector(".r-days");
+  const beforeInput = form.querySelector(".r-before");
+
+  if (!dateInput.value || !daysInput.value) { resultEl.classList.remove("show"); return; }
+
+  const { endDateStr, daysLeft } = calcReminderDates(dateInput.value, daysInput.value, beforeInput.value || 5);
+  resultEl.textContent = daysLeft >= 0
+    ? `📅 Ürün yaklaşık ${endDateStr} tarihinde biter — ${daysLeft} gün kaldı.`
+    : `⚠️ Tahmini bitiş tarihi (${endDateStr}) geçti.`;
+  resultEl.classList.add("show");
+}
+
+async function saveReminder(itemId) {
+  const form        = document.getElementById(`rform-${itemId}`);
+  const item        = state.products.find(w => w.id === itemId);
+  const dateInput   = form.querySelector(".r-date");
+  const daysInput   = form.querySelector(".r-days");
+  const beforeInput = form.querySelector(".r-before");
+  const saveBtn     = form.querySelector(".btn-reminder-save");
+
+  if (!dateInput.value || !daysInput.value) { toast("Tarih ve periyot alanlarını doldur."); return; }
+
+  saveBtn.disabled = true; saveBtn.textContent = "Kaydediliyor…";
+
+  try {
+    await api("/api/reminders", {
+      method: "POST",
+      body: JSON.stringify({
+        product_url:        item?.url || "",
+        product_title:      item?.title || String(itemId),
+        last_purchase_date: dateInput.value,
+        reorder_days:       Number(daysInput.value),
+        remind_before_days: Number(beforeInput.value || 5),
+      }),
+    });
+    toast("Hatırlatıcı kaydedildi ✓");
+    form.classList.remove("open");
+    saveBtn.textContent = "✓ Kaydedildi";
+  } catch {
+    toast("Kaydedilemedi — yerel olarak saklandı.");
+    const local = JSON.parse(localStorage.getItem("almadan_reminders") || "[]");
+    local.push({ itemId, lastPurchaseDate: dateInput.value, reorderDays: Number(daysInput.value), remindBeforeDays: Number(beforeInput.value || 5), savedAt: new Date().toISOString() });
+    localStorage.setItem("almadan_reminders", JSON.stringify(local));
+    saveBtn.textContent = "✓ Yerel kaydedildi";
+  } finally {
+    saveBtn.disabled = false;
+  }
+}
+
+function toggleReminderForm(itemId) {
+  document.getElementById(`rform-${itemId}`)?.classList.toggle("open");
+}
+
+/* ── Mağaza Bültenleri ───────────────────────────────────────────────────── */
+
+const STORE_EMOJIS     = { market: "🛒", fashion: "👗", beauty: "💄", home: "🏠" };
+const storeFollowState  = {};
+const storeFollowerCounts = {};
+
+async function loadStores() {
+  const list = document.getElementById("storeList");
+  if (!list) return;
+  list.innerHTML = `<div class="loading-row"><span class="spinner"></span><span>Mağazalar yükleniyor…</span></div>`;
+  try {
+    const res    = await fetch("/api/stores");
+    const data   = await res.json();
+    const stores = data.stores || [];
+
+    if (!stores.length) { list.innerHTML = `<p class="empty-state">Henüz mağaza eklenmemiş.</p>`; return; }
+
+    stores.forEach(s => {
+      storeFollowState[s.slug]    = s.followed;
+      storeFollowerCounts[s.slug] = s.follower_count || 0;
+    });
+
+    let html = "";
+
+    // Takip Ettiklerim bölümü
+    const followed = stores.filter(s => s.followed);
+    if (followed.length) {
+      html += `<div class="store-section-title">⭐ Takip Ettiklerim</div><div class="store-grid">`;
+      html += followed.map(s => renderStoreCard(s)).join("");
+      html += `</div>`;
+    }
+
+    // Tüm mağazalar kategoriye göre
+    const groups = {};
+    stores.forEach(s => (groups[s.category] = groups[s.category] || []).push(s));
+    const CAT_LABELS = { market: "Marketler", fashion: "Moda", beauty: "Güzellik & Kozmetik", home: "Ev & Yaşam" };
+    html += `<div class="store-section-title" style="margin-top:${followed.length ? "24px" : "0"}">🏪 Tüm Mağazalar</div>`;
+    ["market", "fashion", "beauty", "home"].forEach(cat => {
+      if (!groups[cat]?.length) return;
+      html += `<div class="store-section-title" style="font-size:11px;margin-top:12px;">${CAT_LABELS[cat] || cat}</div><div class="store-grid">`;
+      html += groups[cat].map(s => renderStoreCard(s)).join("");
+      html += `</div>`;
+    });
+    list.innerHTML = html;
+  } catch {
+    list.innerHTML = `<p class="empty-state">Mağazalar yüklenemedi. Tekrar dene.</p>`;
+  }
+}
+
+function renderStoreCard(s) {
+  const followed = storeFollowState[s.slug];
+  const count    = storeFollowerCounts[s.slug] || 0;
+  const emoji    = STORE_EMOJIS[s.category] || "🏪";
+  const countTxt = count > 0 ? `👥 ${count} kişi takipte` : "İlk takipçi ol!";
+  return `
+    <div class="store-card ${followed ? "followed" : ""}" id="scard-${s.slug}">
+      <div class="store-card-header">
+        <span class="store-emoji">${emoji}</span>
+        <div>
+          <div class="store-name">${escapeHtml(s.name)}</div>
+          <div class="store-cat">${escapeHtml(s.category)}</div>
+        </div>
+      </div>
+      ${s.publication_note ? `<div class="store-note">📅 ${escapeHtml(s.publication_note)}</div>` : ""}
+      <div class="store-follower-count" id="scount-${s.slug}">${countTxt}</div>
+      <button class="btn-follow ${followed ? "active" : ""}" onclick="toggleFollow(${inlineJsArg(s.slug)}, ${inlineJsArg(s.name)})" id="sfbtn-${escapeHtml(s.slug)}">
+        ${followed ? "✓ Takip Ediliyor" : "+ Takibe Al"}
+      </button>
+    </div>`;
+}
+
+async function toggleFollow(slug, name) {
+  const btn      = document.getElementById(`sfbtn-${slug}`);
+  const card     = document.getElementById(`scard-${slug}`);
+  const countEl  = document.getElementById(`scount-${slug}`);
+  const isFollowed = storeFollowState[slug];
+
+  // Optimistic UI
+  storeFollowState[slug] = !isFollowed;
+  storeFollowerCounts[slug] = Math.max(0, (storeFollowerCounts[slug] || 0) + (isFollowed ? -1 : 1));
+  btn.textContent = isFollowed ? "+ Takibe Al" : "✓ Takip Ediliyor";
+  btn.classList.toggle("active", !isFollowed);
+  card.classList.toggle("followed", !isFollowed);
+  if (countEl) {
+    const c = storeFollowerCounts[slug];
+    countEl.textContent = c > 0 ? `👥 ${c} kişi takipte` : "İlk takipçi ol!";
+  }
+
+  try {
+    await api(`/api/stores/${encodeURIComponent(slug)}/follow`, {
+      method: isFollowed ? "DELETE" : "POST",
+    });
+    toast(isFollowed ? `${name} takipten çıkarıldı.` : `${name} takibe alındı ✓`);
+    // Takip değişince bültenleri yeniden yükle (liste güncellensin)
+    if (!isFollowed) loadStores();
+  } catch (error) {
+    storeFollowState[slug] = isFollowed;
+    storeFollowerCounts[slug] = Math.max(0, (storeFollowerCounts[slug] || 0) + (isFollowed ? 1 : -1));
+    btn.textContent = isFollowed ? "✓ Takip Ediliyor" : "+ Takibe Al";
+    btn.classList.toggle("active", isFollowed);
+    card.classList.toggle("followed", isFollowed);
+    if (countEl) {
+      const c = storeFollowerCounts[slug];
+      countEl.textContent = c > 0 ? `👥 ${c} kişi takipte` : "İlk takipçi ol!";
+    }
+    toast(error?.message || "Bağlantı hatası, tekrar dene.");
+  }
+}
+
+/* ── Rehber Popup Sistemi ────────────────────────────────────────────────── */
+
+const GUIDES = {
+  discover: {
+    icon: "🔍",
+    title: "Fiyat karşılaştırması nasıl yapılır?",
+    steps: [
+      "Herhangi bir marketten ürünün linkini kopyala",
+      "Yukarıdaki kutuya yapıştır ve Fiyat Bul'a bas",
+      "Ya da barkod butonuyla ürünü tara — anında karşılaştır",
+    ],
+  },
+  tracking: {
+    icon: "📡",
+    title: "Fiyat takibi nasıl çalışır?",
+    steps: [
+      "Fiyat Bul sonuçlarında 'Takibe Al' butonuna bas",
+      "Fiyat düşünce otomatik bildirim alırsın",
+      "Hatırlatıcı kurarak stok bitmeden seni uyaralım",
+    ],
+  },
+  bulletins: {
+    icon: "🏪",
+    title: "Mağaza bültenleri nasıl çalışır?",
+    steps: [
+      "Takip etmek istediğin mağazanın kartına tıkla",
+      "Mağaza kampanya başlatınca sana mail gönderilir",
+      "Birden fazla mağazayı aynı anda takip edebilirsin",
+    ],
+  },
+  savings: {
+    icon: "💰",
+    title: "Tasarruf sayfası ne gösterir?",
+    steps: [
+      "Takip ettiğin ürünlerde yakaladığın fiyat farklarını görürsün",
+      "Harcamalarını kategorilere göre analiz eder",
+      "Fişlerini ekleyerek aylık bütçeni takip et",
+    ],
+  },
+  cart: {
+    icon: "🛒",
+    title: "Sepet ve listeler nasıl kullanılır?",
+    steps: [
+      "Almak istediğin ürünleri sepetine ekle",
+      "Listeyi bir bağlantı ile arkadaşlarınla paylaş",
+      "Toplu alışverişte en uygun mağazayı hesaplar",
+    ],
+  },
+};
+
+const GUIDE_KEY = "almadan_guide_dismissed_v1";
+
+function _getDismissed() {
+  try { return JSON.parse(localStorage.getItem(GUIDE_KEY) || "{}"); } catch { return {}; }
+}
+function _setDismissed(view) {
+  const d = _getDismissed(); d[view] = true;
+  localStorage.setItem(GUIDE_KEY, JSON.stringify(d));
+}
+
+function showGuide(view) {
+  const guide = GUIDES[view];
+  if (!guide || _getDismissed()[view]) return;
+
+  // Önce eski varsa kaldır
+  document.getElementById(`guide-${view}`)?.remove();
+
+  const el = document.createElement("div");
+  el.className = "guide-popup";
+  el.id = `guide-${view}`;
+  el.innerHTML = `
+    <div class="guide-icon">${guide.icon}</div>
+    <div class="guide-body">
+      <div class="guide-title">${guide.title}</div>
+      <ul class="guide-steps">
+        ${guide.steps.map((s, i) => `<li data-step="${i + 1}">${s}</li>`).join("")}
+      </ul>
+    </div>
+    <button class="guide-close" onclick="dismissGuide('${view}')" aria-label="Kapat">✕</button>
+  `;
+
+  // Her view'in ilk container'ına ekle
+  const viewId = view === "bulletins" ? "bulletinsView" : `${view}View`;
+  const viewEl = document.getElementById(viewId);
+  if (!viewEl) return;
+  const target = viewEl.querySelector(".section-heading, .page-guide, .intro-band");
+  if (target) {
+    target.insertAdjacentElement("afterend", el);
+  } else {
+    viewEl.prepend(el);
+  }
+}
+
+function dismissGuide(view) {
+  _setDismissed(view);
+  const el = document.getElementById(`guide-${view}`);
+  if (!el) return;
+  el.classList.add("hiding");
+  setTimeout(() => el.remove(), 230);
+}
+
+function resetGuides() {
+  localStorage.removeItem(GUIDE_KEY);
+  toast("Rehberler sıfırlandı — sekmeleri ziyaret et.");
+}
+
+/* ── Link Kılavuzu Popup ─────────────────────────────────────────────────── */
+
+const LINK_GUIDE_APPS = [
+  {
+    icon: "🛒",
+    name: "Migros, CarrefourSA, A101, BİM",
+    steps: "Ürün sayfasını aç → tarayıcının <b>adres çubuğuna</b> dokun → linki kopyala → Almadan'a yapıştır.",
+  },
+  {
+    icon: "📦",
+    name: "Trendyol",
+    steps: "Ürün sayfası → sağ üstteki <b>paylaş</b> simgesi → <b>Bağlantıyı Kopyala</b> → Almadan'a yapıştır.",
+  },
+  {
+    icon: "🌐",
+    name: "Hepsiburada",
+    steps: "Ürün sayfası → üstteki <b>⋯ Daha Fazla</b> → <b>Linki Kopyala</b> → Almadan'a yapıştır.",
+  },
+  {
+    icon: "🛍️",
+    name: "n11, GittiGidiyor, diğer siteler",
+    steps: "Ürün sayfasını aç → tarayıcı adres çubuğundaki <b>URL'yi</b> kopyala → Almadan'a yapıştır.",
+  },
+  {
+    icon: "📱",
+    name: "Mobil uygulama kullanıyorsan",
+    steps: "Ürün sayfası → uygulamanın <b>Paylaş</b> butonu → <b>Bağlantıyı Kopyala</b> seç → Almadan'a gel, kutuya basılı tut → Yapıştır.",
+  },
+];
+
+function showLinkGuide(autoTriggered = false) {
+  if (document.getElementById("linkGuideOverlay")) return;
+
+  const overlay = document.createElement("div");
+  overlay.className = "link-guide-overlay";
+  overlay.id = "linkGuideOverlay";
+  overlay.onclick = e => { if (e.target === overlay) closeLinkGuide(); };
+
+  overlay.innerHTML = `
+    <div class="link-guide-modal" role="dialog" aria-modal="true" aria-labelledby="lgTitle">
+      <button class="link-guide-close" onclick="closeLinkGuide()" aria-label="Kapat">✕</button>
+      <h3 id="lgTitle">${autoTriggered ? "⚠️ Geçersiz link girildi" : "🔗 Ürün linki nasıl bulunur?"}</h3>
+      <p class="subtitle">${autoTriggered
+        ? "Girdiğin adres bir ürün linki gibi görünmüyor. Aşağıdan doğru linki nasıl kopyalayacağını öğren:"
+        : "Alışveriş uygulamasından ürün linkini şu şekilde kopyalayabilirsin:"
+      }</p>
+      ${LINK_GUIDE_APPS.map(a => `
+        <div class="link-guide-app">
+          <div class="link-guide-app-icon">${a.icon}</div>
+          <div>
+            <div class="link-guide-app-name">${a.name}</div>
+            <div class="link-guide-app-steps">${a.steps}</div>
+          </div>
+        </div>
+      `).join("")}
+      <div class="link-guide-tip">💡 İpucu: Barkod butonu ile kameranı açıp ürün barkodunu taratabilirsin — link gerekmez!</div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  document.addEventListener("keydown", _lgEscHandler);
+}
+
+function closeLinkGuide() {
+  const overlay = document.getElementById("linkGuideOverlay");
+  if (!overlay) return;
+  overlay.style.animation = "fadeOut .15s ease forwards";
+  overlay.style.setProperty("--tw-opacity", "0");
+  overlay.style.opacity = "0";
+  setTimeout(() => overlay.remove(), 160);
+  document.removeEventListener("keydown", _lgEscHandler);
+}
+
+function _lgEscHandler(e) { if (e.key === "Escape") closeLinkGuide(); }
+
+function _isValidProductUrl(val) {
+  if (!val) return false;
+  try {
+    const url = new URL(val);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+/* ── Ana Arama Barkod Tarayıcısı ─────────────────────────────────────────── */
+
+let _mainScanner = null;
+let _mainScannerRunning = false;
+let _mainScanLocked = false;
+
+function openMainBarcodeScanner() {
+  const area = document.getElementById("mainBarcodeScanArea");
+  if (!area) return;
+  area.classList.remove("hidden");
+  document.getElementById("mainBarcodeBtn").style.display = "none";
+  _startMainScanner();
+}
+
+function closeMainBarcodeScanner() {
+  _stopMainScanner();
+  const area = document.getElementById("mainBarcodeScanArea");
+  if (area) area.classList.add("hidden");
+  const btn = document.getElementById("mainBarcodeBtn");
+  if (btn) btn.style.display = "";
+}
+
+async function _startMainScanner() {
+  if (!window.Html5Qrcode) {
+    showToast("Kamera kütüphanesi yükleniyor, biraz bekle...");
+    return;
+  }
+  if (_mainScannerRunning) return;
+  try {
+    _mainScanner = new Html5Qrcode("mainHtml5QrReader", { verbose: false });
+    await _mainScanner.start(
+      { facingMode: "environment" },
+      {
+        fps: 10,
+        qrbox: (w, h) => ({ width: Math.floor(Math.min(w * 0.8, 280)), height: Math.floor(Math.min(h * 0.35, 120)) }),
+        aspectRatio: 1.777778,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+        ],
+      },
+      async (decoded) => {
+        const code = String(decoded || "").replace(/\D/g, "");
+        if (_mainScanLocked || ![8, 12, 13].includes(code.length)) return;
+        _mainScanLocked = true;
+        await _stopMainScanner();
+        closeMainBarcodeScanner();
+        await searchByBarcode(code);
+        _mainScanLocked = false;
+      },
+      () => {},
+    );
+    _mainScannerRunning = true;
+  } catch (e) {
+    showToast("Kamera açılamadı: " + (e.message || e));
+    closeMainBarcodeScanner();
+  }
+}
+
+async function _stopMainScanner() {
+  if (!_mainScanner || !_mainScannerRunning) return;
+  try { await _mainScanner.stop(); _mainScanner.clear(); } catch {}
+  _mainScannerRunning = false;
+}
+
+async function searchByBarcode(code) {
+  showToast("Barkod aranıyor: " + code);
+  const overlay = document.getElementById("quantumScanOverlay");
+  const progressText = document.getElementById("quantumScanProgress");
+  if (overlay) overlay.style.display = "flex";
+  if (progressText) progressText.innerText = "Barkod ürünü tanımlanıyor...";
+
+  try {
+    const res = await api(`/api/barcode/${code}`);
+    if (overlay) overlay.style.display = "none";
+
+    if (res.found && res.results && res.results.length > 0) {
+      switchView("discover");
+      showSearchResults({
+        products: res.results,
+        query: res.search_query || res.title || code,
+        category: res.suggested_category || "general",
+      });
+      showToast("✓ " + (res.title || "Ürün bulundu"));
+    } else if (res.found) {
+      // Ürün bilgisi var ama fiyat karşılaştırma sonucu yok
+      switchView("discover");
+      showToast(res.title + " — fiyat karşılaştırması bulunamadı.");
+      showBarcodeManualEntry && showBarcodeManualEntry(code, res.message || "Sonuç bulunamadı.");
+    } else {
+      if (overlay) overlay.style.display = "none";
+      showToast("Barkod bulunamadı: " + code);
+    }
+  } catch (e) {
+    if (overlay) overlay.style.display = "none";
+    showToast("Barkod sorgulanamadı: " + (e.message || e));
   }
 }

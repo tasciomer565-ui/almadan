@@ -1,7 +1,6 @@
-const CACHE_VERSION = "almadan-v10-ux-fix";
+const CACHE_VERSION = "almadan-v19-url-parser-security";
 const APP_SHELL = [
   "/",
-  "/index.html",
   "/static/index.html",
   "/static/styles.css",
   "/static/app.js",

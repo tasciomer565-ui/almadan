@@ -1,4 +1,12 @@
-from app.parser import translate_deep_link, resolve_short_url
+from unittest.mock import Mock, patch
+
+from app.parser import (
+    normalize_product_url,
+    parse_product_url,
+    resolve_short_url,
+    title_from_product_url,
+    translate_deep_link,
+)
 
 def test_translate_deep_link():
     t1 = translate_deep_link("trendyol://?Page=Product&ContentId=123456&BoutiqueId=61")
@@ -26,6 +34,56 @@ def test_resolve_short_url():
     assert resolved2 == s2, f"Failed: {resolved2}"
 
     print("test_resolve_short_url passed!")
+
+
+def test_trendyol_url_forces_turkish_storefront():
+    url = (
+        "https://www.trendyol.com/icollagen/kolajen-ve-prebiyotik-tablet-"
+        "p-752356123?boutiqueId=61&utm_source=test"
+    )
+    response = Mock()
+    response.status_code = 200
+    response.headers = {}
+    response.text = """
+        <html><head>
+          <meta property="og:title" content="icollagen Kolajen ve Prebiyotik Tablet">
+          <meta property="product:price:amount" content="350,00">
+          <meta property="og:image" content="https://cdn.example.com/product.jpg">
+        </head></html>
+    """
+    response.raise_for_status.return_value = None
+
+    with (
+        patch("app.parser.is_public_product_url", return_value=True),
+        patch("app.parser.requests.get", return_value=response) as get,
+    ):
+        parsed = parse_product_url(url)
+
+    requested_url = get.call_args.args[0]
+    assert "countryCode=TR" in requested_url
+    assert "language=tr" in requested_url
+    assert "storefrontId=1" in requested_url
+    assert parsed.title == "icollagen Kolajen ve Prebiyotik Tablet"
+    assert parsed.price == 350.0
+
+
+def test_url_normalization_and_slug_title_fallback():
+    url = normalize_product_url(
+        "trendyol.com/icollagen/kolajen-ve-prebiyotik-tablet-p-752356123"
+        "?merchantId=1&utm_source=test"
+    )
+    assert url == (
+        "https://www.trendyol.com/icollagen/kolajen-ve-prebiyotik-tablet-"
+        "p-752356123?merchantId=1"
+    )
+    assert title_from_product_url(url) == "Kolajen Ve Prebiyotik Tablet"
+
+
+def test_private_network_product_url_is_rejected():
+    parsed = parse_product_url("http://127.0.0.1:8000/admin")
+    assert parsed.title is None
+    assert parsed.price is None
+    assert parsed.confidence == 0
 
 
 def test_detect_source():

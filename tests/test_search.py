@@ -1,6 +1,6 @@
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 from app.comparator import search_products_by_name
 
 class TestSearchByName(unittest.TestCase):
@@ -40,15 +40,10 @@ class TestSearchByName(unittest.TestCase):
             print("First item price:", results[0]["price"])
 
     def test_search_fallback_on_bogus_query(self):
-        # Search for a query that won't match anything
+        # Alakasız ürün göstermek yerine güvenli biçimde boş dönmeli.
         results = search_products_by_name("xyzabcqwerty")
         self.assertIsInstance(results, list)
-        self.assertTrue(len(results) > 0)
-        
-        # Verify that all returned items are fallback recommendations
-        for item in results:
-            self.assertIn("Önerilen Alternatif", item["labels"])
-            self.assertTrue(item["extra_info"].get("fallback"))
+        self.assertEqual(results, [])
 
     @patch("app.comparator.search_n11_direct")
     @patch("app.search_orchestrator.fetch_aol_urls_for_sites")
@@ -84,7 +79,24 @@ class TestSearchByName(unittest.TestCase):
         self.assertIn("Birim Fiyat Riski", item_200["labels"])
         self.assertNotIn("Önerilen", item_200["labels"])
 
-    def test_search_local_geographic_resonance(self):
+    @patch("app.search_orchestrator.master_search", new_callable=AsyncMock)
+    def test_search_local_geographic_resonance(self, mock_search):
+        mock_search.return_value = [{
+            "title": "Süt 1 L",
+            "price": 40.0,
+            "original_price": None,
+            "image_url": None,
+            "source": "migros",
+            "url": "https://www.migros.com.tr/sut-1-l-p-1",
+            "labels": ["Önerilen"],
+            "extra_info": {"out_of_stock": False},
+            "delivery_type": "local",
+            "delivery_time": "20-30 Dakika",
+            "delivery_cost": 0,
+            "distance_km": 1.2,
+            "latitude": 41.0082,
+            "longitude": 28.9784,
+        }]
         # Search with coordinates and hybrid mode
         results = search_products_by_name("süt", lat=41.0082, lon=28.9784, mode="hybrid")
         self.assertIsInstance(results, list)
