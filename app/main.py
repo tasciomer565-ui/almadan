@@ -45,7 +45,9 @@ from app.storage import (
     price_values,
     save_db,
     storage_diagnostics,
+    supabase_base_url,
     supabase_enabled,
+    supabase_headers,
     utc_now,
 )
 from app.tracker import refresh_all_products, refresh_owner_products, refresh_product
@@ -4202,22 +4204,28 @@ async def create_reminder(payload: ReminderPayload, request: Request, user=Depen
         "remind_before_days": payload.remind_before_days,
         "notified":           False,
     }
-    result = supabase.table("product_reminders").insert(row).execute()
-    if not result.data:
+    resp = requests.post(
+        f"{supabase_base_url()}/rest/v1/product_reminders",
+        headers={**supabase_headers(), "Prefer": "return=representation"},
+        json=row, timeout=10,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if not data:
         raise HTTPException(status_code=500, detail="Hatırlatıcı kaydedilemedi.")
-    return {**result.data[0], **dates}
+    return {**data[0], **dates}
 
 
 @app.get("/api/reminders")
 async def list_reminders(request: Request, user=Depends(require_login)):
     """Kullanıcının tüm hatırlatıcılarını listeler, tarih hesaplamalarıyla birlikte."""
-    rows = (
-        supabase.table("product_reminders")
-        .select("*")
-        .eq("user_id", user["id"])
-        .order("last_purchase_date", desc=False)
-        .execute()
-    ).data or []
+    resp = requests.get(
+        f"{supabase_base_url()}/rest/v1/product_reminders",
+        headers=supabase_headers(),
+        params={"user_id": f"eq.{user['id']}", "select": "*", "order": "last_purchase_date.asc"},
+        timeout=10,
+    )
+    rows = resp.json() if resp.ok else []
     enriched = []
     for r in rows:
         dates = _calc_reminder_dates(r["last_purchase_date"], r["reorder_days"], r["remind_before_days"])
@@ -4228,7 +4236,12 @@ async def list_reminders(request: Request, user=Depends(require_login)):
 @app.delete("/api/reminders/{reminder_id}")
 async def delete_reminder(reminder_id: str, request: Request, user=Depends(require_login)):
     """Hatırlatıcıyı siler (sadece kendi kaydı)."""
-    supabase.table("product_reminders").delete().eq("id", reminder_id).eq("user_id", user["id"]).execute()
+    requests.delete(
+        f"{supabase_base_url()}/rest/v1/product_reminders",
+        headers=supabase_headers(),
+        params={"id": f"eq.{reminder_id}", "user_id": f"eq.{user['id']}"},
+        timeout=10,
+    )
     return {"deleted": reminder_id}
 
 
@@ -4245,12 +4258,13 @@ async def cron_check_reminders(request: Request):
 
     # reminder_date <= bugün AND notified = false
     # Hesaplanan tarihler DB'de değil — uygulama katmanında filtreleriz
-    rows = (
-        supabase.table("product_reminders")
-        .select("*")
-        .eq("notified", False)
-        .execute()
-    ).data or []
+    resp = requests.get(
+        f"{supabase_base_url()}/rest/v1/product_reminders",
+        headers=supabase_headers(),
+        params={"notified": "eq.false", "select": "*"},
+        timeout=10,
+    )
+    rows = resp.json() if resp.ok else []
 
     sent = 0
     for r in rows:
@@ -4266,7 +4280,13 @@ async def cron_check_reminders(request: Request):
                 product_url=r["product_url"],
             )
             if any(result.values()):
-                supabase.table("product_reminders").update({"notified": True}).eq("id", r["id"]).execute()
+                requests.patch(
+                    f"{supabase_base_url()}/rest/v1/product_reminders",
+                    headers=supabase_headers(),
+                    params={"id": f"eq.{r['id']}"},
+                    json={"notified": True},
+                    timeout=10,
+                )
                 sent += 1
         except Exception:
             pass
@@ -4289,48 +4309,50 @@ async def list_stores(request: Request):
     Tüm aktif mağazaları döndürür.
     Giriş yapan kullanıcı için hangileri takip edildiğini de işaretler.
     """
-    stores = (
-        supabase.table("store_newsletters")
-        .select("*")
-        .eq("active", True)
-        .order("name")
-        .execute()
-    ).data or []
+    sb_url = supabase_base_url()
+    sb_hdrs = supabase_headers()
+
+    r = requests.get(
+        f"{sb_url}/rest/v1/store_newsletters",
+        headers=sb_hdrs,
+        params={"active": "eq.true", "select": "*", "order": "name.asc"},
+        timeout=10,
+    )
+    stores = r.json() if r.ok else []
 
     # Oturum varsa takip listesini çek
     followed_slugs: set[str] = set()
     try:
-        token = request.cookies.get("access_token") or request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
-        if token:
-            user_resp = supabase.auth.get_user(token)
-            if user_resp and user_resp.user:
-                rows = (
-                    supabase.table("followed_stores")
-                    .select("store_slug")
-                    .eq("user_id", user_resp.user.id)
-                    .execute()
-                ).data or []
-                followed_slugs = {r["store_slug"] for r in rows}
+        user_id = getattr(request.state, "user_id", None)
+        if user_id:
+            fr = requests.get(
+                f"{sb_url}/rest/v1/followed_stores",
+                headers=sb_hdrs,
+                params={"user_id": f"eq.{user_id}", "select": "store_slug"},
+                timeout=10,
+            )
+            followed_slugs = {row["store_slug"] for row in (fr.json() if fr.ok else [])}
     except Exception:
         pass
 
     # Takipçi sayılarını çek
     try:
-        counts_rows = (
-            supabase.table("followed_stores")
-            .select("store_slug")
-            .execute()
-        ).data or []
+        cr = requests.get(
+            f"{sb_url}/rest/v1/followed_stores",
+            headers=sb_hdrs,
+            params={"select": "store_slug"},
+            timeout=10,
+        )
         follower_counts: dict[str, int] = {}
-        for r in counts_rows:
-            slug = r["store_slug"]
-            follower_counts[slug] = follower_counts.get(slug, 0) + 1
+        for row in (cr.json() if cr.ok else []):
+            s = row["store_slug"]
+            follower_counts[s] = follower_counts.get(s, 0) + 1
     except Exception:
         follower_counts = {}
 
     for s in stores:
-        s["followed"]        = s["slug"] in followed_slugs
-        s["follower_count"]  = follower_counts.get(s["slug"], 0)
+        s["followed"]       = s["slug"] in followed_slugs
+        s["follower_count"] = follower_counts.get(s["slug"], 0)
 
     return {"stores": stores}
 
@@ -4338,23 +4360,35 @@ async def list_stores(request: Request):
 @app.post("/api/stores/{slug}/follow")
 async def follow_store(slug: str, request: Request, user=Depends(require_login)):
     """Mağazayı takip et (idempotent — zaten takip ediliyorsa sessiz döner)."""
-    store = (
-        supabase.table("store_newsletters").select("slug").eq("slug", slug).eq("active", True).execute()
-    ).data
-    if not store:
+    sb_url = supabase_base_url()
+    sb_hdrs = supabase_headers()
+    chk = requests.get(
+        f"{sb_url}/rest/v1/store_newsletters",
+        headers=sb_hdrs,
+        params={"slug": f"eq.{slug}", "active": "eq.true", "select": "slug"},
+        timeout=10,
+    )
+    if not chk.ok or not chk.json():
         raise HTTPException(status_code=404, detail="Mağaza bulunamadı.")
 
-    supabase.table("followed_stores").upsert(
-        {"user_id": user["id"], "store_slug": slug},
-        on_conflict="user_id,store_slug",
-    ).execute()
+    requests.post(
+        f"{sb_url}/rest/v1/followed_stores",
+        headers={**sb_hdrs, "Prefer": "resolution=merge-duplicates"},
+        json={"user_id": user["id"], "store_slug": slug},
+        timeout=10,
+    )
     return {"followed": slug}
 
 
 @app.delete("/api/stores/{slug}/follow")
 async def unfollow_store(slug: str, request: Request, user=Depends(require_login)):
     """Mağaza takibini bırak."""
-    supabase.table("followed_stores").delete().eq("user_id", user["id"]).eq("store_slug", slug).execute()
+    requests.delete(
+        f"{supabase_base_url()}/rest/v1/followed_stores",
+        headers=supabase_headers(),
+        params={"user_id": f"eq.{user['id']}", "store_slug": f"eq.{slug}"},
+        timeout=10,
+    )
     return {"unfollowed": slug}
 
 
@@ -4363,15 +4397,19 @@ async def store_campaigns(slug: str):
     """Mağazanın aktif kampanyalarını döndürür (herkes görebilir)."""
     from datetime import date
     today = date.today().isoformat()
-    rows = (
-        supabase.table("store_campaigns")
-        .select("*")
-        .eq("store_slug", slug)
-        .or_(f"valid_until.is.null,valid_until.gte.{today}")
-        .order("created_at", desc=True)
-        .limit(20)
-        .execute()
-    ).data or []
+    r = requests.get(
+        f"{supabase_base_url()}/rest/v1/store_campaigns",
+        headers=supabase_headers(),
+        params={
+            "store_slug": f"eq.{slug}",
+            "select": "*",
+            "or": f"(valid_until.is.null,valid_until.gte.{today})",
+            "order": "created_at.desc",
+            "limit": "20",
+        },
+        timeout=10,
+    )
+    rows = r.json() if r.ok else []
     return {"slug": slug, "campaigns": rows}
 
 
@@ -4388,8 +4426,13 @@ async def create_campaign(slug: str, request: Request, admin=Depends(require_adm
         "valid_until": body.get("valid_until"),
         "notified":    False,
     }
-    result = supabase.table("store_campaigns").insert(row).execute()
-    return result.data[0] if result.data else {}
+    resp = requests.post(
+        f"{supabase_base_url()}/rest/v1/store_campaigns",
+        headers={**supabase_headers(), "Prefer": "return=representation"},
+        json=row, timeout=10,
+    )
+    data = resp.json() if resp.ok else []
+    return data[0] if data else {}
 
 
 @app.get("/cron/store-newsletters")
@@ -4409,37 +4452,42 @@ async def cron_store_newsletters(request: Request):
     today_weekday = date.today().weekday()  # 0=Pzt … 6=Paz
     today_str     = date.today().isoformat()
 
-    # Bugün yayın günü olan mağazalar
-    active_stores = (
-        supabase.table("store_newsletters")
-        .select("slug,name")
-        .eq("active", True)
-        .execute()
-    ).data or []
+    sb_url = supabase_base_url()
+    sb_hdrs = supabase_headers()
+
+    ar = requests.get(
+        f"{sb_url}/rest/v1/store_newsletters",
+        headers=sb_hdrs,
+        params={"active": "eq.true", "select": "slug,name"},
+        timeout=10,
+    )
+    active_stores = ar.json() if ar.ok else []
 
     triggered = []
     for store in active_stores:
         slug = store["slug"]
 
-        # Bu mağazanın bildirilmemiş kampanyaları var mı?
-        campaigns = (
-            supabase.table("store_campaigns")
-            .select("*")
-            .eq("store_slug", slug)
-            .eq("notified", False)
-            .or_(f"valid_from.is.null,valid_from.lte.{today_str}")
-            .execute()
-        ).data or []
-
+        cr = requests.get(
+            f"{sb_url}/rest/v1/store_campaigns",
+            headers=sb_hdrs,
+            params={
+                "store_slug": f"eq.{slug}", "notified": "eq.false",
+                "select": "*", "or": f"(valid_from.is.null,valid_from.lte.{today_str})",
+            },
+            timeout=10,
+        )
+        campaigns = cr.json() if cr.ok else []
         if not campaigns:
             continue
 
-        # Kaç takipçi var?
-        follower_count = len(
-            (supabase.table("followed_stores").select("user_id").eq("store_slug", slug).execute()).data or []
+        fr = requests.get(
+            f"{sb_url}/rest/v1/followed_stores",
+            headers=sb_hdrs,
+            params={"store_slug": f"eq.{slug}", "select": "user_id"},
+            timeout=10,
         )
+        follower_count = len(fr.json() if fr.ok else [])
 
-        # En güncel kampanyayı al
         latest = campaigns[0]
         result = await asyncio.to_thread(
             notify_store_update,
@@ -4451,10 +4499,15 @@ async def cron_store_newsletters(request: Request):
         )
 
         if any(result.values()):
-            # Tüm bu kampanyaları notified=True yap
             ids = [c["id"] for c in campaigns]
             for cid in ids:
-                supabase.table("store_campaigns").update({"notified": True}).eq("id", cid).execute()
+                requests.patch(
+                    f"{sb_url}/rest/v1/store_campaigns",
+                    headers=sb_hdrs,
+                    params={"id": f"eq.{cid}"},
+                    json={"notified": True},
+                    timeout=10,
+                )
             triggered.append({"slug": slug, "campaigns_notified": len(ids), "followers": follower_count})
 
     return {"date": today_str, "triggered": triggered, "total_stores_checked": len(active_stores)}
