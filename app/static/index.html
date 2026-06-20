@@ -852,55 +852,33 @@
           grid.innerHTML = '<div style="grid-column:1/-1;padding:48px 24px;text-align:center;"><div style="font-size:40px;margin-bottom:12px;">🛒</div><p style="font-size:15px;font-weight:600;color:var(--ink);margin:0 0 6px;">Henüz takip edilen ürün yok</p><p style="font-size:13px;color:var(--ink-2);margin:0;">Üst kısımdan ürün linki yapıştır veya barkod tara — fiyatları karşılaştıralım.</p></div>';
         };
 
-        /* Sprint 12 — Bultenler: bulletinsView aktif olunca fallback goster */
-        function _showFallbackStores(list) {
-          var stores = [
-            {slug:'bim',name:'BİM',cat:'market',note:'Her Cuma 09:00'},
-            {slug:'a101',name:'A101',cat:'market',note:'Her Perşembe'},
-            {slug:'sok',name:'ŞOK',cat:'market',note:'Her Çarşamba'},
-            {slug:'migros',name:'Migros',cat:'market',note:'Haftalık değişken'},
-            {slug:'carrefour',name:'CarrefourSA',cat:'market',note:'Haftalık değişken'},
-            {slug:'gratis',name:'Gratis',cat:'beauty',note:'Kampanya dönemlerinde'},
-            {slug:'karaca',name:'Karaca',cat:'home',note:'Sezon ve özel günlerde'},
-            {slug:'trendyol',name:'Trendyol',cat:'fashion',note:'Büyük indirim günlerinde'},
-            {slug:'hepsiburada',name:'Hepsiburada',cat:'fashion',note:'Büyük indirim günlerinde'},
-            {slug:'lcwaikiki',name:'LC Waikiki',cat:'fashion',note:'Sezon geçişlerinde'}
-          ];
-          var E = {market:'🛒',fashion:'👗',beauty:'💄',home:'🏠'};
-          var L = {market:'Marketler',fashion:'Moda',beauty:'Güzellik',home:'Ev & Yaşam'};
-          var g = {};
-          stores.forEach(function(s){ (g[s.cat]=g[s.cat]||[]).push(s); });
-          var html = '';
-          ['market','fashion','beauty','home'].forEach(function(cat){
-            if(!g[cat]) return;
-            html += '<p style="font-size:11px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px;">'+E[cat]+' '+L[cat]+'</p><div class="store-grid">';
-            g[cat].forEach(function(s){
-              html += '<div class="store-card" id="scard-'+s.slug+'"><div class="store-card-header"><span class="store-emoji">'+E[s.cat]+'</span><div><div class="store-name">'+s.name+'</div></div></div><div class="store-note">📅 '+s.note+'</div><button class="btn-follow" onclick="toggleFollow(\''+s.slug+'\',\''+s.name+'\')">+ Takibe Al</button></div>';
-            });
-            html += '</div>';
-          });
-          list.innerHTML = html;
-        }
-        var _bvObs = new MutationObserver(function() {
-          var bv = document.getElementById('bulletinsView');
-          if (!bv || bv.classList.contains('hidden')) return;
-          // Bültenler aktif — storeList'i izle
+        /* Sprint 12 — Bultenler: polling ile fallback mağaza listesi */
+        window._almadanShowStores = function() {
           var list = document.getElementById('storeList');
           if (!list) return;
-          var _slObs = new MutationObserver(function() {
-            var isLoading = !!list.querySelector('.loading-row');
-            var isEmpty = list.innerHTML.includes('eklenmemiş') || list.innerHTML.includes('yüklenemedi');
-            if (isEmpty) { _slObs.disconnect(); _showFallbackStores(list); return; }
-            if (!isLoading) _slObs.disconnect();
+          var stores=[['bim','BİM','market','Her Cuma 09:00'],['a101','A101','market','Her Perşembe'],['sok','ŞOK','market','Her Çarşamba'],['migros','Migros','market','Haftalık değişken'],['carrefour','CarrefourSA','market','Haftalık değişken'],['gratis','Gratis','beauty','Kampanya dönemlerinde'],['karaca','Karaca','home','Sezon ve özel günlerde'],['trendyol','Trendyol','fashion','Büyük indirim günlerinde'],['hepsiburada','Hepsiburada','fashion','Büyük indirim günlerinde'],['lcwaikiki','LC Waikiki','fashion','Sezon geçişlerinde']];
+          var E={market:'🛒',fashion:'👗',beauty:'💄',home:'🏠'};
+          var L={market:'Marketler',fashion:'Moda',beauty:'Güzellik',home:'Ev & Yaşam'};
+          var g={};
+          stores.forEach(function(s){(g[s[2]]=g[s[2]]||[]).push(s);});
+          var html='';
+          ['market','fashion','beauty','home'].forEach(function(cat){
+            if(!g[cat])return;
+            html+='<p style="font-size:11px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px;">'+E[cat]+' '+L[cat]+'</p><div class="store-grid">';
+            g[cat].forEach(function(s){html+='<div class="store-card" id="scard-'+s[0]+'"><div class="store-card-header"><span class="store-emoji">'+E[s[2]]+'</span><div><div class="store-name">'+s[1]+'</div></div></div><div class="store-note">📅 '+s[3]+'</div><button class="btn-follow" onclick="toggleFollow(\''+s[0]+'\',\''+s[1]+'\')">+ Takibe Al</button></div>';});
+            html+='</div>';
           });
-          _slObs.observe(list, {childList:true, subtree:true});
-          // 4 saniye sonra hala loading gösteriyorsa fallback
-          setTimeout(function() {
-            if (list.querySelector('.loading-row')) { _showFallbackStores(list); }
-          }, 4000);
-        });
-        var _bvEl = document.getElementById('bulletinsView');
-        if (_bvEl) _bvObs.observe(_bvEl, {attributes:true, attributeFilter:['class']});
+          list.innerHTML=html;
+        };
+        var _storeTimer = setInterval(function() {
+          var bv = document.getElementById('bulletinsView');
+          var list = document.getElementById('storeList');
+          if (!bv || !list) return;
+          var bvActive = !bv.classList.contains('hidden');
+          var needsFallback = bvActive && (!!list.querySelector('.loading-row') || list.innerHTML.includes('eklenmemiş') || list.innerHTML.includes('yüklenemedi'));
+          if (needsFallback) { clearInterval(_storeTimer); window._almadanShowStores(); }
+          if (!needsFallback && bvActive && list.querySelector('.store-card')) clearInterval(_storeTimer);
+        }, 500);
 
         /* Sprint 12 — intro-band sadece Kesfet sekmesinde goster */
         var introBand = document.querySelector('.intro-band');
