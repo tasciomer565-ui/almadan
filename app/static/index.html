@@ -852,6 +852,47 @@
           grid.innerHTML = '<div style="grid-column:1/-1;padding:48px 24px;text-align:center;"><div style="font-size:40px;margin-bottom:12px;">🛒</div><p style="font-size:15px;font-weight:600;color:var(--ink);margin:0 0 6px;">Henüz takip edilen ürün yok</p><p style="font-size:13px;color:var(--ink-2);margin:0;">Üst kısımdan ürün linki yapıştır veya barkod tara — fiyatları karşılaştıralım.</p></div>';
         };
 
+        /* Sprint 12 — Bultenler: API bos donunce fallback liste goster */
+        var _origLoadStores = window.loadStores;
+        window.loadStores = async function() {
+          var list = document.getElementById('storeList');
+          if (!list) return;
+          try {
+            var res = await fetch('/api/stores', {cache:'no-store'});
+            var data = await res.json();
+            if (data.stores && data.stores.length > 0) {
+              if (typeof _origLoadStores === 'function') return _origLoadStores();
+              return;
+            }
+          } catch(e) {}
+          // Fallback: hardcoded mağaza listesi (DB migration bekleniyor)
+          var stores = [
+            {slug:'bim',name:'BİM',category:'market',publication_note:'Her Cuma 09:00',followed:false},
+            {slug:'a101',name:'A101',category:'market',publication_note:'Her Perşembe',followed:false},
+            {slug:'sok',name:'ŞOK',category:'market',publication_note:'Her Çarşamba',followed:false},
+            {slug:'migros',name:'Migros',category:'market',publication_note:'Haftalık değişken',followed:false},
+            {slug:'carrefour',name:'CarrefourSA',category:'market',publication_note:'Haftalık değişken',followed:false},
+            {slug:'gratis',name:'Gratis',category:'beauty',publication_note:'Kampanya dönemlerinde',followed:false},
+            {slug:'karaca',name:'Karaca',category:'home',publication_note:'Sezon ve özel günlerde',followed:false},
+            {slug:'trendyol',name:'Trendyol',category:'fashion',publication_note:'Büyük indirim günlerinde',followed:false},
+            {slug:'hepsiburada',name:'Hepsiburada',category:'fashion',publication_note:'Büyük indirim günlerinde',followed:false},
+            {slug:'lcwaikiki',name:'LC Waikiki',category:'fashion',publication_note:'Sezon geçişlerinde',followed:false}
+          ];
+          var CAT = {market:'🛒 Marketler',fashion:'👗 Moda',beauty:'💄 Güzellik',home:'🏠 Ev & Yaşam'};
+          var groups = {};
+          stores.forEach(function(s){ (groups[s.category]=groups[s.category]||[]).push(s); });
+          var html = '<div style="margin-bottom:16px;padding:10px 12px;background:var(--green-bg);border-radius:8px;font-size:12px;color:var(--ink-2);">Mağaza bülteni takibi için üye ol ve mağazaları takibe al.</div>';
+          ['market','fashion','beauty','home'].forEach(function(cat){
+            if(!groups[cat]) return;
+            html += '<div style="font-size:11px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px;">'+CAT[cat]+'</div><div class="store-grid">';
+            groups[cat].forEach(function(s){
+              html += '<div class="store-card" id="scard-'+s.slug+'"><div class="store-card-header"><span class="store-emoji">'+(cat==='market'?'🛒':cat==='fashion'?'👗':cat==='beauty'?'💄':'🏠')+'</span><div><div class="store-name">'+s.name+'</div><div class="store-cat">'+s.category+'</div></div></div>'+(s.publication_note?'<div class="store-note">📅 '+s.publication_note+'</div>':'')+'<button class="btn-follow" onclick="toggleFollow(\''+s.slug+'\',\''+s.name+'\')">+ Takibe Al</button></div>';
+            });
+            html += '</div>';
+          });
+          list.innerHTML = html;
+        };
+
         /* Sprint 12 — intro-band sadece Kesfet sekmesinde goster */
         var introBand = document.querySelector('.intro-band');
         function updateIntroBand(view) {
