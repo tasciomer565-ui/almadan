@@ -829,6 +829,25 @@
 
     <script defer src="/static/app.js?v=20260617-barcode"></script>
     <script>
+      /* Sprint 12 — loadSession override: daima cache bypass ile auth/session cek */
+      document.addEventListener('DOMContentLoaded', function() {
+        window.loadSession = async function() {
+          try {
+            var resp = await fetch('/auth/session', {cache: 'no-store'});
+            var data = await resp.json();
+            if (typeof state !== 'undefined') {
+              state.auth = data;
+              if (typeof renderAccountButton === 'function') renderAccountButton();
+              if (typeof handleCategoryChange === 'function') handleCategoryChange();
+              setTimeout(function() { if (typeof showOnboarding === 'function') showOnboarding(); }, 800);
+            }
+          } catch(e) {
+            if (typeof state !== 'undefined')
+              state.auth = {enabled: false, authenticated: false, user: null};
+          }
+        };
+      });
+
       /* Sprint 12 — demo urunleri kaldir (app.js cache bypass) */
       window.addEventListener('load', function() {
         window.renderFallbackOpportunities = function() {
