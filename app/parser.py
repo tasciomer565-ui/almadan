@@ -740,19 +740,28 @@ def parse_product_url(url: str) -> ParsedProduct:
 
     try:
         fetch_url = product_fetch_url(url, source)
-        response = safe_product_get(
-            fetch_url,
-            headers={
-                "User-Agent": USER_AGENT,
-                "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
-                "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
-                "Cache-Control": "no-cache",
-                "Referer": "https://www.google.com/",
-            },
-            cookies={"countryCode": "TR", "language": "tr", "storefrontId": "1"},
-            timeout=20,
-        )
-        response.raise_for_status()
+        from app.scraping_proxy import proxy_enabled, proxy_get
+        if proxy_enabled():
+            html = proxy_get(fetch_url, render_js=False, timeout=15)
+            if html:
+                response_text = html
+            else:
+                raise requests.RequestException("Proxy ile sayfa içeriği çekilemedi.")
+        else:
+            response = safe_product_get(
+                fetch_url,
+                headers={
+                    "User-Agent": USER_AGENT,
+                    "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
+                    "Cache-Control": "no-cache",
+                    "Referer": "https://www.google.com/",
+                },
+                cookies={"countryCode": "TR", "language": "tr", "storefrontId": "1"},
+                timeout=20,
+            )
+            response.raise_for_status()
+            response_text = response.text
     except requests.RequestException as e:
         fallback_title = title_from_product_url(url)
         return ParsedProduct(
@@ -771,7 +780,7 @@ def parse_product_url(url: str) -> ParsedProduct:
             extra_info={},
         )
 
-    soup = BeautifulSoup(response.text, "lxml")
+    soup = BeautifulSoup(response_text, "lxml")
     canonical_url = first_meta(soup, ["og:url"]) or url
 
     title, price, image_url = extract_from_json_ld(soup)
