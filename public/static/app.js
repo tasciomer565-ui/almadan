@@ -7043,7 +7043,16 @@ const LINK_GUIDE_APPS = [
   {
     icon: "🛒",
     name: "Migros, CarrefourSA, A101, BİM",
-    steps: "Ürün sayfasını aç → tarayıcının <b>adres çubuğuna</b> dokun → linki kopyala → Almadan'a yapıştır.",
+    steps: `Ürün sayfasını aç → tarayıcının <b>adres çubuğuna</b> dokun → linki kopyala → Almadan'a yapıştır.
+            <div style="margin-top: 6px;">
+              <a href="#" onclick="event.preventDefault(); const d = document.getElementById('marketAppsDetails'); if(d.style.display==='none'){d.style.display='block'; this.innerText='Mobil uygulamalar için anlatımı gizle ▴';}else{d.style.display='none'; this.innerText='Mobil uygulamalar için tek tek anlatım ▾';}" style="color: var(--green); font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 4px 0;">Mobil uygulamalar için tek tek anlatım ▾</a>
+            </div>
+            <div id="marketAppsDetails" style="display: none; margin-top: 8px; padding: 12px; background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05); border-radius: 8px; font-size: 13px; line-height: 1.6; color: var(--ink);">
+              <div style="margin-bottom: 6px;"><b>Migros:</b> Ürün sayfasının sağ üst köşesindeki <i>Paylaş</i> butonuna bas → <i>Bağlantıyı Kopyala</i>'yı seç.</div>
+              <div style="margin-bottom: 6px;"><b>CarrefourSA:</b> Ürün detayında sağ üstteki <i>Paylaş</i> ikonuna tıkla → <i>Kopyala</i>'yı seç.</div>
+              <div style="margin-bottom: 6px;"><b>A101:</b> Ürün görselinin sağ üst kısmındaki <i>Paylaş</i> simgesine dokun → <i>Bağlantıyı Kopyala</i>.</div>
+              <div><b>BİM:</b> Ürün detay sayfasında <i>Paylaş</i> butonuna bas → <i>Panoya Kopyala</i> işlemini yap.</div>
+            </div>`,
   },
   {
     icon: "📦",
