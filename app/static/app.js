@@ -2257,7 +2257,13 @@ function showParsedProduct(parsed) {
           <input id="parsedPrice" type="text" inputmode="decimal" value="${parsed.price ?? ""}" placeholder="Örn. 1849,90">
         </label>
         <label class="manual-field">
-          <span>Hedef Fiyat Eşiği (Alarm)</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <span>Hedef Fiyat Eşiği (Alarm)</span>
+            <label style="display:flex; align-items:center; gap:4px; cursor:pointer; margin:0;">
+              <input type="checkbox" id="parsedStockAlarm" style="width:14px;height:14px;accent-color:var(--green);">
+              <span style="font-size:10.5px; color:var(--ink-2); font-weight:700; text-transform:uppercase;">Stok Takibi</span>
+            </label>
+          </div>
           <input id="parsedTargetPrice" type="text" inputmode="decimal" placeholder="Bu fiyata düşünce haber ver (İsteğe bağlı)">
         </label>
         <label class="manual-field">
@@ -2417,16 +2423,33 @@ async function findAlternativeSellers(parsed) {
         }
       }
 
+      // Sepet İndirimi Analizi (Cart & Coupon Intelligence)
+      let cartDiscountText = "";
+      let finalPriceToDisplay = a.price.toFixed(2);
+      let oldPriceDisplay = a.original_price && a.original_price > a.price ? `<div style="font-size:10px; color:#ff6b6b; text-decoration:line-through; font-weight: 500; margin-top: 2px;">₺${a.original_price.toFixed(2)}</div>` : '';
+      
+      const cartMatch = a.title.match(/sepette\s*%(\d+)/i);
+      if (cartMatch) {
+        const discountPercent = parseInt(cartMatch[1], 10);
+        if (discountPercent > 0 && discountPercent < 100) {
+          const discountedPrice = a.price * (1 - (discountPercent / 100));
+          finalPriceToDisplay = `<span style="color:#00e676;">₺${discountedPrice.toFixed(2)}</span>`;
+          oldPriceDisplay = `<div style="font-size:10px; color:#ff6b6b; text-decoration:line-through; font-weight: 500; margin-top: 2px;">Etiket: ₺${a.price.toFixed(2)}</div>`;
+          cartDiscountText = `<div style="font-size:9.5px; background:rgba(0,230,118,0.15); color:#00e676; padding:2px 6px; border-radius:4px; font-weight:700; margin-top:4px;">Sepette %${discountPercent} İndirim</div>`;
+        }
+      }
+
       html += `
         <div class="alt-seller-card" style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-lighter); padding:10px 12px; border-radius:8px; font-size:13px; cursor:pointer; border: 1px solid rgba(255,255,255,0.05); transition: 0.2s;" onclick="selectAlternativeSeller(this)" data-alt='${altJson}'>
           <div style="display:flex; flex-direction:column; max-width:65%;">
             <span style="font-weight:600; color:#e8ede8;">${escapeHtml(a.source)}</span>
             <span style="color:#a0aab0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;">${escapeHtml(a.title)}</span>
             ${badgesHtml}
+            ${cartDiscountText}
           </div>
           <div style="font-weight:800; color:var(--green); text-align:right; font-size: 14px; display:flex; flex-direction:column; align-items:flex-end;">
-            <span>₺${a.price.toFixed(2)}</span>
-            ${a.original_price && a.original_price > a.price ? `<div style="font-size:10px; color:#ff6b6b; text-decoration:line-through; font-weight: 500; margin-top: 2px;">₺${a.original_price.toFixed(2)}</div>` : ''}
+            <span>${finalPriceToDisplay}</span>
+            ${oldPriceDisplay}
             ${unitPriceText}
           </div>
         </div>
@@ -2872,11 +2895,15 @@ function openProduct(id) {
         <button class="secondary-button" style="width: 100%; font-size: 12px; height: 34px;" onclick="window.saveRestockTracking('${product.id}')">Takip Ayarlarını Kaydet</button>
       </div>
       <div class="dialog-actions">
-        <button class="danger-button" type="button" onclick="removeTrackedProduct('${product.id}')">
+        <button class="secondary-button" style="flex:1;" type="button" onclick="showToast('Koleksiyonlar özelliği çok yakında aktif olacak!')">
+          <i data-lucide="bookmark-plus"></i>
+          Listeye Ekle
+        </button>
+        <button class="danger-button" style="flex:1;" type="button" onclick="removeTrackedProduct('${product.id}')">
           <i data-lucide="trash-2"></i>
           Takipten çıkar
         </button>
-        <button class="primary-button" onclick="window.open(${inlineJsArg(safeHttpUrl(product.url))}, '_blank', 'noopener,noreferrer')">
+        <button class="primary-button" style="flex:1;" onclick="window.open(${inlineJsArg(safeHttpUrl(product.url))}, '_blank', 'noopener,noreferrer')">
           <i data-lucide="external-link"></i>
           Mağazaya git
         </button>
@@ -2885,11 +2912,34 @@ function openProduct(id) {
         <i data-lucide="refresh-cw"></i>
         Şimdi otomatik kontrol et
       </button>
+
+      <!-- Topluluk İncelemeleri -->
+      <div class="manual-fields" style="margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px;">
+        <h3 style="font-size: 14px; margin-bottom: 8px; color: var(--ink); display:flex; align-items:center; gap:6px;">
+          <i data-lucide="message-square" style="width:16px;height:16px;"></i> Topluluk İncelemeleri
+        </h3>
+        <div id="reviewsList" style="display:flex; flex-direction:column; gap:8px; margin-bottom: 12px; max-height: 200px; overflow-y: auto;">
+           <div class="loading-row" style="margin:0;"><span class="spinner" style="width:14px;height:14px;border-width:2px;border-color:#a0aab0;border-top-color:transparent;"></span><span style="font-size:12px;color:#a0aab0;">Yorumlar yükleniyor...</span></div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+           <input type="text" id="reviewComment" placeholder="Bu fiyat/satıcı hakkında ne düşünüyorsun?" style="flex:1; padding: 8px; font-size:12px; border-radius:6px; background:var(--bg-lighter); border:1px solid var(--line); color:var(--ink);">
+           <select id="reviewRating" style="padding: 8px; font-size:12px; border-radius:6px; background:var(--bg-lighter); border:1px solid var(--line); color:var(--ink); width:auto;">
+              <option value="5">⭐⭐⭐⭐⭐</option>
+              <option value="4">⭐⭐⭐⭐</option>
+              <option value="3">⭐⭐⭐</option>
+              <option value="2">⭐⭐</option>
+              <option value="1">⭐</option>
+           </select>
+           <button class="primary-button" style="padding: 8px 12px;" onclick="submitProductReview('${product.id}')">Gönder</button>
+        </div>
+      </div>
     </div>
   `;
 
   dialog.showModal();
   lucide.createIcons();
+  
+  loadProductReviews(product.id);
 
   // Grafik çizimi
   setTimeout(() => {
@@ -2960,6 +3010,56 @@ function openProduct(id) {
     });
   }, 100);
 }
+
+window.loadProductReviews = async function(productId) {
+  const list = document.getElementById("reviewsList");
+  if (!list) return;
+  try {
+    const res = await fetch(`/api/products/${productId}/reviews`);
+    const data = await res.json();
+    if (!data.reviews || data.reviews.length === 0) {
+      list.innerHTML = `<div style="font-size:12px; color:#a0aab0; text-align:center; padding: 10px;">Henüz yorum yapılmamış. İlk değerlendiren sen ol!</div>`;
+      return;
+    }
+    list.innerHTML = data.reviews.map(r => `
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;">
+         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+            <span style="font-weight:700; font-size:11px; color:#e8ede8;">${escapeHtml(r.user_name)}</span>
+            <span style="font-size:10px;">${"⭐".repeat(r.rating)}</span>
+         </div>
+         <div style="font-size:12px; color:#a0aab0;">${escapeHtml(r.comment)}</div>
+      </div>
+    `).join("");
+  } catch (err) {
+    list.innerHTML = `<div style="font-size:12px; color:#ff6b6b; text-align:center;">Yorumlar yüklenemedi.</div>`;
+  }
+};
+
+window.submitProductReview = async function(productId) {
+  const commentInput = document.getElementById("reviewComment");
+  const ratingInput = document.getElementById("reviewRating");
+  if (!commentInput || !ratingInput) return;
+  
+  const comment = commentInput.value.trim();
+  if (!comment) return showToast("Lütfen bir yorum yazın.");
+  
+  try {
+    const res = await fetch(`/api/products/${productId}/reviews`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-device-id": deviceId },
+      body: JSON.stringify({ rating: parseInt(ratingInput.value), comment: comment })
+    });
+    if (res.ok) {
+      commentInput.value = "";
+      showToast("Yorumunuz eklendi!");
+      loadProductReviews(productId);
+    } else {
+      showToast("Yorum eklenirken hata oluştu.");
+    }
+  } catch (e) {
+    showToast("Bağlantı hatası.");
+  }
+};
 
 async function updateProductPrice(productId) {
   const input = document.getElementById("newPriceInput");

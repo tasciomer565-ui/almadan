@@ -799,6 +799,11 @@ class AlternativesRequest(BaseModel):
     title: str
     original_url: str | None = None
 
+class ReviewCreateRequest(BaseModel):
+    user_name: str | None = "Anonim Kullanıcı"
+    rating: int = Field(ge=1, le=5)
+    comment: str
+
 class UrlParseRequest(BaseModel):
     url: str = Field(min_length=5)
 
@@ -1615,6 +1620,46 @@ def add_product_from_url(
     background_tasks.add_task(update_product_comparison, product["id"])
     
     return enrich_product(product)
+
+
+@app.get("/api/products/{product_id}/reviews")
+def get_reviews(product_id: str) -> dict:
+    db = load_db()
+    reviews = db.get("reviews", [])
+    product_reviews = [r for r in reviews if r.get("product_id") == product_id]
+    # En yeniler en üstte
+    product_reviews.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return {"reviews": product_reviews}
+
+
+@app.post("/api/products/{product_id}/reviews")
+def add_review(
+    product_id: str,
+    payload: ReviewCreateRequest,
+    request: Request,
+    x_device_id: str | None = Header(default=None),
+) -> dict:
+    owner_id = request_owner_id(request, x_device_id)
+    db = load_db()
+    
+    if "reviews" not in db:
+        db["reviews"] = []
+        
+    import uuid
+    from datetime import datetime, timezone
+    new_review = {
+        "id": str(uuid.uuid4()),
+        "product_id": product_id,
+        "owner_id": owner_id,
+        "user_name": payload.user_name or "Anonim Kullanıcı",
+        "rating": payload.rating,
+        "comment": payload.comment,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    db["reviews"].append(new_review)
+    save_db(db)
+    
+    return {"status": "success", "review": new_review}
 
 
 @app.post("/products/{product_id}/compare")

@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Almadan Akıllı Asistan",
+  "version": "1.0",
+  "description": "Alışveriş yaparken aynı ürünü başka nerede daha ucuza alabileceğinizi gösterir.",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": [
+    "*://*.trendyol.com/*",
+    "*://*.hepsiburada.com/*",
+    "*://*.amazon.com.tr/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.trendyol.com/*",
+        "*://*.hepsiburada.com/*",
+        "*://*.amazon.com.tr/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "128": "icon.png"
+  }
+}

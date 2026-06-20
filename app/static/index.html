@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Almadan">
-    <link rel="manifest" href="/static/manifest.webmanifest">
+    <link rel="manifest" href="/static/manifest.json">
     <link rel="apple-touch-icon" href="/static/icon-192.png">
     <link rel="icon" href="data:image/x-icon;,">
     <title>Almadan - Alışveriş Karar Asistanı</title>
@@ -1179,6 +1179,20 @@
             var dot = document.querySelector('.notification-dot');
             if (dot) dot.style.display = unread.length ? '' : 'none';
           }).catch(function(){});
+          
+        /* PWA Service Worker & Push Kaydı */
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/static/sw.js').then(function(reg) {
+              console.log('SW Kayıt Başarılı:', reg.scope);
+              if (Notification.permission === 'default') {
+                setTimeout(() => Notification.requestPermission(), 3000);
+              }
+            }).catch(function(err) {
+              console.log('SW Kayıt Hatası:', err);
+            });
+          });
+        }
       });
     </script>
   </body>

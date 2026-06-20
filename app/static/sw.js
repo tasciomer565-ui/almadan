@@ -1,124 +1,36 @@
-const CACHE_VERSION = "almadan-v19-url-parser-security";
-const APP_SHELL = [
-  "/",
-  "/static/index.html",
-  "/static/styles.css",
-  "/static/app.js",
-  "/static/manifest.webmanifest",
-  "/static/icon-192.png",
-  "/static/icon-512.png",
-  "/static/sw.js",
-];
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_VERSION)
-      .then((cache) => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting()),
-  );
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
 });
 
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(
-        keys.filter((key) => key !== CACHE_VERSION).map((key) => caches.delete(key)),
-      ))
-      .then(() => self.clients.claim()),
-  );
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-
-  const url = new URL(event.request.url);
-  const isNavigation = event.request.mode === "navigate";
-  const isStatic = url.origin === self.location.origin
-    && (url.pathname.startsWith("/static/") || url.pathname === "/sw.js");
-  const isOfflineApi = url.origin === self.location.origin
-    && url.pathname.startsWith("/api/barcode/");
-
-  if (isNavigation) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put("/", copy));
-          return response;
-        })
-        .catch(() => caches.match("/")),
-    );
-    return;
-  }
-
-  if (isStatic) {
-    event.respondWith(
-      caches.match(event.request).then((cached) => (
-        cached
-        || fetch(event.request).then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, copy));
-          return response;
-        })
-      )),
-    );
-    return;
-  }
-
-  if (isOfflineApi) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, copy));
-          return response;
-        })
-        .catch(() => caches.match(event.request)),
-    );
-  }
-});
-
-self.addEventListener("push", (event) => {
-  let payload = {
-    title: "Almadan",
-    body: "Takip ettiğin bir üründe yeni bir fırsat var.",
-    url: "/",
-    tag: "almadan-price-alert",
-  };
-
+self.addEventListener('push', function(event) {
+  let data = { title: "Almadan", message: "Yeni bir bildiriminiz var!" };
   if (event.data) {
     try {
-      payload = { ...payload, ...event.data.json() };
-    } catch {
-      payload.body = event.data.text();
+      data = event.data.json();
+    } catch(e) {
+      data.message = event.data.text();
     }
   }
 
+  const options = {
+    body: data.message,
+    icon: 'https://img.icons8.com/color/192/shopping-cart--v1.png',
+    badge: 'https://img.icons8.com/color/96/shopping-cart--v1.png',
+    data: data.url || '/'
+  };
+
   event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      tag: payload.tag,
-      data: { url: payload.url || "/" },
-      renotify: true,
-    }),
+    self.registration.showNotification(data.title, options)
   );
 });
 
-self.addEventListener("notificationclick", (event) => {
+self.addEventListener('notificationclick', function(event) {
   event.notification.close();
-  const targetUrl = new URL(
-    event.notification.data?.url || "/",
-    self.location.origin,
-  ).href;
-
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
-      const existing = windows.find((client) => client.url.startsWith(self.location.origin));
-      if (existing) {
-        existing.navigate(targetUrl);
-        return existing.focus();
-      }
-      return clients.openWindow(targetUrl);
-    }),
+    clients.openWindow(event.notification.data)
   );
 });
