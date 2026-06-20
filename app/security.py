@@ -106,6 +106,7 @@ CSRF_EXEMPT_PATHS = {
     "/api/search",
     "/api/vton/",
     "/cron/",
+    "/parse-url",
 }
 CSRF_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
