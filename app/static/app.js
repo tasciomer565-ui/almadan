@@ -2398,16 +2398,36 @@ async function findAlternativeSellers(parsed) {
 
       const badgesHtml = badges.length > 0 ? `<div style="display:flex; gap:4px; margin-top:4px; flex-wrap:wrap;">${badges.join("")}</div>` : '';
 
+      // Birim Fiyat Analizi (Unit Price Comparison)
+      let unitPriceText = "";
+      const match = a.title.match(/(\d+(?:[.,]\d+)?)\s*(kg|g|gr|ml|l|lt|litre)\b/i);
+      if (match) {
+        let val = parseFloat(match[1].replace(',', '.'));
+        let unit = match[2].toLowerCase();
+        let qtyInBase = 0;
+        let baseUnit = "";
+        if (unit === 'g' || unit === 'gr') { qtyInBase = val / 1000; baseUnit = "KG"; }
+        else if (unit === 'kg') { qtyInBase = val; baseUnit = "KG"; }
+        else if (unit === 'ml') { qtyInBase = val / 1000; baseUnit = "Litre"; }
+        else if (unit === 'l' || unit === 'lt' || unit === 'litre') { qtyInBase = val; baseUnit = "Litre"; }
+        
+        if (qtyInBase > 0) {
+          const unitPrice = a.price / qtyInBase;
+          unitPriceText = `<div style="font-size:10.5px; color:#a0aab0; font-weight:500; margin-top:3px; border-top: 1px solid rgba(255,255,255,0.05); padding-top:2px;">Birim: ₺${unitPrice.toFixed(2)} / ${baseUnit}</div>`;
+        }
+      }
+
       html += `
         <div class="alt-seller-card" style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-lighter); padding:10px 12px; border-radius:8px; font-size:13px; cursor:pointer; border: 1px solid rgba(255,255,255,0.05); transition: 0.2s;" onclick="selectAlternativeSeller(this)" data-alt='${altJson}'>
-          <div style="display:flex; flex-direction:column; max-width:70%;">
+          <div style="display:flex; flex-direction:column; max-width:65%;">
             <span style="font-weight:600; color:#e8ede8;">${escapeHtml(a.source)}</span>
             <span style="color:#a0aab0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;">${escapeHtml(a.title)}</span>
             ${badgesHtml}
           </div>
-          <div style="font-weight:800; color:var(--green); text-align:right; font-size: 14px;">
-            ₺${a.price.toFixed(2)}
+          <div style="font-weight:800; color:var(--green); text-align:right; font-size: 14px; display:flex; flex-direction:column; align-items:flex-end;">
+            <span>₺${a.price.toFixed(2)}</span>
             ${a.original_price && a.original_price > a.price ? `<div style="font-size:10px; color:#ff6b6b; text-decoration:line-through; font-weight: 500; margin-top: 2px;">₺${a.original_price.toFixed(2)}</div>` : ''}
+            ${unitPriceText}
           </div>
         </div>
       `;
