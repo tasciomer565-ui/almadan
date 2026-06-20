@@ -6824,9 +6824,17 @@ function toggleReminderForm(itemId) {
 
 /* ── Mağaza Bültenleri ───────────────────────────────────────────────────── */
 
-const STORE_EMOJIS     = { market: "🛒", fashion: "👗", beauty: "💄", home: "🏠" };
 const storeFollowState  = {};
 const storeFollowerCounts = {};
+
+function getStoreColor(slug) {
+  let hash = 0;
+  for (let i = 0; i < slug.length; i++) {
+    hash = slug.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 75%, 45%)`;
+}
 
 async function loadStores() {
   const list = document.getElementById("storeList");
@@ -6835,7 +6843,7 @@ async function loadStores() {
   try {
     const res    = await fetch("/api/stores");
     const data   = await res.json();
-    const stores = data.stores || [];
+    const stores = data.stores || data;
 
     if (!stores.length) { list.innerHTML = `<p class="empty-state">Henüz mağaza eklenmemiş.</p>`; return; }
 
@@ -6846,7 +6854,6 @@ async function loadStores() {
 
     let html = "";
 
-    // Takip Ettiklerim bölümü
     const followed = stores.filter(s => s.followed);
     if (followed.length) {
       html += `<div class="store-section-title">⭐ Takip Ettiklerim</div><div class="store-grid">`;
@@ -6854,12 +6861,11 @@ async function loadStores() {
       html += `</div>`;
     }
 
-    // Tüm mağazalar kategoriye göre
     const groups = {};
     stores.forEach(s => (groups[s.category] = groups[s.category] || []).push(s));
-    const CAT_LABELS = { market: "Marketler", fashion: "Moda", beauty: "Güzellik & Kozmetik", home: "Ev & Yaşam" };
+    const CAT_LABELS = { market: "Marketler", tech: "Teknoloji", beauty: "Kozmetik & Kişisel Bakım", fashion: "Giyim & Moda", health: "Sağlık & Optik", home: "Ev & Yaşam", online: "Pazaryeri" };
     html += `<div class="store-section-title" style="margin-top:${followed.length ? "24px" : "0"}">🏪 Tüm Mağazalar</div>`;
-    ["market", "fashion", "beauty", "home"].forEach(cat => {
+    ["market", "tech", "beauty", "fashion", "health", "home", "online"].forEach(cat => {
       if (!groups[cat]?.length) return;
       html += `<div class="store-section-title" style="font-size:11px;margin-top:12px;">${CAT_LABELS[cat] || cat}</div><div class="store-grid">`;
       html += groups[cat].map(s => renderStoreCard(s)).join("");
@@ -6874,12 +6880,13 @@ async function loadStores() {
 function renderStoreCard(s) {
   const followed = storeFollowState[s.slug];
   const count    = storeFollowerCounts[s.slug] || 0;
-  const emoji    = STORE_EMOJIS[s.category] || "🏪";
   const countTxt = count > 0 ? `👥 ${count} kişi takipte` : "İlk takipçi ol!";
+  const initial  = escapeHtml(s.name.charAt(0).toUpperCase());
+  const bgColor  = getStoreColor(s.slug);
   return `
     <div class="store-card ${followed ? "followed" : ""}" id="scard-${s.slug}">
       <div class="store-card-header">
-        <span class="store-emoji">${emoji}</span>
+        <div class="store-avatar" style="background-color: ${bgColor}; color: white; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${initial}</div>
         <div>
           <div class="store-name">${escapeHtml(s.name)}</div>
           <div class="store-cat">${escapeHtml(s.category)}</div>

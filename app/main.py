@@ -4353,18 +4353,47 @@ _WEEKDAY_MAP = {
     "friday": 4, "saturday": 5, "sunday": 6,
 }
 
-DEFAULT_STORE_NEWSLETTERS = [
-    {"slug": "bim", "name": "BİM", "category": "market", "publication_note": "Her Cuma yeni kampanya"},
-    {"slug": "a101", "name": "A101", "category": "market", "publication_note": "Her Perşembe indirimler"},
-    {"slug": "sok", "name": "ŞOK", "category": "market", "publication_note": "Her Çarşamba fırsatlar"},
-    {"slug": "migros", "name": "Migros", "category": "market", "publication_note": "Haftalık kampanyalar"},
-    {"slug": "carrefour", "name": "CarrefourSA", "category": "market", "publication_note": "Haftalık kampanyalar"},
-    {"slug": "karaca", "name": "Karaca", "category": "home", "publication_note": "Sezon kampanyaları"},
-    {"slug": "gratis", "name": "Gratis", "category": "beauty", "publication_note": "Kampanya dönemlerinde"},
-    {"slug": "hepsiburada", "name": "Hepsiburada", "category": "fashion", "publication_note": "Büyük indirim günlerinde"},
-    {"slug": "trendyol", "name": "Trendyol", "category": "fashion", "publication_note": "Flaş indirimler"},
-    {"slug": "lcwaikiki", "name": "LC Waikiki", "category": "fashion", "publication_note": "Sezon geçişlerinde"},
-]
+ALL_STORES_MAP = {
+    "market": ["bim", "a101", "sok", "hakmarekspres", "migros", "5mmigros", "migrosjet", "carrefoursa", "carrefoursagurme", "tarimkredi", "file", "macrocenter", "happycenter", "onurmarket", "mopas", "hakmar", "cagrimarket", "bizimtoptan", "metro", "secmarket"],
+    "tech": ["teknosa", "mediamarkt", "vatanbilgisayar", "troy", "gurgencer", "pozitifteknoloji", "samsung", "huawei", "mistore", "evkur", "cetmen", "yigitavm", "ozsanal", "itopya"],
+    "beauty": ["gratis", "watsons", "rossmann", "eveshop", "sephora", "sevil", "yvesrocher", "flormar", "goldenrose", "mac", "kikomilano"],
+    "fashion": ["lcwaikiki", "defacto", "koton", "mavi", "ltb", "colins", "boyner", "ozdilek", "beymen", "vakko", "altinyildiz", "kigili", "sarar", "suvari", "hatemoglu", "tudors", "ipekyol", "twist", "machka", "penti", "zara", "bershka", "pullandbear", "stradivarius", "massimodutti", "hm", "mango", "flo", "instreet", "deichmann", "ayakkabidunyasi", "superstep", "sportive", "decathlon"],
+    "health": ["atasunoptik", "opmaroptik", "eleganceoptik", "mertoptik", "ebebek", "babymall", "joker", "gnc"],
+    "home": ["karaca", "pasabahce", "bernardo", "jumbo", "korkmaz", "schafer", "porland", "hisar", "englishhome", "madamecoco", "linens", "bellamaison", "karacahome", "ikea", "koctas", "koctasfix", "bauhaus", "tekzen"],
+    "online": ["trendyol", "hepsiburada", "amazon", "n11", "supplementler", "proteinocean"]
+}
+
+def _format_store_name(slug: str) -> str:
+    known = {
+        "bim": "BİM", "a101": "A101", "sok": "ŞOK", "migros": "Migros", "carrefoursa": "CarrefourSA",
+        "carrefoursagurme": "CarrefourSA Gurme", "lcwaikiki": "LC Waikiki", "boyner": "Boyner",
+        "trendyol": "Trendyol", "hepsiburada": "Hepsiburada", "amazon": "Amazon", "n11": "n11",
+        "mac": "MAC", "kigili": "Kiğılı", "defacto": "DeFacto", "gratis": "Gratis",
+        "watsons": "Watsons", "vatanbilgisayar": "Vatan Bilgisayar", "mediamarkt": "MediaMarkt",
+        "5mmigros": "5M Migros", "migrosjet": "Migros Jet", "tarimkredi": "Tarım Kredi",
+        "macrocenter": "Macrocenter", "happycenter": "Happy Center", "onurmarket": "Onur Market",
+        "bizimtoptan": "Bizim Toptan", "secmarket": "Seç Market", "hakmarekspres": "Hakmar Ekspres",
+        "pozitifteknoloji": "Pozitif Teknoloji", "mistore": "Mi Store", "ozsanal": "Özşanal",
+        "eveshop": "Eve Shop", "yvesrocher": "Yves Rocher", "kikomilano": "Kiko Milano",
+        "goldenrose": "Golden Rose", "beymen": "Beymen", "pullandbear": "Pull&Bear",
+        "massimodutti": "Massimo Dutti", "hm": "H&M", "ayakkabidunyasi": "Ayakkabı Dünyası",
+        "atasunoptik": "Atasun Optik", "opmaroptik": "Opmar Optik", "eleganceoptik": "Elegance Optik",
+        "mertoptik": "Mert Optik", "ebebek": "e-bebek", "babymall": "BabyMall",
+        "pasabahce": "Paşabahçe", "englishhome": "English Home", "madamecoco": "Madame Coco",
+        "bellamaison": "Bella Maison", "karacahome": "Karaca Home", "koctas": "Koçtaş",
+        "koctasfix": "Koçtaş Fix"
+    }
+    return known.get(slug, slug.capitalize())
+
+DEFAULT_STORE_NEWSLETTERS = []
+for cat, slugs in ALL_STORES_MAP.items():
+    for slug in slugs:
+        DEFAULT_STORE_NEWSLETTERS.append({
+            "slug": slug,
+            "name": _format_store_name(slug),
+            "category": cat,
+            "publication_note": ""
+        })
 
 
 @app.get("/api/stores")
@@ -4388,7 +4417,14 @@ async def list_stores(request: Request):
             )
             rows = r.json() if r.ok else []
             if rows:
-                stores = rows
+                db_slugs = {r["slug"]: r for r in rows}
+                for i, st in enumerate(stores):
+                    if st["slug"] in db_slugs:
+                        stores[i] = db_slugs[st["slug"]]
+                existing_slugs = {st["slug"] for st in stores}
+                for r_data in rows:
+                    if r_data["slug"] not in existing_slugs:
+                        stores.append(r_data)
         except Exception:
             pass
 
