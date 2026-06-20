@@ -2370,17 +2370,44 @@ async function findAlternativeSellers(parsed) {
     
     let html = fakeDiscountWarning + `<div style="font-size:12px; font-weight:600; color:#e8ede8; margin-bottom:8px;">Satıcı Seçimi:</div><div style="display:flex; flex-direction:column; gap:8px;">`;
     
+    // Find min price
+    const validPrices = alts.map(a => a.price).filter(p => p > 0);
+    const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : -1;
+    
     alts.forEach((a) => {
       const altJson = escapeHtml(JSON.stringify(a));
+      
+      let badges = [];
+      // Sponsorlu badge
+      if (a.labels?.includes("Sponsorlu")) {
+        badges.push('<span style="background: rgba(255, 183, 77, 0.15); color: #ffb74d; border: 1px solid rgba(255, 183, 77, 0.3); padding: 2px 6px; border-radius: 4px; font-size: 9.5px; font-weight: 700;">Reklam</span>');
+      }
+      // En ucuz badge
+      if (minPrice > 0 && a.price === minPrice) {
+        badges.push('<span style="background: rgba(0, 230, 118, 0.15); color: #00e676; border: 1px solid rgba(0, 230, 118, 0.3); padding: 2px 6px; border-radius: 4px; font-size: 9.5px; font-weight: 700;">🌟 En Ucuz</span>');
+      }
+      // Hızlı Teslimat badge
+      const fastDeliverySources = ["migros", "carrefoursa", "sokmarket", "metro", "file", "a101", "getir", "yemeksepeti"];
+      if (fastDeliverySources.includes(String(a.source).toLowerCase())) {
+        badges.push('<span style="background: rgba(41, 182, 246, 0.15); color: #29b6f6; border: 1px solid rgba(41, 182, 246, 0.3); padding: 2px 6px; border-radius: 4px; font-size: 9.5px; font-weight: 700;">⚡ Hızlı Teslimat</span>');
+      }
+      // Güvenilir Satıcı badge
+      if (["amazon", "hepsiburada"].includes(String(a.source).toLowerCase())) {
+        badges.push('<span style="background: rgba(171, 71, 188, 0.15); color: #ab47bc; border: 1px solid rgba(171, 71, 188, 0.3); padding: 2px 6px; border-radius: 4px; font-size: 9.5px; font-weight: 700;">🛡️ Güvenilir</span>');
+      }
+
+      const badgesHtml = badges.length > 0 ? `<div style="display:flex; gap:4px; margin-top:4px; flex-wrap:wrap;">${badges.join("")}</div>` : '';
+
       html += `
-        <div class="alt-seller-card" style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-lighter); padding:8px 12px; border-radius:6px; font-size:13px; cursor:pointer; border: 1px solid transparent; transition: 0.2s;" onclick="selectAlternativeSeller(this)" data-alt='${altJson}'>
+        <div class="alt-seller-card" style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-lighter); padding:10px 12px; border-radius:8px; font-size:13px; cursor:pointer; border: 1px solid rgba(255,255,255,0.05); transition: 0.2s;" onclick="selectAlternativeSeller(this)" data-alt='${altJson}'>
           <div style="display:flex; flex-direction:column; max-width:70%;">
-            <span style="font-weight:600; color:#e8ede8;">${escapeHtml(a.source)} ${a.labels?.includes("Sponsorlu") ? '<span style="font-size:10px; color:#ffb74d;">(Sponsorlu)</span>' : ''}</span>
-            <span style="color:#a0aab0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(a.title)}</span>
+            <span style="font-weight:600; color:#e8ede8;">${escapeHtml(a.source)}</span>
+            <span style="color:#a0aab0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;">${escapeHtml(a.title)}</span>
+            ${badgesHtml}
           </div>
-          <div style="font-weight:700; color:var(--green); text-align:right;">
+          <div style="font-weight:800; color:var(--green); text-align:right; font-size: 14px;">
             ₺${a.price.toFixed(2)}
-            ${a.original_price && a.original_price > a.price ? `<div style="font-size:10px; color:#ff6b6b; text-decoration:line-through;">₺${a.original_price.toFixed(2)}</div>` : ''}
+            ${a.original_price && a.original_price > a.price ? `<div style="font-size:10px; color:#ff6b6b; text-decoration:line-through; font-weight: 500; margin-top: 2px;">₺${a.original_price.toFixed(2)}</div>` : ''}
           </div>
         </div>
       `;
