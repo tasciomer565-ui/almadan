@@ -802,11 +802,11 @@
           <div class="onboarding-step" data-step="3" style="display: none;">
             <div style="display: flex; gap: 14px; align-items: flex-start; padding: 14px; background: rgba(40,122,80,0.05); border-radius: 10px;">
               <div style="width: 36px; height: 36px; background: #287a50; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                <i data-lucide="shirt" style="width: 16px; height: 16px; color: #fff;"></i>
+                <i data-lucide="store" style="width: 16px; height: 16px; color: #fff;"></i>
               </div>
               <div>
-                <strong style="font-size: 15px; display: block; margin-bottom: 4px;">AI Kıyafet Deneme</strong>
-                <span style="font-size: 13px; color: var(--ink-light, #666);">"Kıyafet" sekmesinden fotoğrafınızı yükleyin — kıyafeti sanal olarak üzerinizde görün.</span>
+                <strong style="font-size: 15px; display: block; margin-bottom: 4px;">Mağaza Bültenleri</strong>
+                <span style="font-size: 13px; color: var(--ink-light, #666);">Favori mağazanı takip et — kampanya başlatınca sana e-posta ile haber verelim.</span>
               </div>
             </div>
           </div>
@@ -828,5 +828,15 @@
     </dialog>
 
     <script defer src="/static/app.js?v=20260617-barcode"></script>
+    <script>
+      /* Sprint 12 — demo urunleri kaldir (app.js cache bypass) */
+      window.addEventListener('load', function() {
+        window.renderFallbackOpportunities = function() {
+          var grid = document.getElementById('dealGrid');
+          if (!grid) return;
+          grid.innerHTML = '<div style="grid-column:1/-1;padding:48px 24px;text-align:center;"><div style="font-size:40px;margin-bottom:12px;">🛒</div><p style="font-size:15px;font-weight:600;color:var(--ink);margin:0 0 6px;">Henüz takip edilen ürün yok</p><p style="font-size:13px;color:var(--ink-2);margin:0;">Üst kısımdan ürün linki yapıştır veya barkod tara — fiyatları karşılaştıralım.</p></div>';
+        };
+      });
+    </script>
   </body>
 </html>
