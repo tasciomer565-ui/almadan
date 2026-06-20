@@ -100,6 +100,7 @@ def verify_csrf_token(token: str, session_id: str, max_age_seconds: int = 7200) 
 
 
 CSRF_EXEMPT_PATHS = {
+    "/auth/",
     "/api/auth/",
     "/api/barcode/",
     "/api/search",
