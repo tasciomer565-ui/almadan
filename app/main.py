@@ -795,6 +795,10 @@ class ProductCreate(BaseModel):
     extra_info: dict | None = None
 
 
+class AlternativesRequest(BaseModel):
+    title: str
+    original_url: str | None = None
+
 class UrlParseRequest(BaseModel):
     url: str = Field(min_length=5)
 
@@ -1517,6 +1521,27 @@ def parse_url(payload: UrlParseRequest) -> dict:
         "warnings": parsed.warnings,
         "original_price": parsed.original_price,
         "extra_info": parsed.extra_info,
+    }
+
+
+@app.post("/api/find-alternatives")
+async def find_alternatives(payload: AlternativesRequest):
+    from app.search_orchestrator import master_search
+    query = payload.title
+    products, is_fallback, effective_query, category = await master_search(query)
+    
+    if payload.original_url:
+        from urllib.parse import urlparse
+        orig_path = urlparse(payload.original_url).path
+        filtered = []
+        for p in products:
+            p_path = urlparse(p["url"]).path
+            if p_path != orig_path:
+                filtered.append(p)
+        products = filtered
+
+    return {
+        "alternatives": products[:10]
     }
 
 
@@ -4357,7 +4382,7 @@ ALL_STORES_MAP = {
     "market": ["bim", "a101", "sok", "hakmarekspres", "migros", "5mmigros", "migrosjet", "carrefoursa", "carrefoursagurme", "tarimkredi", "file", "macrocenter", "happycenter", "onurmarket", "mopas", "hakmar", "cagrimarket", "bizimtoptan", "metro", "secmarket"],
     "tech": ["teknosa", "mediamarkt", "vatanbilgisayar", "troy", "gurgencer", "pozitifteknoloji", "samsung", "huawei", "mistore", "evkur", "cetmen", "yigitavm", "ozsanal", "itopya"],
     "beauty": ["gratis", "watsons", "rossmann", "eveshop", "sephora", "sevil", "yvesrocher", "flormar", "goldenrose", "mac", "kikomilano"],
-    "fashion": ["lcwaikiki", "defacto", "koton", "mavi", "ltb", "colins", "boyner", "ozdilek", "beymen", "vakko", "altinyildiz", "kigili", "sarar", "suvari", "hatemoglu", "tudors", "ipekyol", "twist", "machka", "penti", "zara", "bershka", "pullandbear", "stradivarius", "massimodutti", "hm", "mango", "flo", "instreet", "deichmann", "ayakkabidunyasi", "superstep", "sportive", "decathlon"],
+    "fashion": ["lcwaikiki", "defacto", "koton", "mavi", "ltb", "colins", "boyner", "ozdilek", "beymen", "vakko", "trendyolmilla", "altinyildiz", "kigili", "sarar", "suvari", "hatemoglu", "tudors", "ipekyol", "twist", "machka", "penti", "zara", "bershka", "pullandbear", "stradivarius", "massimodutti", "hm", "mango", "flo", "instreet", "deichmann", "ayakkabidunyasi", "superstep", "sportive", "decathlon"],
     "health": ["atasunoptik", "opmaroptik", "eleganceoptik", "mertoptik", "ebebek", "babymall", "joker", "gnc"],
     "home": ["karaca", "pasabahce", "bernardo", "jumbo", "korkmaz", "schafer", "porland", "hisar", "englishhome", "madamecoco", "linens", "bellamaison", "karacahome", "ikea", "koctas", "koctasfix", "bauhaus", "tekzen"],
     "online": ["trendyol", "hepsiburada", "amazon", "n11", "supplementler", "proteinocean"]
@@ -4367,7 +4392,7 @@ def _format_store_name(slug: str) -> str:
     known = {
         "bim": "BİM", "a101": "A101", "sok": "ŞOK", "migros": "Migros", "carrefoursa": "CarrefourSA",
         "carrefoursagurme": "CarrefourSA Gurme", "lcwaikiki": "LC Waikiki", "boyner": "Boyner",
-        "trendyol": "Trendyol", "hepsiburada": "Hepsiburada", "amazon": "Amazon", "n11": "n11",
+        "trendyol": "Trendyol", "trendyolmilla": "Trendyolmilla", "hepsiburada": "Hepsiburada", "amazon": "Amazon", "n11": "n11",
         "mac": "MAC", "kigili": "Kiğılı", "defacto": "DeFacto", "gratis": "Gratis",
         "watsons": "Watsons", "vatanbilgisayar": "Vatan Bilgisayar", "mediamarkt": "MediaMarkt",
         "5mmigros": "5M Migros", "migrosjet": "Migros Jet", "tarimkredi": "Tarım Kredi",

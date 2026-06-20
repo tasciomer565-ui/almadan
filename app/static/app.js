@@ -2288,6 +2288,9 @@ function showParsedProduct(parsed) {
         <p class="form-hint">Otomatik bulunan bilgileri kontrol edip düzeltebilirsin.</p>
       </div>
       ${parsed.warnings.length ? `<p class="source-name">${parsed.warnings.map(escapeHtml).join(" ")}</p>` : ""}
+      <div id="alternativeSellersContainer" style="margin-top: 16px; margin-bottom: 16px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
+        <div class="loading-row" style="margin: 0;"><span class="spinner" style="width:14px;height:14px;border-width:2px;border-color:#a0aab0;border-top-color:transparent;"></span><span style="font-size:13px;color:#a0aab0;">Alternatif satıcılar aranıyor... (Bu işlem birkaç saniye sürebilir)</span></div>
+      </div>
       <p class="dialog-error" id="trackProductError" hidden></p>
       <div class="dialog-actions">
         <button class="secondary-button" type="button" onclick="closeDialog()">Vazgeç</button>
@@ -2327,8 +2330,108 @@ function showParsedProduct(parsed) {
   }
 
   updateTrackButton();
+  findAlternativeSellers(parsed);
   lucide.createIcons();
 }
+
+async function findAlternativeSellers(parsed) {
+  const container = document.getElementById("alternativeSellersContainer");
+  if (!container) return;
+  
+  try {
+    const res = await fetch("/api/find-alternatives", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url })
+    });
+    const data = await res.json();
+    const alts = data.alternatives || [];
+    
+    if (alts.length === 0) {
+      container.innerHTML = `<p style="font-size:12px; color:#a0aab0; margin:0; text-align:center;">Alternatif satıcı bulunamadı.</p>`;
+      return;
+    }
+    
+    let fakeDiscountWarning = "";
+    if (parsed.original_price && parsed.price) {
+      const prices = alts.map(a => a.price).filter(p => p > 0);
+      if (prices.length > 0) {
+        const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+        if (parsed.original_price > avgPrice * 1.15) {
+          fakeDiscountWarning = `
+            <div style="margin-bottom: 12px; padding: 10px; border-radius: 6px; background: rgba(255, 60, 60, 0.1); border: 1px solid rgba(255, 60, 60, 0.3); color: #ff6b6b; font-size: 13px;">
+              <strong style="display:flex; align-items:center; gap:4px;"><i data-lucide="alert-triangle" style="width:14px;height:14px;"></i> Sahte İndirim Tespit Edildi!</strong>
+              <div style="margin-top:4px; opacity:0.9;">Mağaza ürünün ₺${parsed.original_price.toFixed(2)} değerinden düştüğünü iddia ediyor, ancak piyasa ortalaması zaten ₺${avgPrice.toFixed(2)} seviyesinde.</div>
+            </div>
+          `;
+        }
+      }
+    }
+    
+    let html = fakeDiscountWarning + `<div style="font-size:12px; font-weight:600; color:#e8ede8; margin-bottom:8px;">Satıcı Seçimi:</div><div style="display:flex; flex-direction:column; gap:8px;">`;
+    
+    alts.forEach((a) => {
+      const altJson = escapeHtml(JSON.stringify(a));
+      html += `
+        <div class="alt-seller-card" style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-lighter); padding:8px 12px; border-radius:6px; font-size:13px; cursor:pointer; border: 1px solid transparent; transition: 0.2s;" onclick="selectAlternativeSeller(this)" data-alt='${altJson}'>
+          <div style="display:flex; flex-direction:column; max-width:70%;">
+            <span style="font-weight:600; color:#e8ede8;">${escapeHtml(a.source)} ${a.labels?.includes("Sponsorlu") ? '<span style="font-size:10px; color:#ffb74d;">(Sponsorlu)</span>' : ''}</span>
+            <span style="color:#a0aab0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(a.title)}</span>
+          </div>
+          <div style="font-weight:700; color:var(--green); text-align:right;">
+            ₺${a.price.toFixed(2)}
+            ${a.original_price && a.original_price > a.price ? `<div style="font-size:10px; color:#ff6b6b; text-decoration:line-through;">₺${a.original_price.toFixed(2)}</div>` : ''}
+          </div>
+        </div>
+      `;
+    });
+    html += `</div>`;
+    
+    container.innerHTML = html;
+    lucide.createIcons();
+  } catch (err) {
+    container.innerHTML = `<p style="font-size:12px; color:#ff6b6b; margin:0; text-align:center;">Alternatifler aranırken hata oluştu.</p>`;
+  }
+}
+
+window.selectAlternativeSeller = function(el) {
+  document.querySelectorAll('.alt-seller-card').forEach(c => {
+    c.style.border = '1px solid transparent';
+    c.style.background = 'var(--bg-lighter)';
+  });
+  el.style.border = '1px solid var(--green)';
+  el.style.background = 'rgba(0, 230, 118, 0.1)';
+  
+  const alt = JSON.parse(el.getAttribute('data-alt'));
+  
+  const parsedPrice = document.getElementById("parsedPrice");
+  const parsedTitle = document.getElementById("parsedTitle");
+  if (parsedPrice) {
+    parsedPrice.value = String(alt.price).replace('.', ',');
+    parsedPrice.dispatchEvent(new Event('input'));
+  }
+  if (parsedTitle) {
+    parsedTitle.value = alt.title;
+    parsedTitle.dispatchEvent(new Event('input'));
+  }
+  
+  const sourceNameEl = document.querySelector(".dialog-body .source-name");
+  if (sourceNameEl) sourceNameEl.innerText = alt.source;
+  
+  if (state.parsedProduct) {
+     state.parsedProduct.canonical_url = alt.url || alt.canonical_url || state.parsedProduct.canonical_url;
+     state.parsedProduct.source = alt.source;
+     if (alt.image_url) state.parsedProduct.image_url = alt.image_url;
+     state.parsedProduct.title = alt.title;
+     state.parsedProduct.price = alt.price;
+     state.parsedProduct.original_price = alt.original_price;
+     
+     const imgEl = document.querySelector(".dialog-product-image");
+     if (imgEl && state.parsedProduct.image_url) {
+       imgEl.innerHTML = `<img src="${escapeHtml(state.parsedProduct.image_url)}" alt="${escapeHtml(state.parsedProduct.title)}" style="max-height:100%;">`;
+     }
+  }
+};
 
 function parseUserPrice(value) {
   let text = String(value || "").trim().replace(/[^\d,.]/g, "");

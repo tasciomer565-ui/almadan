@@ -20,7 +20,7 @@ MARKET_STORES = (
     "gratis", "watsons", "rossmann", "eveshop", "sephora", "sevil", "yvesrocher",
     "flormar", "goldenrose", "mac", "kikomilano",
     # 4. Giyim, Ayakkabı & Moda
-    "lcwaikiki", "defacto", "koton", "mavi", "ltb", "colins", "boyner", "ozdilek", "beymen", "vakko",
+    "lcwaikiki", "defacto", "koton", "mavi", "ltb", "colins", "boyner", "ozdilek", "beymen", "vakko", "trendyolmilla",
     "altinyildiz", "kigili", "sarar", "suvari", "hatemoglu", "tudors",
     "ipekyol", "twist", "machka", "penti",
     "zara", "bershka", "pullandbear", "stradivarius", "massimodutti", "hm", "mango",
