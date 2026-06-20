@@ -3266,7 +3266,7 @@ function closeDialog() {
 
 function showToast(message) {
   const toast = document.getElementById("toast");
-  toast.textContent = message;
+  toast.innerHTML = message;
   toast.classList.add("show");
   clearTimeout(showToast.timeout);
   showToast.timeout = setTimeout(() => toast.classList.remove("show"), 2800);
@@ -7024,7 +7024,12 @@ async function toggleFollow(slug, name) {
     await api(`/api/stores/${encodeURIComponent(slug)}/follow`, {
       method: isFollowed ? "DELETE" : "POST",
     });
-    toast(isFollowed ? `${name} takipten çıkarıldı.` : `${name} takibe alındı ✓`);
+    showToast(isFollowed 
+      ? `<strong>${escapeHtml(name)}</strong> takipten çıkarıldı.` 
+      : `<div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
+           <strong>✓ ${escapeHtml(name)} takibe alındı</strong>
+           <span style="font-size:11.5px; opacity:0.95;">Bu mağazada kampanya veya önemli fiyat düşüşleri olduğunda anında bildirim alacaksınız.</span>
+         </div>`);
     // Takip değişince bültenleri yeniden yükle (liste güncellensin)
     if (!isFollowed) loadStores();
   } catch (error) {
@@ -7037,7 +7042,7 @@ async function toggleFollow(slug, name) {
       const c = storeFollowerCounts[slug];
       countEl.textContent = c > 0 ? `👥 ${c} kişi takipte` : "İlk takipçi ol!";
     }
-    toast(error?.message || "Bağlantı hatası, tekrar dene.");
+    showToast(escapeHtml(error?.message || "Bağlantı hatası, tekrar dene."));
   }
 }
 
