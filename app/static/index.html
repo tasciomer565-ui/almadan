@@ -829,23 +829,19 @@
 
     <script defer src="/static/app.js?v=20260617-barcode"></script>
     <script>
-      /* Sprint 12 — loadSession override: daima cache bypass ile auth/session cek */
+      /* Sprint 12 — auth fix: DOMContentLoaded sonrasi state.auth guncelle */
       document.addEventListener('DOMContentLoaded', function() {
-        window.loadSession = async function() {
+        /* app.js'in loadSession() cagrisini bekle, sonra auth/session ile patch et */
+        setTimeout(async function() {
           try {
             var resp = await fetch('/auth/session', {cache: 'no-store'});
             var data = await resp.json();
-            if (typeof state !== 'undefined') {
+            if (typeof state !== 'undefined' && data.enabled && !state.auth.enabled) {
               state.auth = data;
               if (typeof renderAccountButton === 'function') renderAccountButton();
-              if (typeof handleCategoryChange === 'function') handleCategoryChange();
-              setTimeout(function() { if (typeof showOnboarding === 'function') showOnboarding(); }, 800);
             }
-          } catch(e) {
-            if (typeof state !== 'undefined')
-              state.auth = {enabled: false, authenticated: false, user: null};
-          }
-        };
+          } catch(e) {}
+        }, 200);
       });
 
       /* Sprint 12 — demo urunleri kaldir (app.js cache bypass) */
