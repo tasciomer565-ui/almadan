@@ -863,20 +863,103 @@
           grid.innerHTML = '<div style="grid-column:1/-1;padding:48px 24px;text-align:center;"><div style="font-size:40px;margin-bottom:12px;">🛒</div><p style="font-size:15px;font-weight:600;color:var(--ink);margin:0 0 6px;">Henüz takip edilen ürün yok</p><p style="font-size:13px;color:var(--ink-2);margin:0;">Üst kısımdan ürün linki yapıştır veya barkod tara — fiyatları karşılaştıralım.</p></div>';
         };
 
-        /* Sprint 12 — Bultenler: polling ile fallback mağaza listesi */
+        /* Bultenler: tum magazalar + marka logosu stili */
+        var _STORES = {
+          market:[
+            ['bim','BİM','#E30613'],['a101','A101','#FF6600'],['sok','ŞOK','#8B0000'],
+            ['migros','Migros','#E3000F'],['5mmigros','5M Migros','#c40'],['migrosjet','MigrosJet','#E3000F'],
+            ['carrefoursa','CarrefourSA','#0070AC'],['carrefoursagurme','Carrefour Gurme','#0070AC'],
+            ['hakmarekspres','Hakmar Ekspres','#FF0000'],['hakmar','Hakmar','#FF0000'],
+            ['file','File Market','#1D3D7C'],['macrocenter','MacroCenter','#8B0000'],
+            ['happycenter','Happy Center','#FF6600'],['onurmarket','Onur Market','#006633'],
+            ['mopas','Mopas','#003087'],['cagrimarket','Çağrı Market','#1a6b1a'],
+            ['bizimtoptan','BizimToptan','#E63946'],['metro','Metro','#003F87'],
+            ['secmarket','SeçMarket','#2d6a4f'],['tarimkredi','Tarım Kredi','#1B5E20']
+          ],
+          genel:[
+            ['trendyol','Trendyol','#F27A1A'],['hepsiburada','Hepsiburada','#FF6000'],
+            ['amazon','Amazon','#FF9900'],['n11','n11','#7B00D4']
+          ],
+          teknoloji:[
+            ['teknosa','Teknosa','#E60026'],['mediamarkt','MediaMarkt','#CC0000'],
+            ['vatanbilgisayar','Vatan','#003087'],['evkur','Evkur','#E8232A'],
+            ['samsung','Samsung','#1428A0'],['huawei','Huawei','#CF0A2C'],
+            ['mistore','Mi Store','#FF6900'],['itopya','İtopya','#222'],
+            ['troy','TROY','#333'],['pozitifteknoloji','Pozitif Tek.','#005F9E'],
+            ['gurgencer','Gürgencer','#1a1a6e'],['ozsanal','Özsanal','#004080'],
+            ['yigitavm','Yiğit AVM','#8B0000'],['cetmen','Çetmen','#333']
+          ],
+          moda:[
+            ['lcwaikiki','LC Waikiki','#E4002B'],['defacto','DeFacto','#000'],
+            ['koton','Koton','#000'],['mavi','Mavi','#003DA5'],
+            ['ltb','LTB','#1a1a1a'],['colins','Colin\'s','#8B0000'],
+            ['boyner','Boyner','#222'],['beymen','Beymen','#111'],
+            ['vakko','Vakko','#111'],['altinyildiz','Altınyıldız','#8B0000'],
+            ['kigili','Kiğılı','#1B2A4A'],['sarar','Sarar','#1a1a1a'],
+            ['penti','Penti','#E8003D'],['ipekyol','İpekyol','#8B6914'],
+            ['twist','Twist','#9B59B6'],['machka','Machka','#222'],
+            ['zara','Zara','#111'],['hm','H&M','#E50010'],
+            ['mango','Mango','#1a1a1a'],['bershka','Bershka','#000'],
+            ['pullandbear','Pull&Bear','#333'],['stradivarius','Stradivarius','#8B6914'],
+            ['massimodutti','Massimo Dutti','#1a1a1a'],['ozdilek','Özdilek','#8B0000'],
+            ['flo','FLO','#E8232A'],['deichmann','Deichmann','#E8003D'],
+            ['ayakkabidunyasi','Ayakkabı Dünyası','#003087'],['superstep','Superstep','#FF6600'],
+            ['sportive','Sportive','#003087'],['decathlon','Decathlon','#0082C3'],
+            ['instreet','İnstreet','#333'],['suvari','Süvari','#8B0000'],
+            ['hatemoglu','Hatemoglu','#1a1a1a'],['tudors','Tudors','#1B2A4A'],
+            ['kigili','Kiğılı','#1B2A4A']
+          ],
+          kozmetik:[
+            ['gratis','Gratis','#E91E8C'],['watsons','Watsons','#007B5E'],
+            ['rossmann','Rossmann','#E8232A'],['sephora','Sephora','#000'],
+            ['yvesrocher','Yves Rocher','#2E7D32'],['eveshop','Eve Shop','#C2185B'],
+            ['flormar','Flormar','#E91E8C'],['goldenrose','Golden Rose','#C62828'],
+            ['mac','MAC','#111'],['kikomilano','Kiko Milano','#C62828'],
+            ['sevil','Sevil Parfüm','#8B4513']
+          ],
+          saglik:[
+            ['ebebek','ebebek','#E91E8C'],['babymall','Baby Mall','#7B1FA2'],
+            ['joker','Joker Oyuncak','#FF6600'],['atasunoptik','Atasun Optik','#003087'],
+            ['opmaroptik','Opmar Optik','#0070AC'],['eleganceoptik','Elegance Optik','#1565C0'],
+            ['mertoptik','Mert Optik','#1B5E20'],['gnc','GNC','#FF6600'],
+            ['supplementler','Supplementler','#1B5E20'],['proteinocean','ProteinOcean','#003087']
+          ],
+          ev:[
+            ['karaca','Karaca','#8B0000'],['pasabahce','Paşabahçe','#1565C0'],
+            ['englishhome','English Home','#2E7D32'],['madamecoco','Madame Coco','#9C27B0'],
+            ['bellamaison','Bella Maison','#C2185B'],['linens','Linens','#5D4037'],
+            ['karacahome','Karaca Home','#8B0000'],['jumbo','Jumbo','#FFC107'],
+            ['ikea','IKEA','#0058A3'],['koctas','Koçtaş','#E8232A'],
+            ['bauhaus','Bauhaus','#E8232A'],['tekzen','Tekzen','#003087'],
+            ['korkmaz','Korkmaz','#CC0000'],['porland','Porland','#1a1a1a'],
+            ['bernardo','Bernardo','#5D4037'],['hisar','Hisar','#1565C0'],
+            ['schafer','Schäfer','#333'],['pasabahce','Paşabahçe','#1565C0']
+          ]
+        };
+        var _CAT_LABEL = {
+          market:'Marketler',genel:'Pazaryerleri',teknoloji:'Teknoloji',
+          moda:'Moda & Giyim',kozmetik:'Kozmetik & Güzellik',
+          saglik:'Sağlık & Bebek',ev:'Ev & Yaşam'
+        };
+        function _storeLogo(name, color) {
+          var initials = name.replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ0-9&]/g,' ').trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0,2);
+          return '<div style="width:36px;height:36px;border-radius:8px;background:'+color+';display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="color:#fff;font-size:11px;font-weight:800;letter-spacing:-.3px">'+initials+'</span></div>';
+        }
         window._almadanShowStores = function() {
           var list = document.getElementById('storeList');
           if (!list) return;
-          var stores=[['bim','BİM','market','Her Cuma 09:00'],['a101','A101','market','Her Perşembe'],['sok','ŞOK','market','Her Çarşamba'],['migros','Migros','market','Haftalık değişken'],['carrefour','CarrefourSA','market','Haftalık değişken'],['gratis','Gratis','beauty','Kampanya dönemlerinde'],['karaca','Karaca','home','Sezon ve özel günlerde'],['trendyol','Trendyol','fashion','Büyük indirim günlerinde'],['hepsiburada','Hepsiburada','fashion','Büyük indirim günlerinde'],['lcwaikiki','LC Waikiki','fashion','Sezon geçişlerinde']];
-          var E={market:'🛒',fashion:'👗',beauty:'💄',home:'🏠'};
-          var L={market:'Marketler',fashion:'Moda',beauty:'Güzellik',home:'Ev & Yaşam'};
-          var g={};
-          stores.forEach(function(s){(g[s[2]]=g[s[2]]||[]).push(s);});
           var html='';
-          ['market','fashion','beauty','home'].forEach(function(cat){
-            if(!g[cat])return;
-            html+='<p style="font-size:11px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px;">'+E[cat]+' '+L[cat]+'</p><div class="store-grid">';
-            g[cat].forEach(function(s){html+='<div class="store-card" id="scard-'+s[0]+'"><div class="store-card-header"><span class="store-emoji">'+E[s[2]]+'</span><div><div class="store-name">'+s[1]+'</div></div></div><div class="store-note">📅 '+s[3]+'</div><button class="btn-follow" onclick="toggleFollow(\''+s[0]+'\',\''+s[1]+'\')">+ Takibe Al</button></div>';});
+          ['genel','market','teknoloji','moda','kozmetik','saglik','ev'].forEach(function(cat){
+            var arr=_STORES[cat]; if(!arr||!arr.length)return;
+            var seen={};
+            html+='<p style="font-size:11px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em;margin:20px 0 8px 0;">'+_CAT_LABEL[cat]+'</p><div class="store-grid">';
+            arr.forEach(function(s){
+              if(seen[s[0]])return; seen[s[0]]=1;
+              html+='<div class="store-card" id="scard-'+s[0]+'">'
+                +'<div class="store-card-header">'+_storeLogo(s[1],s[2])
+                +'<div class="store-name">'+s[1]+'</div></div>'
+                +'<button class="btn-follow" onclick="toggleFollow(\''+s[0]+'\',\''+s[1]+'\')">+ Takibe Al</button></div>';
+            });
             html+='</div>';
           });
           list.innerHTML=html;
