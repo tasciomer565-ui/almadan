@@ -5456,7 +5456,7 @@ async function renderCart() {
     requestAnimationFrame(() => {
       setTimeout(async () => {
         const progressText = document.getElementById("quantumScanProgress");
-        var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Optimal kuantum dağılımı hesaplanıyor..."; }, 600);
+        var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Sepetiniz için en uygun mağazalar seçiliyor..."; }, 600);
         
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 saniye kuralı
@@ -5490,7 +5490,7 @@ async function renderCart() {
           return;
         } catch (error) {
           clearTimeout(timeoutId);
-          console.warn("Kuantum sepet optimizasyonu başarısız veya zaman aşımına uğradı, hata kurtarma protokolü devrede:", error);
+          console.warn("Sepet optimizasyonu başarısız veya zaman aşımına uğradı, hata kurtarma protokolü devrede:", error);
           
           if (overlay && progressText) {
             // overlay.classList.add("recovery-mode");
@@ -5499,7 +5499,7 @@ async function renderCart() {
               header.classList.add("glitch-active");
               header.innerText = "SİSTEM KURTARMA AKTİF: LOKAL ANALİZ";
             }
-            progressText.innerText = "Kuantum düğümleri yanıt vermedi. Yerel çekirdekler üzerinden sepet optimizasyonu sürdürülüyor...";
+            progressText.innerText = "Sunucular yanıt vermedi. Alternatif analizler üzerinden sepet optimizasyonu sürdürülüyor...";
             
             // Wait 1.5 seconds
             await new Promise(resolve => setTimeout(resolve, 1500));
@@ -7531,7 +7531,7 @@ async function showSellerSelectionDialog(parsed) {
     
     // Asıl ürünü listede yoksa başa ekle
     const origPrice = parsed.price || 0;
-    const origFound = alts.find(a => Math.abs(a.price - origPrice) < 1 && a.source.toLowerCase().includes(parsed.source.toLowerCase()));
+    const origFound = alts.find(a => Math.abs((a.price || 0) - origPrice) < 1 && String(a.source || "").toLowerCase().includes(String(parsed.source || "").toLowerCase()));
     if (!origFound && parsed.price) {
       alts.unshift({
         title: parsed.title,
@@ -7547,8 +7547,15 @@ async function showSellerSelectionDialog(parsed) {
     alts.sort((a, b) => a.price - b.price);
     
     if (alts.length === 0) {
-      dialog.close();
-      showParsedProduct(parsed); // Bulunamazsa direkt eski ekrana düş
+      content.innerHTML = `
+        <div style="text-align:center; padding: 30px 20px;">
+          <h3 style="margin:0 0 12px 0; font-size:18px; font-weight:800; color:var(--ink);">Başka Satıcı Bulunamadı</h3>
+          <p style="font-size:13px; color:var(--ink-2); margin-bottom:24px;">Bu ürün şu anda sadece tek bir satıcıda (<strong style="color:var(--ink);">${escapeHtml(parsed.source || "Bilinmiyor")}</strong>) satılıyor veya diğer satıcılar gizlenmiş.</p>
+          <button class="primary-button" style="width:100%; border-radius:10px; padding:12px; font-weight:700;" data-parsed='${escapeHtml(JSON.stringify(parsed))}' onclick="document.getElementById('sellerSelectionDialog').close(); showParsedProduct(JSON.parse(this.getAttribute('data-parsed')));">
+            Mevcut Ürünü Takip Et
+          </button>
+        </div>
+      `;
       return;
     }
     
@@ -7589,6 +7596,7 @@ async function showSellerSelectionDialog(parsed) {
     content.innerHTML = listHtml;
     
   } catch(e) {
+    console.error("Satıcı Seçim Ekranı Hatası:", e);
     dialog.close();
     showParsedProduct(parsed); // Hata durumunda asıl ekrana düş
   }
