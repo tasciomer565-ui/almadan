@@ -4518,6 +4518,63 @@ def _format_store_name(slug: str) -> str:
     }
     return known.get(slug, slug.capitalize())
 
+_STORE_DESCRIPTIONS = {
+    "bim": "Haftalık aktüel ürün katalogları ve fırsatlar anında gelsin.",
+    "a101": "Her perşembe yeni aktüel ürünler ve indirimli kampanyalar.",
+    "sok": "Haftalık ŞOK aktüel katalog ve özel fırsatlar.",
+    "migros": "Migros kampanya ve indirimlerini kaçırma.",
+    "carrefoursa": "CarrefourSA haftalık fırsatları ve kampanya bildirimler.",
+    "carrefoursagurme": "Gurme ürünlerde özel indirim ve kampanyalar.",
+    "hakmarekspres": "Hakmar Ekspres aktüel ürün ve fırsatlar.",
+    "5mmigros": "5M Migros büyük format kampanyaları.",
+    "migrosjet": "Migros Jet market kampanya ve indirimleri.",
+    "tarimkredi": "Tarım Kredi kooperatif ürün ve fırsatlar.",
+    "macrocenter": "Premium market kampanya ve özel ürünler.",
+    "happycenter": "Happy Center ürün ve indirim haberleri.",
+    "mediamarkt": "Teknoloji ürünlerinde en iyi fırsatlar ve kampanyalar.",
+    "vatanbilgisayar": "Bilgisayar ve elektronik kampanyalarını takip et.",
+    "pozitifteknoloji": "Teknoloji ürünlerinde özel indirimler.",
+    "mistore": "Xiaomi ürünlerinde indirim ve yeni ürün duyuruları.",
+    "teknosa": "Teknoloji ürünleri kampanya ve indirim haberleri.",
+    "samsung": "Samsung yeni ürün ve kampanya duyuruları.",
+    "gratis": "Kozmetik ve kişisel bakım kampanyaları.",
+    "watsons": "Watsons indirim ve kampanya bildirimleri.",
+    "rossmann": "Rossmann kozmetik fırsatları ve kampanyalar.",
+    "sephora": "Sephora güzellik ürünleri kampanya ve indirimleri.",
+    "flormar": "Flormar makyaj ürünleri kampanya ve haberleri.",
+    "goldenrose": "Golden Rose kozmetik ürün indirimleri.",
+    "mac": "MAC Cosmetics yeni koleksiyon ve kampanyalar.",
+    "kikomilano": "Kiko Milano fırsatları ve yeni ürünler.",
+    "yvesrocher": "Yves Rocher doğal güzellik ürün kampanyaları.",
+    "lcwaikiki": "LCW yeni sezon ve indirim kampanyaları.",
+    "defacto": "DeFacto giyim kampanyaları ve sezon indirimleri.",
+    "koton": "Koton yeni koleksiyon ve özel indirimler.",
+    "mavi": "Mavi marka kampanya ve yeni koleksiyon haberleri.",
+    "boyner": "Boyner marka koleksiyon ve kampanya bildirimleri.",
+    "beymen": "Beymen lüks moda kampanya ve özel teklifler.",
+    "trendyolmilla": "Trendyolmilla marka fırsatlar ve indirimler.",
+    "hm": "H&M yeni sezon ve kampanya haberleri.",
+    "zara": "Zara yeni koleksiyon ve indirim dönemleri.",
+    "mango": "Mango moda kampanya ve koleksiyon haberleri.",
+    "decathlon": "Decathlon spor ürünleri kampanya ve indirimleri.",
+    "flo": "FLO ayakkabı kampanyaları ve yeni sezon haberleri.",
+    "ayakkabidunyasi": "Ayakkabı Dünyası kampanya ve indirim bildirimleri.",
+    "atasunoptik": "Atasun Optik gözlük kampanyaları ve haberleri.",
+    "opmaroptik": "Opmar Optik fırsatları ve kampanyaları.",
+    "ebebek": "e-bebek anne-bebek ürünleri kampanya ve haberleri.",
+    "pasabahce": "Paşabahçe ev ürünleri kampanya ve koleksiyonlar.",
+    "englishhome": "English Home ev tekstili kampanya ve indirimleri.",
+    "madamecoco": "Madame Coco ev dekor kampanya ve haberleri.",
+    "bellamaison": "Bella Maison ev ürünleri kampanya ve indirimleri.",
+    "karacahome": "Karaca Home mutfak ve ev ürünleri kampanyaları.",
+    "koctas": "Koçtaş yapı market kampanya ve indirimleri.",
+    "ikea": "IKEA yeni ürün ve kampanya haberleri.",
+    "trendyol": "Trendyol flash indirim ve kampanya bildirimleri.",
+    "hepsiburada": "Hepsiburada büyük indirim günleri ve fırsatlar.",
+    "amazon": "Amazon özel teklifler ve flaş indirimler.",
+    "n11": "n11 kampanya ve indirimli ürün haberleri.",
+}
+
 DEFAULT_STORE_NEWSLETTERS = []
 for cat, slugs in ALL_STORES_MAP.items():
     for slug in slugs:
@@ -4525,7 +4582,8 @@ for cat, slugs in ALL_STORES_MAP.items():
             "slug": slug,
             "name": _format_store_name(slug),
             "category": cat,
-            "publication_note": ""
+            "publication_note": "",
+            "description": _STORE_DESCRIPTIONS.get(slug, "Bu mağazanın kampanya ve indirimlerini takip et."),
         })
 
 

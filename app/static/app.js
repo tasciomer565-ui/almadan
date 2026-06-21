@@ -1145,7 +1145,8 @@ async function submitAuth(mode) {
 
   const gender = document.getElementById("authGender")?.value || "belirtilmemiş";
   const notificationPref = document.getElementById("authNotificationPref")?.value || "both";
-  const phone = document.getElementById("authPhone")?.value.trim() || "";
+  const rawPhone = document.getElementById("authPhone")?.value.trim() || "";
+  const phone = rawPhone ? normalizePhoneNumber(rawPhone) : "";
 
   if (mode === "signup" && notificationPref !== "email" && !phone) {
     showAuthError("SMS bildirimleri için telefon numarası gereklidir.");
@@ -1157,7 +1158,7 @@ async function submitAuth(mode) {
     if (mode === "signup") {
       payload.gender = gender;
       payload.notification_pref = notificationPref;
-      payload.phone = phone;
+      if (phone) payload.phone = phone;
     }
 
     const result = await api(`/auth/${mode}`, {
@@ -7131,9 +7132,9 @@ async function loadStores() {
 function renderStoreCard(s) {
   const followed = storeFollowState[s.slug];
   const count    = storeFollowerCounts[s.slug] || 0;
-  const countTxt = count > 0 ? `👥 ${count} kişi takipte` : "İlk takipçi ol!";
   const initial  = escapeHtml(s.name.charAt(0).toUpperCase());
   const bgColor  = getStoreColor(s.slug);
+  const desc     = s.description ? `<div class="store-desc">${escapeHtml(s.description)}</div>` : "";
   return `
     <div class="store-card ${followed ? "followed" : ""}" id="scard-${s.slug}">
       <div class="store-card-header">
@@ -7144,7 +7145,7 @@ function renderStoreCard(s) {
         </div>
       </div>
       ${s.publication_note ? `<div class="store-note">📅 ${escapeHtml(s.publication_note)}</div>` : ""}
-      <div class="store-follower-count" id="scount-${s.slug}">${countTxt}</div>
+      ${desc}
       <button class="btn-follow ${followed ? "active" : ""}" onclick="toggleFollow(${inlineJsArg(s.slug)}, ${inlineJsArg(s.name)})" id="sfbtn-${escapeHtml(s.slug)}">
         ${followed ? "✓ Takip Ediliyor" : "+ Takibe Al"}
       </button>
