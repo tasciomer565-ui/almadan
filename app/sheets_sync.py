@@ -2,10 +2,10 @@
 Google Sheets Senkronizasyonu — Almadan (hızlı versiyon, <8s)
 """
 from __future__ import annotations
-
 import base64
 import json
 import logging
+logger = logging.getLogger(__name__)
 import os
 import time
 from collections import defaultdict
@@ -52,8 +52,11 @@ def sync_to_sheets(local_db: dict) -> dict:
     # Veri çek
     ev_r = _req.get(f"{sb_url}/rest/v1/user_events",    headers=sb_hdrs, params={"order":"created_at.desc","limit":"3000","select":"user_id,event_type,payload,created_at"}, timeout=6)
     fs_r = _req.get(f"{sb_url}/rest/v1/followed_stores", headers=sb_hdrs, params={"order":"created_at.desc","limit":"3000","select":"user_id,email,store_slug,created_at"}, timeout=6)
-    # Auth kullanıcıları — email mapping için
-    au_r = _req.get(f"{sb_url}/auth/v1/admin/users", headers=sb_hdrs, params={"per_page":"1000"}, timeout=6)
+    # Auth kullanıcıları — email mapping için (service key gerekli)
+    _key = os.environ["SUPABASE_SERVICE_KEY"]
+    au_r = _req.get(f"{sb_url}/auth/v1/admin/users",
+                    headers={"apikey": _key, "Authorization": f"Bearer {_key}"},
+                    params={"per_page": "1000", "page": "1"}, timeout=6)
 
     events  = ev_r.json() if ev_r.ok else []
     follows = fs_r.json() if fs_r.ok else []
@@ -64,6 +67,8 @@ def sync_to_sheets(local_db: dict) -> dict:
         for u in (au_r.json().get("users") or []):
             if u.get("id") and u.get("email"):
                 emails[u["id"]] = u["email"]
+    else:
+        logger.warning("Auth users API hatası: %s %s", au_r.status_code, au_r.text[:200])
 
     # Kullanıcı bazlı grupla
     links:    dict[str, list[str]] = defaultdict(list)
