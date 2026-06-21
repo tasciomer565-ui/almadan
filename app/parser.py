@@ -790,7 +790,8 @@ def parse_product_url(url: str) -> ParsedProduct:
     if is_generic_title(title):
         title = None
 
-    price = price or parse_price(
+    visible_price = extract_visible_price(soup, source)
+    price = visible_price or price or parse_price(
         first_meta(
             soup,
             [
@@ -801,7 +802,7 @@ def parse_product_url(url: str) -> ParsedProduct:
             ],
         )
     )
-    price = price or embedded_price or extract_visible_price(soup, source)
+    price = price or embedded_price
     image_url = (
         image_url
         or embedded_image

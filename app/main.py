@@ -1538,7 +1538,8 @@ async def find_alternatives(payload: AlternativesRequest):
     # (Diğer mağazalardaki eşleşme ihtimalini %90 artırır)
     cleaned = re.sub(r'[^\w\s]', ' ', payload.title)
     words = [w for w in cleaned.split() if len(w) > 1]
-    query = " ".join(words[:5]) if len(words) > 5 else payload.title
+    # Sadece ilk 4 kelimeyi al (Marka ve Model), böylece "MOMORDICA Coconut Mix - 250 ml" -> "MOMORDICA Coconut Mix 250" olur ve her mağazada eşleşir.
+    query = " ".join(words[:4]) if words else payload.title
 
     products, is_fallback, effective_query, category = await master_search(query)
     

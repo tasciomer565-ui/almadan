@@ -5492,7 +5492,7 @@ async function renderCart() {
           console.warn("Kuantum sepet optimizasyonu başarısız veya zaman aşımına uğradı, hata kurtarma protokolü devrede:", error);
           
           if (overlay && progressText) {
-            overlay.classList.add("recovery-mode");
+            // overlay.classList.add("recovery-mode");
             const header = overlay.querySelector("h3");
             if (header) {
               header.classList.add("glitch-active");
@@ -5546,7 +5546,7 @@ async function renderCart() {
             };
             renderBackendOptimization(mockOptResult, state.optimizerMode);
             
-            overlay.classList.remove("recovery-mode");
+            // overlay.classList.remove("recovery-mode");
             if (header) {
               header.classList.remove("glitch-active");
               header.innerText = "KUANTUM SPEKTRUMU TARANIYOR";
@@ -6976,7 +6976,7 @@ function showInitialLoadFallback() {
   const progressText = document.getElementById("quantumScanProgress");
   if (overlay && progressText) {
     overlay.style.display = "flex";
-    overlay.classList.add("recovery-mode");
+    // overlay.classList.add("recovery-mode");
     const header = overlay.querySelector("h3");
     if (header) {
       header.classList.add("glitch-active");
@@ -6986,7 +6986,7 @@ function showInitialLoadFallback() {
     
     setTimeout(() => {
       overlay.style.display = "none";
-      overlay.classList.remove("recovery-mode");
+      // overlay.classList.remove("recovery-mode");
       if (header) {
         header.classList.remove("glitch-active");
         header.innerText = "KUANTUM SPEKTRUMU TARANIYOR";
