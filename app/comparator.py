@@ -527,48 +527,47 @@ def search_n11_direct(query: str) -> tuple[list[dict], str]:
     return parsed_results, corrected_query
 
 def search_trendyol_direct(query: str) -> list[dict]:
-    """Trendyol arama API'sini direkt çağırır."""
+    """Trendyol arama sayfasını scrape eder — __NEXT_DATA__ JSON'dan ürün çeker."""
+    import json as _json
     try:
-        url = (
-            "https://public.trendyol.com/discovery-web-searchgw-service/v2/api/infinite-scroll/sr"
-            f"?q={urllib.parse.quote_plus(query)}&qt={urllib.parse.quote_plus(query)}"
-            "&st=SEARCH&os=1&pi=1&culture=tr-TR&userGenderId=2&pId=0&scoringAlgorithmId=2&categoryRelevanceEnabled=False"
-        )
+        url = f"https://www.trendyol.com/sr?q={urllib.parse.quote_plus(query)}&qt={urllib.parse.quote_plus(query)}&st=SEARCH"
         headers = {
-            "User-Agent": YAHOO_USER_AGENT,
-            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+            "Accept": "text/html,application/xhtml+xml",
             "Accept-Language": "tr-TR,tr;q=0.9",
-            "Origin": "https://www.trendyol.com",
-            "Referer": "https://www.trendyol.com/",
         }
         r = requests.get(url, headers=headers, timeout=8)
         if not r.ok:
             return []
-        data = r.json()
-        products = (data.get("result") or {}).get("products") or []
+        # __NEXT_DATA__ içinde ürün listesi var
+        m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.+?)</script>', r.text, re.DOTALL)
+        if not m:
+            return []
+        nd = _json.loads(m.group(1))
+        prods = (
+            nd.get("props", {}).get("pageProps", {})
+            .get("search", {}).get("products")
+            or nd.get("props", {}).get("pageProps", {})
+            .get("initialState", {}).get("productList", {}).get("products")
+            or []
+        )
         results = []
-        for p in products[:12]:
+        for p in prods[:12]:
             name = p.get("name") or p.get("title") or ""
             if not name:
                 continue
-            price_info = p.get("price") or {}
-            price = price_info.get("sellingPrice") or price_info.get("originalPrice") or 0
-            orig = price_info.get("originalPrice")
+            price = p.get("price", {}).get("sellingPrice") or p.get("priceInfo", {}).get("price") or 0
             slug = p.get("url") or ""
-            prod_url = f"https://www.trendyol.com{slug}" if slug.startswith("/") else slug
-            img = ""
+            prod_url = f"https://www.trendyol.com{slug}" if slug.startswith("/") else f"https://www.trendyol.com/sr?q={urllib.parse.quote_plus(query)}"
             imgs = p.get("images") or []
-            if imgs:
-                img = f"https://cdn.dsmcdn.com/{imgs[0]}" if not imgs[0].startswith("http") else imgs[0]
+            img = imgs[0] if imgs else ""
+            if img and not img.startswith("http"):
+                img = f"https://cdn.dsmcdn.com/{img}"
             results.append({
-                "title": name,
-                "price": float(price),
-                "original_price": float(orig) if orig else None,
-                "image_url": img,
-                "source": "trendyol",
-                "url": prod_url,
-                "labels": ["Önerilen"],
-                "extra_info": {"out_of_stock": price == 0},
+                "title": name, "price": float(price),
+                "original_price": None, "image_url": img,
+                "source": "trendyol", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": price == 0},
             })
         return results
     except Exception:
@@ -577,10 +576,11 @@ def search_trendyol_direct(query: str) -> list[dict]:
 
 def search_hepsiburada_direct(query: str) -> list[dict]:
     """Hepsiburada arama sayfasını scrape eder."""
+    import json as _json
     try:
         url = f"https://www.hepsiburada.com/ara?q={urllib.parse.quote_plus(query)}"
         headers = {
-            "User-Agent": YAHOO_USER_AGENT,
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
             "Accept": "text/html,application/xhtml+xml",
             "Accept-Language": "tr-TR,tr;q=0.9",
         }
