@@ -2260,19 +2260,7 @@ def _barcode_from_sources(barcode: str) -> dict | None:
     except Exception as exc:
         log.warning("UPCitemdb exception for barcode %s: %s", barcode, exc)
 
-    # ── Kaynak 3: N11 ürün arama (barkod numarasını query olarak gönder) ──
-    try:
-        from app.comparator import search_n11_direct
-        n11_results, _ = search_n11_direct(barcode)
-        if n11_results:
-            first = n11_results[0]
-            return {"title": first["title"], "brand": "", "quantity": "",
-                    "image_url": first.get("image_url", ""),
-                    "search_query": first["title"],
-                    "source": "n11_search"}
-    except Exception as exc:
-        log.warning("N11 barcode fallback exception for %s: %s", barcode, exc)
-
+    # N11 arama fallback kaldırıldı — barkod numarasını isim gibi aratınca yanlış ürün geliyor.
     return None
 
 

@@ -526,6 +526,116 @@ def search_n11_direct(query: str) -> tuple[list[dict], str]:
         
     return parsed_results, corrected_query
 
+def search_trendyol_direct(query: str) -> list[dict]:
+    """Trendyol arama API'sini direkt çağırır."""
+    try:
+        url = (
+            "https://public.trendyol.com/discovery-web-searchgw-service/v2/api/infinite-scroll/sr"
+            f"?q={urllib.parse.quote_plus(query)}&qt={urllib.parse.quote_plus(query)}"
+            "&st=SEARCH&os=1&pi=1&culture=tr-TR&userGenderId=2&pId=0&scoringAlgorithmId=2&categoryRelevanceEnabled=False"
+        )
+        headers = {
+            "User-Agent": YAHOO_USER_AGENT,
+            "Accept": "application/json",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Origin": "https://www.trendyol.com",
+            "Referer": "https://www.trendyol.com/",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        data = r.json()
+        products = (data.get("result") or {}).get("products") or []
+        results = []
+        for p in products[:12]:
+            name = p.get("name") or p.get("title") or ""
+            if not name:
+                continue
+            price_info = p.get("price") or {}
+            price = price_info.get("sellingPrice") or price_info.get("originalPrice") or 0
+            orig = price_info.get("originalPrice")
+            slug = p.get("url") or ""
+            prod_url = f"https://www.trendyol.com{slug}" if slug.startswith("/") else slug
+            img = ""
+            imgs = p.get("images") or []
+            if imgs:
+                img = f"https://cdn.dsmcdn.com/{imgs[0]}" if not imgs[0].startswith("http") else imgs[0]
+            results.append({
+                "title": name,
+                "price": float(price),
+                "original_price": float(orig) if orig else None,
+                "image_url": img,
+                "source": "trendyol",
+                "url": prod_url,
+                "labels": ["Önerilen"],
+                "extra_info": {"out_of_stock": price == 0},
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_hepsiburada_direct(query: str) -> list[dict]:
+    """Hepsiburada arama sayfasını scrape eder."""
+    try:
+        url = f"https://www.hepsiburada.com/ara?q={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": YAHOO_USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        items = soup.select("li[data-test-id='product-card-item']") or soup.select("li.productListContent-item")
+        if not items:
+            # JSON içinde veri ara
+            import json as _json
+            m = re.search(r'__NEXT_DATA__.*?=\s*(\{.*?\})\s*;?\s*</script>', r.text, re.DOTALL)
+            if m:
+                try:
+                    nd = _json.loads(m.group(1))
+                    prods = nd.get("props", {}).get("pageProps", {}).get("products") or []
+                    results = []
+                    for p in prods[:10]:
+                        name = p.get("name") or p.get("displayName") or ""
+                        price = p.get("price") or p.get("salePrice") or 0
+                        sku = p.get("sku") or ""
+                        prod_url = f"https://www.hepsiburada.com/{sku}" if sku else ""
+                        img = p.get("images", [""])[0] if p.get("images") else ""
+                        if name and price:
+                            results.append({
+                                "title": name, "price": float(price), "original_price": None,
+                                "image_url": img, "source": "hepsiburada", "url": prod_url,
+                                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                            })
+                    return results
+                except Exception:
+                    pass
+        results = []
+        for item in items[:10]:
+            name_el = item.select_one("[data-test-id='product-card-name']") or item.select_one("h3") or item.select_one(".product-title")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one("[data-test-id='price-current-price']") or item.select_one(".price-value")
+            price = parse_price(price_el.get_text(strip=True)) if price_el else 0
+            link_el = item.select_one("a")
+            href = link_el.get("href", "") if link_el else ""
+            prod_url = f"https://www.hepsiburada.com{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = img_el.get("src") or img_el.get("data-src") or "" if img_el else ""
+            results.append({
+                "title": name, "price": float(price or 0), "original_price": None,
+                "image_url": img, "source": "hepsiburada", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": price == 0},
+            })
+        return results
+    except Exception:
+        return []
+
+
 def run_async(coro):
     import asyncio
     import threading
