@@ -41,7 +41,7 @@ def _sheets(method, path, tok, **kw):
 
 
 def _sb():
-    key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+    key = os.environ["SUPABASE_SERVICE_KEY"]
     return os.environ["SUPABASE_URL"].rstrip("/"), {"apikey": key, "Authorization": f"Bearer {key}"}
 
 

@@ -2160,9 +2160,9 @@ async def sync_google_sheets(request: Request, user=Depends(require_login)):
         result = sync_to_sheets(load_db())
         return result
     except Exception as exc:
-        import traceback
-        detail = f"{type(exc).__name__}: {exc}\n{traceback.format_exc()[-800:]}"
-        logger.error("Google Sheets sync hatası: %s", detail)
+        import traceback, logging as _lg
+        detail = f"{type(exc).__name__}: {exc}\n{traceback.format_exc()[-600:]}"
+        _lg.getLogger(__name__).error("Google Sheets sync hatası: %s", detail)
         raise HTTPException(status_code=500, detail=detail)
 
 
