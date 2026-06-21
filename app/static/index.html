@@ -1222,7 +1222,7 @@
             var resultDiv = btn.parentElement.querySelector('[data-sheets-result]');
             if (resultDiv) {
               resultDiv.innerHTML = '<a href="' + data.sheet_url + '" target="_blank" style="color:#287a50;font-size:12px;font-weight:600;text-decoration:none;">📊 Tabloyu Aç →</a>'
-                + '<span style="font-size:11px;color:var(--ink-2);margin-left:10px;">' + data.links + ' link · ' + data.products + ' ürün · ' + data.stores + ' mağaza</span>';
+                + '<span style="font-size:11px;color:var(--ink-2);margin-left:10px;">' + (data.users||0) + ' kullanıcı · ' + (data.links||0) + ' link · ' + (data.products||0) + ' ürün · ' + (data.stores||0) + ' mağaza</span>';
               resultDiv.style.display = 'block';
             }
             setTimeout(function(){ btn.innerHTML = orig; btn.disabled = false; btn.style.background = ''; }, 4000);

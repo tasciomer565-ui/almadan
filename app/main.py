@@ -4951,3 +4951,19 @@ async def cron_store_newsletters(request: Request):
             triggered.append({"slug": slug, "campaigns_notified": len(ids), "followers": follower_count})
 
     return {"date": today_str, "triggered": triggered, "total_stores_checked": len(active_stores)}
+
+
+@app.get("/cron/sync-sheets")
+async def cron_sync_sheets(request: Request):
+    """Vercel Cron: Her gün 02:00'da çalışır — Google Sheets'i günceller."""
+    require_cron_request(request)
+    if not os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON") or not os.getenv("GOOGLE_SHEET_ID"):
+        return {"skipped": True, "reason": "Google Sheets env vars not configured"}
+    try:
+        from app.sheets_sync import sync_to_sheets
+        result = sync_to_sheets(load_db())
+        return {"ok": True, **result}
+    except Exception as exc:
+        import traceback
+        logger.error("cron/sync-sheets hatası: %s", traceback.format_exc())
+        return {"ok": False, "error": str(exc)}

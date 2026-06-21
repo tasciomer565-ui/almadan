@@ -45,6 +45,10 @@
     {
       "path": "/cron/store-newsletters",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/cron/sync-sheets",
+      "schedule": "0 2 * * *"
     }
   ]
 }
