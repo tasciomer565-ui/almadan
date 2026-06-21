@@ -1223,7 +1223,8 @@
             var resultDiv = btn.parentElement.querySelector('[data-sheets-result]');
             if (resultDiv) {
               resultDiv.innerHTML = '<a href="' + data.sheet_url + '" target="_blank" style="color:#287a50;font-size:12px;font-weight:600;text-decoration:none;">📊 Tabloyu Aç →</a>'
-                + '<span style="font-size:11px;color:var(--ink-2);margin-left:10px;">' + (data.users||0) + ' kullanıcı · ' + (data.links||0) + ' link · ' + (data.products||0) + ' ürün · ' + (data.stores||0) + ' mağaza</span>';
+                + '<span style="font-size:11px;color:var(--ink-2);margin-left:10px;">' + (data.users||0) + ' kullanıcı · ' + (data.links||0) + ' link · ' + (data.products||0) + ' ürün · ' + (data.stores||0) + ' mağaza</span>'
+                + (data.auth_api_snippet ? '<div style="font-size:10px;color:red;margin-top:4px;">Auth err ' + data.auth_api_status + ': ' + data.auth_api_snippet + '</div>' : '<div style="font-size:10px;color:green;margin-top:4px;">Auth OK · ' + (data.emails_found||0) + ' email</div>');
               resultDiv.style.display = 'block';
             }
             setTimeout(function(){ btn.innerHTML = orig; btn.disabled = false; btn.style.background = ''; }, 4000);
