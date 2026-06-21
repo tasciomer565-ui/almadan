@@ -49,18 +49,26 @@ def sync_to_sheets(local_db: dict) -> dict:
     sb_url, sb_hdrs = _sb()
     tok = _token()
 
-    # Paralel veri çek (sırayla ama kısa timeout)
+    # Veri çek
     ev_r = _req.get(f"{sb_url}/rest/v1/user_events",    headers=sb_hdrs, params={"order":"created_at.desc","limit":"3000","select":"user_id,event_type,payload,created_at"}, timeout=6)
     fs_r = _req.get(f"{sb_url}/rest/v1/followed_stores", headers=sb_hdrs, params={"order":"created_at.desc","limit":"3000","select":"user_id,email,store_slug,created_at"}, timeout=6)
+    # Auth kullanıcıları — email mapping için
+    au_r = _req.get(f"{sb_url}/auth/v1/admin/users", headers=sb_hdrs, params={"per_page":"1000"}, timeout=6)
 
     events  = ev_r.json() if ev_r.ok else []
     follows = fs_r.json() if fs_r.ok else []
+
+    # Email map: user_id → email (auth tablosundan)
+    emails: dict[str, str] = {}
+    if au_r.ok:
+        for u in (au_r.json().get("users") or []):
+            if u.get("id") and u.get("email"):
+                emails[u["id"]] = u["email"]
 
     # Kullanıcı bazlı grupla
     links:    dict[str, list[str]] = defaultdict(list)
     products: dict[str, list[str]] = defaultdict(list)
     stores:   dict[str, list[str]] = defaultdict(list)
-    emails:   dict[str, str]       = {}
     last_act: dict[str, str]       = {}
 
     for ev in events:
@@ -78,7 +86,7 @@ def sync_to_sheets(local_db: dict) -> dict:
 
     for f in follows:
         uid = f.get("user_id") or "anonim"
-        if f.get("email"): emails[uid] = f["email"]
+        if f.get("email") and uid not in emails: emails[uid] = f["email"]
         slug = f.get("store_slug", "")
         if slug and slug not in stores[uid]: stores[uid].append(slug)
         date = (f.get("created_at") or "")[:10]
