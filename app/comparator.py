@@ -527,20 +527,28 @@ def search_n11_direct(query: str) -> tuple[list[dict], str]:
     return parsed_results, corrected_query
 
 def search_trendyol_direct(query: str) -> list[dict]:
-    """Trendyol arama sayfasını scrape eder — __NEXT_DATA__ JSON'dan ürün çeker."""
+    """Trendyol arama sayfasını scrape eder — ScrapingBee varsa proxy üzerinden."""
     import json as _json
+    from app.scraping_proxy import proxy_get, proxy_enabled
     try:
         url = f"https://www.trendyol.com/sr?q={urllib.parse.quote_plus(query)}&qt={urllib.parse.quote_plus(query)}&st=SEARCH"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-            "Accept": "text/html,application/xhtml+xml",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
+        if proxy_enabled():
+            html = proxy_get(url, render_js=False, timeout=12)
+            if not html:
+                return []
+            r_text = html
+        else:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+                "Accept": "text/html,application/xhtml+xml",
+                "Accept-Language": "tr-TR,tr;q=0.9",
+            }
+            r = requests.get(url, headers=headers, timeout=8)
+            if not r.ok:
+                return []
+            r_text = r.text
         # __NEXT_DATA__ içinde ürün listesi var
-        m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.+?)</script>', r.text, re.DOTALL)
+        m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.+?)</script>', r_text, re.DOTALL)
         if not m:
             return []
         nd = _json.loads(m.group(1))
@@ -575,24 +583,31 @@ def search_trendyol_direct(query: str) -> list[dict]:
 
 
 def search_hepsiburada_direct(query: str) -> list[dict]:
-    """Hepsiburada arama sayfasını scrape eder."""
+    """Hepsiburada arama sayfasını scrape eder — ScrapingBee varsa proxy üzerinden."""
     import json as _json
+    from app.scraping_proxy import proxy_get, proxy_enabled
     try:
         url = f"https://www.hepsiburada.com/ara?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-            "Accept": "text/html,application/xhtml+xml",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
+        if proxy_enabled():
+            html = proxy_get(url, render_js=False, timeout=12)
+            if not html:
+                return []
+            r_text = html
+        else:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+                "Accept": "text/html,application/xhtml+xml",
+                "Accept-Language": "tr-TR,tr;q=0.9",
+            }
+            r = requests.get(url, headers=headers, timeout=8)
+            if not r.ok:
+                return []
+            r_text = r.text
+        soup = BeautifulSoup(r_text, "html.parser")
         items = soup.select("li[data-test-id='product-card-item']") or soup.select("li.productListContent-item")
         if not items:
-            # JSON içinde veri ara
             import json as _json
-            m = re.search(r'__NEXT_DATA__.*?=\s*(\{.*?\})\s*;?\s*</script>', r.text, re.DOTALL)
+            m = re.search(r'__NEXT_DATA__.*?=\s*(\{.*?\})\s*;?\s*</script>', r_text, re.DOTALL)
             if m:
                 try:
                     nd = _json.loads(m.group(1))
