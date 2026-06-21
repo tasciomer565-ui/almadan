@@ -1213,7 +1213,8 @@
             var csrfToken = document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('csrf_token=');});
             var csrfVal = csrfToken ? csrfToken.split('=')[1] : '';
             var res = await fetch('/api/admin/sync-google-sheets', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': csrfVal, 'Content-Type': 'application/json' } });
-            var data = await res.json();
+            var text = await res.text();
+            var data; try { data = JSON.parse(text); } catch(je) { throw new Error('Sunucu hatası: ' + text.slice(0, 120)); }
             if (!res.ok) throw new Error(data.detail || 'Hata');
             btn.innerHTML = '✓ Gönderildi';
             btn.style.background = '#287a50';
