@@ -50,6 +50,21 @@ def _enabled() -> bool:
 
 def cache_get(cache_key: str, query: str = "", category: str = "") -> Optional[list[dict]]:
     """Cache'de taze (süresi dolmamış) veri varsa döndür, yoksa None."""
+    # 1. Redis önce — çok daha hızlı
+    try:
+        from app.redis_cache import rget
+        hit = rget(cache_key)
+        if hit is not None:
+            logger.info("Redis HIT: %s (%d ürün)", cache_key, len(hit))
+            try:
+                from app.admin_metrics import record_event
+                record_event("cache_hit", query=query, category=category, duration_ms=1)
+            except Exception:
+                pass
+            return hit
+    except Exception as exc:
+        logger.warning("Redis cache_get hata: %s", exc)
+
     if not _enabled():
         return None
     import time as _time
@@ -120,6 +135,13 @@ def cache_get_stale(cache_key: str) -> Optional[list[dict]]:  # noqa: C901
 
 def cache_set(cache_key: str, query: str, category: str, products: list[dict]) -> None:
     """Sonuçları cache'e kaydet / varsa güncelle."""
+    # Redis'e de yaz (hızlı okuma için)
+    try:
+        from app.redis_cache import rset
+        rset(cache_key, products)
+    except Exception as exc:
+        logger.warning("Redis cache_set hata: %s", exc)
+
     if not _enabled() or not products:
         return
     try:
