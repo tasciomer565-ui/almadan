@@ -732,6 +732,14 @@
       </button>
     </nav>
 
+    <!-- Yeni: Satıcı Seçim Ekranı -->
+    <dialog class="product-dialog" id="sellerSelectionDialog" style="max-width: 500px; border-radius: 12px; border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+      <button class="dialog-close icon-button" onclick="document.getElementById('sellerSelectionDialog').close()" aria-label="Pencereyi kapat" title="Kapat">
+        <i data-lucide="x"></i>
+      </button>
+      <div id="sellerSelectionContent" class="dialog-body" style="padding: 24px;"></div>
+    </dialog>
+
     <dialog class="product-dialog" id="productDialog">
       <button class="dialog-close icon-button" id="dialogClose" aria-label="Pencereyi kapat" title="Kapat">
         <i data-lucide="x"></i>

@@ -1678,7 +1678,8 @@ async function parseProduct(event) {
             showLinkGuide(true);
             return;
           }
-          showParsedProduct(parsed);
+          if (overlay) overlay.style.display = "none";
+          showSellerSelectionDialog(parsed);
         } else {
           // URL değil — rehber popup göster
           if (overlay) overlay.style.display = "none";
@@ -7492,4 +7493,113 @@ async function searchByBarcode(code) {
     if (overlay) overlay.style.display = "none";
     showToast("Barkod sorgulanamadı: " + (e.message || e));
   }
+}
+
+/* ── Yeni: Satıcı Seçim Akışı ─────────────────────────────────────────────── */
+
+async function showSellerSelectionDialog(parsed) {
+  const dialog = document.getElementById("sellerSelectionDialog");
+  const content = document.getElementById("sellerSelectionContent");
+  if (!dialog || !content) return;
+  
+  dialog.showModal();
+  content.innerHTML = `
+    <div style="text-align:center; padding: 30px 20px;">
+      <span class="spinner" style="display:inline-block; width:28px; height:28px; border-color:#287a50; border-right-color:transparent; border-width:3px;"></span>
+      <p style="margin-top:16px; font-weight:700; font-size:15px; color:var(--ink);">Satıcılar karşılaştırılıyor...</p>
+    </div>
+  `;
+  
+  try {
+    const res = await fetch("/api/find-alternatives", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url })
+    });
+    const data = await res.json();
+    let alts = data.alternatives || [];
+    
+    // Asıl ürünü listede yoksa başa ekle
+    const origPrice = parsed.price || 0;
+    const origFound = alts.find(a => Math.abs(a.price - origPrice) < 1 && a.source.toLowerCase().includes(parsed.source.toLowerCase()));
+    if (!origFound && parsed.price) {
+      alts.unshift({
+        title: parsed.title,
+        price: parsed.price,
+        source: parsed.source,
+        url: parsed.canonical_url,
+        image_url: parsed.image_url,
+        extra_info: parsed.extra_info || {}
+      });
+    }
+    
+    // Fiyata göre sırala
+    alts.sort((a, b) => a.price - b.price);
+    
+    if (alts.length === 0) {
+      dialog.close();
+      showParsedProduct(parsed); // Bulunamazsa direkt eski ekrana düş
+      return;
+    }
+    
+    let listHtml = `
+      <h3 style="margin:0 0 16px 0; font-size:18px; font-weight:800; color:var(--ink);">Hangi Satıcıyı İstersiniz?</h3>
+      <p style="font-size:13px; color:var(--ink-2); margin-top:-10px; margin-bottom:18px;">Bu ürün için <b>${alts.length} farklı satıcı/mağaza</b> bulundu. Devam etmek istediğiniz teklifi seçin.</p>
+      <div style="display:flex; flex-direction:column; gap:12px; max-height:55vh; overflow-y:auto; padding-right:6px;" class="custom-scrollbar">
+    `;
+    
+    alts.forEach((a, idx) => {
+      let badgesHtml = "";
+      if (idx === 0) badgesHtml += `<span style="background:var(--green);color:white;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:800;">🌟 En Ucuz</span>`;
+      if (a.extra_info && a.extra_info.fast_delivery) badgesHtml += `<span style="background:rgba(255,152,0,0.12);color:#ef6c00;border:1px solid rgba(255,152,0,0.3);padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;">⚡ Hızlı Teslimat</span>`;
+      if (a.extra_info && a.extra_info.rating && parseFloat(a.extra_info.rating) >= 9.0) badgesHtml += `<span style="background:rgba(33,150,243,0.12);color:#1976d2;border:1px solid rgba(33,150,243,0.3);padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;">🏆 En Yüksek Puanlı (${a.extra_info.rating})</span>`;
+      
+      const badgeDiv = badgesHtml ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">${badgesHtml}</div>` : "";
+      
+      const escapedJson = escapeHtml(JSON.stringify(a));
+      
+      listHtml += `
+        <div style="border: 1.5px solid var(--line); border-radius: 10px; padding: 14px; cursor: pointer; transition: all 0.15s; background: white; position: relative;" onmouseover="this.style.borderColor='var(--green)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.borderColor='var(--line)'; this.style.transform='none';" onclick="selectSellerAndProceed(this)" data-seller='${escapedJson}'>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div style="display:flex; flex-direction:column; max-width:70%;">
+              <strong style="font-size:15px; color:var(--ink);">${escapeHtml(a.source)}</strong>
+              <span style="font-size:12px; color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:3px;">${escapeHtml(a.title)}</span>
+              ${badgeDiv}
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:flex-end;">
+               <div style="font-size:17px; font-weight:800; color:var(--green-dark);">₺${a.price.toFixed(2)}</div>
+               <span style="font-size:11px; color:var(--green); font-weight:700; margin-top:4px;">Seç ve Takip Et ➜</span>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    
+    listHtml += `</div>`;
+    content.innerHTML = listHtml;
+    
+  } catch(e) {
+    dialog.close();
+    showParsedProduct(parsed); // Hata durumunda asıl ekrana düş
+  }
+}
+
+function selectSellerAndProceed(element) {
+  const sellerData = JSON.parse(element.getAttribute("data-seller"));
+  document.getElementById("sellerSelectionDialog").close();
+  
+  // Seçili satıcıyı sanki asıl taranan oymuş gibi asıl ekrana taşı
+  const newParsed = {
+    title: sellerData.title,
+    price: sellerData.price,
+    source: sellerData.source,
+    canonical_url: sellerData.url,
+    image_url: sellerData.image_url,
+    original_price: sellerData.original_price,
+    extra_info: sellerData.extra_info,
+    warnings: [],
+    confidence: 100
+  };
+  
+  showParsedProduct(newParsed);
 }

@@ -1559,21 +1559,28 @@ async def find_alternatives(payload: AlternativesRequest):
             import json
             try:
                 resp = safe_product_get(payload.original_url)
-                m = re.search(r'window\.__INITIAL_STATE__\s*=\s*({.*?});', resp.text)
+                m = re.search(r'window\.__INITIAL_STATE__\s*=\s*({.*?});?</script>', resp.text, re.DOTALL)
                 if m:
-                    state = json.loads(m.group(1))
+                    state = json.loads(m.group(1).strip())
                     merchants = state.get("product", {}).get("productDetails", {}).get("otherMerchants", [])
                     for merchant in merchants:
                         merch_price = merchant.get("price", {}).get("discountedPrice", {}).get("value")
                         merch_name = merchant.get("merchant", {}).get("name")
                         merch_url = merchant.get("merchant", {}).get("sellerLink", "")
+                        merch_score = merchant.get("merchant", {}).get("sellerScore")
+                        merch_delivery = merchant.get("deliveryInformation", {}).get("fastDeliveryOptions", [])
+                        
                         if merch_price and merch_name:
                             products.append({
                                 "title": payload.title,
                                 "price": float(merch_price),
                                 "url": f"https://www.trendyol.com{merch_url}" if merch_url else payload.original_url,
                                 "source": f"Trendyol ({merch_name})",
-                                "image_url": payload.image_url
+                                "image_url": payload.image_url,
+                                "extra_info": {
+                                    "rating": merch_score,
+                                    "fast_delivery": bool(merch_delivery)
+                                }
                             })
             except Exception as e:
                 pass
