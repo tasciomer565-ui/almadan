@@ -72,7 +72,7 @@ def sync_to_sheets(local_db: dict) -> dict:
             if u.get("id") and u.get("email"):
                 emails[u["id"]] = u["email"]
     else:
-        logger.warning("Auth users API hatası: %s %s", au_r.status_code, au_r.text[:200])
+        logger.warning("Auth users API hatası: %s %s", au_r.status_code, au_r.text[:300])
 
     # Kullanıcı bazlı grupla
     links:    dict[str, list[str]] = defaultdict(list)
@@ -141,4 +141,7 @@ def sync_to_sheets(local_db: dict) -> dict:
     return {"users": len(all_users), "links": sum(len(v) for v in links.values()),
             "products": sum(len(v) for v in products.values()),
             "stores": sum(len(v) for v in stores.values()),
+            "emails_found": len(emails),
+            "auth_api_status": au_r.status_code,
+            "auth_api_snippet": au_r.text[:120] if not au_r.ok else "",
             "sheet_url": sheet_url, "synced_at": now_ts}
