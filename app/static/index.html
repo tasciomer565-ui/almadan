@@ -1230,21 +1230,29 @@
           }
         };
 
-        /* Admin paneli açılınca butonu enjekte et */
-        document.addEventListener('click', function(e) {
-          if (!e.target.closest('[onclick*="showAdminDashboard"]') && !e.target.closest('[data-admin]')) return;
-          setTimeout(function() {
-            var statsBody = document.getElementById('adminStatsBody');
-            if (!statsBody || statsBody.querySelector('[data-sheets-btn]')) return;
-            var wrapper = document.createElement('div');
-            wrapper.style.cssText = 'margin-top:20px;padding-top:16px;border-top:1px solid var(--border);';
-            wrapper.innerHTML = '<p style="font-size:11px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;margin:0 0 10px;">VERİ DIŞA AKTARMA</p>'
-              + '<button type="button" data-sheets-btn="1" onclick="window._almadanSheetsSync(this)" style="background:#1a3d6e;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:8px;">📊 Google Sheets\'e Gönder</button>'
-              + '<div data-sheets-result style="display:none;margin-top:8px;"></div>'
-              + '<p style="font-size:11px;color:var(--ink-2);margin:8px 0 0;">3 sekme: Yapıştırılan Linkler · Takip Edilen Ürünler · Takip Edilen Mağazalar</p>';
-            statsBody.appendChild(wrapper);
-          }, 800);
+        /* Admin paneli açılınca butonu enjekte et — MutationObserver ile yakala */
+        function _injectSheetsBtn() {
+          var statsBody = document.getElementById('adminStatsBody');
+          if (!statsBody || statsBody.querySelector('[data-sheets-btn]')) return;
+          /* İçerik henüz yüklenmediyse (spinner varsa) tekrar dene */
+          if (statsBody.querySelector('.spinner') || statsBody.textContent.trim() === 'Yükleniyor...') {
+            setTimeout(_injectSheetsBtn, 400);
+            return;
+          }
+          var wrapper = document.createElement('div');
+          wrapper.style.cssText = 'margin-top:20px;padding-top:16px;border-top:1px solid var(--border);';
+          wrapper.innerHTML = '<p style="font-size:11px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;margin:0 0 10px;">VERİ DIŞA AKTARMA</p>'
+            + '<button type="button" data-sheets-btn="1" onclick="window._almadanSheetsSync(this)" style="background:#1a3d6e;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);">📊 Google Sheets\'e Gönder</button>'
+            + '<div data-sheets-result style="display:none;margin-top:8px;"></div>'
+            + '<p style="font-size:11px;color:var(--ink-2);margin:8px 0 0;">3 sekme: Yapıştırılan Linkler · Takip Edilen Ürünler · Takip Edilen Mağazalar</p>';
+          statsBody.appendChild(wrapper);
+        }
+        /* dialogContent değişimlerini izle */
+        var _adminObs = new MutationObserver(function() {
+          if (document.getElementById('adminStatsBody')) _injectSheetsBtn();
         });
+        var _dlgContent = document.getElementById('dialogContent');
+        if (_dlgContent) _adminObs.observe(_dlgContent, { childList: true, subtree: true });
 
         /* ── YENİ SATICI KARŞILAŞTIRMA EKRANI (app.js override) ─────────────
            URL yapıştırıldıktan sonra 15+ satıcı/ürün listesi gösterir.
