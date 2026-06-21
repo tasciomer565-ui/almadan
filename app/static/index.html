@@ -1210,7 +1210,9 @@
           btn.disabled = true;
           btn.innerHTML = '<span class="spinner" style="display:inline-block;width:14px;height:14px;border-width:2px;border-color:#fff;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite;"></span> Gönderiliyor...';
           try {
-            var res = await fetch('/api/admin/sync-google-sheets', { method: 'POST', credentials: 'same-origin' });
+            var csrfToken = document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('csrf_token=');});
+            var csrfVal = csrfToken ? csrfToken.split('=')[1] : '';
+            var res = await fetch('/api/admin/sync-google-sheets', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': csrfVal, 'Content-Type': 'application/json' } });
             var data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Hata');
             btn.innerHTML = '✓ Gönderildi';
