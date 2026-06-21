@@ -2352,27 +2352,25 @@ def api_barcode_lookup(code: str) -> dict:
     _fm = FuzzyMatcher()
     barcode_title = match["title"]
 
+    # Barkod adındaki anlamlı kelimeler sonuçta geçiyor mu?
+    barcode_words = [w.lower() for w in barcode_title.split() if len(w) > 2]
     validated_results = []
     for r in results:
         candidate_title = r.get("title") or r.get("name") or ""
         match_score = _fm.score(barcode_title, candidate_title)
-        if match_score >= 0.60:
-            r["_match_score"] = match_score
+        # Kelime bazlı ek kontrol: barkod kelimelerinin yarısı sonuçta varsa kabul et
+        candidate_lower = candidate_title.lower()
+        word_hits = sum(1 for w in barcode_words if w in candidate_lower)
+        word_ratio = word_hits / len(barcode_words) if barcode_words else 0
+        if match_score >= 0.40 or word_ratio >= 0.5:
+            r["_match_score"] = max(match_score, word_ratio)
             validated_results.append(r)
 
     if not validated_results:
-        # Hiçbir sonuç eşik üzerinde değil → güvenli hata
-        return {
-            "found": False,
-            "barcode": barcode,
-            "barcode_title": barcode_title,
-            "match_score": None,
-            "message": (
-                f"'{barcode_title}' barkodu tanımlandı ancak markette güvenilir "
-                "eşleşme bulunamadı. Lütfen ürün linkini yapıştırın."
-            ),
-            "allow_manual": True,
-        }
+        # Eşleşme yok ama ürün tanındı → tüm sonuçları göster (kullanıcı seçsin)
+        for r in results[:8]:
+            r["_match_score"] = 0
+            validated_results.append(r)
 
     # En yüksek skora göre sırala
     validated_results.sort(key=lambda x: x.get("_match_score", 0), reverse=True)
