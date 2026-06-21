@@ -593,6 +593,18 @@ def search_products_by_name(
         if not has_any_match:
             filtered_products = []
 
+    # Title bazlı deduplicate: aynı ürün farklı satıcıdan geliyorsa en ucuzunu tut
+    def _title_key(title: str) -> str:
+        import re
+        return re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', '', title.lower().strip()))[:60]
+
+    seen_titles: dict[str, dict] = {}
+    for p in filtered_products:
+        tk = _title_key(p.get("title", ""))
+        if tk not in seen_titles or p["price"] < seen_titles[tk]["price"]:
+            seen_titles[tk] = p
+    filtered_products = list(seen_titles.values())
+
     # Separate into in-stock and out-of-stock
     in_stock = [p for p in filtered_products if not p["extra_info"].get("out_of_stock")]
     out_of_stock = [p for p in filtered_products if p["extra_info"].get("out_of_stock")]
