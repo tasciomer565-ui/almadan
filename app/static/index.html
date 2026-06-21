@@ -1201,6 +1201,170 @@
             });
           });
         }
+
+        /* ── YENİ SATICI KARŞILAŞTIRMA EKRANI (app.js override) ─────────────
+           URL yapıştırıldıktan sonra 15+ satıcı/ürün listesi gösterir.
+           Kullanıcı seçim yapar → takip sayfasına geçer.
+        ─────────────────────────────────────────────────────────────────────── */
+        window.showSellerSelectionDialog = async function(parsed) {
+          var dialog  = document.getElementById('sellerSelectionDialog');
+          var content = document.getElementById('sellerSelectionContent');
+          if (!dialog || !content) return;
+
+          dialog.showModal();
+          content.innerHTML = '<div style="text-align:center;padding:36px 20px;">'
+            + '<span class="spinner" style="display:inline-block;width:28px;height:28px;border-color:#287a50;border-right-color:transparent;border-width:3px;"></span>'
+            + '<p style="margin-top:16px;font-weight:700;font-size:15px;color:var(--ink);">En İyi Teklifler Karşılaştırılıyor...</p>'
+            + '<p style="font-size:12px;color:var(--ink-2);margin-top:4px;">15+ satıcı ve alternatif tarıyor</p>'
+            + '</div>';
+
+          try {
+            /* İki kaynaktan paralel çek */
+            var title = (parsed.title || '').split(/[,\|\-–]/)[0].trim().slice(0, 60);
+            var results = await Promise.allSettled([
+              fetch('/api/find-alternatives', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url })
+              }).then(function(r){ return r.json(); }),
+              fetch('/api/search?query=' + encodeURIComponent(title) + '&category=general', {
+                credentials: 'same-origin'
+              }).then(function(r){ return r.json(); })
+            ]);
+
+            var alts = [];
+
+            /* find-alternatives sonuçları */
+            if (results[0].status === 'fulfilled') {
+              (results[0].value.alternatives || []).forEach(function(a){ alts.push(a); });
+            }
+            /* Trendyol / diğer satıcılar parsed içinden */
+            if (parsed.extra_info && parsed.extra_info.otherMerchants) {
+              var seen = new Set(alts.map(function(a){ return a.url; }));
+              parsed.extra_info.otherMerchants.forEach(function(m){
+                if (!seen.has(m.url)) { alts.push(m); seen.add(m.url); }
+              });
+            }
+            /* Arama sonuçlarını ekle */
+            if (results[1].status === 'fulfilled') {
+              var searchProducts = results[1].value.products || [];
+              var seenTitles = new Set(alts.map(function(a){ return (a.title||'').toLowerCase().slice(0,30); }));
+              searchProducts.forEach(function(p){
+                var key = (p.name||p.title||'').toLowerCase().slice(0,30);
+                if (!seenTitles.has(key) && p.price) {
+                  alts.push({
+                    title: p.name || p.title,
+                    price: parseFloat(p.price),
+                    source: p.store || p.source || '',
+                    url: p.url || '',
+                    image_url: p.image_url || '',
+                    extra_info: { rating: p.rating, review_count: p.review_count }
+                  });
+                  seenTitles.add(key);
+                }
+              });
+            }
+
+            /* Asıl ürünü başa ekle */
+            if (parsed.price) {
+              var origFound = alts.find(function(a){
+                return Math.abs((a.price||0) - parsed.price) < 1
+                  && String(a.source||'').toLowerCase().includes(String(parsed.source||'').toLowerCase());
+              });
+              if (!origFound) {
+                alts.unshift({
+                  title: parsed.title, price: parsed.price, source: parsed.source,
+                  url: parsed.canonical_url, image_url: parsed.image_url,
+                  extra_info: parsed.extra_info || {}, _isOriginal: true
+                });
+              } else {
+                origFound._isOriginal = true;
+              }
+            }
+
+            /* Fiyata göre sırala */
+            alts.sort(function(a,b){ return (a.price||999999) - (b.price||999999); });
+
+            /* En çok değerlendirme */
+            var maxReviews = 0;
+            alts.forEach(function(a){ if ((a.extra_info||{}).review_count > maxReviews) maxReviews = a.extra_info.review_count; });
+            var maxReviewItem = maxReviews > 0 ? alts.find(function(a){ return (a.extra_info||{}).review_count === maxReviews; }) : null;
+
+            /* En yüksek puanlı */
+            var maxRating = 0;
+            alts.forEach(function(a){ var r = parseFloat((a.extra_info||{}).rating||0); if(r>maxRating) maxRating=r; });
+            var maxRatingItem = maxRating >= 8.5 ? alts.find(function(a){ return parseFloat((a.extra_info||{}).rating||0) === maxRating; }) : null;
+
+            if (alts.length === 0) {
+              content.innerHTML = '<div style="text-align:center;padding:30px 20px;">'
+                + '<p style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:12px;">Başka Satıcı Bulunamadı</p>'
+                + '<p style="font-size:13px;color:var(--ink-2);margin-bottom:20px;">Bu ürün yalnızca tek satıcıda görünüyor.</p>'
+                + '<button type="button" class="primary-button" style="width:100%;border-radius:10px;padding:12px;font-weight:700;" data-p=\'' + JSON.stringify(parsed).replace(/'/g,'&#39;') + '\' onclick="document.getElementById(\'sellerSelectionDialog\').close(); showParsedProduct(JSON.parse(this.getAttribute(\'data-p\')));"> Mevcut Ürünü Takip Et</button>'
+                + '</div>';
+              return;
+            }
+
+            var cheapestPrice = alts[0].price;
+
+            var html = '<div style="position:sticky;top:0;background:var(--bg);padding:0 0 12px;z-index:1;border-bottom:1px solid var(--border);margin-bottom:12px;">'
+              + '<h3 style="margin:0 0 4px;font-size:17px;font-weight:800;color:var(--ink);">Hangi Teklifi Takip Edersiniz?</h3>'
+              + '<p style="margin:0;font-size:13px;color:var(--ink-2);"><b style="color:var(--green);">' + alts.length + ' satıcı</b> karşılaştırıldı — birini seçin</p>'
+              + '</div>'
+              + '<div style="display:flex;flex-direction:column;gap:10px;max-height:58vh;overflow-y:auto;padding-right:4px;">';
+
+            alts.forEach(function(a, idx){
+              var badges = '';
+              if (a._isOriginal) badges += '<span style="background:rgba(25,118,210,.1);color:#1565c0;border:1px solid rgba(25,118,210,.25);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">📌 Sizin Aradığınız</span>';
+              if (a.price === cheapestPrice && idx === 0) badges += '<span style="background:#287a50;color:#fff;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">🏷 En Ucuz</span>';
+              if (maxRatingItem && a === maxRatingItem && !a._isOriginal) badges += '<span style="background:rgba(33,150,243,.1);color:#1976d2;border:1px solid rgba(33,150,243,.25);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">⭐ Yüksek Puanlı ('+(a.extra_info.rating)+')</span>';
+              if (maxReviewItem && a === maxReviewItem && !a._isOriginal) badges += '<span style="background:rgba(156,39,176,.1);color:#7b1fa2;border:1px solid rgba(156,39,176,.25);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">💬 En Çok Değerlendirilen</span>';
+              if ((a.extra_info||{}).fast_delivery) badges += '<span style="background:rgba(255,152,0,.1);color:#e65100;border:1px solid rgba(255,152,0,.3);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">⚡ Hızlı Teslimat</span>';
+
+              var priceStr = a.price ? ('₺' + a.price.toFixed(2)) : '—';
+              var escapedData = JSON.stringify(a).replace(/'/g, '&#39;');
+
+              html += '<div style="border:1.5px solid var(--border);border-radius:10px;padding:13px;cursor:pointer;transition:border-color .15s,transform .1s;background:var(--bg);" '
+                + 'onmouseover="this.style.borderColor=\'#287a50\';this.style.transform=\'translateY(-1px)\';" '
+                + 'onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'none\';" '
+                + 'onclick="window._almadanSelectSeller(this)" data-seller=\'' + escapedData + '\'>'
+                + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
+                +   '<div style="min-width:0;flex:1;">'
+                +     '<div style="font-size:14px;font-weight:700;color:var(--ink);">' + (a.source||'Satıcı') + '</div>'
+                +     '<div style="font-size:11px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">' + (a.title||'').slice(0,70) + '</div>'
+                +     (badges ? '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;">' + badges + '</div>' : '')
+                +   '</div>'
+                +   '<div style="text-align:right;flex-shrink:0;">'
+                +     '<div style="font-size:16px;font-weight:800;color:var(--green-dark);">' + priceStr + '</div>'
+                +     '<div style="font-size:11px;color:var(--green);font-weight:700;margin-top:3px;">Seç →</div>'
+                +   '</div>'
+                + '</div>'
+                + '</div>';
+            });
+
+            html += '</div>';
+            content.innerHTML = html;
+
+          } catch(err) {
+            console.error('Satıcı ekranı hatası:', err);
+            dialog.close();
+            if (typeof showParsedProduct === 'function') showParsedProduct(parsed);
+          }
+        };
+
+        /* Satıcı seçince takip sayfasına geç */
+        window._almadanSelectSeller = function(el) {
+          var a = JSON.parse(el.getAttribute('data-seller'));
+          document.getElementById('sellerSelectionDialog').close();
+          var newParsed = {
+            title: a.title, price: a.price, source: a.source,
+            canonical_url: a.url, image_url: a.image_url,
+            original_price: a.original_price, extra_info: a.extra_info,
+            warnings: [], confidence: 100
+          };
+          if (typeof showParsedProduct === 'function') showParsedProduct(newParsed);
+          else if (typeof selectSellerAndProceed === 'function') el.setAttribute('data-seller', JSON.stringify({...a, url: a.url})), selectSellerAndProceed(el);
+        };
+
       });
     </script>
   </body>
