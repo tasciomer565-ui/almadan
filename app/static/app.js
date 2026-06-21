@@ -3692,22 +3692,22 @@ async function startLiveBarcodeScanner() {
       });
     }
     await liveBarcodeScanner.start(
-      { facingMode: "environment" },
+      { facingMode: "environment", advanced: [{ zoom: 1.5 }] },
       {
-        fps: 10,
-        qrbox: (viewfinderWidth, viewfinderHeight) => {
-          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          return {
-            width: Math.floor(Math.min(viewfinderWidth * 0.86, minEdge * 1.15)),
-            height: Math.floor(Math.min(viewfinderHeight * 0.34, minEdge * 0.46)),
-          };
-        },
+        fps: 20,
+        qrbox: (viewfinderWidth, viewfinderHeight) => ({
+          width:  Math.floor(viewfinderWidth  * 0.92),
+          height: Math.floor(viewfinderHeight * 0.28),
+        }),
         aspectRatio: 1.777778,
+        disableFlip: false,
         formatsToSupport: [
           Html5QrcodeSupportedFormats.EAN_13,
           Html5QrcodeSupportedFormats.EAN_8,
           Html5QrcodeSupportedFormats.UPC_A,
           Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
         ],
       },
       async (decodedText) => {

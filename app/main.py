@@ -2216,7 +2216,27 @@ def _barcode_from_sources(barcode: str) -> dict | None:
     except Exception as exc:
         log.warning("OFF exception for barcode %s: %s", barcode, exc)
 
-    # ── Kaynak 2: UPCitemdb (ücretsiz tier, 100 sorgu/gün) ────────────────
+    # ── Kaynak 2: Go-UPC (Türkiye dahil global, ücretsiz tier) ───────────
+    try:
+        r_goupc = requests.get(
+            "https://go-upc.com/api/v1/code/" + barcode,
+            headers={"Authorization": "Bearer " + (os.getenv("GO_UPC_API_KEY") or "")},
+            timeout=5,
+        )
+        if r_goupc.ok:
+            d = r_goupc.json()
+            prod = d.get("product") or {}
+            title = (prod.get("name") or "").strip()
+            if title:
+                brand = (prod.get("brand") or "").strip()
+                img   = (prod.get("imageUrl") or "").strip()
+                return {"title": title, "brand": brand, "quantity": "",
+                        "image_url": img, "search_query": " ".join(x for x in (brand, title) if x),
+                        "source": "go_upc"}
+    except Exception as exc:
+        log.warning("Go-UPC exception for barcode %s: %s", barcode, exc)
+
+    # ── Kaynak 3: UPCitemdb (ücretsiz tier, 100 sorgu/gün) ────────────────
     try:
         r2 = requests.get(
             "https://api.upcitemdb.com/prod/trial/lookup",
