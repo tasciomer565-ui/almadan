@@ -2160,8 +2160,10 @@ async def sync_google_sheets(request: Request, user=Depends(require_login)):
         result = sync_to_sheets(load_db())
         return result
     except Exception as exc:
-        logger.error("Google Sheets sync hatası: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        import traceback
+        detail = f"{type(exc).__name__}: {exc}\n{traceback.format_exc()[-800:]}"
+        logger.error("Google Sheets sync hatası: %s", detail)
+        raise HTTPException(status_code=500, detail=detail)
 
 
 # VTON ve AI endpoint'leri kaldırıldı (Sprint 12 — stabilizasyon)
