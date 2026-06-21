@@ -1553,8 +1553,33 @@ async def find_alternatives(payload: AlternativesRequest):
                 filtered.append(p)
         products = filtered
 
+        # Trendyol özel "Diğer Satıcılar" çekimi
+        if "trendyol.com" in payload.original_url:
+            from app.parser import safe_product_get
+            import json
+            try:
+                resp = safe_product_get(payload.original_url)
+                m = re.search(r'window\.__INITIAL_STATE__\s*=\s*({.*?});', resp.text)
+                if m:
+                    state = json.loads(m.group(1))
+                    merchants = state.get("product", {}).get("productDetails", {}).get("otherMerchants", [])
+                    for merchant in merchants:
+                        merch_price = merchant.get("price", {}).get("discountedPrice", {}).get("value")
+                        merch_name = merchant.get("merchant", {}).get("name")
+                        merch_url = merchant.get("merchant", {}).get("sellerLink", "")
+                        if merch_price and merch_name:
+                            products.append({
+                                "title": payload.title,
+                                "price": float(merch_price),
+                                "url": f"https://www.trendyol.com{merch_url}" if merch_url else payload.original_url,
+                                "source": f"Trendyol ({merch_name})",
+                                "image_url": payload.image_url
+                            })
+            except Exception as e:
+                pass
+
     return {
-        "alternatives": products[:10]
+        "alternatives": products[:15]
     }
 
 
