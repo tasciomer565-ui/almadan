@@ -2143,6 +2143,27 @@ def admin_stats(days: int = 7) -> dict:
     return get_dashboard_stats(days=min(days, 30))
 
 
+@app.post("/api/admin/sync-google-sheets")
+async def sync_google_sheets(request: Request, user=Depends(require_login)):
+    """
+    Kullanıcı bazlı verileri Google Sheets'e senkronize eder.
+    3 sekme: Yapıştırılan Linkler / Takip Edilen Ürünler / Takip Edilen Mağazalar
+    Gerekli env: GOOGLE_SERVICE_ACCOUNT_JSON, GOOGLE_SHEET_ID
+    """
+    if not os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON") or not os.getenv("GOOGLE_SHEET_ID"):
+        raise HTTPException(
+            status_code=503,
+            detail="Google Sheets henüz yapılandırılmamış. GOOGLE_SERVICE_ACCOUNT_JSON ve GOOGLE_SHEET_ID env değişkenlerini Vercel'e ekleyin.",
+        )
+    try:
+        from app.sheets_sync import sync_to_sheets
+        result = sync_to_sheets(load_db())
+        return result
+    except Exception as exc:
+        logger.error("Google Sheets sync hatası: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 # VTON ve AI endpoint'leri kaldırıldı (Sprint 12 — stabilizasyon)
 
 
