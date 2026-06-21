@@ -5550,7 +5550,7 @@ async function renderCart() {
             // overlay.classList.remove("recovery-mode");
             if (header) {
               header.classList.remove("glitch-active");
-              header.innerText = "KUANTUM SPEKTRUMU TARANIYOR";
+              header.innerText = "EN İYİ FIRSATLAR ARANIYOR";
             }
           } else {
             resultsDiv.innerHTML = `<p class="empty-text">Canlı fiyat servisine ulaşılamadı. Lokal analiz devreye sokuluyor...</p>`;
@@ -6990,7 +6990,7 @@ function showInitialLoadFallback() {
       // overlay.classList.remove("recovery-mode");
       if (header) {
         header.classList.remove("glitch-active");
-        header.innerText = "KUANTUM SPEKTRUMU TARANIYOR";
+        header.innerText = "EN İYİ FIRSATLAR ARANIYOR";
       }
       renderFallbackOpportunities();
     }, 1500);
@@ -7506,7 +7506,7 @@ async function showSellerSelectionDialog(parsed) {
   content.innerHTML = `
     <div style="text-align:center; padding: 30px 20px;">
       <span class="spinner" style="display:inline-block; width:28px; height:28px; border-color:#287a50; border-right-color:transparent; border-width:3px;"></span>
-      <p style="margin-top:16px; font-weight:700; font-size:15px; color:var(--ink);">Satıcılar karşılaştırılıyor...</p>
+      <p style="margin-top:16px; font-weight:700; font-size:15px; color:var(--ink);">En İyi Fırsatlar Avlanıyor...</p>
     </div>
   `;
   
@@ -7518,6 +7518,16 @@ async function showSellerSelectionDialog(parsed) {
     });
     const data = await res.json();
     let alts = data.alternatives || [];
+    
+    // İlk taramada yakalanan satıcılar varsa birleştir
+    if (parsed.extra_info && parsed.extra_info.otherMerchants) {
+      const existingUrls = new Set(alts.map(a => a.url));
+      parsed.extra_info.otherMerchants.forEach(m => {
+        if (!existingUrls.has(m.url)) {
+          alts.push(m);
+        }
+      });
+    }
     
     // Asıl ürünü listede yoksa başa ekle
     const origPrice = parsed.price || 0;
