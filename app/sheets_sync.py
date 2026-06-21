@@ -42,7 +42,11 @@ def _sheets(method, path, tok, **kw):
 
 def _sb():
     key = os.environ["SUPABASE_SERVICE_KEY"]
-    return os.environ["SUPABASE_URL"].rstrip("/"), {"apikey": key, "Authorization": f"Bearer {key}"}
+    url = os.environ["SUPABASE_URL"].strip().rstrip("/")
+    for suf in ("/rest/v1", "/rest"):
+        if url.endswith(suf):
+            url = url[:-len(suf)]
+    return url, {"apikey": key, "Authorization": f"Bearer {key}"}
 
 
 def sync_to_sheets(local_db: dict) -> dict:
