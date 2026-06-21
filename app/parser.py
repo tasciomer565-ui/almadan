@@ -834,41 +834,40 @@ def parse_product_url(url: str) -> ParsedProduct:
         import json
         for script in soup.find_all("script"):
             script_text = script.string or ""
-            if "window.__INITIAL_STATE__" in script_text:
-                # Script içindeki süslü parantezi dengeleyerek JSON çekmek çok daha güvenli
-                m = re.search(r'window\.__INITIAL_STATE__\s*=\s*({.*?});(?:window\.__|</script>|$)', script_text, re.DOTALL)
-                if not m:
-                    m = re.search(r'window\.__INITIAL_STATE__\s*=\s*({.*})', script_text, re.DOTALL)
-                if m:
-                    try:
-                        # Eğer script sonunda fazladan karakter varsa ayıkla
-                        json_str = m.group(1).strip()
-                        if json_str.endswith(";"): json_str = json_str[:-1]
-                        
-                        state = json.loads(json_str)
-                        merchants = state.get("product", {}).get("productDetails", {}).get("otherMerchants", [])
-                        parsed_merchants = []
-                        for merchant in merchants:
-                            merch_price = merchant.get("price", {}).get("discountedPrice", {}).get("value")
-                            merch_name = merchant.get("merchant", {}).get("name")
-                            merch_url = merchant.get("merchant", {}).get("sellerLink", "")
-                            merch_score = merchant.get("merchant", {}).get("sellerScore")
-                            merch_delivery = merchant.get("deliveryInformation", {}).get("fastDeliveryOptions", [])
-                            if merch_price and merch_name:
-                                parsed_merchants.append({
-                                    "title": title or "",
-                                    "price": float(merch_price),
-                                    "url": f"https://www.trendyol.com{merch_url}" if merch_url else url,
-                                    "source": f"Trendyol ({merch_name})",
-                                    "extra_info": {
-                                        "rating": merch_score,
-                                        "fast_delivery": bool(merch_delivery)
-                                    }
-                                })
-                        if parsed_merchants:
-                            extra_info["otherMerchants"] = parsed_merchants
-                    except Exception as e:
-                        pass
+            if "window.__INITIAL_STATE__=" in script_text:
+                try:
+                    json_str = script_text.split("window.__INITIAL_STATE__=")[1]
+                    if ";window.__SEARCH_APP_INITIAL_STATE__=" in json_str:
+                        json_str = json_str.split(";window.__SEARCH_APP_INITIAL_STATE__=")[0]
+                    elif ";window.__" in json_str:
+                        json_str = json_str.split(";window.__")[0]
+                    else:
+                        json_str = json_str.rsplit(";", 1)[0]
+                    
+                    state = json.loads(json_str.strip())
+                    merchants = state.get("product", {}).get("productDetails", {}).get("otherMerchants", [])
+                    parsed_merchants = []
+                    for merchant in merchants:
+                        merch_price = merchant.get("price", {}).get("discountedPrice", {}).get("value")
+                        merch_name = merchant.get("merchant", {}).get("name")
+                        merch_url = merchant.get("merchant", {}).get("sellerLink", "")
+                        merch_score = merchant.get("merchant", {}).get("sellerScore")
+                        merch_delivery = merchant.get("deliveryInformation", {}).get("fastDeliveryOptions", [])
+                        if merch_price and merch_name:
+                            parsed_merchants.append({
+                                "title": title or "",
+                                "price": float(merch_price),
+                                "url": f"https://www.trendyol.com{merch_url}" if merch_url else url,
+                                "source": f"Trendyol ({merch_name})",
+                                "extra_info": {
+                                    "rating": merch_score,
+                                    "fast_delivery": bool(merch_delivery)
+                                }
+                            })
+                    if parsed_merchants:
+                        extra_info["otherMerchants"] = parsed_merchants
+                except Exception as e:
+                    pass
                 break
     else:
         warnings.append("Başlık bulunamadı.")
