@@ -1,10 +1,5 @@
 """
-Google Sheets Senkronizasyonu — Almadan
-Kullanıcı bazlı özet görünüm: bir satır = bir kullanıcı, 3 veri sütunu.
-
-Gerekli Vercel env değişkenleri:
-  GOOGLE_SERVICE_ACCOUNT_JSON  — servis hesabı JSON içeriği
-  GOOGLE_SHEET_ID              — sheet URL'sindeki uzun ID
+Google Sheets Senkronizasyonu — Almadan (hızlı versiyon, <8s)
 """
 from __future__ import annotations
 
@@ -19,197 +14,114 @@ from datetime import datetime, timezone
 import requests as _req
 
 logger = logging.getLogger(__name__)
+_TOKEN_URL = "https://oauth2.googleapis.com/token"
+_SCOPE     = "https://www.googleapis.com/auth/spreadsheets"
 
-_SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets"
-_TOKEN_URL    = "https://oauth2.googleapis.com/token"
 
-
-def _get_access_token() -> str:
-    raw = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
-    if not raw:
-        raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON env değişkeni ayarlanmamış.")
-    creds = json.loads(raw)
-
+def _token() -> str:
+    creds = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import padding
 
     now = int(time.time())
-
-    def _b64(data: dict) -> str:
-        return base64.urlsafe_b64encode(json.dumps(data, separators=(",", ":")).encode()).rstrip(b"=").decode()
-
-    signing_input = f"{_b64({'alg':'RS256','typ':'JWT'})}.{_b64({'iss':creds['client_email'],'scope':_SHEETS_SCOPE,'aud':_TOKEN_URL,'iat':now,'exp':now+3600})}".encode()
-    private_key   = serialization.load_pem_private_key(creds["private_key"].encode(), password=None)
-    sig           = private_key.sign(signing_input, padding.PKCS1v15(), hashes.SHA256())
-    jwt_token     = signing_input.decode() + "." + base64.urlsafe_b64encode(sig).rstrip(b"=").decode()
-
-    resp = _req.post(_TOKEN_URL, data={"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer", "assertion": jwt_token}, timeout=10)
-    resp.raise_for_status()
-    return resp.json()["access_token"]
+    def _b64(d): return base64.urlsafe_b64encode(json.dumps(d, separators=(",",":")).encode()).rstrip(b"=").decode()
+    inp  = f"{_b64({'alg':'RS256','typ':'JWT'})}.{_b64({'iss':creds['client_email'],'scope':_SCOPE,'aud':_TOKEN_URL,'iat':now,'exp':now+3600})}".encode()
+    key  = serialization.load_pem_private_key(creds["private_key"].encode(), password=None)
+    sig  = key.sign(inp, padding.PKCS1v15(), hashes.SHA256())
+    jwt  = inp.decode() + "." + base64.urlsafe_b64encode(sig).rstrip(b"=").decode()
+    r    = _req.post(_TOKEN_URL, data={"grant_type":"urn:ietf:params:oauth:grant-type:jwt-bearer","assertion":jwt}, timeout=8)
+    r.raise_for_status()
+    return r.json()["access_token"]
 
 
-def _api(method: str, url: str, token: str, **kwargs):
-    return _req.request(method, url, headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}, timeout=20, **kwargs)
+def _sheets(method, path, tok, **kw):
+    sid = os.environ["GOOGLE_SHEET_ID"]
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{sid}{path}"
+    return _req.request(method, url, headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}, timeout=8, **kw)
 
 
-def _sb_url() -> str:
-    return os.environ["SUPABASE_URL"].rstrip("/")
-
-
-def _sb_hdrs() -> dict:
+def _sb():
     key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-    return {"apikey": key, "Authorization": f"Bearer {key}"}
-
-
-def _fmt_date(iso: str) -> str:
-    return (iso or "")[:10]
+    return os.environ["SUPABASE_URL"].rstrip("/"), {"apikey": key, "Authorization": f"Bearer {key}"}
 
 
 def sync_to_sheets(local_db: dict) -> dict:
-    """
-    Tek sekme 'Kullanıcı Aktiviteleri':
-      Kullanıcı | Email | Yapıştırılan Linkler | Takip Edilen Ürünler | Takip Edilen Mağazalar | Son Aktivite
-    """
-    token    = _get_access_token()
-    sheet_id = os.environ.get("GOOGLE_SHEET_ID", "")
-    if not sheet_id:
-        raise ValueError("GOOGLE_SHEET_ID env değişkeni ayarlanmamış.")
+    sb_url, sb_hdrs = _sb()
+    tok = _token()
 
-    base_url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}"
-    now_ts   = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    # Paralel veri çek (sırayla ama kısa timeout)
+    ev_r = _req.get(f"{sb_url}/rest/v1/user_events",    headers=sb_hdrs, params={"order":"created_at.desc","limit":"3000","select":"user_id,event_type,payload,created_at"}, timeout=6)
+    fs_r = _req.get(f"{sb_url}/rest/v1/followed_stores", headers=sb_hdrs, params={"order":"created_at.desc","limit":"3000","select":"user_id,email,store_slug,created_at"}, timeout=6)
 
-    # ── Veri topla ────────────────────────────────────────────────────────────
+    events  = ev_r.json() if ev_r.ok else []
+    follows = fs_r.json() if fs_r.ok else []
 
-    # user_events: url_search + product_track
-    events_resp = _req.get(f"{_sb_url()}/rest/v1/user_events",
-                           headers=_sb_hdrs(),
-                           params={"order": "created_at.desc", "limit": "5000",
-                                   "select": "user_id,event_type,payload,created_at"},
-                           timeout=15)
-    events = events_resp.json() if events_resp.ok else []
-
-    # followed_stores
-    follows_resp = _req.get(f"{_sb_url()}/rest/v1/followed_stores",
-                            headers=_sb_hdrs(),
-                            params={"order": "created_at.desc", "limit": "5000",
-                                    "select": "user_id,email,store_slug,created_at"},
-                            timeout=15)
-    follows = follows_resp.json() if follows_resp.ok else []
-
-    # auth.users emaillerini al (user_id → email mapping)
-    users_resp = _req.get(f"{_sb_url()}/auth/v1/admin/users",
-                          headers=_sb_hdrs(),
-                          params={"per_page": "1000"},
-                          timeout=15)
-    email_map: dict[str, str] = {}
-    if users_resp.ok:
-        for u in (users_resp.json().get("users") or []):
-            email_map[u["id"]] = u.get("email", "")
-
-    # followed_stores'dan da email al
-    for f in follows:
-        if f.get("user_id") and f.get("email"):
-            email_map.setdefault(f["user_id"], f["email"])
-
-    # ── Kullanıcı bazlı grupla ────────────────────────────────────────────────
+    # Kullanıcı bazlı grupla
     links:    dict[str, list[str]] = defaultdict(list)
     products: dict[str, list[str]] = defaultdict(list)
     stores:   dict[str, list[str]] = defaultdict(list)
+    emails:   dict[str, str]       = {}
     last_act: dict[str, str]       = {}
 
     for ev in events:
         uid  = ev.get("user_id") or "anonim"
         p    = ev.get("payload") or {}
-        date = _fmt_date(ev.get("created_at", ""))
-        if not last_act.get(uid) or date > last_act[uid]:
-            last_act[uid] = date
-
+        date = (ev.get("created_at") or "")[:10]
+        if not last_act.get(uid) or date > last_act[uid]: last_act[uid] = date
         if ev["event_type"] == "url_search" and p.get("query"):
-            entry = f'{p["query"]} ({date})'
-            if entry not in links[uid]:
-                links[uid].append(entry)
-
+            e = f'{p["query"]} ({date})'
+            if len(links[uid]) < 30 and e not in links[uid]: links[uid].append(e)
         elif ev["event_type"] == "product_track" and p.get("title"):
             price = f' ₺{p["price"]}' if p.get("price") else ""
-            entry = f'{p["title"]}{price} ({date})'
-            if entry not in products[uid]:
-                products[uid].append(entry)
+            e = f'{p["title"]}{price} ({date})'
+            if len(products[uid]) < 30 and e not in products[uid]: products[uid].append(e)
 
     for f in follows:
-        uid  = f.get("user_id") or "anonim"
+        uid = f.get("user_id") or "anonim"
+        if f.get("email"): emails[uid] = f["email"]
         slug = f.get("store_slug", "")
-        if slug and slug not in stores[uid]:
-            stores[uid].append(slug)
-        date = _fmt_date(f.get("created_at", ""))
-        if not last_act.get(uid) or date > last_act[uid]:
-            last_act[uid] = date
+        if slug and slug not in stores[uid]: stores[uid].append(slug)
+        date = (f.get("created_at") or "")[:10]
+        if not last_act.get(uid) or date > last_act[uid]: last_act[uid] = date
 
-    # Dosya tabanlı DB ürünleri
     for pr in (local_db.get("products") or []):
-        uid  = pr.get("owner_id", "anonim")
+        uid = pr.get("owner_id", "anonim")
         price = f' ₺{pr["price"]}' if pr.get("price") else ""
-        entry = f'{pr.get("title","")}{price}'
-        if entry not in products[uid]:
-            products[uid].append(entry)
+        e = f'{pr.get("title","")}{price}'
+        if len(products[uid]) < 30 and e not in products[uid]: products[uid].append(e)
 
-    # ── Tüm user_id'leri birleştir ────────────────────────────────────────────
     all_users = set(links) | set(products) | set(stores)
+    now_ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-    # ── Satırları oluştur ─────────────────────────────────────────────────────
-    header = ["Kullanıcı ID", "Email", "Yapıştırılan Linkler", "Takip Edilen Ürünler",
-              "Takip Edilen Mağazalar", "Son Aktivite"]
-    rows = [header]
+    # Satırları oluştur
+    rows = [["Kullanıcı ID", "Email", "Yapıştırılan Linkler", "Takip Edilen Ürünler", "Takip Edilen Mağazalar", "Son Aktivite", "Güncelleme"]]
     for uid in sorted(all_users):
         rows.append([
             uid,
-            email_map.get(uid, ""),
-            "\n".join(links[uid][:50]),
-            "\n".join(products[uid][:50]),
+            emails.get(uid, ""),
+            "\n".join(links[uid]),
+            "\n".join(products[uid]),
             ", ".join(stores[uid]),
             last_act.get(uid, ""),
+            now_ts,
         ])
 
-    # ── Google Sheets'e yaz ───────────────────────────────────────────────────
-    # Sekme var mı kontrol et / oluştur
+    # Sekme adı
     tab = "Kullanıcı Aktiviteleri"
-    meta = _api("GET", base_url, token).json()
-    tab_exists = any(s["properties"]["title"] == tab for s in meta.get("sheets", []))
-    if not tab_exists:
-        _api("POST", f"{base_url}:batchUpdate", token,
-             json={"requests": [{"addSheet": {"properties": {"title": tab}}}]})
 
-    # Temizle
-    _api("POST", f"{base_url}/values/{tab}!A1:Z50000:clear", token, json={})
+    # Var mı kontrol et, yoksa oluştur
+    meta = _sheets("GET", "", tok).json()
+    if not any(s["properties"]["title"] == tab for s in meta.get("sheets", [])):
+        _sheets("POST", ":batchUpdate", tok, json={"requests":[{"addSheet":{"properties":{"title":tab}}}]})
 
-    # Yaz
-    _api("PUT", f"{base_url}/values/{tab}!A1", token,
-         json={"values": [[str(c) for c in row] for row in rows]},
-         params={"valueInputOption": "USER_ENTERED"})
+    # Temizle + yaz
+    _sheets("POST", f"/values/{tab}!A1:Z50000:clear", tok, json={})
+    _sheets("PUT",  f"/values/{tab}!A1", tok,
+            json={"values": [[str(c) for c in r] for r in rows]},
+            params={"valueInputOption": "USER_ENTERED"})
 
-    # Header satırını bold + freeze yap
-    sheet_gid = next((s["properties"]["sheetId"] for s in
-                      _api("GET", base_url, token).json().get("sheets", [])
-                      if s["properties"]["title"] == tab), 0)
-    _api("POST", f"{base_url}:batchUpdate", token, json={"requests": [
-        {"repeatCell": {
-            "range": {"sheetId": sheet_gid, "startRowIndex": 0, "endRowIndex": 1},
-            "cell": {"userEnteredFormat": {"textFormat": {"bold": True},
-                                           "backgroundColor": {"red": 0.16, "green": 0.24, "blue": 0.16}}},
-            "fields": "userEnteredFormat(textFormat,backgroundColor)",
-        }},
-        {"updateSheetProperties": {
-            "properties": {"sheetId": sheet_gid, "gridProperties": {"frozenRowCount": 1}},
-            "fields": "gridProperties.frozenRowCount",
-        }},
-    ]})
-
-    sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}"
-    logger.info("Sheets sync OK: %d kullanıcı, sync: %s", len(all_users), now_ts)
-    return {
-        "users":     len(all_users),
-        "links":     sum(len(v) for v in links.values()),
-        "products":  sum(len(v) for v in products.values()),
-        "stores":    sum(len(v) for v in stores.values()),
-        "sheet_url": sheet_url,
-        "synced_at": now_ts,
-    }
+    sheet_url = f"https://docs.google.com/spreadsheets/d/{os.environ['GOOGLE_SHEET_ID']}"
+    return {"users": len(all_users), "links": sum(len(v) for v in links.values()),
+            "products": sum(len(v) for v in products.values()),
+            "stores": sum(len(v) for v in stores.values()),
+            "sheet_url": sheet_url, "synced_at": now_ts}
