@@ -527,46 +527,33 @@ def search_n11_direct(query: str) -> tuple[list[dict], str]:
     return parsed_results, corrected_query
 
 def search_trendyol_direct(query: str) -> list[dict]:
-    """Trendyol arama sayfasını scrape eder — ScrapingBee varsa proxy üzerinden."""
+    """Trendyol mobil API — JSON döner, JS render gerektirmez."""
     import json as _json
-    from app.scraping_proxy import proxy_get, proxy_enabled
     try:
-        url = f"https://www.trendyol.com/sr?q={urllib.parse.quote_plus(query)}&qt={urllib.parse.quote_plus(query)}&st=SEARCH"
-        if proxy_enabled():
-            html = proxy_get(url, render_js=False, timeout=12)
-            if not html:
-                return []
-            r_text = html
-        else:
-            headers = {
-                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-                "Accept": "text/html,application/xhtml+xml",
-                "Accept-Language": "tr-TR,tr;q=0.9",
-            }
-            r = requests.get(url, headers=headers, timeout=8)
-            if not r.ok:
-                return []
-            r_text = r.text
-        # __NEXT_DATA__ içinde ürün listesi var
-        m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.+?)</script>', r_text, re.DOTALL)
-        if not m:
-            return []
-        nd = _json.loads(m.group(1))
-        prods = (
-            nd.get("props", {}).get("pageProps", {})
-            .get("search", {}).get("products")
-            or nd.get("props", {}).get("pageProps", {})
-            .get("initialState", {}).get("productList", {}).get("products")
-            or []
+        api_url = (
+            "https://apigw.trendyol.com/discovery-web-searchgw-service/v2/api/infinite-scroll/sr"
+            f"?q={urllib.parse.quote_plus(query)}&qt={urllib.parse.quote_plus(query)}"
+            "&st=SEARCH&os=1&pi=1&culture=tr-TR&pId=0"
         )
+        headers = {
+            "User-Agent": "TrendyolAndroid/7.14.0.559 (Android 13; samsung SM-S918B)",
+            "Accept": "application/json",
+            "Accept-Language": "tr-TR",
+            "x-requested-with": "XMLHttpRequest",
+        }
+        r = requests.get(api_url, headers=headers, timeout=7)
+        if not r.ok:
+            return []
+        prods = (r.json().get("result") or {}).get("products") or []
         results = []
-        for p in prods[:12]:
-            name = p.get("name") or p.get("title") or ""
+        for p in prods[:10]:
+            name = p.get("name") or ""
             if not name:
                 continue
-            price = p.get("price", {}).get("sellingPrice") or p.get("priceInfo", {}).get("price") or 0
+            pi = p.get("price") or {}
+            price = pi.get("sellingPrice") or pi.get("discountedPrice") or pi.get("originalPrice") or 0
             slug = p.get("url") or ""
-            prod_url = f"https://www.trendyol.com{slug}" if slug.startswith("/") else f"https://www.trendyol.com/sr?q={urllib.parse.quote_plus(query)}"
+            prod_url = f"https://www.trendyol.com{slug}" if slug.startswith("/") else ""
             imgs = p.get("images") or []
             img = imgs[0] if imgs else ""
             if img and not img.startswith("http"):
@@ -583,70 +570,67 @@ def search_trendyol_direct(query: str) -> list[dict]:
 
 
 def search_hepsiburada_direct(query: str) -> list[dict]:
-    """Hepsiburada arama sayfasını scrape eder — ScrapingBee varsa proxy üzerinden."""
+    """Hepsiburada mobil API — JSON döner."""
     import json as _json
-    from app.scraping_proxy import proxy_get, proxy_enabled
     try:
+        api_url = (
+            "https://productgw.hepsiburada.com/discovery-web-searchgw-service/v2/api/infinite-scroll/sr"
+            f"?q={urllib.parse.quote_plus(query)}&pi=1&pn=24&culture=tr-TR&st=SEARCH"
+        )
+        headers = {
+            "User-Agent": "HepsiburadaAndroid/5.9.0 (Android 13; samsung SM-S918B)",
+            "Accept": "application/json",
+            "Accept-Language": "tr-TR",
+        }
+        r = requests.get(api_url, headers=headers, timeout=7)
+        if r.ok:
+            prods = (r.json().get("result") or {}).get("products") or []
+            results = []
+            for p in prods[:10]:
+                name = p.get("name") or p.get("title") or ""
+                if not name:
+                    continue
+                price = p.get("price", {}).get("sellingPrice") or p.get("price", {}).get("originalPrice") or 0
+                slug = p.get("url") or p.get("productUrl") or ""
+                prod_url = f"https://www.hepsiburada.com{slug}" if slug.startswith("/") else slug
+                imgs = p.get("images") or []
+                img = imgs[0] if imgs else p.get("imageUrl") or ""
+                results.append({
+                    "title": name, "price": float(price), "original_price": None,
+                    "image_url": img, "source": "hepsiburada", "url": prod_url,
+                    "labels": ["Önerilen"], "extra_info": {"out_of_stock": price == 0},
+                })
+            if results:
+                return results
+        # Fallback: normal arama sayfası HTML scrape
         url = f"https://www.hepsiburada.com/ara?q={urllib.parse.quote_plus(query)}"
-        if proxy_enabled():
-            html = proxy_get(url, render_js=False, timeout=12)
-            if not html:
-                return []
-            r_text = html
-        else:
-            headers = {
-                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-                "Accept": "text/html,application/xhtml+xml",
-                "Accept-Language": "tr-TR,tr;q=0.9",
-            }
-            r = requests.get(url, headers=headers, timeout=8)
-            if not r.ok:
-                return []
-            r_text = r.text
-        soup = BeautifulSoup(r_text, "html.parser")
-        items = soup.select("li[data-test-id='product-card-item']") or soup.select("li.productListContent-item")
-        if not items:
-            import json as _json
-            m = re.search(r'__NEXT_DATA__.*?=\s*(\{.*?\})\s*;?\s*</script>', r_text, re.DOTALL)
-            if m:
-                try:
-                    nd = _json.loads(m.group(1))
-                    prods = nd.get("props", {}).get("pageProps", {}).get("products") or []
-                    results = []
-                    for p in prods[:10]:
-                        name = p.get("name") or p.get("displayName") or ""
-                        price = p.get("price") or p.get("salePrice") or 0
-                        sku = p.get("sku") or ""
-                        prod_url = f"https://www.hepsiburada.com/{sku}" if sku else ""
-                        img = p.get("images", [""])[0] if p.get("images") else ""
-                        if name and price:
-                            results.append({
-                                "title": name, "price": float(price), "original_price": None,
-                                "image_url": img, "source": "hepsiburada", "url": prod_url,
-                                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-                            })
-                    return results
-                except Exception:
-                    pass
-        results = []
-        for item in items[:10]:
-            name_el = item.select_one("[data-test-id='product-card-name']") or item.select_one("h3") or item.select_one(".product-title")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[data-test-id='price-current-price']") or item.select_one(".price-value")
-            price = parse_price(price_el.get_text(strip=True)) if price_el else 0
-            link_el = item.select_one("a")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.hepsiburada.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = img_el.get("src") or img_el.get("data-src") or "" if img_el else ""
-            results.append({
-                "title": name, "price": float(price or 0), "original_price": None,
-                "image_url": img, "source": "hepsiburada", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": price == 0},
-            })
-        return results
+        headers2 = {
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+        }
+        r2 = requests.get(url, headers=headers2, timeout=7)
+        if not r2.ok:
+            return []
+        m = re.search(r'__NEXT_DATA__[^{]*({.+?})\s*</script>', r2.text, re.DOTALL)
+        if not m:
+            return []
+        nd = _json.loads(m.group(1))
+        prods2 = nd.get("props", {}).get("pageProps", {}).get("products") or []
+        results2 = []
+        for p in prods2[:10]:
+            name = p.get("name") or p.get("displayName") or ""
+            price = p.get("price") or p.get("salePrice") or 0
+            sku = p.get("sku") or ""
+            prod_url = f"https://www.hepsiburada.com/{sku}" if sku else ""
+            img = (p.get("images") or [""])[0]
+            if name and price:
+                results2.append({
+                    "title": name, "price": float(price), "original_price": None,
+                    "image_url": img, "source": "hepsiburada", "url": prod_url,
+                    "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                })
+        return results2
     except Exception:
         return []
 
