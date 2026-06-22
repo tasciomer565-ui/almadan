@@ -413,24 +413,6 @@ def search_migros_proxy(query: str) -> list[dict]:
 
 
 async def scan_worker(query: str, category: str, fallback: bool = False) -> list[dict]:
-    # Marketplace kategorileri için marketplace_scan kullan (N11 + Amazon çalışıyor)
-    if category in ("TEKNOLOJİ", "KOZMETİK", "MODA", "EV", "MARKETPLACE", "GENEL", "general"):
-        from app.comparator import search_n11_direct, search_amazon_tr
-        loop2 = asyncio.get_running_loop()
-        n11_task  = loop2.run_in_executor(None, search_n11_direct, query)
-        amz_task  = loop2.run_in_executor(None, search_amazon_tr, query)
-        (n11_products, _), amazon_res = await asyncio.gather(n11_task, amz_task)
-        all_p = n11_products + amazon_res
-        seen = set()
-        results = []
-        for p in all_p:
-            key = p["url"].split("?")[0]
-            if key not in seen:
-                seen.add(key)
-                results.append(p)
-        if results:
-            return results
-
     sites = WORKER_SITES.get(category, WORKER_SITES["MARKETPLACE"])
     loop = asyncio.get_running_loop()
     # GIDA için "sepete ekle" filtresi olmadan ara — Türk market siteleri bu ifadeyle indexlenmez
@@ -649,7 +631,7 @@ async def master_search(
                             seen.add(key)
                             results.append(p)
                 else:
-                    results = await scan_worker(query, category)
+                    results = await marketplace_scan(query)
             elif mode == "local":
                 local_res = await scan_worker(query, category)
                 results = [r for r in local_res if r["source"] in LOCAL_SOURCES]
@@ -671,7 +653,7 @@ async def master_search(
                             seen.add(key)
                             results.append(p)
                 else:
-                    results = await scan_worker(query, category)
+                    results = await marketplace_scan(query)
     except (asyncio.TimeoutError, Exception):
         results = []
 
