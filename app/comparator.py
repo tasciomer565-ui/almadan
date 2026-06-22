@@ -635,6 +635,52 @@ def search_hepsiburada_direct(query: str) -> list[dict]:
         return []
 
 
+def search_amazon_tr(query: str) -> list[dict]:
+    """Amazon.com.tr arama — HTML parse, geniş katalog."""
+    try:
+        url = f"https://www.amazon.com.tr/s?k={urllib.parse.quote_plus(query)}&language=tr_TR"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml",
+        }
+        r = requests.get(url, headers=headers, timeout=7)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        items = soup.select("div[data-component-type='s-search-result']")
+        results = []
+        for item in items[:10]:
+            name_el = item.select_one("h2 span")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_whole = item.select_one(".a-price-whole")
+            price_frac = item.select_one(".a-price-fraction")
+            if price_whole:
+                pw = price_whole.get_text(strip=True).replace(".", "").replace(",", "")
+                pf = price_frac.get_text(strip=True).replace(",", "") if price_frac else "0"
+                try:
+                    price = float(f"{pw}.{pf}")
+                except Exception:
+                    price = 0.0
+            else:
+                price = 0.0
+            link_el = item.select_one("h2 a")
+            href = link_el.get("href", "") if link_el else ""
+            prod_url = f"https://www.amazon.com.tr{href}" if href.startswith("/") else href
+            img_el = item.select_one("img.s-image")
+            img = img_el.get("src", "") if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "amazon", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": price == 0},
+            })
+        return results
+    except Exception:
+        return []
+
+
 def run_async(coro):
     import asyncio
     import threading
