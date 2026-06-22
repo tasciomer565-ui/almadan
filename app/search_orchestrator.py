@@ -467,12 +467,18 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
     n11_task    = loop.run_in_executor(None, search_n11_direct, query)
     amazon_task = loop.run_in_executor(None, search_amazon_tr, query)
 
-    (n11_products, _), amazon_res = await asyncio.gather(n11_task, amazon_task)
+    results_raw = await asyncio.gather(n11_task, amazon_task, return_exceptions=True)
+
+    n11_raw   = results_raw[0] if not isinstance(results_raw[0], Exception) else ([], "")
+    amazon_raw = results_raw[1] if not isinstance(results_raw[1], Exception) else []
+
+    n11_products = n11_raw[0] if isinstance(n11_raw, tuple) else n11_raw
+    amazon_res   = amazon_raw if isinstance(amazon_raw, list) else []
 
     all_products = []
     seen_urls = set()
     for p in n11_products + amazon_res:
-        url_clean = p["url"].split("?")[0].strip()
+        url_clean = p.get("url", "").split("?")[0].strip()
         if url_clean not in seen_urls:
             seen_urls.add(url_clean)
             all_products.append(p)
