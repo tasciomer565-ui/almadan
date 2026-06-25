@@ -1287,10 +1287,13 @@
           try {
             /* İki kaynaktan paralel çek */
             var title = (parsed.title || '').split(/[,\|\-–]/)[0].trim().slice(0, 60);
+            var csrfToken = (document.cookie.split('; ').find(function(r){return r.startsWith('csrf_token=');})||'').split('=').slice(1).join('=');
+            csrfToken = csrfToken ? decodeURIComponent(csrfToken) : '';
             var results = await Promise.allSettled([
               fetch('/api/find-alternatives', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url })
               }).then(function(r){ return r.json(); }),
               fetch('/api/search?query=' + encodeURIComponent(title) + '&category=general', {
@@ -1373,8 +1376,8 @@
             var cheapestPrice = alts[0].price;
 
             var html = '<div style="position:sticky;top:0;background:var(--bg);padding:0 0 12px;z-index:1;border-bottom:1px solid var(--border);margin-bottom:12px;">'
-              + '<h3 style="margin:0 0 4px;font-size:17px;font-weight:800;color:var(--ink);">Hangi Teklifi Takip Edersiniz?</h3>'
-              + '<p style="margin:0;font-size:13px;color:var(--ink-2);"><b style="color:var(--green);">' + alts.length + ' satıcı</b> karşılaştırıldı — birini seçin</p>'
+              + '<h3 style="margin:0 0 4px;font-size:19px;font-weight:800;color:var(--ink);">🛒 Mağaza Karşılaştırması</h3>'
+              + '<p style="margin:0;font-size:13px;color:var(--ink-2);"><b style="color:var(--green);">' + alts.length + ' satıcı</b> bulundu — en uygununu seç, takibe al</p>'
               + '</div>'
               + '<div style="display:flex;flex-direction:column;gap:10px;max-height:58vh;overflow-y:auto;padding-right:4px;">';
 

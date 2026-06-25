@@ -2384,14 +2384,12 @@ async function findAlternativeSellers(parsed) {
   if (!container) return;
   
   try {
-    const res = await fetch("/api/find-alternatives", {
+    const data = await api("/api/find-alternatives", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url })
     });
-    const data = await res.json();
     const alts = data.alternatives || [];
-    
+
     if (alts.length === 0) {
       container.innerHTML = `<p style="font-size:12px; color:#a0aab0; margin:0; text-align:center;">Alternatif satıcı bulunamadı.</p>`;
       return;
@@ -7516,14 +7514,12 @@ async function showSellerSelectionDialog(parsed) {
   `;
   
   try {
-    const res = await fetch("/api/find-alternatives", {
+    const data = await api("/api/find-alternatives", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url })
     });
-    const data = await res.json();
     let alts = data.alternatives || [];
-    
+
     // İlk taramada yakalanan satıcılar varsa birleştir
     if (parsed.extra_info && parsed.extra_info.otherMerchants) {
       const existingUrls = new Set(alts.map(a => a.url));
@@ -7570,8 +7566,8 @@ async function showSellerSelectionDialog(parsed) {
 
     let listHtml = `
       <div style="margin-bottom:16px;">
-        <h3 style="margin:0 0 4px 0; font-size:18px; font-weight:800; color:var(--ink);">${alts.length} Mağazada Fiyat Karşılaştırma</h3>
-        ${savings > 1 ? `<p style="margin:0; font-size:13px; color:#287a50; font-weight:600;">En pahalıya göre <b>₺${savings.toFixed(2)}</b> tasarruf edebilirsin!</p>` : `<p style="margin:0; font-size:13px; color:var(--ink-2);">Teklifi seç ve takibe al.</p>`}
+        <h3 style="margin:0 0 4px 0; font-size:20px; font-weight:800; color:var(--ink);">🛒 ${alts.length} Mağazada Karşılaştırma</h3>
+        ${savings > 1 ? `<p style="margin:0; font-size:13px; color:#287a50; font-weight:600;">💰 En pahalı satıcıya göre <b>₺${savings.toFixed(2)}</b> tasarruf edebilirsin!</p>` : `<p style="margin:0; font-size:13px; color:var(--ink-2);">Bir mağaza seçip takibe alarak fiyat düşüşlerini takip et.</p>`}
       </div>
       <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; max-height:60vh; overflow-y:auto; padding-right:4px;" class="custom-scrollbar">
     `;
