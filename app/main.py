@@ -1587,6 +1587,8 @@ async def find_alternatives(payload: AlternativesRequest):
     # Interleave results so each source gets fair representation
     from collections import defaultdict
     by_source = defaultdict(list)
+    # Defensive: filter out non-dict entries (corrupt cache data)
+    products = [p for p in products if isinstance(p, dict)]
     for p in products:
         by_source[p.get("source", "other")].append(p)
     interleaved = []
