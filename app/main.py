@@ -1534,14 +1534,13 @@ async def find_alternatives(payload: AlternativesRequest):
     from app.search_orchestrator import master_search
     import re
     
-    # Çok uzun ve karmaşık başlıkları temizleyip sadece ilk 5 kelimeyle arama yap
-    # (Diğer mağazalardaki eşleşme ihtimalini %90 artırır)
+    # Başlığı temizle ve kısa bir arama sorgusuna dönüştür
     cleaned = re.sub(r'[^\w\s]', ' ', payload.title)
     words = [w for w in cleaned.split() if len(w) > 1]
-    # Sadece ilk 4 kelimeyi al (Marka ve Model), böylece "MOMORDICA Coconut Mix - 250 ml" -> "MOMORDICA Coconut Mix 250" olur ve her mağazada eşleşir.
-    query = " ".join(words[:4]) if words else payload.title
+    # İlk 6 kelimeyi al — 4 kelime çok kısa, önemli model bilgisi (GB, RAM) kesilebilir
+    query = " ".join(words[:6]) if words else payload.title
 
-    products, is_fallback, effective_query, category = await master_search(query)
+    products = await master_search(query)
     
     if payload.original_url:
         from urllib.parse import urlparse
@@ -1585,8 +1584,23 @@ async def find_alternatives(payload: AlternativesRequest):
             except Exception as e:
                 pass
 
+    # Interleave results so each source gets fair representation
+    from collections import defaultdict
+    by_source = defaultdict(list)
+    for p in products:
+        by_source[p.get("source", "other")].append(p)
+    interleaved = []
+    max_per_source = 5
+    seen_sources = list(by_source.keys())
+    for i in range(max_per_source):
+        for src in seen_sources:
+            if i < len(by_source[src]):
+                interleaved.append(by_source[src][i])
+    if not interleaved:
+        interleaved = products
+
     return {
-        "alternatives": products[:15]
+        "alternatives": interleaved[:20]
     }
 
 

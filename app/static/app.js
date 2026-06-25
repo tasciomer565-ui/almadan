@@ -1,3 +1,40 @@
+// ── Mağaza marka sistemi ─────────────────────────────────────────────────────
+const STORE_BRANDS = {
+  trendyol:      { name: "Trendyol",      color: "#f27a1a", bg: "rgba(242,122,26,0.08)",  emoji: "🟠" },
+  hepsiburada:   { name: "Hepsiburada",   color: "#ff6000", bg: "rgba(255,96,0,0.08)",    emoji: "🔶" },
+  amazon:        { name: "Amazon",        color: "#ff9900", bg: "rgba(255,153,0,0.08)",   emoji: "📦" },
+  n11:           { name: "n11",           color: "#6f41c1", bg: "rgba(111,65,193,0.08)",  emoji: "🟣" },
+  migros:        { name: "Migros",        color: "#e31e24", bg: "rgba(227,30,36,0.08)",   emoji: "🔴" },
+  carrefoursa:   { name: "CarrefourSA",   color: "#003c91", bg: "rgba(0,60,145,0.08)",    emoji: "🔵" },
+  a101:          { name: "A101",          color: "#e63a2e", bg: "rgba(230,58,46,0.08)",   emoji: "🏪" },
+  bim:           { name: "BİM",           color: "#c0392b", bg: "rgba(192,57,43,0.08)",   emoji: "🏪" },
+  sok:           { name: "ŞOK",           color: "#e74c3c", bg: "rgba(231,76,60,0.08)",   emoji: "🏪" },
+  teknosa:       { name: "Teknosa",       color: "#0066cc", bg: "rgba(0,102,204,0.08)",   emoji: "💻" },
+  mediamarkt:    { name: "MediaMarkt",    color: "#cc0000", bg: "rgba(204,0,0,0.08)",     emoji: "📺" },
+  vatanbilgisayar: { name: "Vatan",       color: "#e52a2a", bg: "rgba(229,42,42,0.08)",   emoji: "💻" },
+  gratis:        { name: "Gratis",        color: "#e91e8c", bg: "rgba(233,30,140,0.08)",  emoji: "💄" },
+  rossmann:      { name: "Rossmann",      color: "#c8002d", bg: "rgba(200,0,45,0.08)",    emoji: "💊" },
+  supplementler: { name: "Supplementler", color: "#1a9c3e", bg: "rgba(26,156,62,0.08)",  emoji: "💪" },
+  proteinocean:  { name: "ProteinOcean",  color: "#0077b6", bg: "rgba(0,119,182,0.08)",   emoji: "🌊" },
+  lcwaikiki:     { name: "LC Waikiki",    color: "#e31837", bg: "rgba(227,24,55,0.08)",   emoji: "👗" },
+  defacto:       { name: "DeFacto",       color: "#1a1a1a", bg: "rgba(26,26,26,0.06)",    emoji: "👕" },
+  koton:         { name: "Koton",         color: "#c8a45a", bg: "rgba(200,164,90,0.08)",  emoji: "👚" },
+  ikea:          { name: "IKEA",          color: "#0051a2", bg: "rgba(0,81,162,0.08)",    emoji: "🪑" },
+  karaca:        { name: "Karaca",        color: "#8b1a1a", bg: "rgba(139,26,26,0.08)",   emoji: "🍳" },
+};
+
+function getStoreBrand(source) {
+  const key = String(source || "").toLowerCase().replace(/\s+.*$/, "").replace(/[^a-z0-9]/g, "");
+  return STORE_BRANDS[key] || { name: source || "Mağaza", color: "#287a50", bg: "rgba(40,122,80,0.08)", emoji: "🛒" };
+}
+
+function storeLogoHtml(source, size = 36) {
+  const brand = getStoreBrand(source);
+  const initial = brand.name.charAt(0).toUpperCase();
+  return `<div style="width:${size}px;height:${size}px;border-radius:8px;background:${brand.bg};border:1.5px solid ${brand.color}44;display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.44)}px;font-weight:900;color:${brand.color};flex-shrink:0;font-family:'Manrope',sans-serif;">${initial}</div>`;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 window.__almadanPanicModeActive = false;
 window.onerror = function (message, source, lineno, colno, error) {
   console.error("Almadan global hata yakalayıcı:", {
@@ -2376,89 +2413,56 @@ async function findAlternativeSellers(parsed) {
       }
     }
     
-    let html = fakeDiscountWarning + `<div style="font-size:12px; font-weight:600; color:#e8ede8; margin-bottom:8px;">Satıcı Seçimi:</div><div style="display:flex; flex-direction:column; gap:8px;">`;
-    
-    // Find min price
-    const validPrices = alts.map(a => a.price).filter(p => p > 0);
-    const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : -1;
-    
+    const validPrices2 = alts.map(a => a.price).filter(p => p > 0);
+    const minPrice2 = validPrices2.length > 0 ? Math.min(...validPrices2) : -1;
+    const maxPrice2 = validPrices2.length > 0 ? Math.max(...validPrices2) : -1;
+
+    let html = fakeDiscountWarning + `
+      <div style="font-size:11px;font-weight:700;color:var(--ink-2);margin-bottom:8px;letter-spacing:.5px;text-transform:uppercase;">
+        ${alts.length} Mağaza Karşılaştırması ${maxPrice2 > minPrice2 + 1 ? `· <span style="color:#287a50;">₺${(maxPrice2-minPrice2).toFixed(2)} tasarruf mümkün</span>` : ""}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px;">`;
+
     alts.forEach((a) => {
       const altJson = escapeHtml(JSON.stringify(a));
-      
+      const brand = getStoreBrand(a.source);
+      const isCheapest = minPrice2 > 0 && a.price === minPrice2;
+      const savingVsMax = a.price > 0 && maxPrice2 > a.price ? (maxPrice2 - a.price) : 0;
+
       let badges = [];
-      // Sponsorlu badge
-      if (a.labels?.includes("Sponsorlu")) {
-        badges.push('<span style="background: rgba(255, 183, 77, 0.15); color: #ffb74d; border: 1px solid rgba(255, 183, 77, 0.3); padding: 2px 6px; border-radius: 4px; font-size: 9.5px; font-weight: 700;">Reklam</span>');
-      }
-      // En ucuz badge
-      if (minPrice > 0 && a.price === minPrice) {
-        badges.push('<span style="background: rgba(0, 230, 118, 0.15); color: #00e676; border: 1px solid rgba(0, 230, 118, 0.3); padding: 2px 6px; border-radius: 4px; font-size: 9.5px; font-weight: 700;">🌟 En Ucuz</span>');
-      }
-      // Hızlı Teslimat badge
-      const fastDeliverySources = ["migros", "carrefoursa", "sokmarket", "metro", "file", "a101", "getir", "yemeksepeti"];
-      if (fastDeliverySources.includes(String(a.source).toLowerCase())) {
-        badges.push('<span style="background: rgba(41, 182, 246, 0.15); color: #29b6f6; border: 1px solid rgba(41, 182, 246, 0.3); padding: 2px 6px; border-radius: 4px; font-size: 9.5px; font-weight: 700;">⚡ Hızlı Teslimat</span>');
-      }
-      // Güvenilir Satıcı badge
-      if (["amazon", "hepsiburada"].includes(String(a.source).toLowerCase())) {
-        badges.push('<span style="background: rgba(171, 71, 188, 0.15); color: #ab47bc; border: 1px solid rgba(171, 71, 188, 0.3); padding: 2px 6px; border-radius: 4px; font-size: 9.5px; font-weight: 700;">🛡️ Güvenilir</span>');
-      }
+      if (isCheapest) badges.push(`<span style="background:#287a50;color:#fff;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:800;">EN UCUZ</span>`);
+      if (a.labels?.includes("Sponsorlu")) badges.push(`<span style="background:rgba(255,183,77,.15);color:#ffb74d;border:1px solid rgba(255,183,77,.3);padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700;">Reklam</span>`);
+      if (["amazon","hepsiburada"].includes(String(a.source).toLowerCase())) badges.push(`<span style="background:rgba(171,71,188,.1);color:#ab47bc;border:1px solid rgba(171,71,188,.25);padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700;">🛡 Güvenilir</span>`);
+      const fastDeliverySources = ["migros","carrefoursa","sokmarket","metro","file","a101"];
+      if (fastDeliverySources.includes(String(a.source).toLowerCase())) badges.push(`<span style="background:rgba(41,182,246,.1);color:#29b6f6;border:1px solid rgba(41,182,246,.25);padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700;">⚡ Hızlı</span>`);
 
-      const badgesHtml = badges.length > 0 ? `<div style="display:flex; gap:4px; margin-top:4px; flex-wrap:wrap;">${badges.join("")}</div>` : '';
+      const badgesHtml = badges.length > 0 ? `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:3px;">${badges.join("")}</div>` : "";
 
-      // Birim Fiyat Analizi (Unit Price Comparison)
-      let unitPriceText = "";
-      const match = a.title.match(/(\d+(?:[.,]\d+)?)\s*(kg|g|gr|ml|l|lt|litre)\b/i);
-      if (match) {
-        let val = parseFloat(match[1].replace(',', '.'));
-        let unit = match[2].toLowerCase();
-        let qtyInBase = 0;
-        let baseUnit = "";
-        if (unit === 'g' || unit === 'gr') { qtyInBase = val / 1000; baseUnit = "KG"; }
-        else if (unit === 'kg') { qtyInBase = val; baseUnit = "KG"; }
-        else if (unit === 'ml') { qtyInBase = val / 1000; baseUnit = "Litre"; }
-        else if (unit === 'l' || unit === 'lt' || unit === 'litre') { qtyInBase = val; baseUnit = "Litre"; }
-        
-        if (qtyInBase > 0) {
-          const unitPrice = a.price / qtyInBase;
-          unitPriceText = `<div style="font-size:10.5px; color:#a0aab0; font-weight:500; margin-top:3px; border-top: 1px solid rgba(255,255,255,0.05); padding-top:2px;">Birim: ₺${unitPrice.toFixed(2)} / ${baseUnit}</div>`;
-        }
-      }
-
-      // Sepet İndirimi Analizi (Cart & Coupon Intelligence)
-      let cartDiscountText = "";
-      let finalPriceToDisplay = a.price.toFixed(2);
-      let oldPriceDisplay = a.original_price && a.original_price > a.price ? `<div style="font-size:10px; color:#ff6b6b; text-decoration:line-through; font-weight: 500; margin-top: 2px;">₺${a.original_price.toFixed(2)}</div>` : '';
-      
-      const cartMatch = a.title.match(/sepette\s*%(\d+)/i);
-      if (cartMatch) {
-        const discountPercent = parseInt(cartMatch[1], 10);
-        if (discountPercent > 0 && discountPercent < 100) {
-          const discountedPrice = a.price * (1 - (discountPercent / 100));
-          finalPriceToDisplay = `<span style="color:#00e676;">₺${discountedPrice.toFixed(2)}</span>`;
-          oldPriceDisplay = `<div style="font-size:10px; color:#ff6b6b; text-decoration:line-through; font-weight: 500; margin-top: 2px;">Etiket: ₺${a.price.toFixed(2)}</div>`;
-          cartDiscountText = `<div style="font-size:9.5px; background:rgba(0,230,118,0.15); color:#00e676; padding:2px 6px; border-radius:4px; font-weight:700; margin-top:4px;">Sepette %${discountPercent} İndirim</div>`;
-        }
-      }
+      let finalPrice = `₺${a.price.toFixed(2)}`;
+      let oldPriceDisplay = a.original_price && a.original_price > a.price ? `<span style="font-size:10px;color:var(--ink-2);text-decoration:line-through;margin-left:4px;">₺${a.original_price.toFixed(2)}</span>` : "";
 
       html += `
-        <div class="alt-seller-card" style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-lighter); padding:10px 12px; border-radius:8px; font-size:13px; cursor:pointer; border: 1px solid rgba(255,255,255,0.05); transition: 0.2s;" onclick="selectAlternativeSeller(this)" data-alt='${altJson}'>
-          <div style="display:flex; flex-direction:column; max-width:65%;">
-            <span style="font-weight:600; color:#e8ede8;">${escapeHtml(a.source)}</span>
-            <span style="color:#a0aab0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;">${escapeHtml(a.title)}</span>
-            ${badgesHtml}
-            ${cartDiscountText}
+        <div class="alt-seller-card" onclick="selectAlternativeSeller(this)" data-alt='${altJson}'
+          style="display:flex;justify-content:space-between;align-items:center;background:${isCheapest ? 'rgba(40,122,80,0.06)' : 'var(--bg-card,#fff)'};padding:9px 11px;border-radius:8px;cursor:pointer;border:${isCheapest ? '1.5px solid #287a5055' : '1px solid var(--line)'};transition:.15s;"
+          onmouseover="this.style.borderColor='${brand.color}55';this.style.background='${brand.bg}';"
+          onmouseout="this.style.borderColor='${isCheapest ? '#287a5055' : 'var(--line)'}';this.style.background='${isCheapest ? 'rgba(40,122,80,0.06)' : 'var(--bg-card,#fff)'}';">
+          <div style="display:flex;align-items:center;gap:9px;min-width:0;flex:1;">
+            ${storeLogoHtml(a.source, 32)}
+            <div style="min-width:0;">
+              <div style="font-size:13px;font-weight:800;color:${brand.color};">${escapeHtml(brand.name)}</div>
+              <div style="font-size:10.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;">${escapeHtml(a.title)}</div>
+              ${badgesHtml}
+            </div>
           </div>
-          <div style="font-weight:800; color:var(--green); text-align:right; font-size: 14px; display:flex; flex-direction:column; align-items:flex-end;">
-            <span>${finalPriceToDisplay}</span>
-            ${oldPriceDisplay}
-            ${unitPriceText}
+          <div style="font-weight:800;color:var(--green-dark);text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;">
+            <span style="font-size:15px;">${finalPrice}${oldPriceDisplay}</span>
+            ${savingVsMax > 1 ? `<span style="font-size:10px;color:#287a50;font-weight:700;">−₺${savingVsMax.toFixed(0)}</span>` : ""}
           </div>
         </div>
       `;
     });
     html += `</div>`;
-    
+
     container.innerHTML = html;
     lucide.createIcons();
   } catch (err) {
@@ -2468,11 +2472,11 @@ async function findAlternativeSellers(parsed) {
 
 window.selectAlternativeSeller = function(el) {
   document.querySelectorAll('.alt-seller-card').forEach(c => {
-    c.style.border = '1px solid transparent';
-    c.style.background = 'var(--bg-lighter)';
+    c.style.border = '1px solid var(--line)';
+    c.style.background = 'var(--bg-card,#fff)';
   });
-  el.style.border = '1px solid var(--green)';
-  el.style.background = 'rgba(0, 230, 118, 0.1)';
+  el.style.border = '1.5px solid #287a50';
+  el.style.background = 'rgba(40,122,80,0.08)';
   
   const alt = JSON.parse(el.getAttribute('data-alt'));
   
@@ -7560,39 +7564,53 @@ async function showSellerSelectionDialog(parsed) {
       return;
     }
     
+    const minPrice = Math.min(...alts.filter(a => a.price > 0).map(a => a.price));
+    const maxPrice = Math.max(...alts.filter(a => a.price > 0).map(a => a.price));
+    const savings = maxPrice - minPrice;
+
     let listHtml = `
-      <h3 style="margin:0 0 16px 0; font-size:18px; font-weight:800; color:var(--ink);">Hangi Satıcıyı İstersiniz?</h3>
-      <p style="font-size:13px; color:var(--ink-2); margin-top:-10px; margin-bottom:18px;">Bu ürün için <b>${alts.length} farklı satıcı/mağaza</b> bulundu. Devam etmek istediğiniz teklifi seçin.</p>
-      <div style="display:flex; flex-direction:column; gap:12px; max-height:55vh; overflow-y:auto; padding-right:6px;" class="custom-scrollbar">
+      <div style="margin-bottom:16px;">
+        <h3 style="margin:0 0 4px 0; font-size:18px; font-weight:800; color:var(--ink);">${alts.length} Mağazada Fiyat Karşılaştırma</h3>
+        ${savings > 1 ? `<p style="margin:0; font-size:13px; color:#287a50; font-weight:600;">En pahalıya göre <b>₺${savings.toFixed(2)}</b> tasarruf edebilirsin!</p>` : `<p style="margin:0; font-size:13px; color:var(--ink-2);">Teklifi seç ve takibe al.</p>`}
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; max-height:60vh; overflow-y:auto; padding-right:4px;" class="custom-scrollbar">
     `;
-    
+
     alts.forEach((a, idx) => {
-      let badgesHtml = "";
-      if (idx === 0) badgesHtml += `<span style="background:var(--green);color:white;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:800;">🌟 En Ucuz</span>`;
-      if (a.extra_info && a.extra_info.fast_delivery) badgesHtml += `<span style="background:rgba(255,152,0,0.12);color:#ef6c00;border:1px solid rgba(255,152,0,0.3);padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;">⚡ Hızlı Teslimat</span>`;
-      if (a.extra_info && a.extra_info.rating && parseFloat(a.extra_info.rating) >= 9.0) badgesHtml += `<span style="background:rgba(33,150,243,0.12);color:#1976d2;border:1px solid rgba(33,150,243,0.3);padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;">🏆 En Yüksek Puanlı (${a.extra_info.rating})</span>`;
-      
-      const badgeDiv = badgesHtml ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">${badgesHtml}</div>` : "";
-      
+      const brand = getStoreBrand(a.source);
+      const isCheapest = idx === 0 && a.price > 0;
+      const savingVsMax = a.price > 0 && maxPrice > a.price ? (maxPrice - a.price) : 0;
       const escapedJson = escapeHtml(JSON.stringify(a));
-      
+
+      let badgeTop = "";
+      if (isCheapest) badgeTop = `<div style="position:absolute;top:-1px;left:12px;background:#287a50;color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:0 0 6px 6px;letter-spacing:.3px;">EN UCUZ</div>`;
+
+      let badgesRow = "";
+      if (a.extra_info && a.extra_info.fast_delivery) badgesRow += `<span style="font-size:9.5px;background:rgba(255,152,0,.1);color:#ef6c00;border:1px solid rgba(255,152,0,.25);padding:2px 6px;border-radius:4px;font-weight:700;">⚡ Hızlı</span>`;
+      if (a.extra_info && a.extra_info.rating && parseFloat(a.extra_info.rating) >= 9.0) badgesRow += `<span style="font-size:9.5px;background:rgba(33,150,243,.1);color:#1976d2;border:1px solid rgba(33,150,243,.25);padding:2px 6px;border-radius:4px;font-weight:700;">🏆 ${a.extra_info.rating}</span>`;
+
       listHtml += `
-        <div style="border: 1.5px solid var(--line); border-radius: 10px; padding: 14px; cursor: pointer; transition: all 0.15s; background: white; position: relative;" onmouseover="this.style.borderColor='var(--green)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.borderColor='var(--line)'; this.style.transform='none';" onclick="selectSellerAndProceed(this)" data-seller='${escapedJson}'>
-          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-            <div style="display:flex; flex-direction:column; max-width:70%;">
-              <strong style="font-size:15px; color:var(--ink);">${escapeHtml(a.source)}</strong>
-              <span style="font-size:12px; color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:3px;">${escapeHtml(a.title)}</span>
-              ${badgeDiv}
-            </div>
-            <div style="display:flex; flex-direction:column; align-items:flex-end;">
-               <div style="font-size:17px; font-weight:800; color:var(--green-dark);">₺${a.price.toFixed(2)}</div>
-               <span style="font-size:11px; color:var(--green); font-weight:700; margin-top:4px;">Seç ve Takip Et ➜</span>
+        <div onclick="selectSellerAndProceed(this)" data-seller='${escapedJson}'
+          style="position:relative;border:${isCheapest ? '2px solid #287a50' : '1.5px solid var(--line)'};border-radius:10px;padding:${isCheapest ? '18px 12px 12px' : '12px'};cursor:pointer;transition:all .15s;background:var(--surface);"
+          onmouseover="this.style.borderColor='${brand.color}';this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 16px ${brand.color}22';"
+          onmouseout="this.style.borderColor='${isCheapest ? '#287a50' : 'var(--line)'}';this.style.transform='none';this.style.boxShadow='none';">
+          ${badgeTop}
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            ${storeLogoHtml(a.source, 32)}
+            <div>
+              <div style="font-size:13px;font-weight:800;color:${brand.color};line-height:1.2;">${escapeHtml(brand.name)}</div>
+              <div style="font-size:10px;color:var(--ink-2);">Ücretsiz Kargo</div>
             </div>
           </div>
+          <div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">₺${a.price.toFixed(2)}</div>
+          ${a.original_price && a.original_price > a.price ? `<div style="font-size:11px;color:var(--ink-2);text-decoration:line-through;">₺${a.original_price.toFixed(2)}</div>` : ""}
+          ${savingVsMax > 1 ? `<div style="font-size:10px;color:#287a50;font-weight:700;margin-top:2px;">₺${savingVsMax.toFixed(2)} tasarruf</div>` : ""}
+          ${badgesRow ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">${badgesRow}</div>` : ""}
+          <div style="margin-top:8px;text-align:center;background:${isCheapest ? '#287a50' : 'var(--line)'};color:${isCheapest ? '#fff' : 'var(--ink-2)'};border-radius:6px;padding:5px;font-size:11px;font-weight:700;">Seç ›</div>
         </div>
       `;
     });
-    
+
     listHtml += `</div>`;
     content.innerHTML = listHtml;
     

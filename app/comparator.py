@@ -527,46 +527,86 @@ def search_n11_direct(query: str) -> tuple[list[dict], str]:
     return parsed_results, corrected_query
 
 def search_trendyol_direct(query: str) -> list[dict]:
-    """Trendyol mobil API — JSON döner, JS render gerektirmez."""
+    """Trendyol arama — önce web API, sonra HTML fallback."""
     import json as _json
-    try:
-        api_url = (
+
+    # Yöntem 1: Trendyol web arama API (Vercel IP'de çalışır)
+    _API_URLS = [
+        (
             "https://apigw.trendyol.com/discovery-web-searchgw-service/v2/api/infinite-scroll/sr"
             f"?q={urllib.parse.quote_plus(query)}&qt={urllib.parse.quote_plus(query)}"
-            "&st=SEARCH&os=1&pi=1&culture=tr-TR&pId=0"
-        )
-        headers = {
-            "User-Agent": "TrendyolAndroid/7.14.0.559 (Android 13; samsung SM-S918B)",
-            "Accept": "application/json",
-            "Accept-Language": "tr-TR",
-            "x-requested-with": "XMLHttpRequest",
-        }
-        r = requests.get(api_url, headers=headers, timeout=7)
-        if not r.ok:
-            return []
-        prods = (r.json().get("result") or {}).get("products") or []
-        results = []
-        for p in prods[:10]:
-            name = p.get("name") or ""
-            if not name:
+            "&st=SEARCH&os=1&pi=1&culture=tr-TR&pId=0",
+            {"User-Agent": "TrendyolAndroid/7.14.0.559 (Android 13; samsung SM-S918B)", "Accept": "application/json", "Accept-Language": "tr-TR"},
+        ),
+        (
+            f"https://www.trendyol.com/sr?q={urllib.parse.quote_plus(query)}&qt={urllib.parse.quote_plus(query)}&st=SEARCH",
+            {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36", "Accept": "text/html,application/xhtml+xml", "Accept-Language": "tr-TR,tr;q=0.9"},
+        ),
+    ]
+
+    for api_url, headers in _API_URLS:
+        try:
+            r = requests.get(api_url, headers=headers, timeout=8)
+            if not r.ok:
                 continue
-            pi = p.get("price") or {}
-            price = pi.get("sellingPrice") or pi.get("discountedPrice") or pi.get("originalPrice") or 0
-            slug = p.get("url") or ""
-            prod_url = f"https://www.trendyol.com{slug}" if slug.startswith("/") else ""
-            imgs = p.get("images") or []
-            img = imgs[0] if imgs else ""
-            if img and not img.startswith("http"):
-                img = f"https://cdn.dsmcdn.com/{img}"
-            results.append({
-                "title": name, "price": float(price),
-                "original_price": None, "image_url": img,
-                "source": "trendyol", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": price == 0},
-            })
-        return results
-    except Exception:
-        return []
+            # JSON API yanıtı
+            if "application/json" in r.headers.get("Content-Type", ""):
+                prods = (r.json().get("result") or {}).get("products") or []
+                results = []
+                for p in prods[:10]:
+                    name = p.get("name") or ""
+                    if not name:
+                        continue
+                    pi = p.get("price") or {}
+                    price = pi.get("sellingPrice") or pi.get("discountedPrice") or pi.get("originalPrice") or 0
+                    slug = p.get("url") or ""
+                    prod_url = f"https://www.trendyol.com{slug}" if slug.startswith("/") else ""
+                    imgs = p.get("images") or []
+                    img = imgs[0] if imgs else ""
+                    if img and not img.startswith("http"):
+                        img = f"https://cdn.dsmcdn.com/{img}"
+                    results.append({
+                        "title": name, "price": float(price),
+                        "original_price": None, "image_url": img,
+                        "source": "trendyol", "url": prod_url,
+                        "labels": ["Önerilen"], "extra_info": {"out_of_stock": price == 0},
+                    })
+                if results:
+                    return results
+            # HTML arama sayfası — __INITIAL_STATE__ içinden çek
+            m = re.search(r'window\.__SEARCH_APP_INITIAL_STATE__\s*=\s*({.+?});\s*(?:window\.|</)', r.text, re.DOTALL)
+            if not m:
+                m = re.search(r'"products"\s*:\s*(\[.+?\])\s*[,}]', r.text, re.DOTALL)
+            if m:
+                try:
+                    raw = m.group(1)
+                    state = _json.loads(raw) if raw.startswith("{") else {"products": _json.loads(raw)}
+                    prods = state.get("productListingResponse", {}).get("products") or state.get("products") or []
+                    results = []
+                    for p in prods[:10]:
+                        name = p.get("name") or ""
+                        if not name:
+                            continue
+                        price = (p.get("price") or {}).get("discountedPrice") or (p.get("price") or {}).get("originalPrice") or 0
+                        slug = p.get("url") or ""
+                        prod_url = f"https://www.trendyol.com{slug}" if slug.startswith("/") else ""
+                        imgs = p.get("images") or []
+                        img = imgs[0] if imgs else ""
+                        if img and not img.startswith("http"):
+                            img = f"https://cdn.dsmcdn.com/{img}"
+                        results.append({
+                            "title": name, "price": float(price),
+                            "original_price": None, "image_url": img,
+                            "source": "trendyol", "url": prod_url,
+                            "labels": ["Önerilen"], "extra_info": {"out_of_stock": price == 0},
+                        })
+                    if results:
+                        return results
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    return []
 
 
 def search_hepsiburada_direct(query: str) -> list[dict]:
@@ -637,48 +677,89 @@ def search_hepsiburada_direct(query: str) -> list[dict]:
 
 def search_amazon_tr(query: str) -> list[dict]:
     """Amazon.com.tr arama — HTML parse, geniş katalog."""
-    try:
-        url = f"https://www.amazon.com.tr/s?k={urllib.parse.quote_plus(query)}&language=tr_TR"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml",
-        }
-        r = requests.get(url, headers=headers, timeout=7)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        items = soup.select("div[data-component-type='s-search-result']")
-        results = []
-        for item in items[:10]:
-            name_el = item.select_one("h2 span")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
+    _UA_LIST = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    ]
+    import random as _r
+    for attempt in range(3):
+        try:
+            url = f"https://www.amazon.com.tr/s?k={urllib.parse.quote_plus(query)}&language=tr_TR"
+            headers = {
+                "User-Agent": _r.choice(_UA_LIST),
+                "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.7",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Encoding": "gzip, deflate, br",
+                "DNT": "1",
+                "Upgrade-Insecure-Requests": "1",
+                "Referer": "https://www.google.com/",
+            }
+            r = requests.get(url, headers=headers, timeout=10)
+            if r.status_code == 503:
                 continue
-            price_whole = item.select_one(".a-price-whole")
-            price_frac = item.select_one(".a-price-fraction")
-            if price_whole:
-                pw = price_whole.get_text(strip=True).replace(".", "").replace(",", "")
-                pf = price_frac.get_text(strip=True).replace(",", "") if price_frac else "0"
-                try:
-                    price = float(f"{pw}.{pf}")
-                except Exception:
-                    price = 0.0
-            else:
+            if not r.ok:
+                return []
+            # Handle meta-refresh redirect
+            if 'meta http-equiv="refresh"' in r.text or "meta http-equiv='refresh'" in r.text:
+                import re as _re
+                m_url = _re.search(r'content=["\'][^"\']*URL=["\']?([^"\'>\s]+)', r.text, _re.IGNORECASE)
+                if m_url:
+                    redirect_url = m_url.group(1)
+                    if redirect_url.startswith('/'):
+                        redirect_url = 'https://www.amazon.com.tr' + redirect_url
+                    r = requests.get(redirect_url, headers=headers, timeout=10)
+                    if not r.ok:
+                        continue
+            soup = BeautifulSoup(r.text, "html.parser")
+            items = soup.select("div[data-component-type='s-search-result']")
+            if not items:
+                continue
+            results = []
+            for item in items[:10]:
+                name_el = item.select_one("h2 span")
+                name = name_el.get_text(strip=True) if name_el else ""
+                if not name:
+                    continue
+                # Try .a-offscreen first (most reliable), then .a-price-whole
                 price = 0.0
-            link_el = item.select_one("h2 a")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.amazon.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img.s-image")
-            img = img_el.get("src", "") if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "amazon", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": price == 0},
-            })
-        return results
-    except Exception:
-        return []
+                offscreen = item.select_one(".a-price .a-offscreen")
+                if offscreen:
+                    raw = offscreen.get_text(strip=True).replace("\xa0", "").replace("TL", "").replace("₺", "").strip()
+                    raw = raw.replace(".", "").replace(",", ".")
+                    try:
+                        price = float(raw)
+                    except Exception:
+                        pass
+                if not price:
+                    price_whole = item.select_one(".a-price-whole")
+                    price_frac = item.select_one(".a-price-fraction")
+                    if price_whole:
+                        pw = price_whole.get_text(strip=True).replace(".", "").replace(",", "")
+                        pf = price_frac.get_text(strip=True).replace(",", "") if price_frac else "0"
+                        try:
+                            price = float(f"{pw}.{pf}")
+                        except Exception:
+                            price = 0.0
+                # Build URL from data-asin (more reliable than href which is a tracking link)
+                asin = item.get("data-asin", "")
+                prod_url = f"https://www.amazon.com.tr/dp/{asin}" if asin else ""
+                if not prod_url:
+                    link_el = item.select_one("h2 a")
+                    href = link_el.get("href", "") if link_el else ""
+                    prod_url = f"https://www.amazon.com.tr{href}" if href.startswith("/") else href
+                img_el = item.select_one("img.s-image")
+                img = img_el.get("src", "") if img_el else ""
+                results.append({
+                    "title": name, "price": price, "original_price": None,
+                    "image_url": img, "source": "amazon", "url": prod_url,
+                    "labels": ["Önerilen"], "extra_info": {"out_of_stock": price == 0},
+                })
+            if results:
+                return results
+        except Exception:
+            pass
+    return []
 
 
 def run_async(coro):

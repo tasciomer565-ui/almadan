@@ -261,9 +261,9 @@ def classify_intent(query: str) -> str:
         # kelime bazlı eşleşme
         if words.intersection(kw_set) or words_n.intersection(kw_norm):
             return True
-        # substring eşleşme (çok kelimeli kalıplar ve kısmi yazımlar için)
+        # substring eşleşme yalnızca çok kelimeli kalıplar için (tek kelimeler yanlış eşleşmesin: "su" in "samsung")
         for kw in kw_norm:
-            if kw in qn:
+            if " " in kw and kw in qn:
                 return True
         return False
 
@@ -462,26 +462,39 @@ async def scan_worker(query: str, category: str, fallback: bool = False) -> list
 
 async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
     loop = asyncio.get_running_loop()
-    from app.comparator import search_n11_direct, search_amazon_tr
+    from app.comparator import (
+        search_n11_direct,
+        search_amazon_tr,
+        search_trendyol_direct,
+        search_hepsiburada_direct,
+    )
 
-    n11_task    = loop.run_in_executor(None, search_n11_direct, query)
-    amazon_task = loop.run_in_executor(None, search_amazon_tr, query)
+    ty_task  = loop.run_in_executor(None, search_trendyol_direct, query)
+    hb_task  = loop.run_in_executor(None, search_hepsiburada_direct, query)
+    n11_task = loop.run_in_executor(None, search_n11_direct, query)
+    amz_task = loop.run_in_executor(None, search_amazon_tr, query)
 
-    results_raw = await asyncio.gather(n11_task, amazon_task, return_exceptions=True)
+    results_raw = await asyncio.gather(ty_task, hb_task, n11_task, amz_task, return_exceptions=True)
 
-    n11_raw   = results_raw[0] if not isinstance(results_raw[0], Exception) else ([], "")
-    amazon_raw = results_raw[1] if not isinstance(results_raw[1], Exception) else []
+    ty_res  = results_raw[0] if not isinstance(results_raw[0], Exception) else []
+    hb_res  = results_raw[1] if not isinstance(results_raw[1], Exception) else []
+    n11_raw = results_raw[2] if not isinstance(results_raw[2], Exception) else ([], "")
+    amz_res = results_raw[3] if not isinstance(results_raw[3], Exception) else []
 
-    n11_products = n11_raw[0] if isinstance(n11_raw, tuple) else n11_raw
-    amazon_res   = amazon_raw if isinstance(amazon_raw, list) else []
+    n11_products = n11_raw[0] if isinstance(n11_raw, tuple) else (n11_raw if isinstance(n11_raw, list) else [])
+    ty_products  = ty_res  if isinstance(ty_res,  list) else []
+    hb_products  = hb_res  if isinstance(hb_res,  list) else []
+    amz_products = amz_res if isinstance(amz_res, list) else []
 
     all_products = []
     seen_urls = set()
-    for p in n11_products + amazon_res:
+    for p in ty_products + hb_products + n11_products + amz_products:
         url_clean = p.get("url", "").split("?")[0].strip()
-        if url_clean not in seen_urls:
+        if url_clean:
+            if url_clean in seen_urls:
+                continue
             seen_urls.add(url_clean)
-            all_products.append(p)
+        all_products.append(p)
 
     return all_products
 
