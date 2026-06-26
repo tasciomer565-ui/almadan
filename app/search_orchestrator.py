@@ -491,6 +491,12 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
         search_remzi,
         search_tazedirekt, search_bizimtoptan, search_tarimkredi,
         search_defacto,
+        search_kutahyaporselen, search_beymen, search_vakko, search_network,
+        search_philips, search_farmasi, search_dsmart, search_miniso, search_action,
+        search_turkcell, search_hopi, search_pandora, search_altinyildiz,
+        search_derimod, search_lescon, search_namet, search_dardanel,
+        search_shein, search_aliexpress,
+        search_hm, search_sephora, search_koctas, search_adidas, search_metro,
     )
 
     category = classify_intent(query)
@@ -622,6 +628,54 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
         extra_tasks.append(loop.run_in_executor(None, search_tazedirekt, query))
         extra_tasks.append(loop.run_in_executor(None, search_bizimtoptan, query))
         extra_tasks.append(loop.run_in_executor(None, search_tarimkredi, query))
+
+    # Yeni mağazalar - EV/Porselen
+    if category in ("EV", "GENEL"):
+        extra_tasks.append(loop.run_in_executor(None, search_kutahyaporselen, query))
+        extra_tasks.append(loop.run_in_executor(None, search_koctas, query))
+
+    # Yeni mağazalar - MODA
+    if category in ("MODA", "GENEL"):
+        extra_tasks.append(loop.run_in_executor(None, search_beymen, query))
+        extra_tasks.append(loop.run_in_executor(None, search_vakko, query))
+        extra_tasks.append(loop.run_in_executor(None, search_network, query))
+        extra_tasks.append(loop.run_in_executor(None, search_altinyildiz, query))
+        extra_tasks.append(loop.run_in_executor(None, search_derimod, query))
+        extra_tasks.append(loop.run_in_executor(None, search_lescon, query))
+        extra_tasks.append(loop.run_in_executor(None, search_shein, query))
+        extra_tasks.append(loop.run_in_executor(None, search_hm, query))
+
+    # Yeni mağazalar - KOZMETİK
+    if category in ("KOZMETİK", "GENEL"):
+        extra_tasks.append(loop.run_in_executor(None, search_farmasi, query))
+        extra_tasks.append(loop.run_in_executor(None, search_sephora, query))
+
+    # Yeni mağazalar - TEKNOLOJİ
+    if category in ("TEKNOLOJİ", "GENEL"):
+        extra_tasks.append(loop.run_in_executor(None, search_philips, query))
+        extra_tasks.append(loop.run_in_executor(None, search_dsmart, query))
+        extra_tasks.append(loop.run_in_executor(None, search_turkcell, query))
+        extra_tasks.append(loop.run_in_executor(None, search_aliexpress, query))
+
+    # Yeni mağazalar - GENEL
+    extra_tasks.append(loop.run_in_executor(None, search_miniso, query))
+    extra_tasks.append(loop.run_in_executor(None, search_action, query))
+    extra_tasks.append(loop.run_in_executor(None, search_hopi, query))
+
+    # Yeni mağazalar - GIDA
+    if category in ("GIDA", "GENEL"):
+        extra_tasks.append(loop.run_in_executor(None, search_namet, query))
+        extra_tasks.append(loop.run_in_executor(None, search_dardanel, query))
+        extra_tasks.append(loop.run_in_executor(None, search_metro, query))
+
+    # Pandora - sadece takı sorgularında
+    is_jewelry = any(w in q_lower for w in ["yuzuk", "yüzük", "kolye", "bileklik", "kupe", "küpe", "taki", "takı", "pandora"])
+    if is_jewelry:
+        extra_tasks.append(loop.run_in_executor(None, search_pandora, query))
+
+    # Adidas - spor veya moda
+    if is_sport or category in ("MODA", "GENEL"):
+        extra_tasks.append(loop.run_in_executor(None, search_adidas, query))
 
     results_raw = await asyncio.gather(ty_task, hb_task, n11_task, amz_task, *extra_tasks, return_exceptions=True)
 
