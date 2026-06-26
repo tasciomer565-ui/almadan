@@ -117,6 +117,14 @@ const STORE_BRANDS = {
   sony:            { name: "Sony",           color: "#000000", bg: "rgba(0,0,0,0.06)",       logo: "SN" },
   lg:              { name: "LG",             color: "#a50034", bg: "rgba(165,0,52,0.08)",   logo: "LG" },
   canon:           { name: "Canon",          color: "#cc0000", bg: "rgba(204,0,0,0.08)",    logo: "CN" },
+  oyundeposu:      { name: "Oyun Deposu",   color: "#1a1a2e", bg: "rgba(26,26,46,0.08)",   logo: "OD" },
+  frigg:           { name: "Frigg",          color: "#7b1fa2", bg: "rgba(123,31,162,0.08)", logo: "FG" },
+  asusrog:         { name: "Asus ROG",       color: "#cc0000", bg: "rgba(204,0,0,0.08)",    logo: "RG" },
+  melodika:        { name: "Melodika",       color: "#00695c", bg: "rgba(0,105,92,0.08)",   logo: "ML" },
+  ufukkirtasiye:   { name: "Ufuk Kirtasiye", color: "#1565c0", bg: "rgba(21,101,192,0.08)", logo: "UK" },
+  evpet:           { name: "Evpet",          color: "#2e7d32", bg: "rgba(46,125,50,0.08)",  logo: "EP" },
+  zopet:           { name: "Zopet",          color: "#e65100", bg: "rgba(230,81,0,0.08)",   logo: "ZP" },
+  petbis:          { name: "Petbis",         color: "#6a1b9a", bg: "rgba(106,27,154,0.08)", logo: "PB" },
 };
 
 function addAffiliateTag(url, source) {

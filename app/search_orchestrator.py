@@ -501,6 +501,9 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
         search_reebok, search_bershka, search_ulker, search_lego,
         search_epson, search_sarar, search_damattween, search_yargici,
         search_sony, search_lg, search_canon,
+        search_oyundeposu, search_frigg, search_asusrog,
+        search_melodika, search_ufukkirtasiye,
+        search_evpet, search_zopet, search_petbis,
     )
 
     category = classify_intent(query)
@@ -606,7 +609,7 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
         extra_tasks.append(loop.run_in_executor(None, search_bauhaus, query))
 
     # Pet
-    is_pet = any(w in q_lower for w in ["pet", "kedi", "kopek", "köpek", "hayvan"])
+    is_pet = any(w in q_lower for w in ["kedi", "köpek", "kopek", "kuş", "kus", "balik", "balık", "pet", "hayvan", "mama", "tasma", "kafes"])
     if is_pet:
         extra_tasks.append(loop.run_in_executor(None, search_petlebi, query))
 
@@ -688,11 +691,28 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
     is_hobi = any(w in q_lower for w in ["lego", "oyuncak", "model", "puzzle", "hobi"])
 
     if is_gaming or category in ("TEKNOLOJİ", "GENEL"):
-        extra_tasks += [loop.run_in_executor(None, search_gamegaraj, query)]
+        extra_tasks += [
+            loop.run_in_executor(None, search_gamegaraj, query),
+            loop.run_in_executor(None, search_oyundeposu, query),
+            loop.run_in_executor(None, search_frigg, query),
+            loop.run_in_executor(None, search_asusrog, query),
+        ]
     if is_ofis or category in ("TEKNOLOJİ", "GENEL"):
-        extra_tasks += [loop.run_in_executor(None, search_ofissepeti, query)]
+        extra_tasks += [
+            loop.run_in_executor(None, search_ofissepeti, query),
+            loop.run_in_executor(None, search_ufukkirtasiye, query),
+        ]
     if is_muzik or category == "GENEL":
-        extra_tasks += [loop.run_in_executor(None, search_muzikdunyasi, query)]
+        extra_tasks += [
+            loop.run_in_executor(None, search_muzikdunyasi, query),
+            loop.run_in_executor(None, search_melodika, query),
+        ]
+    if is_pet:
+        extra_tasks += [
+            loop.run_in_executor(None, search_evpet, query),
+            loop.run_in_executor(None, search_zopet, query),
+            loop.run_in_executor(None, search_petbis, query),
+        ]
     if is_hobi or category in ("BEBEK", "GENEL"):
         extra_tasks += [loop.run_in_executor(None, search_lego, query)]
     if category in ("MODA", "SPOR", "GENEL"):
