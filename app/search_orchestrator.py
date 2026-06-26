@@ -480,6 +480,17 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
         search_flormar, search_goldenrose,
         search_istikbal, search_bellona, search_madamecoco, search_korkmaz,
         search_kitapyurdu, search_dr, search_idefix,
+        search_bebek, search_ebebek, search_toyzz,
+        search_tefal, search_arnica, search_arzum, search_schafer, search_fakir, search_bosch,
+        search_evidea, search_vivense, search_kelebek, search_dogtas,
+        search_bauhaus,
+        search_petlebi,
+        search_proteinocean, search_bigjoy, search_runnutrition,
+        search_pierrecardin,
+        search_vatanbilgisayar, search_itopya, search_casper,
+        search_remzi,
+        search_tazedirekt, search_bizimtoptan, search_tarimkredi,
+        search_defacto,
     )
 
     category = classify_intent(query)
@@ -558,6 +569,59 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
         extra_tasks.append(loop.run_in_executor(None, search_kitapyurdu, query))
         extra_tasks.append(loop.run_in_executor(None, search_dr, query))
         extra_tasks.append(loop.run_in_executor(None, search_idefix, query))
+        extra_tasks.append(loop.run_in_executor(None, search_remzi, query))
+
+    # Bebek & Çocuk kategorisi
+    is_bebek = any(w in q_lower for w in ["bebek", "oyuncak", "çocuk", "cocuk", "bez"])
+    if is_bebek or category == "BEBEK":
+        extra_tasks.append(loop.run_in_executor(None, search_bebek, query))
+        extra_tasks.append(loop.run_in_executor(None, search_ebebek, query))
+        extra_tasks.append(loop.run_in_executor(None, search_toyzz, query))
+
+    # Ev aletleri & mutfak
+    if category in ("EV", "GENEL", "TEKNOLOJİ"):
+        extra_tasks.append(loop.run_in_executor(None, search_tefal, query))
+        extra_tasks.append(loop.run_in_executor(None, search_arnica, query))
+        extra_tasks.append(loop.run_in_executor(None, search_arzum, query))
+        extra_tasks.append(loop.run_in_executor(None, search_schafer, query))
+        extra_tasks.append(loop.run_in_executor(None, search_fakir, query))
+        extra_tasks.append(loop.run_in_executor(None, search_bosch, query))
+
+    # Mobilya & ev dekor
+    if category in ("EV", "GENEL"):
+        extra_tasks.append(loop.run_in_executor(None, search_evidea, query))
+        extra_tasks.append(loop.run_in_executor(None, search_vivense, query))
+        extra_tasks.append(loop.run_in_executor(None, search_kelebek, query))
+        extra_tasks.append(loop.run_in_executor(None, search_dogtas, query))
+        extra_tasks.append(loop.run_in_executor(None, search_bauhaus, query))
+
+    # Pet
+    is_pet = any(w in q_lower for w in ["pet", "kedi", "kopek", "köpek", "hayvan"])
+    if is_pet:
+        extra_tasks.append(loop.run_in_executor(None, search_petlebi, query))
+
+    # Supplement ek
+    if category in ("SUPPLEMENT", "GENEL"):
+        extra_tasks.append(loop.run_in_executor(None, search_proteinocean, query))
+        extra_tasks.append(loop.run_in_executor(None, search_bigjoy, query))
+        extra_tasks.append(loop.run_in_executor(None, search_runnutrition, query))
+
+    # Moda ek
+    if category in ("MODA", "GENEL"):
+        extra_tasks.append(loop.run_in_executor(None, search_pierrecardin, query))
+        extra_tasks.append(loop.run_in_executor(None, search_defacto, query))
+
+    # Teknoloji ek
+    if category in ("TEKNOLOJİ", "GENEL"):
+        extra_tasks.append(loop.run_in_executor(None, search_vatanbilgisayar, query))
+        extra_tasks.append(loop.run_in_executor(None, search_itopya, query))
+        extra_tasks.append(loop.run_in_executor(None, search_casper, query))
+
+    # Gida ek
+    if category in ("GIDA", "GENEL"):
+        extra_tasks.append(loop.run_in_executor(None, search_tazedirekt, query))
+        extra_tasks.append(loop.run_in_executor(None, search_bizimtoptan, query))
+        extra_tasks.append(loop.run_in_executor(None, search_tarimkredi, query))
 
     results_raw = await asyncio.gather(ty_task, hb_task, n11_task, amz_task, *extra_tasks, return_exceptions=True)
 
