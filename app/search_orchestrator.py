@@ -473,6 +473,13 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
         search_lcwaikiki, search_mavi, search_zara,
         search_bim, search_rossmann, search_supplementler,
         search_englishhome, search_a101, search_sokmarket,
+        search_temu, search_pazarama, search_ciceksepeti,
+        search_xiaomi, search_huawei, search_hp, search_lenovo, search_evkur,
+        search_penti, search_colins, search_twist, search_ltb, search_modanisa,
+        search_nike, search_puma, search_newbalance, search_sportive,
+        search_flormar, search_goldenrose,
+        search_istikbal, search_bellona, search_madamecoco, search_korkmaz,
+        search_kitapyurdu, search_dr, search_idefix,
     )
 
     category = classify_intent(query)
@@ -486,18 +493,31 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
     # Category-specific extras
     extra_tasks = []
 
+    q_lower = query.lower()
+
     if category in ("KOZMETİK", "GENEL"):
         extra_tasks.append(loop.run_in_executor(None, search_watsons, query))
         extra_tasks.append(loop.run_in_executor(None, search_gratis, query))
         extra_tasks.append(loop.run_in_executor(None, search_rossmann, query))
+        extra_tasks.append(loop.run_in_executor(None, search_flormar, query))
+        extra_tasks.append(loop.run_in_executor(None, search_goldenrose, query))
 
     if category in ("EV", "GENEL"):
         extra_tasks.append(loop.run_in_executor(None, search_karaca, query))
         extra_tasks.append(loop.run_in_executor(None, search_englishhome, query))
+        extra_tasks.append(loop.run_in_executor(None, search_istikbal, query))
+        extra_tasks.append(loop.run_in_executor(None, search_bellona, query))
+        extra_tasks.append(loop.run_in_executor(None, search_madamecoco, query))
+        extra_tasks.append(loop.run_in_executor(None, search_korkmaz, query))
 
     if category in ("TEKNOLOJİ", "GENEL"):
         extra_tasks.append(loop.run_in_executor(None, search_mediamarkt, query))
         extra_tasks.append(loop.run_in_executor(None, search_teknosa, query))
+        extra_tasks.append(loop.run_in_executor(None, search_xiaomi, query))
+        extra_tasks.append(loop.run_in_executor(None, search_huawei, query))
+        extra_tasks.append(loop.run_in_executor(None, search_hp, query))
+        extra_tasks.append(loop.run_in_executor(None, search_lenovo, query))
+        extra_tasks.append(loop.run_in_executor(None, search_evkur, query))
 
     if category in ("MODA", "GENEL"):
         extra_tasks.append(loop.run_in_executor(None, search_boyner, query))
@@ -505,9 +525,19 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
         extra_tasks.append(loop.run_in_executor(None, search_lcwaikiki, query))
         extra_tasks.append(loop.run_in_executor(None, search_mavi, query))
         extra_tasks.append(loop.run_in_executor(None, search_zara, query))
+        extra_tasks.append(loop.run_in_executor(None, search_penti, query))
+        extra_tasks.append(loop.run_in_executor(None, search_colins, query))
+        extra_tasks.append(loop.run_in_executor(None, search_twist, query))
+        extra_tasks.append(loop.run_in_executor(None, search_ltb, query))
+        extra_tasks.append(loop.run_in_executor(None, search_modanisa, query))
 
-    if category in ("SPOR", "GENEL", "MODA"):
+    is_sport = any(w in q_lower for w in ["spor", "koşu", "kosu", "ayakkabı", "ayakkabi", "forma", "antrenman", "fitness", "gym"])
+    if is_sport or category in ("SPOR", "GENEL", "MODA"):
         extra_tasks.append(loop.run_in_executor(None, search_decathlon, query))
+        extra_tasks.append(loop.run_in_executor(None, search_nike, query))
+        extra_tasks.append(loop.run_in_executor(None, search_puma, query))
+        extra_tasks.append(loop.run_in_executor(None, search_newbalance, query))
+        extra_tasks.append(loop.run_in_executor(None, search_sportive, query))
 
     if category in ("GIDA", "GENEL"):
         extra_tasks.append(loop.run_in_executor(None, search_bim, query))
@@ -516,6 +546,18 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
 
     if category in ("SUPPLEMENT", "GENEL"):
         extra_tasks.append(loop.run_in_executor(None, search_supplementler, query))
+
+    # GENEL marketplace extras
+    extra_tasks.append(loop.run_in_executor(None, search_temu, query))
+    extra_tasks.append(loop.run_in_executor(None, search_pazarama, query))
+    extra_tasks.append(loop.run_in_executor(None, search_ciceksepeti, query))
+
+    # Kitap kategorisi
+    is_book = any(w in q_lower for w in ["kitap", "roman", "yazar", "hikaye", "dergi", "ansiklopedi"])
+    if is_book or category == "KİTAP":
+        extra_tasks.append(loop.run_in_executor(None, search_kitapyurdu, query))
+        extra_tasks.append(loop.run_in_executor(None, search_dr, query))
+        extra_tasks.append(loop.run_in_executor(None, search_idefix, query))
 
     results_raw = await asyncio.gather(ty_task, hb_task, n11_task, amz_task, *extra_tasks, return_exceptions=True)
 
