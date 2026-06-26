@@ -22,6 +22,13 @@ const STORE_BRANDS = {
   ikea:          { name: "IKEA",          color: "#0051a2", bg: "rgba(0,81,162,0.08)",    emoji: "🪑" },
   karaca:        { name: "Karaca",        color: "#8b1a1a", bg: "rgba(139,26,26,0.08)",   emoji: "🍳" },
   watsons:       { name: "Watsons",       color: "#00843d", bg: "rgba(0,132,61,0.08)",    emoji: "💚" },
+  boyner:        { name: "Boyner",        color: "#e30613", bg: "rgba(227,6,19,0.08)",    emoji: "🛍️" },
+  flo:           { name: "FLO",           color: "#ff6600", bg: "rgba(255,102,0,0.08)",   emoji: "👟" },
+  decathlon:     { name: "Decathlon",     color: "#0082c3", bg: "rgba(0,130,195,0.08)",   emoji: "⚽" },
+  mavi:          { name: "Mavi",          color: "#003087", bg: "rgba(0,48,135,0.08)",    emoji: "👖" },
+  zara:          { name: "Zara",          color: "#000000", bg: "rgba(0,0,0,0.06)",        emoji: "🖤" },
+  englishhome:   { name: "English Home",  color: "#8b4513", bg: "rgba(139,69,19,0.08)",   emoji: "🏠" },
+  sokmarket:     { name: "ŞOK",           color: "#f7941d", bg: "rgba(247,148,29,0.08)",  emoji: "🏪" },
 };
 
 function addAffiliateTag(url, source) {

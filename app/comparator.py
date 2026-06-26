@@ -959,6 +959,636 @@ def search_gratis(query: str) -> list[dict]:
         return []
 
 
+def search_mediamarkt(query: str) -> list[dict]:
+    """MediaMarkt Türkiye ürün araması."""
+    try:
+        url = f"https://www.mediamarkt.com.tr/tr/search.html?query={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product-wrapper, .product-list-item, [data-test='product-list-item']")[:10]:
+            name_el = item.select_one(".product-title, h2, [class*='title']")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one(".price, [class*='price'], .product-price")
+            if not price_el:
+                continue
+            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
+            raw = re.sub(r"[^\d.]","", raw)
+            try:
+                price = float(raw)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            link_el = item.select_one("a[href]")
+            href = link_el.get("href","") if link_el else ""
+            prod_url = f"https://www.mediamarkt.com.tr{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "mediamarkt", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_teknosa(query: str) -> list[dict]:
+    """Teknosa ürün araması."""
+    try:
+        url = f"https://www.teknosa.com/arama/?q={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product-item, .prd-item, [class*='product-card']")[:10]:
+            name_el = item.select_one(".product-name, .prd-name, h3, [class*='name']")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one(".product-price, .prd-price, [class*='price']")
+            if not price_el:
+                continue
+            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
+            raw = re.sub(r"[^\d.]","", raw)
+            try:
+                price = float(raw)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            link_el = item.select_one("a[href]")
+            href = link_el.get("href","") if link_el else ""
+            prod_url = f"https://www.teknosa.com{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "teknosa", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_boyner(query: str) -> list[dict]:
+    """Boyner ürün araması."""
+    try:
+        url = f"https://www.boyner.com.tr/search?q={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product-item, .product-card, [class*='ProductCard']")[:10]:
+            name_el = item.select_one(".product-name, .product-title, h3, [class*='name']")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one(".product-price, [class*='price'], .price")
+            if not price_el:
+                continue
+            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
+            raw = re.sub(r"[^\d.]","", raw)
+            try:
+                price = float(raw)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            link_el = item.select_one("a[href]")
+            href = link_el.get("href","") if link_el else ""
+            prod_url = f"https://www.boyner.com.tr{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "boyner", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_flo(query: str) -> list[dict]:
+    """FLO ürün araması."""
+    try:
+        url = f"https://www.flo.com.tr/search?q={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product-item, .product-card, [class*='product']")[:10]:
+            name_el = item.select_one(".product-name, .brand-name, h3, [class*='name']")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one(".product-price, [class*='price'], .price")
+            if not price_el:
+                continue
+            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
+            raw = re.sub(r"[^\d.]","", raw)
+            try:
+                price = float(raw)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            link_el = item.select_one("a[href]")
+            href = link_el.get("href","") if link_el else ""
+            prod_url = f"https://www.flo.com.tr{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "flo", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_decathlon(query: str) -> list[dict]:
+    """Decathlon Türkiye ürün araması."""
+    try:
+        url = f"https://www.decathlon.com.tr/search?Ntt={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product-list-item, .product-card, [data-qa='product-card'], article")[:10]:
+            name_el = item.select_one(".product-name, h3, [class*='title'], [class*='name']")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one("[class*='price'], .price, [data-qa='price']")
+            if not price_el:
+                continue
+            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
+            raw = re.sub(r"[^\d.]","", raw)
+            try:
+                price = float(raw)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            link_el = item.select_one("a[href]")
+            href = link_el.get("href","") if link_el else ""
+            prod_url = f"https://www.decathlon.com.tr{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "decathlon", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_lcwaikiki(query: str) -> list[dict]:
+    """LC Waikiki ürün araması."""
+    try:
+        url = f"https://www.lcwaikiki.com/tr-TR/TR/search/index.aspx?searchvalue={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product-item, .col-product, [class*='ProductItem']")[:10]:
+            name_el = item.select_one(".product-name, [class*='product-name'], h3")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one("[class*='price'], .price, .product-price")
+            if not price_el:
+                continue
+            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
+            raw = re.sub(r"[^\d.]","", raw)
+            try:
+                price = float(raw)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            link_el = item.select_one("a[href]")
+            href = link_el.get("href","") if link_el else ""
+            prod_url = f"https://www.lcwaikiki.com{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "lcwaikiki", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_mavi(query: str) -> list[dict]:
+    """Mavi ürün araması."""
+    try:
+        url = f"https://www.mavi.com/search?q={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product-item, [class*='product-card'], .product")[:10]:
+            name_el = item.select_one(".product-title, .product-name, h3, [class*='name']")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one("[class*='price'], .price, .product-price")
+            if not price_el:
+                continue
+            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
+            raw = re.sub(r"[^\d.]","", raw)
+            try:
+                price = float(raw)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            link_el = item.select_one("a[href]")
+            href = link_el.get("href","") if link_el else ""
+            prod_url = f"https://www.mavi.com{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "mavi", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_zara(query: str) -> list[dict]:
+    """Zara Türkiye ürün araması."""
+    try:
+        url = f"https://www.zara.com/tr/tr/search?searchTerm={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product-grid-product, [class*='product-grid'], [class*='ProductCard'], li[class*='product']")[:10]:
+            name_el = item.select_one("[class*='product-name'], .product-name, h3, [aria-label]")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one("[class*='price'], .price, [data-price]")
+            if not price_el:
+                continue
+            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
+            raw = re.sub(r"[^\d.]","", raw)
+            try:
+                price = float(raw)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            link_el = item.select_one("a[href]")
+            href = link_el.get("href","") if link_el else ""
+            prod_url = f"https://www.zara.com{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "zara", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_bim(query: str) -> list[dict]:
+    """BIM ürün araması."""
+    try:
+        url = f"https://www.bim.com.tr/search.aspx?q={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product-item, .item, [class*='product-card']")[:10]:
+            name_el = item.select_one(".product-name, .item-name, h3, h4, [class*='name']")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one("[class*='price'], .price, .item-price")
+            if not price_el:
+                continue
+            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
+            raw = re.sub(r"[^\d.]","", raw)
+            try:
+                price = float(raw)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            link_el = item.select_one("a[href]")
+            href = link_el.get("href","") if link_el else ""
+            prod_url = f"https://www.bim.com.tr{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "bim", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_rossmann(query: str) -> list[dict]:
+    """Rossmann Türkiye ürün araması."""
+    try:
+        url = f"https://www.rossmann.com.tr/?s={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product-item, .product, [class*='product-card']")[:10]:
+            name_el = item.select_one(".product-title, .product-name, h3, [class*='name']")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one("[class*='price'], .price, .product-price")
+            if not price_el:
+                continue
+            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
+            raw = re.sub(r"[^\d.]","", raw)
+            try:
+                price = float(raw)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            link_el = item.select_one("a[href]")
+            href = link_el.get("href","") if link_el else ""
+            prod_url = f"https://www.rossmann.com.tr{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "rossmann", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_supplementler(query: str) -> list[dict]:
+    """Supplementler.com ürün araması."""
+    try:
+        url = f"https://www.supplementler.com/search/?q={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product-item, [class*='product'], .item")[:10]:
+            name_el = item.select_one(".product-name, .item-name, h3, [class*='name']")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one("[class*='price'], .price, .product-price")
+            if not price_el:
+                continue
+            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
+            raw = re.sub(r"[^\d.]","", raw)
+            try:
+                price = float(raw)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            link_el = item.select_one("a[href]")
+            href = link_el.get("href","") if link_el else ""
+            prod_url = f"https://www.supplementler.com{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "supplementler", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_englishhome(query: str) -> list[dict]:
+    """English Home ürün araması."""
+    try:
+        url = f"https://www.englishhome.com/?q={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product-item, .product-card, [class*='product']")[:10]:
+            name_el = item.select_one(".product-name, .product-title, h3, [class*='title']")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one("[class*='price'], .price, .product-price")
+            if not price_el:
+                continue
+            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
+            raw = re.sub(r"[^\d.]","", raw)
+            try:
+                price = float(raw)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            link_el = item.select_one("a[href]")
+            href = link_el.get("href","") if link_el else ""
+            prod_url = f"https://www.englishhome.com{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "englishhome", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_a101(query: str) -> list[dict]:
+    """A101 ürün araması."""
+    try:
+        url = f"https://www.a101.com.tr/arama?q={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product-item, [class*='product-card'], .product")[:10]:
+            name_el = item.select_one(".product-name, h3, [class*='name']")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one("[class*='price'], .price")
+            if not price_el:
+                continue
+            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
+            raw = re.sub(r"[^\d.]","", raw)
+            try:
+                price = float(raw)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            link_el = item.select_one("a[href]")
+            href = link_el.get("href","") if link_el else ""
+            prod_url = f"https://www.a101.com.tr{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "a101", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_sokmarket(query: str) -> list[dict]:
+    """SOK Market ürün araması."""
+    try:
+        url = f"https://www.sokmarket.com.tr/arama?q={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product-item, [class*='product-card'], .product")[:10]:
+            name_el = item.select_one(".product-name, h3, [class*='name']")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_el = item.select_one("[class*='price'], .price")
+            if not price_el:
+                continue
+            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
+            raw = re.sub(r"[^\d.]","", raw)
+            try:
+                price = float(raw)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            link_el = item.select_one("a[href]")
+            href = link_el.get("href","") if link_el else ""
+            prod_url = f"https://www.sokmarket.com.tr{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "sokmarket", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
+
+
 def run_async(coro):
     import asyncio
     import threading
