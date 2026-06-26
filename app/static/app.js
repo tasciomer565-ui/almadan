@@ -21,7 +21,19 @@ const STORE_BRANDS = {
   koton:         { name: "Koton",         color: "#c8a45a", bg: "rgba(200,164,90,0.08)",  emoji: "👚" },
   ikea:          { name: "IKEA",          color: "#0051a2", bg: "rgba(0,81,162,0.08)",    emoji: "🪑" },
   karaca:        { name: "Karaca",        color: "#8b1a1a", bg: "rgba(139,26,26,0.08)",   emoji: "🍳" },
+  watsons:       { name: "Watsons",       color: "#00843d", bg: "rgba(0,132,61,0.08)",    emoji: "💚" },
 };
+
+function addAffiliateTag(url, source) {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    if (source === 'amazon' || u.hostname.includes('amazon.com.tr')) {
+      u.searchParams.set('tag', 'almadan-21');
+    }
+    return u.toString();
+  } catch(e) { return url; }
+}
 
 function getStoreBrand(source) {
   const key = String(source || "").toLowerCase().replace(/\s+.*$/, "").replace(/[^a-z0-9]/g, "");
@@ -2493,7 +2505,7 @@ window.selectAlternativeSeller = function(el) {
   if (sourceNameEl) sourceNameEl.innerText = alt.source;
   
   if (state.parsedProduct) {
-     state.parsedProduct.canonical_url = alt.url || alt.canonical_url || state.parsedProduct.canonical_url;
+     state.parsedProduct.canonical_url = addAffiliateTag(alt.url || alt.canonical_url || state.parsedProduct.canonical_url, alt.source);
      state.parsedProduct.source = alt.source;
      if (alt.image_url) state.parsedProduct.image_url = alt.image_url;
      state.parsedProduct.title = alt.title;
@@ -2816,7 +2828,7 @@ function openProduct(id) {
               <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
                 <strong style="color: ${isCheapest ? "var(--green-dark)" : "var(--ink)"}; font-size: 13px;">${currency.format(item.price)}</strong>
                 ${isCheapest ? `<span style="${badgeStyle}">EN UCUZ</span>` : ""}
-          <a href="${escapeHtml(safeHttpUrl(item.url))}" target="_blank" rel="noopener noreferrer" style="color: var(--muted); display: inline-grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 4px; background: white;" title="Mağazaya git">
+          <a href="${escapeHtml(safeHttpUrl(addAffiliateTag(item.url, item.store)))}" target="_blank" rel="noopener noreferrer" style="color: var(--muted); display: inline-grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 4px; background: white;" title="Mağazaya git">
                   <i data-lucide="external-link" style="width: 14px; height: 14px; color: var(--ink);"></i>
                 </a>
               </div>
@@ -2907,7 +2919,7 @@ function openProduct(id) {
           <i data-lucide="trash-2"></i>
           Takipten çıkar
         </button>
-        <button class="primary-button" style="flex:1;" onclick="window.open(${inlineJsArg(safeHttpUrl(product.url))}, '_blank', 'noopener,noreferrer')">
+        <button class="primary-button" style="flex:1;" onclick="window.open(${inlineJsArg(safeHttpUrl(addAffiliateTag(product.url, product.source)))}, '_blank', 'noopener,noreferrer')">
           <i data-lucide="external-link"></i>
           Mağazaya git
         </button>
@@ -7626,7 +7638,7 @@ function selectSellerAndProceed(element) {
     title: sellerData.title,
     price: sellerData.price,
     source: sellerData.source,
-    canonical_url: sellerData.url,
+    canonical_url: addAffiliateTag(sellerData.url, sellerData.source),
     image_url: sellerData.image_url,
     original_price: sellerData.original_price,
     extra_info: sellerData.extra_info,

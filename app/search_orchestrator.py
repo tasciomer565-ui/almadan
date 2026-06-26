@@ -467,28 +467,38 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
         search_amazon_tr,
         search_trendyol_direct,
         search_hepsiburada_direct,
+        search_karaca, search_watsons, search_gratis,
     )
 
-    ty_task  = loop.run_in_executor(None, search_trendyol_direct, query)
-    hb_task  = loop.run_in_executor(None, search_hepsiburada_direct, query)
-    n11_task = loop.run_in_executor(None, search_n11_direct, query)
-    amz_task = loop.run_in_executor(None, search_amazon_tr, query)
+    ty_task      = loop.run_in_executor(None, search_trendyol_direct, query)
+    hb_task      = loop.run_in_executor(None, search_hepsiburada_direct, query)
+    n11_task     = loop.run_in_executor(None, search_n11_direct, query)
+    amz_task     = loop.run_in_executor(None, search_amazon_tr, query)
+    karaca_task  = loop.run_in_executor(None, search_karaca, query)
+    watsons_task = loop.run_in_executor(None, search_watsons, query)
+    gratis_task  = loop.run_in_executor(None, search_gratis, query)
 
-    results_raw = await asyncio.gather(ty_task, hb_task, n11_task, amz_task, return_exceptions=True)
+    results_raw = await asyncio.gather(ty_task, hb_task, n11_task, amz_task, karaca_task, watsons_task, gratis_task, return_exceptions=True)
 
-    ty_res  = results_raw[0] if not isinstance(results_raw[0], Exception) else []
-    hb_res  = results_raw[1] if not isinstance(results_raw[1], Exception) else []
-    n11_raw = results_raw[2] if not isinstance(results_raw[2], Exception) else ([], "")
-    amz_res = results_raw[3] if not isinstance(results_raw[3], Exception) else []
+    ty_res      = results_raw[0] if not isinstance(results_raw[0], Exception) else []
+    hb_res      = results_raw[1] if not isinstance(results_raw[1], Exception) else []
+    n11_raw     = results_raw[2] if not isinstance(results_raw[2], Exception) else ([], "")
+    amz_res     = results_raw[3] if not isinstance(results_raw[3], Exception) else []
+    karaca_res  = results_raw[4] if not isinstance(results_raw[4], Exception) else []
+    watsons_res = results_raw[5] if not isinstance(results_raw[5], Exception) else []
+    gratis_res  = results_raw[6] if not isinstance(results_raw[6], Exception) else []
 
-    n11_products = n11_raw[0] if isinstance(n11_raw, tuple) else (n11_raw if isinstance(n11_raw, list) else [])
-    ty_products  = ty_res  if isinstance(ty_res,  list) else []
-    hb_products  = hb_res  if isinstance(hb_res,  list) else []
-    amz_products = amz_res if isinstance(amz_res, list) else []
+    n11_products     = n11_raw[0] if isinstance(n11_raw, tuple) else (n11_raw if isinstance(n11_raw, list) else [])
+    ty_products      = ty_res      if isinstance(ty_res,      list) else []
+    hb_products      = hb_res      if isinstance(hb_res,      list) else []
+    amz_products     = amz_res     if isinstance(amz_res,     list) else []
+    karaca_products  = karaca_res  if isinstance(karaca_res,  list) else []
+    watsons_products = watsons_res if isinstance(watsons_res, list) else []
+    gratis_products  = gratis_res  if isinstance(gratis_res,  list) else []
 
     all_products = []
     seen_urls = set()
-    for p in ty_products + hb_products + n11_products + amz_products:
+    for p in ty_products + hb_products + n11_products + amz_products + karaca_products + watsons_products + gratis_products:
         url_clean = p.get("url", "").split("?")[0].strip()
         if url_clean:
             if url_clean in seen_urls:
