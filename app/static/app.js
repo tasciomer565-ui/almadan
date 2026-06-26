@@ -103,6 +103,20 @@ const STORE_BRANDS = {
   koctas:          { name: "Koçtaş",         color: "#e30613", bg: "rgba(227,6,19,0.08)",   logo: "KT" },
   adidas:          { name: "Adidas",         color: "#000000", bg: "rgba(0,0,0,0.06)",       logo: "AD" },
   metro:           { name: "Metro",          color: "#003087", bg: "rgba(0,48,135,0.08)",   logo: "MT" },
+  gamegaraj:       { name: "GameGaraj",      color: "#1a1a2e", bg: "rgba(26,26,46,0.08)",   logo: "GG" },
+  ofissepeti:      { name: "Ofis Sepeti",    color: "#e65100", bg: "rgba(230,81,0,0.08)",   logo: "OS" },
+  muzikdunyasi:    { name: "Müzik Dünyası",  color: "#6a1b9a", bg: "rgba(106,27,154,0.08)", logo: "MD" },
+  reebok:          { name: "Reebok",         color: "#cc0000", bg: "rgba(204,0,0,0.08)",    logo: "RB" },
+  bershka:         { name: "Bershka",        color: "#1a1a1a", bg: "rgba(26,26,26,0.06)",   logo: "BK" },
+  ulker:           { name: "Ülker",          color: "#e53935", bg: "rgba(229,57,53,0.08)",  logo: "UK" },
+  lego:            { name: "Lego",           color: "#e3000b", bg: "rgba(227,0,11,0.08)",   logo: "LG" },
+  epson:           { name: "Epson",          color: "#003087", bg: "rgba(0,48,135,0.08)",   logo: "EP" },
+  sarar:           { name: "Sarar",          color: "#1a1a1a", bg: "rgba(26,26,26,0.06)",   logo: "SR" },
+  damattween:      { name: "Damat Tween",    color: "#1a237e", bg: "rgba(26,35,126,0.08)",  logo: "DT" },
+  yargici:         { name: "Yargıcı",        color: "#3e2723", bg: "rgba(62,39,35,0.08)",   logo: "YG" },
+  sony:            { name: "Sony",           color: "#000000", bg: "rgba(0,0,0,0.06)",       logo: "SN" },
+  lg:              { name: "LG",             color: "#a50034", bg: "rgba(165,0,52,0.08)",   logo: "LG" },
+  canon:           { name: "Canon",          color: "#cc0000", bg: "rgba(204,0,0,0.08)",    logo: "CN" },
 };
 
 function addAffiliateTag(url, source) {

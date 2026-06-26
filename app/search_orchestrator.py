@@ -497,6 +497,10 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
         search_derimod, search_lescon, search_namet, search_dardanel,
         search_shein, search_aliexpress,
         search_hm, search_sephora, search_koctas, search_adidas, search_metro,
+        search_gamegaraj, search_ofissepeti, search_muzikdunyasi,
+        search_reebok, search_bershka, search_ulker, search_lego,
+        search_epson, search_sarar, search_damattween, search_yargici,
+        search_sony, search_lg, search_canon,
     )
 
     category = classify_intent(query)
@@ -676,6 +680,38 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
     # Adidas - spor veya moda
     if is_sport or category in ("MODA", "GENEL"):
         extra_tasks.append(loop.run_in_executor(None, search_adidas, query))
+
+    # Gaming / Ofis / Müzik / Hobi
+    is_gaming = any(w in q_lower for w in ["oyun", "game", "gaming", "konsol", "ps", "xbox", "pc", "mouse", "klavye", "kulaklık"])
+    is_ofis = any(w in q_lower for w in ["kalem", "defter", "ofis", "kırtasiye", "yazici", "printer", "toner"])
+    is_muzik = any(w in q_lower for w in ["gitar", "piyano", "müzik", "muzik", "enstruman", "bateri", "keman"])
+    is_hobi = any(w in q_lower for w in ["lego", "oyuncak", "model", "puzzle", "hobi"])
+
+    if is_gaming or category in ("TEKNOLOJİ", "GENEL"):
+        extra_tasks += [loop.run_in_executor(None, search_gamegaraj, query)]
+    if is_ofis or category in ("TEKNOLOJİ", "GENEL"):
+        extra_tasks += [loop.run_in_executor(None, search_ofissepeti, query)]
+    if is_muzik or category == "GENEL":
+        extra_tasks += [loop.run_in_executor(None, search_muzikdunyasi, query)]
+    if is_hobi or category in ("BEBEK", "GENEL"):
+        extra_tasks += [loop.run_in_executor(None, search_lego, query)]
+    if category in ("MODA", "SPOR", "GENEL"):
+        extra_tasks += [
+            loop.run_in_executor(None, search_reebok, query),
+            loop.run_in_executor(None, search_bershka, query),
+            loop.run_in_executor(None, search_sarar, query),
+            loop.run_in_executor(None, search_damattween, query),
+            loop.run_in_executor(None, search_yargici, query),
+        ]
+    if category in ("GIDA", "GENEL"):
+        extra_tasks += [loop.run_in_executor(None, search_ulker, query)]
+    if category in ("TEKNOLOJİ", "GENEL"):
+        extra_tasks += [
+            loop.run_in_executor(None, search_epson, query),
+            loop.run_in_executor(None, search_sony, query),
+            loop.run_in_executor(None, search_lg, query),
+            loop.run_in_executor(None, search_canon, query),
+        ]
 
     results_raw = await asyncio.gather(ty_task, hb_task, n11_task, amz_task, *extra_tasks, return_exceptions=True)
 
