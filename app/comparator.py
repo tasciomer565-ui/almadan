@@ -4951,6 +4951,28 @@ def run_async(coro):
     else:
         return loop.run_until_complete(coro)
 
+def _call_railway_scraper(query: str, category: str) -> list[dict] | None:
+    """Railway scraper API'sini çağır — env var set edilmişse kullan."""
+    import requests as _req, os as _os
+    url = _os.getenv("RAILWAY_SCRAPER_URL", "").rstrip("/")
+    secret = _os.getenv("SCRAPER_SECRET", "")
+    if not url:
+        return None
+    try:
+        r = _req.get(
+            f"{url}/scrape",
+            params={"query": query, "category": category, "secret": secret},
+            timeout=55,
+        )
+        if r.ok:
+            data = r.json()
+            return data.get("products") or []
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Railway scraper hata: %s", e)
+    return None
+
+
 def search_products_by_name(
     query: str,
     category: str = "general",
@@ -4958,9 +4980,14 @@ def search_products_by_name(
     lon: float = None,
     mode: str = "hybrid"
 ) -> list[dict]:
-    # 1. Run Kuantum Arama Orkestratörü
-    from app.search_orchestrator import master_search
-    all_products = run_async(master_search(query, selected_category=category, lat=lat, lon=lon, mode=mode))
+    # Railway scraper varsa onu kullan (tüm mağazalar, sınırsız süre)
+    railway_products = _call_railway_scraper(query, category)
+    if railway_products is not None:
+        all_products = railway_products
+    else:
+        # 1. Lokal orkestratör (sadece N11+Amazon)
+        from app.search_orchestrator import master_search
+        all_products = run_async(master_search(query, selected_category=category, lat=lat, lon=lon, mode=mode))
     corrected_query = query
     
     # 5. Filter out accessory/irrelevant products (like cloth, case, cables)
