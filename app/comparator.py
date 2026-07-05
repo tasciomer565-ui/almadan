@@ -1,5 +1,6 @@
 import urllib.parse
 import re
+import json
 import requests
 from bs4 import BeautifulSoup
 from app.parser import parse_product_url, detect_source, USER_AGENT
@@ -960,7 +961,7 @@ def search_gratis(query: str) -> list[dict]:
 
 
 def search_mediamarkt(query: str) -> list[dict]:
-    """MediaMarkt Türkiye ürün araması."""
+    """MediaMarkt Türkiye ürün araması — JSON-LD ItemList."""
     try:
         url = f"https://www.mediamarkt.com.tr/tr/search.html?query={urllib.parse.quote_plus(query)}"
         headers = {
@@ -973,41 +974,48 @@ def search_mediamarkt(query: str) -> list[dict]:
             return []
         soup = BeautifulSoup(r.text, "html.parser")
         results = []
-        for item in soup.select(".product-wrapper, .product-list-item, [data-test='product-list-item']")[:10]:
-            name_el = item.select_one(".product-title, h2, [class*='title']")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one(".price, [class*='price'], .product-price")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
+        for script in soup.find_all("script", type="application/ld+json"):
             try:
-                price = float(raw)
+                data = json.loads(script.string or "{}")
+                items = data.get("itemListElement", [])
+                if not items:
+                    continue
+                for item in items[:10]:
+                    prod = item.get("item", item)
+                    name = prod.get("name", "")
+                    if not name:
+                        continue
+                    offers = prod.get("offers", {})
+                    if isinstance(offers, list):
+                        offers = offers[0]
+                    try:
+                        price = float(str(offers.get("price", 0)).replace(",", "."))
+                    except Exception:
+                        continue
+                    if price <= 0:
+                        continue
+                    prod_url = prod.get("url", "")
+                    image = prod.get("image", "")
+                    if isinstance(image, list):
+                        image = image[0] if image else ""
+                    results.append({
+                        "title": name, "price": price, "original_price": None,
+                        "image_url": image, "source": "mediamarkt", "url": prod_url,
+                        "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                    })
+                if results:
+                    break
             except Exception:
                 continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.mediamarkt.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "mediamarkt", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
         return results
     except Exception:
         return []
 
 
 def search_teknosa(query: str) -> list[dict]:
-    """Teknosa ürün araması."""
+    """Teknosa ürün araması — JSON-LD ItemList."""
     try:
-        url = f"https://www.teknosa.com/arama/?q={urllib.parse.quote_plus(query)}"
+        url = f"https://www.teknosa.com/arama?q={urllib.parse.quote_plus(query)}"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
             "Accept-Language": "tr-TR,tr;q=0.9",
@@ -1018,32 +1026,41 @@ def search_teknosa(query: str) -> list[dict]:
             return []
         soup = BeautifulSoup(r.text, "html.parser")
         results = []
-        for item in soup.select(".product-item, .prd-item, [class*='product-card']")[:10]:
-            name_el = item.select_one(".product-name, .prd-name, h3, [class*='name']")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one(".product-price, .prd-price, [class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
+        for script in soup.find_all("script", type="application/ld+json"):
             try:
-                price = float(raw)
+                data = json.loads(script.string or "{}")
+                items = data.get("itemListElement", [])
+                if not items:
+                    continue
+                for item in items[:10]:
+                    prod = item.get("item", item)
+                    name = prod.get("name", "")
+                    if not name:
+                        continue
+                    offers = prod.get("offers", {})
+                    if isinstance(offers, list):
+                        offers = offers[0]
+                    try:
+                        price = float(str(offers.get("price", 0)).replace(",", "."))
+                    except Exception:
+                        continue
+                    if price <= 0:
+                        continue
+                    prod_url = prod.get("url", "")
+                    if prod_url and not prod_url.startswith("http"):
+                        prod_url = "https://www.teknosa.com" + prod_url
+                    image = prod.get("image", "")
+                    if isinstance(image, list):
+                        image = image[0] if image else ""
+                    results.append({
+                        "title": name, "price": price, "original_price": None,
+                        "image_url": image, "source": "teknosa", "url": prod_url,
+                        "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                    })
+                if results:
+                    break
             except Exception:
                 continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.teknosa.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "teknosa", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
         return results
     except Exception:
         return []
@@ -2646,6 +2663,7 @@ def search_kitapyurdu(query: str) -> list[dict]:
 
 
 def search_dr(query: str) -> list[dict]:
+    """D&R ürün araması — data-gtm attribute JSON."""
     try:
         url = f"https://www.dr.com.tr/search?q={urllib.parse.quote_plus(query)}"
         headers = {
@@ -2658,32 +2676,32 @@ def search_dr(query: str) -> list[dict]:
             return []
         soup = BeautifulSoup(r.text, "html.parser")
         results = []
-        for item in soup.select(".product-item, [class*='product-card'], .item")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
+        for item in soup.select("[data-gtm]")[:20]:
+            try:
+                gtm = json.loads(item.get("data-gtm", "{}"))
+            except Exception:
+                continue
+            name = gtm.get("item_name", gtm.get("name", ""))
             if not name:
                 continue
-            price_el = item.select_one("[class*='price'], .price")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
             try:
-                price = float(raw)
+                price = float(str(gtm.get("price", 0)).replace(",", "."))
             except Exception:
                 continue
             if price <= 0:
                 continue
             link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
+            href = link_el.get("href", "") if link_el else ""
             prod_url = f"https://www.dr.com.tr{href}" if href.startswith("/") else href
             img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
             results.append({
                 "title": name, "price": price, "original_price": None,
                 "image_url": img, "source": "dr", "url": prod_url,
                 "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
             })
+            if len(results) >= 10:
+                break
         return results
     except Exception:
         return []
