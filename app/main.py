@@ -1621,8 +1621,11 @@ async def find_alternatives(payload: AlternativesRequest):
     # Model kodu: harf ile başlayıp rakam içeren (S24, A54, vb.)
     query_words = re.findall(r'\w+', query.lower())
     query_word_set = set(query_words)
+    # Harf+rakam model kodu: S24, A54, vb. (rakamla başlayanlar hariç)
     model_codes = {w for w in query_words
                    if 2 <= len(w) <= 5 and re.match(r'[a-z]', w) and re.search(r'\d', w)}
+    # Saf rakam model numarası: iPhone 16, PS5 gibi (2 hane: 10-99)
+    digit_models = {w for w in query_words if re.match(r'^\d{2,3}$', w)}
 
     # Varyant anahtar kelimeleri: sorgu yoksa başlıkta olmamalı
     VARIANT_SUFFIXES = {"fe", "plus", "ultra", "pro", "lite", "max", "mini", "neo", "edge", "fold", "flip"}
@@ -1633,15 +1636,16 @@ async def find_alternatives(payload: AlternativesRequest):
         title_words = set(re.findall(r'\w+', (p.get("title") or "").lower()))
         if model_codes and not (model_codes & title_words):
             return False  # S24 aranıyor ama başlıkta s24 yok → at
-        # Sorgu varyantı yoksa başlıkta da olmamalı (fe, ultra, plus…)
+        if digit_models and not (digit_models & title_words):
+            return False  # "16" aranıyor ama başlıkta yok → iPhone 12 at
+        # Varyant filtresi her zaman çalışır (model_codes bağımsız)
         title_variants = VARIANT_SUFFIXES & title_words
         if title_variants - query_variants:
-            return False  # "fe" başlıkta var ama sorguda yok → at
+            return False  # "plus" başlıkta var ama sorguda yok → at
         return True
 
-    # Önce aynı modeli filtrele, sonra relevans sırala
-    if model_codes:
-        products = [p for p in products if is_same_model(p)]
+    # Her zaman filtrele (model_codes boş olsa bile variant filtresi çalışsın)
+    products = [p for p in products if is_same_model(p)]
 
     def relevance(p: dict) -> float:
         title_lower = (p.get("title") or "").lower()
