@@ -461,32 +461,56 @@ async def scan_worker(query: str, category: str, fallback: bool = False) -> list
     return filtered_products
 
 async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
-    """Paralel arama — sadece çalışan kaynaklar (Vercel 10s limiti)."""
+    """Paralel arama — çalışan kaynaklar (Vercel 10s limiti)."""
     loop = asyncio.get_running_loop()
-    from app.comparator import search_n11_direct, search_amazon_tr
+    from app.comparator import (
+        search_n11_direct, search_amazon_tr,
+        search_mediamarkt, search_teknosa, search_ebebek,
+        search_yargici, search_vivense, search_evidea,
+        search_kinetix,
+    )
 
     category = classify_intent(query)
 
-    n11_task = loop.run_in_executor(None, search_n11_direct, query)
-    amz_task = loop.run_in_executor(None, search_amazon_tr, query)
+    # Temel görevler — her aramada çalıştır
+    base_tasks = [
+        loop.run_in_executor(None, search_n11_direct, query),
+        loop.run_in_executor(None, search_amazon_tr, query),
+        loop.run_in_executor(None, search_mediamarkt, query),
+        loop.run_in_executor(None, search_teknosa, query),
+    ]
 
-    results_raw = await asyncio.gather(n11_task, amz_task, return_exceptions=True)
+    # Kategoriye göre ek görevler
+    extra_tasks = []
+    if category in ("BEBEK",):
+        extra_tasks.append(loop.run_in_executor(None, search_ebebek, query))
+    if category in ("MOBİLYA", "EV"):
+        extra_tasks.append(loop.run_in_executor(None, search_vivense, query))
+        extra_tasks.append(loop.run_in_executor(None, search_evidea, query))
+    if category in ("MODA", "SPOR"):
+        extra_tasks.append(loop.run_in_executor(None, search_yargici, query))
+        extra_tasks.append(loop.run_in_executor(None, search_kinetix, query))
 
-    n11_raw  = results_raw[0] if not isinstance(results_raw[0], Exception) else ([], "")
-    amz_raw  = results_raw[1] if not isinstance(results_raw[1], Exception) else []
-
-    n11_products = n11_raw[0] if isinstance(n11_raw, tuple) else (n11_raw if isinstance(n11_raw, list) else [])
-    amz_products = amz_raw if isinstance(amz_raw, list) else []
+    all_tasks = base_tasks + extra_tasks
+    results_raw = await asyncio.gather(*all_tasks, return_exceptions=True)
 
     all_products = []
     seen_urls = set()
-    for p in n11_products + amz_products:
-        url_clean = p.get("url", "").split("?")[0].strip()
-        if url_clean and url_clean in seen_urls:
+    for res in results_raw:
+        if isinstance(res, Exception):
             continue
-        if url_clean:
-            seen_urls.add(url_clean)
-        all_products.append(p)
+        # N11 returns tuple (products, query_str)
+        if isinstance(res, tuple):
+            res = res[0] if res else []
+        if not isinstance(res, list):
+            continue
+        for p in res:
+            url_clean = p.get("url", "").split("?")[0].strip()
+            if url_clean and url_clean in seen_urls:
+                continue
+            if url_clean:
+                seen_urls.add(url_clean)
+            all_products.append(p)
 
     return all_products
 

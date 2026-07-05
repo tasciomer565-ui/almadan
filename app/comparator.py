@@ -2799,6 +2799,7 @@ def search_bebek(query: str) -> list[dict]:
 
 
 def search_ebebek(query: str) -> list[dict]:
+    """e-bebek ürün araması — JSON-LD ItemList."""
     try:
         url = f"https://www.ebebek.com/search?q={urllib.parse.quote_plus(query)}"
         headers = {
@@ -2811,32 +2812,39 @@ def search_ebebek(query: str) -> list[dict]:
             return []
         soup = BeautifulSoup(r.text, "html.parser")
         results = []
-        for item in soup.select(".product-item, [class*='product-card']")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True)
-            raw = re.sub(r"[^\d,.]", "", raw).replace(",", ".")
+        for script in soup.find_all("script", type="application/ld+json"):
             try:
-                price = float(raw.split(".")[0] + ("." + raw.split(".")[-1] if raw.count(".") == 1 else ""))
+                data = json.loads(script.string or "{}")
+                items = data.get("itemListElement", [])
+                if not items:
+                    continue
+                for item in items[:10]:
+                    prod = item.get("item", item)
+                    name = prod.get("name", "")
+                    if not name:
+                        continue
+                    offers = prod.get("offers", {})
+                    if isinstance(offers, list):
+                        offers = offers[0]
+                    try:
+                        price = float(str(offers.get("price", 0)).replace(",", "."))
+                    except Exception:
+                        continue
+                    if price <= 0:
+                        continue
+                    prod_url = prod.get("url", "")
+                    image = prod.get("image", "")
+                    if isinstance(image, list):
+                        image = image[0] if image else ""
+                    results.append({
+                        "title": name, "price": price, "original_price": None,
+                        "image_url": image, "source": "ebebek", "url": prod_url,
+                        "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                    })
+                if results:
+                    break
             except Exception:
                 continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.ebebek.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "ebebek", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
         return results
     except Exception:
         return []
@@ -3197,8 +3205,9 @@ def search_evidea(query: str) -> list[dict]:
 
 
 def search_vivense(query: str) -> list[dict]:
+    """Vivense ürün araması — data-product-name/price attribute."""
     try:
-        url = f"https://www.vivense.com/arama?q={urllib.parse.quote_plus(query)}"
+        url = f"https://www.vivense.com/ara?q={urllib.parse.quote_plus(query)}"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
             "Accept-Language": "tr-TR,tr;q=0.9",
@@ -3209,24 +3218,17 @@ def search_vivense(query: str) -> list[dict]:
             return []
         soup = BeautifulSoup(r.text, "html.parser")
         results = []
-        for item in soup.select(".product-item, [class*='product-card'], [class*='ProductCard']")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
+        for item in soup.select("[data-product-name][data-product-price]")[:10]:
+            name = item.get("data-product-name", "")
             if not name:
                 continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True)
-            raw = re.sub(r"[^\d,.]", "", raw).replace(",", ".")
             try:
-                price = float(raw.split(".")[0] + ("." + raw.split(".")[-1] if raw.count(".") == 1 else ""))
+                price = float(str(item.get("data-product-price", "0")).replace(",", "."))
             except Exception:
                 continue
             if price <= 0:
                 continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
+            href = item.get("data-url", "")
             prod_url = f"https://www.vivense.com{href}" if href.startswith("/") else href
             img_el = item.select_one("img")
             img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
@@ -5750,8 +5752,9 @@ def search_damattween(query: str) -> list[dict]:
 
 
 def search_yargici(query: str) -> list[dict]:
+    """Yargıcı ürün araması — JSON-LD ItemList."""
     try:
-        url = f"https://www.yargici.com.tr/search?q={urllib.parse.quote_plus(query)}"
+        url = f"https://www.yargici.com/search?q={urllib.parse.quote_plus(query)}"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
             "Accept-Language": "tr-TR,tr;q=0.9",
@@ -5762,27 +5765,39 @@ def search_yargici(query: str) -> list[dict]:
             return []
         soup = BeautifulSoup(r.text, "html.parser")
         results = []
-        for item in soup.select(".product-item, [class*='product-card'], [class*='ProductCard']")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price")
-            if not price_el:
-                continue
-            raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
+        for script in soup.find_all("script", type="application/ld+json"):
             try:
-                price = float(raw)
+                data = json.loads(script.string or "{}")
+                items = data.get("itemListElement", [])
+                if not items:
+                    continue
+                for item in items[:10]:
+                    prod = item.get("item", item)
+                    name = prod.get("name", "")
+                    if not name:
+                        continue
+                    offers = prod.get("offers", {})
+                    if isinstance(offers, list):
+                        offers = offers[0]
+                    try:
+                        price = float(str(offers.get("price", 0)).replace(",", "."))
+                    except Exception:
+                        continue
+                    if price <= 0:
+                        continue
+                    prod_url = prod.get("url", "")
+                    image = prod.get("image", "")
+                    if isinstance(image, list):
+                        image = image[0] if image else ""
+                    results.append({
+                        "title": name, "price": price, "original_price": None,
+                        "image_url": image, "source": "yargici", "url": prod_url,
+                        "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                    })
+                if results:
+                    break
             except Exception:
                 continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.yargici.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({"title": name, "price": price, "original_price": None, "image_url": img, "source": "yargici", "url": prod_url, "labels": ["Önerilen"], "extra_info": {"out_of_stock": False}})
         return results
     except Exception:
         return []
@@ -6128,6 +6143,58 @@ def search_petbis(query: str) -> list[dict]:
             img_el = item.select_one("img")
             img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
             results.append({"title": name, "price": price, "original_price": None, "image_url": img, "source": "petbis", "url": prod_url, "labels": ["Önerilen"], "extra_info": {"out_of_stock": False}})
+        return results
+    except Exception:
+        return []
+
+
+def search_kinetix(query: str) -> list[dict]:
+    """Kinetix ürün araması — JSON-LD ItemList (ikinci script)."""
+    try:
+        url = f"https://www.kinetix.com.tr/search?q={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for script in soup.find_all("script", type="application/ld+json"):
+            try:
+                data = json.loads(script.string or "{}")
+                if data.get("@type") != "ItemList":
+                    continue
+                items = data.get("itemListElement", [])
+                for item in items[:10]:
+                    prod = item.get("item", item)
+                    name = prod.get("name", "")
+                    if not name:
+                        continue
+                    offers = prod.get("offers", {})
+                    if isinstance(offers, list):
+                        offers = offers[0]
+                    try:
+                        price = float(str(offers.get("price", 0)).replace(",", "."))
+                    except Exception:
+                        continue
+                    if price <= 0:
+                        continue
+                    prod_url = prod.get("url", "")
+                    image = prod.get("image", "")
+                    if isinstance(image, list):
+                        image = image[0] if image else ""
+                    results.append({
+                        "title": name, "price": price, "original_price": None,
+                        "image_url": image, "source": "kinetix", "url": prod_url,
+                        "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                    })
+                if results:
+                    break
+            except Exception:
+                continue
         return results
     except Exception:
         return []

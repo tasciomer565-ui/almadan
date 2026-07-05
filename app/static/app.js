@@ -94,6 +94,7 @@ const STORE_BRANDS = {
   altinyildiz:     { name: "Altınyıldız",    color: "#1a1a1a", bg: "rgba(26,26,26,0.06)",   logo: "AY" },
   derimod:         { name: "Derimod",        color: "#5d4037", bg: "rgba(93,64,55,0.08)",   logo: "DM" },
   lescon:          { name: "Lescon",         color: "#e53935", bg: "rgba(229,57,53,0.08)",  logo: "LC" },
+  kinetix:         { name: "Kinetix",        color: "#0066cc", bg: "rgba(0,102,204,0.08)",  logo: "KX" },
   namet:           { name: "Namet",          color: "#c62828", bg: "rgba(198,40,40,0.08)",  logo: "NM" },
   dardanel:        { name: "Dardanel",       color: "#0d47a1", bg: "rgba(13,71,161,0.08)",  logo: "DD" },
   shein:           { name: "Shein",          color: "#222222", bg: "rgba(34,34,34,0.06)",   logo: "SH" },
