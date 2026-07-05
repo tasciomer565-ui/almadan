@@ -1214,7 +1214,7 @@ function renderDeals() {
       : "";
     const forecast = product.discount_forecast;
     const forecastBadge = forecast?.status === "ready"
-      ? `<span class="forecast-chip">%${forecast.probability} Â· 7 gün</span>`
+      ? `<span class="forecast-chip">%${forecast.probability} · 7 gün</span>`
       : `<span class="forecast-chip muted">Tahmin hazırlanıyor</span>`;
     return `
     <article class="deal-card">
@@ -1249,15 +1249,21 @@ function renderTracking() {
 
   list.innerHTML = state.products.map((product) => {
     const firstPrice = product.price_history[0]?.price || product.current_price;
-    const difference = Math.max(0, firstPrice - product.current_price);
+    const difference = firstPrice - product.current_price;
+    const diffPercent = firstPrice > 0 ? ((difference / firstPrice) * 100).toFixed(1) : 0;
     const discountPercent = product.discount_analysis?.discount_percent || 0;
     const forecast = product.discount_forecast;
+    const priceChangeHtml = difference > 0.5
+      ? `<span class="price-change-down">▼ %${diffPercent} düştü</span>`
+      : difference < -0.5
+        ? `<span class="price-change-up">▲ %${Math.abs(diffPercent)} arttı</span>`
+        : `<span style="font-size:11px; color:var(--ink-2);">Değişmedi</span>`;
     return `
       <button class="tracking-item" onclick="openProduct('${product.id}')">
         <span class="tracking-thumb">${productImage(product)}</span>
         <span class="tracking-copy">
           <h3>${escapeHtml(product.title)}</h3>
-          <p>${escapeHtml(product.source)} Â· ${product.price_history.length} fiyat kaydı</p>
+          <p>${escapeHtml(product.source)} · ${product.price_history.length} fiyat kaydı</p>
           <span class="check-status">
             <span class="status-dot ${escapeHtml(product.last_check_status || "pending")}"></span>
             ${escapeHtml(checkStatusText(product))}
@@ -1577,7 +1583,7 @@ async function parseProduct(event) {
   const progressText = document.getElementById("quantumScanProgress");
   if (overlay) overlay.style.display = "flex";
   if (progressText) {
-    progressText.innerText = "Sizin için en uygun fırsatları ve ürünleri inceliyoruz...";
+    progressText.innerText = "Ürün bilgilerini getiriyoruz...";
   }
 
   // 2. Arama işlemini asenkron olarak bir sonraki frame'de başlat
@@ -2276,7 +2282,16 @@ async function findAlternativeSellers(parsed) {
     const alts = data.alternatives || [];
 
     if (alts.length === 0) {
-      container.innerHTML = `<p style="font-size:12px; color:#a0aab0; margin:0; text-align:center;">Alternatif satıcı bulunamadı.</p>`;
+      const links = data.search_links || [];
+      if (links.length) {
+        container.innerHTML = `
+          <p style="font-size:12px; color:#a0aab0; margin:0 0 8px; text-align:center;">Otomatik eşleşme bulunamadı — bu mağazalarda arayabilirsin:</p>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center;">
+            ${links.map(l => `<a href="${escapeHtml(l.url)}" target="_blank" rel="noopener" style="font-size:12px; padding:6px 10px; border:1px solid var(--border); border-radius:8px; text-decoration:none; color:var(--ink); font-weight:600;">🔎 ${escapeHtml(l.label)}</a>`).join("")}
+          </div>`;
+      } else {
+        container.innerHTML = `<p style="font-size:12px; color:#a0aab0; margin:0; text-align:center;">Alternatif satıcı bulunamadı.</p>`;
+      }
       return;
     }
 
@@ -2742,7 +2757,7 @@ function openProduct(id) {
         <span class="price">${currency.format(product.current_price)}</span>
         <span class="verdict">${escapeHtml(product.verdict)}</span>
       </div>
-      <p class="source-name">En düşük ${currency.format(lowest)} Â· En yüksek ${currency.format(highest)}</p>
+      <p class="source-name">En düşük ${currency.format(lowest)} · En yüksek ${currency.format(highest)}</p>
 
       <!-- Fiyat Geçmişi Grafiği -->
       <div class="price-chart-container" style="margin: 18px 0; padding: 12px; background: #fbfcf9; border: 1px solid var(--line); border-radius: 6px;">
@@ -5895,6 +5910,8 @@ async function showSellerSelectionDialog(parsed) {
       body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url, source: parsed.source, image_url: parsed.image_url })
     });
     let alts = data.alternatives || [];
+    // alts aynı diziye referans — mutasyonlardan ÖNCE backend sonuç sayısını sakla
+    const backendAltCount = alts.length;
 
     // İlk taramada yakalanan satıcılar varsa birleştir
     if (parsed.extra_info && parsed.extra_info.otherMerchants) {
@@ -5921,11 +5938,18 @@ async function showSellerSelectionDialog(parsed) {
     }
 
     if (alts.length === 0) {
+      const links = data.search_links || [];
+      const linksHtml = links.length ? `
+        <p style="font-size:13px; color:var(--ink-2); margin:16px 0 10px; text-align:left;">Bu mağazalarda kendin aramaya devam edebilirsin:</p>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          ${links.map(l => `<a href="${escapeHtml(l.url)}" target="_blank" rel="noopener" style="display:flex; justify-content:space-between; align-items:center; padding:11px 14px; border:1.5px solid var(--border); border-radius:10px; text-decoration:none; color:var(--ink); font-weight:600; font-size:14px;"><span>🔎 ${escapeHtml(l.label)}</span><span style="color:#287a50;">→</span></a>`).join("")}
+        </div>` : "";
       content.innerHTML = `
-        <div style="text-align:center; padding: 30px 20px;">
-          <h3 style="margin:0 0 12px 0; font-size:18px; font-weight:800; color:var(--ink);">Başka Satıcı Bulunamadı</h3>
-          <p style="font-size:13px; color:var(--ink-2); margin-bottom:24px;">Bu ürün şu anda sadece tek bir satıcıda (<strong style="color:var(--ink);">${escapeHtml(parsed.source || "Bilinmiyor")}</strong>) satılıyor veya diğer satıcılar gizlenmiş.</p>
-          <button class="primary-button" style="width:100%; border-radius:10px; padding:12px; font-weight:700;" data-parsed='${escapeHtml(JSON.stringify(parsed))}' onclick="document.getElementById('sellerSelectionDialog').close(); showParsedProduct(JSON.parse(this.getAttribute('data-parsed')));">
+        <div style="text-align:center; padding: 24px 20px;">
+          <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:800; color:var(--ink);">Otomatik Eşleşme Bulunamadı</h3>
+          <p style="font-size:13px; color:var(--ink-2);">Bu ürünü diğer mağazalarda otomatik bulamadık.</p>
+          ${linksHtml}
+          <button class="primary-button" style="width:100%; border-radius:10px; padding:12px; font-weight:700; margin-top:16px;" data-parsed='${escapeHtml(JSON.stringify(parsed))}' onclick="document.getElementById('sellerSelectionDialog').close(); showParsedProduct(JSON.parse(this.getAttribute('data-parsed')));">
             Mevcut Ürünü Takip Et
           </button>
         </div>
@@ -5981,6 +6005,15 @@ async function showSellerSelectionDialog(parsed) {
     });
 
     listHtml += `</div>`;
+    // Backend hiç alternatif bulamadıysa (sadece orijinal ürün varsa) arama linklerini de göster
+    const fallbackLinks = data.search_links || [];
+    if (backendAltCount === 0 && fallbackLinks.length) {
+      listHtml += `
+        <p style="font-size:13px; color:var(--ink-2); margin:16px 0 10px;">Bu mağazalarda kendin aramaya devam edebilirsin:</p>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          ${fallbackLinks.map(l => `<a href="${escapeHtml(l.url)}" target="_blank" rel="noopener" style="display:flex; justify-content:space-between; align-items:center; padding:11px 14px; border:1.5px solid var(--border); border-radius:10px; text-decoration:none; color:var(--ink); font-weight:600; font-size:14px;"><span>🔎 ${escapeHtml(l.label)}</span><span style="color:#287a50;">→</span></a>`).join("")}
+        </div>`;
+    }
     content.innerHTML = listHtml;
 
   } catch(e) {

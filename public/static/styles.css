@@ -3116,3 +3116,142 @@ body.dark-theme .quantum-node-card {
 }
 .link-hint-btn:hover { color: var(--green); }
 .link-hint-btn svg { width: 13px; height: 13px; }
+
+/* ── Mağaza Karşılaştırma Grid ──────────────────────────────────────────── */
+.price-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.price-compare-card {
+  position: relative;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+  background: var(--surface);
+  transition: all .15s;
+}
+
+.price-compare-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,.08);
+}
+
+.price-compare-card.cheapest {
+  border-color: #287a50;
+  background: rgba(40,122,80,.04);
+}
+
+.price-compare-cheapest-tag {
+  position: absolute;
+  top: -1px; left: 12px;
+  background: #287a50;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 0 0 6px 6px;
+  letter-spacing: .3px;
+}
+
+/* ── Store logo chip ─────────────────────────────────────────────────────── */
+.store-logo-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-weight: 900;
+  font-family: "Manrope", sans-serif;
+  flex-shrink: 0;
+}
+
+/* ── Dark mode bg-card ───────────────────────────────────────────────────── */
+body.dark-theme {
+  --surface: #1a1e1a;
+  --bg-card: #1a1e1a;
+  --paper: #111411;
+  --line: #2a2e2a;
+  --border: #2a2e2a;
+  --ink: #eceeed;
+  --ink-2: #8a9289;
+}
+
+/* ── Mobile hero tweaks ──────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  h1 { font-size: 30px; }
+  .intro-band { padding: 36px 5vw 32px; }
+  .intro-copy { font-size: 15px; }
+  .price-compare-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Satıcı Seçim Dialog - Dark Mode ─────────────────────────────────────── */
+body.dark-theme #sellerSelectionDialog {
+  background: var(--bg-card, #1a1e1a);
+  border-color: var(--line, #2a2e2a);
+  color: var(--ink, #eceeed);
+}
+
+body.dark-theme #sellerSelectionDialog .price-chart-container {
+  background: #111411 !important;
+}
+
+body.dark-theme .price-chart-container {
+  background: #181c18 !important;
+  border-color: var(--line) !important;
+}
+
+/* ── Fiyat Karşılaştırma İyileştirme ─────────────────────────────────────── */
+.seller-card-cheapest {
+  border: 2px solid var(--green) !important;
+  background: var(--green-bg) !important;
+  position: relative;
+}
+
+.seller-card-cheapest::before {
+  content: "EN UCUZ";
+  position: absolute;
+  top: -1px; left: 12px;
+  background: var(--green);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 0 0 6px 6px;
+  letter-spacing: .5px;
+}
+
+/* ── Fiyat Değişim Rozeti ─────────────────────────────────────────────────── */
+.price-change-up {
+  color: #e53e3e;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.price-change-down {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ── Yükleme Ekranı İyileştirmesi ─────────────────────────────────────────── */
+#quantumScanOverlay h3 {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -.3px;
+}
+
+#quantumScanProgress {
+  font-size: 14px;
+  color: var(--ink-2);
+  margin-top: 8px;
+  animation: fadeText 2s ease infinite;
+}
+
+@keyframes fadeText {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .6; }
+}
