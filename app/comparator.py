@@ -2733,22 +2733,24 @@ def search_evidea(query: str) -> list[dict]:
         if not r.ok:
             return []
         soup = BeautifulSoup(r.text, "html.parser")
+        # Evidea araması gevşek eşleşiyor (koltuk → halı/koltuk yıkama makinesi);
+        # tüm sorgu kelimeleri başlıkta geçmeli (TR karakterler normalize edilir)
+        _tr = str.maketrans("şğıöüçâî", "sgioucai")
+        query_words = {w for w in re.findall(r"\w+", query.lower().translate(_tr)) if len(w) > 2}
         results = []
         for item in soup.select(".product-item, [class*='product-card'], [class*='ProductCard']")[:10]:
             name_el = item.select_one("[class*='name'], [class*='title'], h3")
             name = name_el.get_text(strip=True) if name_el else ""
             if not name:
                 continue
+            title_words = set(re.findall(r"\w+", name.lower().translate(_tr)))
+            if query_words and not query_words.issubset(title_words):
+                continue
             price_el = item.select_one("[class*='price']")
             if not price_el:
                 continue
-            raw = price_el.get_text(strip=True)
-            raw = re.sub(r"[^\d,.]", "", raw).replace(",", ".")
-            try:
-                price = float(raw.split(".")[0] + ("." + raw.split(".")[-1] if raw.count(".") == 1 else ""))
-            except Exception:
-                continue
-            if price <= 0:
+            price = parse_price(price_el.get_text(strip=True))
+            if not price or price <= 0:
                 continue
             link_el = item.select_one("a[href]")
             href = link_el.get("href", "") if link_el else ""

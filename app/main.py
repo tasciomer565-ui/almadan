@@ -1361,6 +1361,16 @@ def home() -> Response:
     return RedirectResponse("/index.html", status_code=307)
 
 
+@app.get("/hakkinda", include_in_schema=False)
+@app.get("/gizlilik", include_in_schema=False)
+@app.get("/iletisim", include_in_schema=False)
+def static_page(request: Request) -> Response:
+    page_file = STATIC_DIR / f"{request.url.path.strip('/')}.html"
+    if page_file.is_file():
+        return FileResponse(page_file, media_type="text/html; charset=utf-8")
+    return RedirectResponse("/", status_code=307)
+
+
 @app.get("/products")
 def list_products(
     request: Request,
@@ -1617,6 +1627,9 @@ async def find_alternatives(payload: AlternativesRequest):
 
     # Defensive: filter out non-dict entries (corrupt cache data)
     products = [p for p in products if isinstance(p, dict)]
+
+    # Fiyatı olmayan/0 olan sonuçlar karşılaştırmada işe yaramaz
+    products = [p for p in products if (p.get("price") or 0) > 0]
 
     # Model kodu: harf ile başlayıp rakam içeren (S24, A54, vb.)
     query_words = re.findall(r'\w+', query.lower())
