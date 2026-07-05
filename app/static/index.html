@@ -648,7 +648,7 @@
       </div>
     </dialog>
 
-    <script defer src="/static/app.js?v=20260705-relevance-fix"></script>
+    <script defer src="/static/app.js?v=20260706-search-links-2"></script>
     <script>
       /* Sprint 12 — auth fix: DOMContentLoaded sonrasi state.auth guncelle */
       document.addEventListener('DOMContentLoaded', function() {
@@ -1058,6 +1058,8 @@
             }).then(function(r){ return r.json(); });
 
             var alts = (faResp.alternatives || []);
+            /* alts aynı diziye referans — mutasyonlardan ÖNCE backend sonuç sayısını sakla */
+            var backendAltCount = alts.length;
 
             /* Trendyol / diğer satıcılar parsed içinden */
             if (parsed.extra_info && parsed.extra_info.otherMerchants) {
@@ -1101,11 +1103,26 @@
             alts.forEach(function(a){ var r = parseFloat((a.extra_info||{}).rating||0); if(r>maxRating) maxRating=r; });
             var maxRatingItem = maxRating >= 8.5 ? alts.find(function(a){ return parseFloat((a.extra_info||{}).rating||0) === maxRating; }) : null;
 
+            /* Hazır mağaza arama linkleri — kullanıcı asla eli boş dönmesin */
+            var links = (faResp.search_links || []);
+            var linksHtml = '';
+            if (links.length) {
+              linksHtml = '<p style="font-size:13px;color:var(--ink-2);margin:16px 0 10px;">Bu mağazalarda kendin aramaya devam edebilirsin:</p>'
+                + '<div style="display:flex;flex-direction:column;gap:8px;">'
+                + links.map(function(l){
+                    return '<a href="' + l.url.replace(/"/g,'&quot;') + '" target="_blank" rel="noopener" '
+                      + 'style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;text-decoration:none;color:var(--ink);font-weight:600;font-size:14px;">'
+                      + '<span>🔎 ' + l.label + '</span><span style="color:var(--green);">→</span></a>';
+                  }).join('')
+                + '</div>';
+            }
+
             if (alts.length === 0) {
-              content.innerHTML = '<div style="text-align:center;padding:30px 20px;">'
-                + '<p style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:12px;">Başka Satıcı Bulunamadı</p>'
-                + '<p style="font-size:13px;color:var(--ink-2);margin-bottom:20px;">Bu ürün yalnızca tek satıcıda görünüyor.</p>'
-                + '<button type="button" class="primary-button" style="width:100%;border-radius:10px;padding:12px;font-weight:700;" data-p=\'' + JSON.stringify(parsed).replace(/'/g,'&#39;') + '\' onclick="document.getElementById(\'sellerSelectionDialog\').close(); showParsedProduct(JSON.parse(this.getAttribute(\'data-p\')));"> Mevcut Ürünü Takip Et</button>'
+              content.innerHTML = '<div style="text-align:center;padding:24px 20px;">'
+                + '<p style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:8px;">Otomatik Eşleşme Bulunamadı</p>'
+                + '<p style="font-size:13px;color:var(--ink-2);margin-bottom:4px;">Bu ürünü diğer mağazalarda otomatik bulamadık.</p>'
+                + '<div style="text-align:left;">' + linksHtml + '</div>'
+                + '<button type="button" class="primary-button" style="width:100%;border-radius:10px;padding:12px;font-weight:700;margin-top:16px;" data-p=\'' + JSON.stringify(parsed).replace(/'/g,'&#39;') + '\' onclick="document.getElementById(\'sellerSelectionDialog\').close(); showParsedProduct(JSON.parse(this.getAttribute(\'data-p\')));"> Mevcut Ürünü Takip Et</button>'
                 + '</div>';
               return;
             }
@@ -1148,6 +1165,10 @@
             });
 
             html += '</div>';
+            /* Backend hiç alternatif bulamadıysa (sadece orijinal ürün varsa) arama linklerini de göster */
+            if (backendAltCount === 0 && linksHtml) {
+              html += '<div style="margin-top:4px;">' + linksHtml + '</div>';
+            }
             content.innerHTML = html;
 
           } catch(err) {

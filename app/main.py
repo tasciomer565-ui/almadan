@@ -1382,21 +1382,58 @@ async def find_alternatives(payload: AlternativesRequest):
 
     # Her kaynaktan en fazla 3 ürün al (tekrarlayan mağazaları sınırla)
     from collections import defaultdict
-    source_count: dict[str, int] = defaultdict(int)
-    deduped = []
-    seen_urls: set[str] = set()
-    for p in products:
-        url_key = (p.get("url") or "").split("?")[0]
-        if url_key in seen_urls:
-            continue
-        seen_urls.add(url_key)
-        src = p.get("source", "other")
-        if source_count[src] < 3:
-            deduped.append(p)
-            source_count[src] += 1
+
+    def _dedup(items: list[dict]) -> list[dict]:
+        source_count: dict[str, int] = defaultdict(int)
+        out = []
+        seen: set[str] = set()
+        for p in items:
+            url_key = (p.get("url") or "").split("?")[0]
+            if url_key in seen:
+                continue
+            seen.add(url_key)
+            src_key = p.get("source", "other")
+            if source_count[src_key] < 3:
+                out.append(p)
+                source_count[src_key] += 1
+        return out
+
+    deduped = _dedup(products)
+
+    # 2. deneme: hiç sonuç yoksa sorguyu kısaltıp tekrar ara (marka + model genelde ilk 3 kelime)
+    if not deduped:
+        retry_query = " ".join(query.split()[:3])
+        if retry_query and retry_query != query:
+            try:
+                if forced_category:
+                    retry_products = await marketplace_scan(retry_query, forced_category=forced_category)
+                else:
+                    retry_products = await master_search(retry_query)
+                retry_products = [p for p in retry_products
+                                  if isinstance(p, dict) and (p.get("price") or 0) > 0]
+                retry_products = [p for p in retry_products
+                                  if is_logical_product(query, p.get("title", "")) and is_same_model(p)]
+                retry_products.sort(key=lambda p: (-relevance(p), p.get("price") or 0))
+                deduped = _dedup(retry_products)
+            except Exception:
+                pass
+
+    # Son çare: hazır mağaza arama linkleri — kullanıcı hiçbir zaman eli boş dönmesin
+    search_links = []
+    if not deduped:
+        from urllib.parse import quote_plus
+        q_enc = quote_plus(query)
+        search_links = [
+            {"source": "trendyol", "label": "Trendyol'da ara", "url": f"https://www.trendyol.com/sr?q={q_enc}"},
+            {"source": "hepsiburada", "label": "Hepsiburada'da ara", "url": f"https://www.hepsiburada.com/ara?q={q_enc}"},
+            {"source": "amazon", "label": "Amazon'da ara", "url": f"https://www.amazon.com.tr/s?k={q_enc}"},
+            {"source": "n11", "label": "N11'de ara", "url": f"https://www.n11.com/arama?q={q_enc}"},
+            {"source": "google", "label": "Google Shopping'de ara", "url": f"https://www.google.com/search?tbm=shop&q={q_enc}"},
+        ]
 
     return {
-        "alternatives": deduped[:20]
+        "alternatives": deduped[:20],
+        "search_links": search_links,
     }
 
 
