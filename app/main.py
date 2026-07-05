@@ -1540,9 +1540,9 @@ async def find_alternatives(payload: AlternativesRequest):
     FASHION_SOURCES = {"lcwaikiki","defacto","koton","mavi","zara","bershka","boyner","yargici",
                        "hm","flo","kinetix","adidas","nike","reebok","puma","lescon","superstep",
                        "mango","ipekyol","twist","ltb","colins","kigili","sarar","altinyildiz",
-                       "derimod","damat","vakko","beymen"}
-    TECH_SOURCES = {"mediamarkt","teknosa","vatanbilgisayar","itopya","amazon","hepsiburada",
-                    "n11","casper","huawei","samsung","lg","sony","apple","xiaomi"}
+                       "derimod","damat","vakko","beymen","instreet","deichmann","ayakkabidunyasi"}
+    TECH_SOURCES = {"mediamarkt","teknosa","vatanbilgisayar","itopya","casper","huawei",
+                    "samsung","lg","sony","apple","xiaomi","asus","lenovo"}
     HOME_SOURCES = {"evidea","vivense","karaca","englishhome","ikea","koctas","madamecoco"}
     BABY_SOURCES = {"ebebek"}
 
@@ -1556,7 +1556,10 @@ async def find_alternatives(payload: AlternativesRequest):
     elif src in BABY_SOURCES:
         forced_category = "BEBEK"
     else:
-        forced_category = None
+        # Pazaryerleri (trendyol, hepsiburada, amazon, n11) için ürün başlığından kategori tahmin et
+        from app.search_orchestrator import classify_intent
+        title_category = classify_intent(payload.title)
+        forced_category = title_category if title_category != "GENEL" else None
 
     # Başlığı temizle ve kısa bir arama sorgusuna dönüştür
     cleaned = re.sub(r'[^\w\s]', ' ', payload.title)
