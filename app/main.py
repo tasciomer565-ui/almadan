@@ -1618,13 +1618,30 @@ async def find_alternatives(payload: AlternativesRequest):
     # Defensive: filter out non-dict entries (corrupt cache data)
     products = [p for p in products if isinstance(p, dict)]
 
-    # İlgililik skoru: model numarası eşleşmesini güçlü şekilde ağırlıklandır
+    # Model kodu: harf ile başlayıp rakam içeren (S24, A54, vb.)
     query_words = re.findall(r'\w+', query.lower())
     query_word_set = set(query_words)
-    # Model kodu: harf ile başlayıp rakam içeren (S24, A54, vb.)
-    # Rakamla başlayanları (8gb, 256gb) dışla — bunlar spec, model numarası değil
     model_codes = {w for w in query_words
                    if 2 <= len(w) <= 5 and re.match(r'[a-z]', w) and re.search(r'\d', w)}
+
+    # Varyant anahtar kelimeleri: sorgu yoksa başlıkta olmamalı
+    VARIANT_SUFFIXES = {"fe", "plus", "ultra", "pro", "lite", "max", "mini", "neo", "edge", "fold", "flip"}
+    query_variants = VARIANT_SUFFIXES & query_word_set
+
+    def is_same_model(p: dict) -> bool:
+        """Model kodu varsa başlıkta geçmeli; sorgu varyantı yoksa başlıkta da olmamalı."""
+        title_words = set(re.findall(r'\w+', (p.get("title") or "").lower()))
+        if model_codes and not (model_codes & title_words):
+            return False  # S24 aranıyor ama başlıkta s24 yok → at
+        # Sorgu varyantı yoksa başlıkta da olmamalı (fe, ultra, plus…)
+        title_variants = VARIANT_SUFFIXES & title_words
+        if title_variants - query_variants:
+            return False  # "fe" başlıkta var ama sorguda yok → at
+        return True
+
+    # Önce aynı modeli filtrele, sonra relevans sırala
+    if model_codes:
+        products = [p for p in products if is_same_model(p)]
 
     def relevance(p: dict) -> float:
         title_lower = (p.get("title") or "").lower()
