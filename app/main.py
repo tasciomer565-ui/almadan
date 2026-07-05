@@ -798,6 +798,8 @@ class ProductCreate(BaseModel):
 class AlternativesRequest(BaseModel):
     title: str
     original_url: str | None = None
+    source: str | None = None
+    image_url: str | None = None
 
 class ReviewCreateRequest(BaseModel):
     user_name: str | None = "Anonim Kullanıcı"
@@ -1531,16 +1533,41 @@ def parse_url(payload: UrlParseRequest) -> dict:
 
 @app.post("/api/find-alternatives")
 async def find_alternatives(payload: AlternativesRequest):
-    from app.search_orchestrator import master_search
+    from app.search_orchestrator import master_search, marketplace_scan
     import re
-    
+
+    # Kaynak mağazadan kategori tahmini
+    FASHION_SOURCES = {"lcwaikiki","defacto","koton","mavi","zara","bershka","boyner","yargici",
+                       "hm","flo","kinetix","adidas","nike","reebok","puma","lescon","superstep",
+                       "mango","ipekyol","twist","ltb","colins","kigili","sarar","altinyildiz",
+                       "derimod","damat","vakko","beymen"}
+    TECH_SOURCES = {"mediamarkt","teknosa","vatanbilgisayar","itopya","amazon","hepsiburada",
+                    "n11","casper","huawei","samsung","lg","sony","apple","xiaomi"}
+    HOME_SOURCES = {"evidea","vivense","karaca","englishhome","ikea","koctas","madamecoco"}
+    BABY_SOURCES = {"ebebek"}
+
+    src = (payload.source or "").lower()
+    if src in FASHION_SOURCES:
+        forced_category = "MODA"
+    elif src in TECH_SOURCES:
+        forced_category = "TEKNOLOJİ"
+    elif src in HOME_SOURCES:
+        forced_category = "EV"
+    elif src in BABY_SOURCES:
+        forced_category = "BEBEK"
+    else:
+        forced_category = None
+
     # Başlığı temizle ve kısa bir arama sorgusuna dönüştür
     cleaned = re.sub(r'[^\w\s]', ' ', payload.title)
     words = [w for w in cleaned.split() if len(w) > 1]
     # İlk 6 kelimeyi al — 4 kelime çok kısa, önemli model bilgisi (GB, RAM) kesilebilir
     query = " ".join(words[:6]) if words else payload.title
 
-    products = await master_search(query)
+    if forced_category:
+        products = await marketplace_scan(query, forced_category=forced_category)
+    else:
+        products = await master_search(query)
     
     if payload.original_url:
         from urllib.parse import urlparse

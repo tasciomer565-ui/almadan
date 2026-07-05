@@ -2502,7 +2502,7 @@ async function findAlternativeSellers(parsed) {
   try {
     const data = await api("/api/find-alternatives", {
       method: "POST",
-      body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url })
+      body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url, source: parsed.source, image_url: parsed.image_url })
     });
     const alts = data.alternatives || [];
 
@@ -7632,7 +7632,7 @@ async function showSellerSelectionDialog(parsed) {
   try {
     const data = await api("/api/find-alternatives", {
       method: "POST",
-      body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url })
+      body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url, source: parsed.source, image_url: parsed.image_url })
     });
     let alts = data.alternatives || [];
 

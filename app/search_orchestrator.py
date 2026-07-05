@@ -460,7 +460,7 @@ async def scan_worker(query: str, category: str, fallback: bool = False) -> list
     filtered_products = [p for p in aol_products if is_logical_product(query, p["title"])]
     return filtered_products
 
-async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
+async def marketplace_scan(query: str, fallback: bool = False, forced_category: str = None) -> list[dict]:
     """Paralel arama — çalışan kaynaklar (Vercel 10s limiti)."""
     loop = asyncio.get_running_loop()
     from app.comparator import (
@@ -470,7 +470,7 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
         search_kinetix,
     )
 
-    category = classify_intent(query)
+    category = forced_category or classify_intent(query)
 
     # Temel görevler — her aramada çalıştır
     base_tasks = [
@@ -482,9 +482,9 @@ async def marketplace_scan(query: str, fallback: bool = False) -> list[dict]:
 
     # Kategoriye göre ek görevler
     extra_tasks = []
-    if category in ("BEBEK",):
+    if category == "BEBEK":
         extra_tasks.append(loop.run_in_executor(None, search_ebebek, query))
-    if category in ("MOBİLYA", "EV"):
+    if category in ("EV", "MOBİLYA"):
         extra_tasks.append(loop.run_in_executor(None, search_vivense, query))
         extra_tasks.append(loop.run_in_executor(None, search_evidea, query))
     if category in ("MODA", "SPOR"):
