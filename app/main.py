@@ -1011,6 +1011,45 @@ def home() -> Response:
     return RedirectResponse("/index.html", status_code=307)
 
 
+# ── İstemci hata raporları ──────────────────────────────────
+_client_errors: "deque[dict]" = None  # lazy init
+
+
+@app.post("/api/client-error", include_in_schema=False)
+async def client_error_report(request: Request) -> dict:
+    """Frontend hata raporlarını logla (Vercel function logs'ta görünür)."""
+    global _client_errors
+    from collections import deque
+    if _client_errors is None:
+        _client_errors = deque(maxlen=100)
+    try:
+        body = await request.json()
+    except Exception:
+        return {"ok": False}
+    entry = {
+        "kind": str(body.get("kind", ""))[:32],
+        "message": str(body.get("message", ""))[:500],
+        "source": str(body.get("source", ""))[:200],
+        "lineno": int(body.get("lineno") or 0),
+        "url": str(body.get("url", ""))[:200],
+        "ua": str(body.get("ua", ""))[:120],
+        "at": utc_now(),
+    }
+    _client_errors.append(entry)
+    import logging
+    logging.getLogger("almadan.client").error(
+        "CLIENT-ERROR [%s] %s (%s:%s) sayfa=%s",
+        entry["kind"], entry["message"], entry["source"], entry["lineno"], entry["url"])
+    return {"ok": True}
+
+
+@app.get("/api/client-errors", include_in_schema=False)
+async def client_error_list(request: Request) -> list[dict]:
+    """Son istemci hatalarını listele (yalnızca admin)."""
+    await require_admin(request)
+    return list(_client_errors or [])
+
+
 @app.get("/hakkinda", include_in_schema=False)
 @app.get("/gizlilik", include_in_schema=False)
 @app.get("/iletisim", include_in_schema=False)

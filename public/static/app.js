@@ -152,14 +152,32 @@ function storeLogoHtml(source, size = 36) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 window.__almadanPanicModeActive = false;
+window.__almadanErrorReportCount = 0;
+
+/* Hata raporunu sunucuya gönder (oturum başına en fazla 5, sessizce) */
+function reportClientError(kind, message, source, lineno) {
+  try {
+    if (window.__almadanErrorReportCount >= 5) return;
+    window.__almadanErrorReportCount++;
+    const payload = JSON.stringify({
+      kind, message: String(message).slice(0, 500),
+      source: String(source || "").slice(0, 200),
+      lineno: lineno || 0,
+      url: location.pathname,
+      ua: navigator.userAgent.slice(0, 120),
+    });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon("/api/client-error", new Blob([payload], { type: "application/json" }));
+    } else {
+      fetch("/api/client-error", { method: "POST", headers: { "Content-Type": "application/json" }, body: payload, keepalive: true }).catch(() => {});
+    }
+  } catch (_) { /* raporlama asla uygulamayı bozmasın */ }
+}
+
 window.onerror = function (message, source, lineno, colno, error) {
-  console.error("Almadan global hata yakalayıcı:", {
-    message,
-    source,
-    lineno,
-    colno,
-    error,
-  });
+  const readable = `${message} @ ${String(source).split("/").pop()}:${lineno}:${colno}`;
+  console.error("Almadan hata:", readable, error || "");
+  reportClientError("error", message, source, lineno);
 
   if (window.__almadanPanicModeActive) {
     return true;
@@ -167,7 +185,9 @@ window.onerror = function (message, source, lineno, colno, error) {
 
   window.__almadanPanicModeActive = true;
   try {
-    showInitialLoadFallback();
+    if (typeof window.showInitialLoadFallback === "function") {
+      window.showInitialLoadFallback();
+    }
   } catch (fallbackError) {
     console.error("Almadan kurtarma modu başlatılamadı:", fallbackError);
   } finally {
@@ -178,6 +198,13 @@ window.onerror = function (message, source, lineno, colno, error) {
 
   return true;
 };
+
+window.addEventListener("unhandledrejection", function (event) {
+  const reason = event.reason;
+  const msg = reason && reason.message ? reason.message : String(reason);
+  console.error("Almadan promise hatası:", msg, reason && reason.stack ? reason.stack.split("\n")[1] : "");
+  reportClientError("unhandledrejection", msg, "", 0);
+});
 
 const state = {
   products: [],
@@ -478,7 +505,7 @@ function bindEvents() {
   });
   document.getElementById("optModeSingle").addEventListener("click", () => switchOptimizerMode("single"));
   document.getElementById("optModeSplit").addEventListener("click", () => switchOptimizerMode("split"));
-  document.getElementById("micButton").addEventListener("click", startVoiceSearch);
+  document.getElementById("micButton")?.addEventListener("click", startVoiceSearch);
 
   window.addEventListener("online", () => {
     updateNetworkStatus();

@@ -107,6 +107,7 @@ CSRF_EXEMPT_PATHS = {
     "/api/vton/",
     "/cron/",
     "/parse-url",
+    "/api/client-error",  # sendBeacon header taşıyamaz; endpoint salt-log, durum değiştirmez
 }
 CSRF_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
