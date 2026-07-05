@@ -8,6 +8,63 @@ from app.storage import load_db, save_db
 
 YAHOO_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0"
 
+_STD_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+    "Accept-Language": "tr-TR,tr;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+}
+
+
+def _scrape_jsonld_itemlist(url: str, source: str, render_js: bool = False, timeout: int = 10) -> list[dict]:
+    """JSON-LD ItemList olan sayfalardan ürün çeker. ScrapingBee varsa proxy kullanır."""
+    from app.scraping_proxy import proxy_get, proxy_enabled
+    html = None
+    if proxy_enabled():
+        html = proxy_get(url, render_js=render_js, timeout=timeout + 5)
+    if not html:
+        try:
+            r = requests.get(url, headers=_STD_HEADERS, timeout=timeout)
+            html = r.text if r.ok else None
+        except Exception:
+            return []
+    if not html:
+        return []
+    soup = BeautifulSoup(html, "html.parser")
+    results = []
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(script.string or "{}")
+            if data.get("@type") != "ItemList":
+                continue
+            for item in data.get("itemListElement", [])[:10]:
+                prod = item.get("item", item)
+                name = prod.get("name", "")
+                if not name:
+                    continue
+                offers = prod.get("offers", {})
+                if isinstance(offers, list):
+                    offers = offers[0]
+                try:
+                    price = float(str(offers.get("price", 0)).replace(",", "."))
+                except Exception:
+                    continue
+                if price <= 0:
+                    continue
+                prod_url = prod.get("url", "")
+                img = prod.get("image", "")
+                if isinstance(img, list):
+                    img = img[0] if img else ""
+                results.append({
+                    "title": name, "price": price, "original_price": None,
+                    "image_url": img, "source": source, "url": prod_url,
+                    "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                })
+            if results:
+                return results
+        except Exception:
+            continue
+    return results
+
 def clean_product_title(title: str) -> str:
     # Remove suffix patterns
     text = title.split(" - ")[0].split(" | ")[0]
@@ -610,17 +667,42 @@ def search_trendyol_direct(query: str) -> list[dict]:
     from app.scraping_proxy import proxy_get, proxy_enabled
     if proxy_enabled():
         try:
-            html = proxy_get(f"https://www.trendyol.com/sr?q={urllib.parse.quote_plus(query)}&qt={urllib.parse.quote_plus(query)}&st=SEARCH", timeout=15)
+            html = proxy_get(
+                f"https://www.trendyol.com/sr?q={urllib.parse.quote_plus(query)}&qt={urllib.parse.quote_plus(query)}&st=SEARCH",
+                render_js=True, timeout=20
+            )
             if html:
+                soup = BeautifulSoup(html, "html.parser")
+                sb_results = []
+                for script in soup.find_all("script", type="application/ld+json"):
+                    try:
+                        data = json.loads(script.string or "{}")
+                        if data.get("@type") == "ItemList":
+                            for item in data.get("itemListElement", [])[:10]:
+                                prod = item.get("item", item)
+                                name = prod.get("name", "")
+                                if not name: continue
+                                offers = prod.get("offers", {})
+                                if isinstance(offers, list): offers = offers[0]
+                                try: price = float(str(offers.get("price", 0)).replace(",", "."))
+                                except: continue
+                                if price <= 0: continue
+                                prod_url = prod.get("url", "")
+                                img = prod.get("image", "")
+                                if isinstance(img, list): img = img[0] if img else ""
+                                sb_results.append({
+                                    "title": name, "price": price, "original_price": None,
+                                    "image_url": img, "source": "trendyol", "url": prod_url,
+                                    "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                                })
+                            if sb_results: return sb_results
+                    except Exception: continue
+                # Fallback: __SEARCH_APP_INITIAL_STATE__
                 m = re.search(r'window\.__SEARCH_APP_INITIAL_STATE__\s*=\s*({.+?});\s*(?:window\.|</)', html, re.DOTALL)
-                if not m:
-                    m = re.search(r'"products"\s*:\s*(\[.+?\])\s*[,}]', html, re.DOTALL)
                 if m:
                     import json as _json2
-                    raw = m.group(1)
-                    state = _json2.loads(raw) if raw.startswith("{") else {"products": _json2.loads(raw)}
+                    state = _json2.loads(m.group(1))
                     prods = state.get("productListingResponse", {}).get("products") or state.get("products") or []
-                    sb_results = []
                     for p in prods[:10]:
                         name = p.get("name") or ""
                         if not name: continue
@@ -629,15 +711,13 @@ def search_trendyol_direct(query: str) -> list[dict]:
                         prod_url = f"https://www.trendyol.com{slug}" if slug.startswith("/") else ""
                         imgs = p.get("images") or []
                         img = imgs[0] if imgs else ""
-                        if img and not img.startswith("http"):
-                            img = f"https://cdn.dsmcdn.com/{img}"
+                        if img and not img.startswith("http"): img = f"https://cdn.dsmcdn.com/{img}"
                         sb_results.append({
                             "title": name, "price": float(price), "original_price": None,
                             "image_url": img, "source": "trendyol", "url": prod_url,
                             "labels": ["Önerilen"], "extra_info": {"out_of_stock": price == 0},
                         })
-                    if sb_results:
-                        return sb_results
+                    if sb_results: return sb_results
         except Exception:
             pass
     return []
@@ -709,14 +789,39 @@ def search_hepsiburada_direct(query: str) -> list[dict]:
         from app.scraping_proxy import proxy_get, proxy_enabled
         if proxy_enabled():
             try:
-                html = proxy_get(f"https://www.hepsiburada.com/ara?q={urllib.parse.quote_plus(query)}", timeout=15)
+                html = proxy_get(f"https://www.hepsiburada.com/ara?q={urllib.parse.quote_plus(query)}", render_js=True, timeout=20)
                 if html:
-                    m = re.search(r'__NEXT_DATA__[^{]*({.+?})\s*</script>', html, re.DOTALL)
-                    if m:
+                    soup = BeautifulSoup(html, "html.parser")
+                    sb_results = []
+                    for script in soup.find_all("script", type="application/ld+json"):
+                        try:
+                            data = json.loads(script.string or "{}")
+                            if data.get("@type") == "ItemList":
+                                for item in data.get("itemListElement", [])[:10]:
+                                    prod = item.get("item", item)
+                                    name = prod.get("name", "")
+                                    if not name: continue
+                                    offers = prod.get("offers", {})
+                                    if isinstance(offers, list): offers = offers[0]
+                                    try: price = float(str(offers.get("price", 0)).replace(",", "."))
+                                    except: continue
+                                    if price <= 0: continue
+                                    prod_url = prod.get("url", "")
+                                    img = prod.get("image", "")
+                                    if isinstance(img, list): img = img[0] if img else ""
+                                    sb_results.append({
+                                        "title": name, "price": price, "original_price": None,
+                                        "image_url": img, "source": "hepsiburada", "url": prod_url,
+                                        "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                                    })
+                                if sb_results: return sb_results
+                        except Exception: continue
+                    # __NEXT_DATA__ fallback
+                    nd_el = soup.find("script", id="__NEXT_DATA__")
+                    if nd_el:
                         import json as _json3
-                        nd = _json3.loads(m.group(1))
+                        nd = _json3.loads(nd_el.string or "{}")
                         prods = nd.get("props", {}).get("pageProps", {}).get("products") or []
-                        sb_results = []
                         for p in prods[:10]:
                             name = p.get("name") or p.get("displayName") or ""
                             price = p.get("price") or p.get("salePrice") or 0
@@ -729,8 +834,7 @@ def search_hepsiburada_direct(query: str) -> list[dict]:
                                     "image_url": img, "source": "hepsiburada", "url": prod_url,
                                     "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
                                 })
-                        if sb_results:
-                            return sb_results
+                        if sb_results: return sb_results
             except Exception:
                 pass
         return []
@@ -826,139 +930,25 @@ def search_amazon_tr(query: str) -> list[dict]:
 
 
 def search_karaca(query: str) -> list[dict]:
-    """Karaca.com ürün araması — HTML scrape."""
-    try:
-        url = f"https://www.karaca.com/search?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, .product-card, [data-product-id]")[:10]:
-            name_el = item.select_one(".product-title, .product-name, h3, h2")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one(".price, .product-price, .sale-price, [class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.karaca.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "karaca", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """Karaca ürün araması — JSON-LD + ScrapingBee render_js."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.karaca.com/search?q={urllib.parse.quote_plus(query)}",
+        "karaca", render_js=True, timeout=15
+    )
 
 def search_watsons(query: str) -> list[dict]:
-    """Watsons Türkiye ürün araması."""
-    try:
-        url = f"https://www.watsons.com.tr/search?text={urllib.parse.quote_plus(query)}&pageSize=12"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, .productItem, article.product-card")[:10]:
-            name_el = item.select_one(".product-name, .productName, h3, h2, [class*='name']")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one(".price, .product-price, [class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.watsons.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "watsons", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """Watsons ürün araması — JSON-LD + ScrapingBee render_js."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.watsons.com.tr/search?text={urllib.parse.quote_plus(query)}",
+        "watsons", render_js=True, timeout=15
+    )
 
 def search_gratis(query: str) -> list[dict]:
-    """Gratis ürün araması — JSON API."""
-    try:
-        api_url = f"https://www.gratis.com/search?SearchTerm={urllib.parse.quote_plus(query)}&PageSize=12"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-        }
-        r = requests.get(api_url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, .productItem, [class*='product-card']")[:10]:
-            name_el = item.select_one("[class*='product-name'], [class*='title'], h3, h2")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], [class*='Price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.gratis.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "gratis", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """Gratis ürün araması — JSON-LD + ScrapingBee render_js."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.gratis.com/search?q={urllib.parse.quote_plus(query)}",
+        "gratis", render_js=True, timeout=15
+    )
 
 def search_mediamarkt(query: str) -> list[dict]:
     """MediaMarkt Türkiye ürün araması — JSON-LD ItemList."""
@@ -1067,229 +1057,38 @@ def search_teknosa(query: str) -> list[dict]:
 
 
 def search_boyner(query: str) -> list[dict]:
-    """Boyner ürün araması."""
-    try:
-        url = f"https://www.boyner.com.tr/search?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, .product-card, [class*='ProductCard']")[:10]:
-            name_el = item.select_one(".product-name, .product-title, h3, [class*='name']")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one(".product-price, [class*='price'], .price")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.boyner.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "boyner", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """Boyner ürün araması — JSON-LD + ScrapingBee render_js."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.boyner.com.tr/arama?searchTerm={urllib.parse.quote_plus(query)}",
+        "boyner", render_js=True, timeout=15
+    )
 
 def search_flo(query: str) -> list[dict]:
-    """FLO ürün araması."""
-    try:
-        url = f"https://www.flo.com.tr/search?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, .product-card, [class*='product']")[:10]:
-            name_el = item.select_one(".product-name, .brand-name, h3, [class*='name']")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one(".product-price, [class*='price'], .price")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.flo.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "flo", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """ScrapingBee render_js ile JSON-LD araması."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.flo.com.tr/search?q={urllib.parse.quote_plus(query)}",
+        "flo", render_js=True, timeout=15
+    )
 
 def search_decathlon(query: str) -> list[dict]:
-    """Decathlon Türkiye ürün araması."""
-    try:
-        url = f"https://www.decathlon.com.tr/search?Ntt={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-list-item, .product-card, [data-qa='product-card'], article")[:10]:
-            name_el = item.select_one(".product-name, h3, [class*='title'], [class*='name']")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price, [data-qa='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.decathlon.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "decathlon", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """Decathlon ürün araması — JSON-LD + ScrapingBee render_js."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.decathlon.com.tr/search?Ntt={urllib.parse.quote_plus(query)}",
+        "decathlon", render_js=True, timeout=15
+    )
 
 def search_lcwaikiki(query: str) -> list[dict]:
-    """LC Waikiki ürün araması."""
-    try:
-        url = f"https://www.lcwaikiki.com/tr-TR/TR/search/index.aspx?searchvalue={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, .col-product, [class*='ProductItem']")[:10]:
-            name_el = item.select_one(".product-name, [class*='product-name'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price, .product-price")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.lcwaikiki.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "lcwaikiki", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
+    """LC Waikiki ürün araması — JSON-LD + ScrapingBee render_js."""
+    url = f"https://www.lcwaikiki.com/tr-TR/TR/search/index.aspx?searchvalue={urllib.parse.quote_plus(query)}"
+    return _scrape_jsonld_itemlist(url, "lcwaikiki", render_js=True, timeout=15)
 
 
 def search_mavi(query: str) -> list[dict]:
-    """Mavi ürün araması."""
-    try:
-        url = f"https://www.mavi.com/search?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, [class*='product-card'], .product")[:10]:
-            name_el = item.select_one(".product-title, .product-name, h3, [class*='name']")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price, .product-price")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.mavi.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "mavi", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """Mavi ürün araması — JSON-LD + ScrapingBee render_js."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.mavi.com/search?q={urllib.parse.quote_plus(query)}",
+        "mavi", render_js=True, timeout=15
+    )
 
 def search_zara(query: str) -> list[dict]:
     """Zara Türkiye ürün araması."""
@@ -1382,49 +1181,11 @@ def search_bim(query: str) -> list[dict]:
 
 
 def search_rossmann(query: str) -> list[dict]:
-    """Rossmann Türkiye ürün araması."""
-    try:
-        url = f"https://www.rossmann.com.tr/?s={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, .product, [class*='product-card']")[:10]:
-            name_el = item.select_one(".product-title, .product-name, h3, [class*='name']")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price, .product-price")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.rossmann.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "rossmann", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """Rossmann ürün araması — JSON-LD + ScrapingBee render_js."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.rossmann.com.tr/ara?q={urllib.parse.quote_plus(query)}",
+        "rossmann", render_js=True, timeout=15
+    )
 
 def search_supplementler(query: str) -> list[dict]:
     """Supplementler.com ürün araması."""
@@ -2003,48 +1764,11 @@ def search_penti(query: str) -> list[dict]:
 
 
 def search_colins(query: str) -> list[dict]:
-    try:
-        url = f"https://www.colins.com.tr/search?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, [class*='product-card'], [class*='ProductCard']")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.colins.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "colins", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """ScrapingBee render_js ile JSON-LD araması."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.colins.com.tr/search?q={urllib.parse.quote_plus(query)}",
+        "colins", render_js=True, timeout=15
+    )
 
 def search_twist(query: str) -> list[dict]:
     try:
@@ -2091,48 +1815,11 @@ def search_twist(query: str) -> list[dict]:
 
 
 def search_ltb(query: str) -> list[dict]:
-    try:
-        url = f"https://www.ltbjeans.com/tr/?s={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product, .product-item, [class*='product']")[:10]:
-            name_el = item.select_one("[class*='title'], [class*='name'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.ltbjeans.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "ltb", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """ScrapingBee render_js ile JSON-LD araması."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.ltb.com.tr/search?q={urllib.parse.quote_plus(query)}",
+        "ltb", render_js=True, timeout=15
+    )
 
 def search_modanisa(query: str) -> list[dict]:
     try:
@@ -2223,48 +1910,11 @@ def search_nike(query: str) -> list[dict]:
 
 
 def search_puma(query: str) -> list[dict]:
-    try:
-        url = f"https://tr.puma.com/search?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select("[class*='product-grid-item'], .product-tile, [class*='ProductCard']")[:10]:
-            name_el = item.select_one("[class*='product-title'], [class*='title'], [class*='name'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://tr.puma.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "puma", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """ScrapingBee render_js ile JSON-LD araması."""
+    return _scrape_jsonld_itemlist(
+        f"https://tr.puma.com/tr/tr/search?q={urllib.parse.quote_plus(query)}",
+        "puma", render_js=True, timeout=15
+    )
 
 def search_newbalance(query: str) -> list[dict]:
     try:
@@ -2311,92 +1961,18 @@ def search_newbalance(query: str) -> list[dict]:
 
 
 def search_sportive(query: str) -> list[dict]:
-    try:
-        url = f"https://www.sportive.com.tr/?s={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product, .product-item, [class*='product-card']")[:10]:
-            name_el = item.select_one("[class*='title'], [class*='name'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.sportive.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "sportive", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """ScrapingBee render_js ile JSON-LD araması."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.sportive.com.tr/search?q={urllib.parse.quote_plus(query)}",
+        "sportive", render_js=True, timeout=15
+    )
 
 def search_flormar(query: str) -> list[dict]:
-    try:
-        url = f"https://www.flormar.com.tr/?s={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product, .product-item, [class*='product-card']")[:10]:
-            name_el = item.select_one("[class*='product-title'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.flormar.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "flormar", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """ScrapingBee render_js ile JSON-LD araması."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.flormar.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "flormar", render_js=True, timeout=15
+    )
 
 def search_goldenrose(query: str) -> list[dict]:
     try:
@@ -2619,48 +2195,11 @@ def search_korkmaz(query: str) -> list[dict]:
 
 
 def search_kitapyurdu(query: str) -> list[dict]:
-    try:
-        url = f"https://www.kitapyurdu.com/index.php?route=product/search&filter_name={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, [class*='product-card'], .item")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3, .product-title")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.kitapyurdu.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "kitapyurdu", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """Kitapyurdu ürün araması — JSON-LD + ScrapingBee render_js."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.kitapyurdu.com/index.php?route=product/search&filter_name={urllib.parse.quote_plus(query)}",
+        "kitapyurdu", render_js=False, timeout=12
+    )
 
 def search_dr(query: str) -> list[dict]:
     """D&R ürün araması — data-gtm attribute JSON."""
@@ -2708,52 +2247,12 @@ def search_dr(query: str) -> list[dict]:
 
 
 def search_idefix(query: str) -> list[dict]:
-    try:
-        url = f"https://www.idefix.com/Arama?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, [class*='product-card'], .item")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.idefix.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "idefix", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
+    """Idefix ürün araması — JSON-LD + ScrapingBee render_js."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.idefix.com/Search?q={urllib.parse.quote_plus(query)}",
+        "idefix", render_js=True, timeout=15
+    )
 
-
-# ── 27 YENİ MAĞAZA ──────────────────────────────────────────────────────────
-
-# BEBEK & ÇOCUK
 def search_bebek(query: str) -> list[dict]:
     try:
         url = f"https://www.bebek.com/arama?q={urllib.parse.quote_plus(query)}"
@@ -3733,50 +3232,12 @@ def search_casper(query: str) -> list[dict]:
 
 # KİTAP EK
 def search_remzi(query: str) -> list[dict]:
-    try:
-        url = f"https://www.remzi.com.tr/?s={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product, .product-item, [class*='product']")[:10]:
-            name_el = item.select_one("[class*='title'], [class*='name'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True)
-            raw = re.sub(r"[^\d,.]", "", raw).replace(",", ".")
-            try:
-                price = float(raw.split(".")[0] + ("." + raw.split(".")[-1] if raw.count(".") == 1 else ""))
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.remzi.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "remzi", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
+    """Remzikitabevi ürün araması — JSON-LD + ScrapingBee render_js."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.remzi.com/arama?q={urllib.parse.quote_plus(query)}",
+        "remzi", render_js=True, timeout=15
+    )
 
-
-# GIDA EK
 def search_tazedirekt(query: str) -> list[dict]:
     try:
         url = f"https://www.tazedirekt.com/?s={urllib.parse.quote_plus(query)}"
@@ -3911,43 +3372,11 @@ def search_tarimkredi(query: str) -> list[dict]:
 
 # ScrapingBee-gated
 def search_defacto(query: str) -> list[dict]:
-    try:
-        from app.scraping_proxy import proxy_get
-        url = f"https://www.defacto.com.tr/search?q={urllib.parse.quote_plus(query)}"
-        r = proxy_get(url, render_js=False, timeout=15)
-        if not r or not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, [class*='product-card'], [class*='ProductCard']")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.defacto.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "defacto", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """Defacto ürün araması — JSON-LD + ScrapingBee render_js."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.defacto.com.tr/search?q={urllib.parse.quote_plus(query)}",
+        "defacto", render_js=True, timeout=15
+    )
 
 def search_kutahyaporselen(query: str) -> list[dict]:
     try:
@@ -4423,47 +3852,11 @@ def search_hopi(query: str) -> list[dict]:
 
 
 def search_pandora(query: str) -> list[dict]:
-    try:
-        url = f"https://tr.pandora.net/tr/search/?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select("[class*='product-card'], [class*='ProductCard'], .product-item")[:10]:
-            name_el = item.select_one("[class*='product-name'], [class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price")
-            if not price_el:
-                continue
-            raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://tr.pandora.net{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "pandora", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """ScrapingBee render_js ile JSON-LD araması."""
+    return _scrape_jsonld_itemlist(
+        f"https://tr.pandora.net/search?q={urllib.parse.quote_plus(query)}",
+        "pandora", render_js=True, timeout=15
+    )
 
 def search_altinyildiz(query: str) -> list[dict]:
     try:
@@ -4509,90 +3902,18 @@ def search_altinyildiz(query: str) -> list[dict]:
 
 
 def search_derimod(query: str) -> list[dict]:
-    try:
-        url = f"https://www.derimod.com.tr/search?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, [class*='product-card']")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price")
-            if not price_el:
-                continue
-            raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.derimod.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "derimod", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """ScrapingBee render_js ile JSON-LD araması."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.derimod.com.tr/search?q={urllib.parse.quote_plus(query)}",
+        "derimod", render_js=True, timeout=15
+    )
 
 def search_lescon(query: str) -> list[dict]:
-    try:
-        url = f"https://www.lescon.com.tr/?s={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product, .product-item, [class*='product']")[:10]:
-            name_el = item.select_one("[class*='title'], [class*='name'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price")
-            if not price_el:
-                continue
-            raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.lescon.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "lescon", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
-
+    """ScrapingBee render_js ile JSON-LD araması."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.lescon.com.tr/search?q={urllib.parse.quote_plus(query)}",
+        "lescon", render_js=True, timeout=15
+    )
 
 def search_namet(query: str) -> list[dict]:
     try:
@@ -4767,74 +4088,18 @@ def search_aliexpress(query: str) -> list[dict]:
 
 
 def search_hm(query: str) -> list[dict]:
-    try:
-        from app.scraping_proxy import proxy_get
-        url = f"https://www2.hm.com/tr_tr/search-results.html?q={urllib.parse.quote_plus(query)}"
-        r = proxy_get(url, render_js=False, timeout=15)
-        if not r or not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select("[class*='product-item'], [class*='product-tile'], article")[:10]:
-            name_el = item.select_one("[class*='item-heading'], [class*='product-name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www2.hm.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({"title": name, "price": price, "original_price": None, "image_url": img, "source": "hm", "url": prod_url, "labels": ["Önerilen"], "extra_info": {"out_of_stock": False}})
-        return results
-    except Exception:
-        return []
-
+    """ScrapingBee render_js ile JSON-LD araması."""
+    return _scrape_jsonld_itemlist(
+        f"https://www2.hm.com/tr_tr/search-results.html?q={urllib.parse.quote_plus(query)}",
+        "hm", render_js=True, timeout=15
+    )
 
 def search_sephora(query: str) -> list[dict]:
-    try:
-        from app.scraping_proxy import proxy_get
-        url = f"https://www.sephora.com.tr/search?q={urllib.parse.quote_plus(query)}"
-        r = proxy_get(url, render_js=False, timeout=15)
-        if not r or not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, [class*='product-card']")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.sephora.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({"title": name, "price": price, "original_price": None, "image_url": img, "source": "sephora", "url": prod_url, "labels": ["Önerilen"], "extra_info": {"out_of_stock": False}})
-        return results
-    except Exception:
-        return []
-
+    """ScrapingBee render_js ile JSON-LD araması."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.sephora.com.tr/search?q={urllib.parse.quote_plus(query)}",
+        "sephora", render_js=True, timeout=15
+    )
 
 def search_koctas(query: str) -> list[dict]:
     try:
@@ -4872,39 +4137,11 @@ def search_koctas(query: str) -> list[dict]:
 
 
 def search_adidas(query: str) -> list[dict]:
-    try:
-        from app.scraping_proxy import proxy_get
-        url = f"https://www.adidas.com.tr/search?q={urllib.parse.quote_plus(query)}"
-        r = proxy_get(url, render_js=False, timeout=15)
-        if not r or not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select("[class*='product-card'], [class*='ProductCard'], [data-testid*='product']")[:10]:
-            name_el = item.select_one("[class*='product-title'], [class*='title'], [class*='name'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.adidas.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({"title": name, "price": price, "original_price": None, "image_url": img, "source": "adidas", "url": prod_url, "labels": ["Önerilen"], "extra_info": {"out_of_stock": False}})
-        return results
-    except Exception:
-        return []
-
+    """ScrapingBee render_js ile JSON-LD araması."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.adidas.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "adidas", render_js=True, timeout=15
+    )
 
 def search_metro(query: str) -> list[dict]:
     try:
@@ -5479,82 +4716,18 @@ def search_muzikdunyasi(query: str) -> list[dict]:
 
 
 def search_reebok(query: str) -> list[dict]:
-    try:
-        url = f"https://www.reebok.com.tr/search?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select("[class*='product-card'], [class*='ProductCard'], .product-item")[:10]:
-            name_el = item.select_one("[class*='product-title'], [class*='title'], [class*='name'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price")
-            if not price_el:
-                continue
-            raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.reebok.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({"title": name, "price": price, "original_price": None, "image_url": img, "source": "reebok", "url": prod_url, "labels": ["Önerilen"], "extra_info": {"out_of_stock": False}})
-        return results
-    except Exception:
-        return []
-
+    """ScrapingBee render_js ile JSON-LD araması."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.reebok.com.tr/search?q={urllib.parse.quote_plus(query)}",
+        "reebok", render_js=True, timeout=15
+    )
 
 def search_bershka(query: str) -> list[dict]:
-    try:
-        url = f"https://www.bershka.com/tr/search/?searchTerm={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select("[class*='product-item'], [class*='product-card'], article")[:10]:
-            name_el = item.select_one("[class*='product-title'], [class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price")
-            if not price_el:
-                continue
-            raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.bershka.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({"title": name, "price": price, "original_price": None, "image_url": img, "source": "bershka", "url": prod_url, "labels": ["Önerilen"], "extra_info": {"out_of_stock": False}})
-        return results
-    except Exception:
-        return []
-
+    """ScrapingBee render_js ile JSON-LD araması."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.bershka.com/tr/search?q={urllib.parse.quote_plus(query)}",
+        "bershka", render_js=True, timeout=15
+    )
 
 def search_ulker(query: str) -> list[dict]:
     try:
