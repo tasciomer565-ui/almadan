@@ -125,7 +125,8 @@ async def csrf_middleware(request: Request, call_next):
         # tarayıcı cookie'yi saldırgan isteğine de otomatik ekler. İstemci aynı
         # değeri açıkça header olarak göndermek zorunda (double-submit).
         token = request.headers.get("x-csrf-token")
-        session_id = request.cookies.get("almadan_device_id", "")
+        # Token üretimindeki fallback ile aynı: cookie yoksa "anonymous"
+        session_id = request.cookies.get("almadan_device_id", "anonymous")
         if not verify_csrf_token(token or "", session_id):
             return JSONResponse(
                 status_code=status.HTTP_403_FORBIDDEN,
