@@ -234,7 +234,7 @@ async def security_headers_middleware(request: Request, call_next):
     apply_security_headers(response)
     # CSRF token'ı cookie olarak sun (JS okumaz, header'dan gönderir)
     if not request.cookies.get("csrf_token"):
-        device_id = request.cookies.get("almadan_device_id", "anonymous")
+        device_id = getattr(request.state, "device_id", None) or request.cookies.get("almadan_device_id", "anonymous")
         csrf = generate_csrf_token(device_id)
         response.set_cookie(
             "csrf_token", csrf,
