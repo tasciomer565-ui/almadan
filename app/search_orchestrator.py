@@ -478,8 +478,6 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         loop.run_in_executor(None, search_amazon_tr, query),
         loop.run_in_executor(None, search_mediamarkt, query),
         loop.run_in_executor(None, search_teknosa, query),
-        loop.run_in_executor(None, search_kitapyurdu, query),
-        loop.run_in_executor(None, search_dr, query),
     ]
 
     # Kategoriye göre ek görevler
@@ -493,6 +491,10 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         extra_tasks.append(loop.run_in_executor(None, search_yargici, query))
         extra_tasks.append(loop.run_in_executor(None, search_kinetix, query))
         extra_tasks.append(loop.run_in_executor(None, search_flo, query))
+    # Kitap/müzik/genel için DR ve KitapYurdu
+    if category in ("GENEL", "KİTAP"):
+        extra_tasks.append(loop.run_in_executor(None, search_kitapyurdu, query))
+        extra_tasks.append(loop.run_in_executor(None, search_dr, query))
 
     all_tasks = base_tasks + extra_tasks
     results_raw = await asyncio.gather(*all_tasks, return_exceptions=True)
