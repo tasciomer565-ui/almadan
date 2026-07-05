@@ -1559,15 +1559,20 @@ async def find_alternatives(payload: AlternativesRequest):
 
     # Başlığı temizle ve kısa bir arama sorgusuna dönüştür
     cleaned = re.sub(r'[^\w\s]', ' ', payload.title)
-    words = [w for w in cleaned.split() if len(w) > 1]
-    # İlk 6 kelimeyi al — 4 kelime çok kısa, önemli model bilgisi (GB, RAM) kesilebilir
+    # Sayıları koru (8 GB, 4K, vb.) — sadece harf/harf karışımı kelimeler için >1 şartı
+    words = [w for w in cleaned.split() if len(w) > 1 or w.isdigit()]
+    # İlk 6 kelimeyi al — önemli model bilgisi (GB, RAM) kesilebilir
     query = " ".join(words[:6]) if words else payload.title
 
     if forced_category:
         products = await marketplace_scan(query, forced_category=forced_category)
     else:
         products = await master_search(query)
-    
+
+    # Kılıf/aksesuar/cam koruyucu gibi yanlış ürünleri filtrele
+    from app.comparator import is_logical_product
+    products = [p for p in products if is_logical_product(query, p.get("title", ""))]
+
     if payload.original_url:
         from urllib.parse import urlparse
         orig_path = urlparse(payload.original_url).path

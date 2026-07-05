@@ -472,29 +472,33 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
 
     category = forced_category or classify_intent(query)
 
-    # Temel görevler — her aramada çalıştır
+    # Pazaryerleri her kategoride çalışır
     base_tasks = [
         loop.run_in_executor(None, search_n11_direct, query),
         loop.run_in_executor(None, search_amazon_tr, query),
-        loop.run_in_executor(None, search_mediamarkt, query),
-        loop.run_in_executor(None, search_teknosa, query),
     ]
 
-    # Kategoriye göre ek görevler
+    # Kategoriye göre uzman mağazalar
     extra_tasks = []
-    if category == "BEBEK":
+    if category == "TEKNOLOJİ":
+        extra_tasks.append(loop.run_in_executor(None, search_mediamarkt, query))
+        extra_tasks.append(loop.run_in_executor(None, search_teknosa, query))
+    elif category == "BEBEK":
         extra_tasks.append(loop.run_in_executor(None, search_ebebek, query))
-    if category in ("EV", "MOBİLYA"):
+    elif category in ("EV", "MOBİLYA"):
         extra_tasks.append(loop.run_in_executor(None, search_vivense, query))
         extra_tasks.append(loop.run_in_executor(None, search_evidea, query))
-    if category in ("MODA", "SPOR"):
+    elif category in ("MODA", "SPOR"):
         extra_tasks.append(loop.run_in_executor(None, search_yargici, query))
         extra_tasks.append(loop.run_in_executor(None, search_kinetix, query))
         extra_tasks.append(loop.run_in_executor(None, search_flo, query))
-    # Kitap/müzik/genel için DR ve KitapYurdu
-    if category in ("GENEL", "KİTAP"):
+    elif category in ("GENEL", "KİTAP"):
         extra_tasks.append(loop.run_in_executor(None, search_kitapyurdu, query))
         extra_tasks.append(loop.run_in_executor(None, search_dr, query))
+    else:
+        # GENEL/bilinmeyen → MediaMarkt + Teknosa da dene
+        extra_tasks.append(loop.run_in_executor(None, search_mediamarkt, query))
+        extra_tasks.append(loop.run_in_executor(None, search_teknosa, query))
 
     all_tasks = base_tasks + extra_tasks
     results_raw = await asyncio.gather(*all_tasks, return_exceptions=True)
