@@ -120,11 +120,13 @@ app = FastAPI(title="Fırsat Asistanı API", version="0.2.0", lifespan=lifespan)
 
 
 def find_static_dir() -> Path:
+    # TEK KAYNAK: public/static — Vercel /static'i doğrudan public/ klasöründen sunar,
+    # FastAPI de aynı klasörü kullanmalı; yoksa iki kopya sessizce ayrışır (2026-07-06 kazası)
     module_dir = Path(__file__).resolve().parent
     candidates = (
+        module_dir.parent / "public" / "static",
+        Path.cwd() / "public" / "static",
         module_dir / "static",
-        module_dir / "app" / "static",
-        Path.cwd() / "app" / "static",
         Path.cwd() / "static",
     )
     for candidate in candidates:
