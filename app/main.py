@@ -327,358 +327,6 @@ def image_proxy(url: str) -> Response:
     )
 
 
-class PoseRequest(BaseModel):
-    image_base64: str
-
-
-@app.post("/api/detect-pose")
-def detect_pose(payload: PoseRequest) -> dict:
-    import base64
-    import io
-    import math
-    import numpy as np
-    from PIL import Image
-
-    try:
-        base64_data = payload.image_base64
-        if "," in base64_data:
-            _, base64_data = base64_data.split(",", 1)
-
-        img_bytes = base64.b64decode(base64_data)
-        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-        img_rgb = np.array(img)
-        h, w, _ = img_rgb.shape
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Görsel çözümlenemedi: {str(exc)}")
-
-    # Try running MediaPipe Pose
-    try:
-        import mediapipe as mp
-        mp_pose = mp.solutions.pose
-        with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5) as pose:
-            results = pose.process(img_rgb)
-            if results.pose_landmarks:
-                landmarks = results.pose_landmarks.landmark
-                left_shoulder = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER]
-                right_shoulder = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER]
-
-                # Check visibility threshold (0.4 is reasonable)
-                if left_shoulder.visibility > 0.4 and right_shoulder.visibility > 0.4:
-                    dx = left_shoulder.x - right_shoulder.x
-                    dy = left_shoulder.y - right_shoulder.y
-                    tilt_angle = math.atan2(dy, dx)
-
-                    # Midpoint neck anchor
-                    neck_x = (left_shoulder.x + right_shoulder.x) / 2
-                    neck_y = (left_shoulder.y + right_shoulder.y) / 2
-
-                    # shoulder_left is the left side of the image (smaller X) which corresponds to RIGHT_SHOULDER
-                    # shoulder_right is the right side of the image (greater X) which corresponds to LEFT_SHOULDER
-                    return {
-                        "success": True,
-                        "shoulder_left": [right_shoulder.x, right_shoulder.y],
-                        "shoulder_right": [left_shoulder.x, left_shoulder.y],
-                        "tilt_angle": tilt_angle,
-                        "body_width": dx,
-                        "neck_anchor": [neck_x, neck_y],
-                        "source": "mediapipe"
-                    }
-    except Exception as mp_err:
-        print(f"MediaPipe failed, falling back to NumPy: {mp_err}")
-
-    # Fallback NumPy Contrast/Edge scan algorithm
-    try:
-        samples = [
-            img_rgb[min(5, h-1), min(5, w-1)],
-            img_rgb[min(5, h-1), w // 2],
-            img_rgb[min(5, h-1), max(0, w-6)],
-            img_rgb[h // 2, min(5, w-1)],
-            img_rgb[h // 2, max(0, w-6)],
-            img_rgb[max(0, h-6), min(5, w-1)],
-            img_rgb[max(0, h-6), max(0, w-6)]
-        ]
-        bg_color = np.mean(samples, axis=0)
-
-        def is_different(pixel):
-            diff = np.sqrt(np.sum((pixel - bg_color) ** 2))
-            return diff > 35.0
-
-        lefts = []
-        rights = []
-        y_step = max(2, h // 75)
-        for y in range(int(h * 0.33), int(h * 0.80), y_step):
-            first_x = -1
-            last_x = -1
-            for x in range(int(w * 0.03), int(w * 0.97)):
-                if is_different(img_rgb[y, x]):
-                    if first_x == -1:
-                        first_x = x
-                    last_x = x
-            if first_x != -1 and last_x != -1 and (last_x - first_x) > (w * 0.13):
-                lefts.append((first_x, y))
-                rights.append((last_x, y))
-
-        if len(lefts) >= 5:
-            widths = [r[0] - l[0] for l, r in zip(lefts, rights)]
-            centers = [(l[0] + r[0]) / 2 for l, r in zip(lefts, rights)]
-
-            avg_width = sum(widths) / len(widths)
-            avg_center = sum(centers) / len(centers)
-
-            if avg_width < w * 0.23: avg_width = w * 0.43
-            if avg_width > w * 0.8: avg_width = w * 0.53
-            if avg_center < w * 0.2 or avg_center > w * 0.8: avg_center = w * 0.5
-
-            min_x, min_x_y = w, h // 2
-            max_x, max_x_y = 0, h // 2
-
-            for l, r in zip(lefts, rights):
-                lx, ly = l
-                rx, ry = r
-                if int(h * 0.4) <= ly <= int(h * 0.6):
-                    if lx < min_x:
-                        min_x = lx
-                        min_x_y = ly
-                    if rx > max_x:
-                        max_x = rx
-                        max_x_y = ry
-
-            tilt_angle = 0.0
-            if max_x > min_x and abs(max_x_y - min_x_y) < h * 0.13:
-                tilt_angle = math.atan2(max_x_y - min_x_y, max_x - min_x)
-                if abs(tilt_angle) > 0.35:
-                    tilt_angle = 0.0
-
-            detected_top_y = int(h * 0.37)
-            for y in range(int(h * 0.16), int(h * 0.50), 2):
-                diff_count = 0
-                for x in range(int(w * 0.13), int(w * 0.87)):
-                    if is_different(img_rgb[y, x]):
-                        diff_count += 1
-                if diff_count > 15:
-                    detected_top_y = y + int(h * 0.13)
-                    break
-
-            detected_top_y = max(int(h * 0.3), min(detected_top_y, int(h * 0.43)))
-
-            return {
-                "success": True,
-                "shoulder_left": [min_x / w, min_x_y / h],
-                "shoulder_right": [max_x / w, max_x_y / h],
-                "tilt_angle": tilt_angle,
-                "body_width": avg_width / w,
-                "neck_anchor": [avg_center / w, detected_top_y / h],
-                "source": "contrast_fallback"
-            }
-    except Exception as fallback_err:
-        print(f"NumPy fallback failed: {fallback_err}")
-
-    return {
-        "success": False,
-        "shoulder_left": [0.25, 0.4],
-        "shoulder_right": [0.75, 0.4],
-        "tilt_angle": 0.0,
-        "body_width": 0.5,
-        "neck_anchor": [0.5, 0.37],
-        "source": "default_fallback",
-        "error_message": "Both MediaPipe and NumPy scan failed, using default values."
-    }
-
-
-class SkinRequest(BaseModel):
-    image_base64: str
-
-
-class CosmeticColorRequest(BaseModel):
-    skin_type: str
-    undertone: str
-    query: str
-
-
-@app.post("/api/analyze-skin")
-def analyze_skin(payload: SkinRequest) -> dict:
-    import base64
-    import io
-    import numpy as np
-    from PIL import Image
-
-    try:
-        base64_data = payload.image_base64
-        if "," in base64_data:
-            _, base64_data = base64_data.split(",", 1)
-
-        img_bytes = base64.b64decode(base64_data)
-        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-        img_rgb = np.array(img)
-        h, w, _ = img_rgb.shape
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Görsel çözümlenemedi: {str(exc)}")
-
-    skin_type = "medium"
-    skin_color_hex = "#f5deb3"
-    undertone = "Warm (Sıcak)"
-    detected_rgb = [245, 222, 179]
-    source = "numpy_fallback"
-
-    try:
-        import mediapipe as mp
-        mp_face_mesh = mp.solutions.face_mesh
-        with mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=1, min_detection_confidence=0.5) as face_mesh:
-            results = face_mesh.process(img_rgb)
-            if results.multi_face_landmarks:
-                landmarks = results.multi_face_landmarks[0].landmark
-                xs = [lm.x for lm in landmarks]
-                ys = [lm.y for lm in landmarks]
-                min_x, max_x = int(min(xs) * w), int(max(xs) * w)
-                min_y, max_y = int(min(ys) * h), int(max(ys) * h)
-
-                min_x = max(0, min_x)
-                max_x = min(w - 1, max_x)
-                min_y = max(0, min_y)
-                max_y = min(h - 1, max_y)
-
-                face_w = max_x - min_x
-                face_h = max_y - min_y
-
-                sample_pts = [
-                    (min_x + face_w // 2, min_y + face_h // 2),
-                    (min_x + int(face_w * 0.3), min_y + int(face_h * 0.6)),
-                    (min_x + int(face_w * 0.7), min_y + int(face_h * 0.6)),
-                    (min_x + face_w // 2, min_y + int(face_h * 0.3))
-                ]
-
-                pixels = []
-                for cx, cy in sample_pts:
-                    if 0 <= cx < w and 0 <= cy < h:
-                        pixels.append(img_rgb[cy, cx])
-
-                if pixels:
-                    detected_rgb = np.mean(pixels, axis=0).astype(int).tolist()
-                    source = "mediapipe_face_mesh"
-    except Exception as mp_err:
-        print(f"MediaPipe Face Mesh failed, using NumPy fallback: {mp_err}")
-
-    if source == "numpy_fallback":
-        center_x_start = int(w * 0.35)
-        center_x_end = int(w * 0.65)
-        center_y_start = int(h * 0.35)
-        center_y_end = int(h * 0.65)
-        center_region = img_rgb[center_y_start:center_y_end, center_x_start:center_x_end]
-        detected_rgb = np.mean(center_region, axis=(0, 1)).astype(int).tolist()
-
-    r, g, b = detected_rgb
-    luminance = 0.299 * r + 0.587 * g + 0.114 * b
-
-    if luminance > 195:
-        skin_type = "light"
-        skin_color_hex = f"#{r:02x}{g:02x}{b:02x}"
-        undertone = "Cool (Soğuk)"
-    elif luminance > 115:
-        skin_type = "medium"
-        skin_color_hex = f"#{r:02x}{g:02x}{b:02x}"
-        undertone = "Warm (Sıcak)"
-    else:
-        skin_type = "dark"
-        skin_color_hex = f"#{r:02x}{g:02x}{b:02x}"
-        undertone = "Neutral (Nötr)"
-
-    return {
-        "success": True,
-        "skin_type": skin_type,
-        "skin_color_hex": skin_color_hex,
-        "undertone": undertone,
-        "detected_rgb": detected_rgb,
-        "source": source
-    }
-
-
-@app.post("/api/analyze-cosmetic-color")
-def analyze_cosmetic_color(payload: CosmeticColorRequest) -> dict:
-    skin_type = payload.skin_type
-    undertone = payload.undertone
-    q = payload.query.strip().lower()
-
-    if skin_type == "light":
-        if any(w in q for w in ["pembe", "mor", "eflatun", "gül", "rose", "berry", "plum", "mürdüm"]):
-            comment = (
-                "✨ **[HOLOGRAFİK ANALİZ RAPORU]**\n\n"
-                "Cilt alt tonun derinlemesine tarandı ve veriler süzülerek havada belirdi. **Soğuk/Açık alt tonun**, "
-                "yerçekimsiz laboratuvarımızın gravitasyonel alanı ile %98 oranında mükemmel bir kuantum rezonansı yakaladı!\n\n"
-                "**Fiziksel Öneri:** Yazdığın bu ton, foton saçılım fiziğine göre cildindeki mavi ışık dalga boyunu yansıtarak "
-                "yüzeysel yansımayı %32 oranında artıracaktır. Havada asılı duran dijital vitrinimizdeki pembe pigment yoğunluğu yüksek "
-                "bu kozmetik ürün, sana yerçekimsiz bir parlaklık kazandıracak.\n\n"
-                "🔗 *[Holografik Satın Alma Köprüsü]*: Cilt tipinize en uyumlu pembe/gül kozmetik alternatifleri için fiyat karşılaştır."
-            )
-        elif any(w in q for w in ["kiremit", "bronz", "turuncu", "şeftali", "seftali", "kahve", "nude", "terracotta"]):
-            comment = (
-                "⚠️ **[GRAVİTASYONEL ALAN UYARISI]**\n\n"
-                "Analiz panellerimizden gelen veriler, **soğuk/açık teninle** sıcak kiremit/turuncu tonlarının kuantum frekansının çakıştığını gösteriyor! "
-                "Bu durum, cildindeki foton yansımasını soğurarak yorgun veya solgun bir görünüm oluşturabilir.\n\n"
-                "**Fiziksel Öneri:** Sıcak tonlar yerine, ışık yansımasını maksimize edecek soğuk pembe veya mürdüm tonlarına yönelmenizi öneririz. "
-                "Bu sayede yerçekimsiz alandaki aura canlılık katsayısı optimum düzeyde kalacaktır.\n\n"
-                "🔗 *[Holografik Satın Alma Köprüsü]*: Cilt tipinize özel daha uyumlu alternatif tonları listele."
-            )
-        else:
-            comment = (
-                "ℹ️ **[HOLOGRAFİK BİLGİ SEVİYESİ]**\n\n"
-                "Yüklediğin veriler doğrultusunda, belirttiğin ürünün açık tenin üzerindeki fotonik spektrum etkisi 'Nötr' olarak ölçülmüştür. "
-                "Bu ton gravitasyonel alanımızı bozmaz fakat yerçekimsiz ortamda üstün bir parlaklık da sağlamaz.\n\n"
-                "**Fiziksel Öneri:** Daha yüksek kontrast ve kuantum yansıması elde etmek için pembe/mor yansımalı soğuk tonları tercih edebilirsiniz.\n\n"
-                "🔗 *[Holografik Satın Alma Köprüsü]*: Cilt tipinize özel diğer alternatifleri karşılaştırın."
-            )
-    elif skin_type == "medium":
-        if any(w in q for w in ["şeftali", "seftali", "kiremit", "bronz", "turuncu", "coral", "mercan", "nude", "kahve", "terracotta"]):
-            comment = (
-                "✨ **[HOLOGRAFİK ANALİZ RAPORU]**\n\n"
-                "Cilt analiz verilerin süzülerek havada belirdi. **Sıcak alt tonlu buğday tenin**, "
-                "yerçekimsiz stüdyomuzdaki altın dalga boyundaki foton yansımalarıyle mükemmel bir uyum yakaladı.\n\n"
-                "**Fiziksel Öneri:** Şeftali, mercan ve bronz tonları, buğday teninin yaydığı sıcak spektrumu emerek doğal bir ışıltı katacak "
-                "ve yüzeydeki ışık kırılmasını %25 optimize edecektir. Havada asılı duran dijital vitrinimizdeki bu ürün, yüzüne kusursuz bir teknolojik aura verecektir.\n\n"
-                "🔗 *[Holografik Satın Alma Köprüsü]*: Buğday ten için en popüler şeftali/mercan alternatifleri karşılaştır."
-            )
-        elif any(w in q for w in ["eflatun", "pembe", "mor", "berry", "plum", "soğuk pembe"]):
-            comment = (
-                "⚠️ **[GRAVİTASYONEL ALAN UYARISI]**\n\n"
-                "Cilt analiz panellerimiz, soğuk eflatun/pembe tonlarının **sıcak buğday teninle** fotonik bir uyumsuzluk yarattığını tespit etti. "
-                "Bu tonlar ten renginizle çakışarak cildi solgun gösterebilir.\n\n"
-                "**Fiziksel Öneri:** Sıcak şeftali, terracotta ve mercan tonlarındaki allık ve rujları tercih etmeniz yerçekimsiz alandaki dengenizi koruyacaktır.\n\n"
-                "🔗 *[Holografik Satın Alma Köprüsü]*: Buğday teninizle en uyumlu sıcak tonlu makyaj alternatiflerine gözatın."
-            )
-        else:
-            comment = (
-                "ℹ️ **[HOLOGRAFİK BİLGİ SEVİYESİ]**\n\n"
-                "Buğday teniniz üzerinde bu rengin analiz değeri 'Nötr' seviyededir. Işık yansımasını ne artırır ne azaltır.\n\n"
-                "**Fiziksel Öneri:** Şeftali ve mercan yansımalı tonlar ile altın ışıltılı pigmentler tercih edilirse kuantum auranız daha dengeli duracaktır.\n\n"
-                "🔗 *[Holografik Satın Alma Köprüsü]*: Cildinize özel sıcak yansımalı diğer ürünleri inceleyin."
-            )
-    else:
-        if any(w in q for w in ["altın", "altin", "gold", "bronz", "mürdüm", "plum", "berry", "koyu kırmızı", "bordo", "kahve", "bakır", "bakir"]):
-            comment = (
-                "✨ **[HOLOGRAFİK ANALİZ RAPORU]**\n\n"
-                "Verilerin süzülerek havada belirdi. Derin **esmer tenin ve nötr/sıcak alt tonun**, yerçekimsiz stüdyomuzdaki yüksek dalga boylu ışık huzmeleriyle "
-                "tam uyum içinde rezonansa girdi.\n\n"
-                "**Fiziksel Öneri:** Bronz, altın ışıltıları, mürdüm ve derin bordo tonları, esmer teninizdeki ışık soğurmasını azaltarak yüzey yansımasını %35 oranında artıracaktır. "
-                "Havada asılı duran vitrinimizdeki bu pigmentler, yüzünüze fütüristik bir derinlik ve parlaklık kazandıracak.\n\n"
-                "🔗 *[Holografik Satın Alma Köprüsü]*: Esmer ten için en uyumlu altın/bordo makyaj ürünleri karşılaştır."
-            )
-        elif any(w in q for w in ["toz pembe", "açık pembe", "pastel", "beyaz", "eflatun"]):
-            comment = (
-                "⚠️ **[GRAVİTASYONEL ALAN UYARISI]**\n\n"
-                "Analizörlerimiz, çok açık pastel ve soğuk toz pembe tonlarının esmer teniniz üzerinde 'tebeşirimsi' ve mat bir yansıma kırılması yarattığını gösteriyor. "
-                "Bu durum yerçekimsiz estetiğimizi olumsuz etkileyebilir.\n\n"
-                "**Fiziksel Öneri:** Açık pastel tonlar yerine, derin mürdüm, bordo ve altın ışıltılı bakır tonlarına yönelmeniz daha kusursuz bir teknolojik görünüm sağlayacaktır.\n\n"
-                "🔗 *[Holografik Satın Alma Köprüsü]*: Esmer teninize özel derin pigmentli alternatifleri listele."
-            )
-        else:
-            comment = (
-                "ℹ️ **[HOLOGRAFİK BİLGİ SEVİYESİ]**\n\n"
-                "Esmer teniniz için bu ürünün yansıma etkisi 'Nötr' seviyesindedir. \n\n"
-                "**Fiziksel Öneri:** Derin mürdüm veya altın yansımalı tonları tercih etmeniz esmer teninizin asilliğini fütüristik aura ile birleştirecektir.\n\n"
-                "🔗 *[Holografik Satın Alma Köprüsü]*: Cilt tonunuz için özel önerilen diğer ürünleri karşılaştırın."
-            )
-
-    return {"success": True, "comment": comment}
-
 
 def require_device_id(x_device_id: str | None) -> str:
     if not x_device_id or len(x_device_id) < 8:
@@ -1523,8 +1171,22 @@ def search_products(
 
 @app.post("/parse-url")
 def parse_url(payload: UrlParseRequest) -> dict:
+    import hashlib, time
+    from functools import lru_cache
+
+    # URL önbelleği — aynı URL için 60 dakika sonuç sakla
+    _url_cache = getattr(parse_url, "_cache", {})
+    parse_url._cache = _url_cache
+    
+    cache_key = hashlib.md5(payload.url.strip().encode()).hexdigest()
+    now = time.time()
+    if cache_key in _url_cache:
+        cached_at, cached_data = _url_cache[cache_key]
+        if now - cached_at < 3600:  # 60 dakika
+            return cached_data
+    
     parsed = parse_product_url(payload.url)
-    return {
+    result = {
         "title": parsed.title,
         "price": parsed.price,
         "image_url": parsed.image_url,
@@ -1535,6 +1197,17 @@ def parse_url(payload: UrlParseRequest) -> dict:
         "original_price": parsed.original_price,
         "extra_info": parsed.extra_info,
     }
+    
+    # Sadece başarılı sonuçları önbellekle
+    if parsed.price and parsed.title:
+        _url_cache[cache_key] = (now, result)
+        # Önbelleği 500 girişle sınırla
+        if len(_url_cache) > 500:
+            oldest = sorted(_url_cache.items(), key=lambda x: x[1][0])[:100]
+            for k, _ in oldest:
+                del _url_cache[k]
+    
+    return result
 
 
 @app.post("/api/find-alternatives")
@@ -1593,36 +1266,47 @@ async def find_alternatives(payload: AlternativesRequest):
                 filtered.append(p)
         products = filtered
 
-        # Trendyol özel "Diğer Satıcılar" çekimi
+        # Trendyol özel "Diğer Satıcılar" çekimi - string split ile güvenli
         if "trendyol.com" in payload.original_url:
             from app.parser import safe_product_get
-            import json
+            import json as _json
             try:
                 resp = safe_product_get(payload.original_url)
-                m = re.search(r'window\.__INITIAL_STATE__\s*=\s*({.*?});?</script>', resp.text, re.DOTALL)
-                if m:
-                    state = json.loads(m.group(1).strip())
-                    merchants = state.get("product", {}).get("productDetails", {}).get("otherMerchants", [])
-                    for merchant in merchants:
-                        merch_price = merchant.get("price", {}).get("discountedPrice", {}).get("value")
-                        merch_name = merchant.get("merchant", {}).get("name")
-                        merch_url = merchant.get("merchant", {}).get("sellerLink", "")
-                        merch_score = merchant.get("merchant", {}).get("sellerScore")
-                        merch_delivery = merchant.get("deliveryInformation", {}).get("fastDeliveryOptions", [])
-                        
-                        if merch_price and merch_name:
-                            products.append({
-                                "title": payload.title,
-                                "price": float(merch_price),
-                                "url": f"https://www.trendyol.com{merch_url}" if merch_url else payload.original_url,
-                                "source": f"Trendyol ({merch_name})",
-                                "image_url": payload.image_url,
-                                "extra_info": {
-                                    "rating": merch_score,
-                                    "fast_delivery": bool(merch_delivery)
-                                }
-                            })
-            except Exception as e:
+                if resp and resp.ok:
+                    from bs4 import BeautifulSoup as _BS
+                    _soup = _BS(resp.text, "lxml")
+                    for _script in _soup.find_all("script"):
+                        _st = _script.string or ""
+                        if "window.__INITIAL_STATE__=" in _st:
+                            try:
+                                _json_str = _st.split("window.__INITIAL_STATE__=")[1]
+                                for _sep in [";window.__SEARCH_APP_INITIAL_STATE__=", ";window.__"]:
+                                    if _sep in _json_str:
+                                        _json_str = _json_str.split(_sep)[0]
+                                        break
+                                else:
+                                    _json_str = _json_str.rsplit(";", 1)[0]
+                                _state = _json.loads(_json_str.strip())
+                                _merchants = _state.get("product", {}).get("productDetails", {}).get("otherMerchants", [])
+                                for _m in _merchants:
+                                    _mp = _m.get("price", {}).get("discountedPrice", {}).get("value")
+                                    _mn = _m.get("merchant", {}).get("name")
+                                    _mu = _m.get("merchant", {}).get("sellerLink", "")
+                                    _ms = _m.get("merchant", {}).get("sellerScore")
+                                    _md = bool(_m.get("deliveryInformation", {}).get("fastDeliveryOptions", []))
+                                    if _mp and _mn:
+                                        products.append({
+                                            "title": payload.title,
+                                            "price": float(_mp),
+                                            "url": f"https://www.trendyol.com{_mu}" if _mu else payload.original_url,
+                                            "source": f"Trendyol ({_mn})",
+                                            "image_url": getattr(payload, "image_url", None),
+                                            "extra_info": {"rating": _ms, "fast_delivery": _md}
+                                        })
+                            except Exception:
+                                pass
+                            break
+            except Exception:
                 pass
 
     # Defensive: filter out non-dict entries (corrupt cache data)

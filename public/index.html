@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Almadan">
-    <link rel="manifest" href="/static/manifest.webmanifest">
+    <link rel="manifest" href="/static/manifest.json">
     <link rel="apple-touch-icon" href="/static/icon-192.png">
     <link rel="icon" href="data:image/x-icon;,">
     <title>Almadan - Alışveriş Karar Asistanı</title>
@@ -43,6 +43,7 @@
       .store-emoji { font-size:22px; line-height:1; }
       .store-name  { font-size:14px; font-weight:700; color:var(--ink); }
       .store-note  { font-size:11px; color:var(--ink-2); }
+      .store-desc  { font-size:12px; color:var(--ink-2); margin: 4px 0 6px; line-height:1.4; }
       .btn-follow  { padding:6px 14px; font-size:12px; font-weight:600; border:1.5px solid var(--green); border-radius:6px; background:var(--bg); color:var(--green); cursor:pointer; transition:all .15s; margin-top:auto; }
       .btn-follow:hover,.btn-follow.active { background:var(--green); color:#fff; }
     </style>
@@ -58,7 +59,7 @@
         <button class="nav-item" data-view="tracking">Takiptekiler</button>
         <button class="nav-item" data-view="cart">Sepetim & Listelerim</button>
         <button class="nav-item" data-view="savings">Tasarrufum</button>
-        <button class="nav-item" data-view="bulletins">Bültenler</button>
+        <button class="nav-item" data-view="bulletins">B&uuml;ltenler</button>
       </nav>
       <div class="topbar-actions">
         <span class="network-status" id="networkStatus" role="status" aria-live="polite">
@@ -83,8 +84,17 @@
       <section class="intro-band">
         <div class="intro-content">
           <p class="eyebrow">ALIŞVERİŞ KARAR ASİSTANI</p>
-          <h1>Satın almadan önce kontrol et.</h1>
-          <p class="intro-copy">Ürün linkini yapıştır veya barkodunu tara — hangi mağazada en ucuz, hemen göster.</p>
+          <h1>Satın almadan önce karşılaştır.</h1>
+          <p class="intro-copy">Trendyol, Hepsiburada, Amazon, N11 ve daha fazlası — tek tıkla fiyat karşılaştırması. Link yapıştır, en ucuz mağazayı hemen bul.</p>
+
+          <!-- Mağaza rozetleri -->
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+            <span style="background:rgba(242,122,26,.15);color:#f27a1a;border:1px solid rgba(242,122,26,.3);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;">Trendyol</span>
+            <span style="background:rgba(255,96,0,.15);color:#ff6000;border:1px solid rgba(255,96,0,.3);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;">Hepsiburada</span>
+            <span style="background:rgba(255,153,0,.15);color:#ff9900;border:1px solid rgba(255,153,0,.3);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;">Amazon</span>
+            <span style="background:rgba(111,65,193,.15);color:#9b6ff0;border:1px solid rgba(111,65,193,.3);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;">n11</span>
+            <span style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.12);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;">+100 mağaza daha</span>
+          </div>
 
           <form class="url-form" id="urlForm" style="display:flex;flex-direction:column;gap:10px;">
             <div style="display:flex;gap:10px;width:min(800px,100%);">
@@ -177,224 +187,7 @@
 
         </div>
       </section>
-
-      <!-- YAPAY ZEKA CİLT VE MAKYAJ ANALİSTİ (Sadece Kozmetik Seçildiğinde Görünür) -->
-      <section class="content-section hidden" id="aiCosmeticsSection">
-        <div class="glass-card" style="padding: 20px; border-radius: 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 24px;">
-          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-            <div style="background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 10px rgba(255,117,140,0.3);">
-              <i data-lucide="sparkles" style="width: 20px; height: 20px;"></i>
-            </div>
-            <div>
-              <h3 style="margin: 0; font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 18px; color: var(--green-dark);">Yapay Zeka Cilt & Makyaj Analisti</h3>
-              <p style="margin: 2px 0 0 0; font-size: 12px; color: var(--ink-light);">Selfie fotoğrafınızı analiz ederek en uyumlu makyaj renk paletini belirleyin.</p>
-            </div>
-          </div>
-          
-          <div class="ai-analyst-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-            <!-- Sol Panel: Fotoğraf Yükleme/Seçme -->
-            <div style="border: 2px dashed var(--line); border-radius: 12px; padding: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 220px; position: relative; background: var(--bg-card); transition: all 0.2s;" id="aiPhotoDropzone">
-              <i data-lucide="camera" style="width: 48px; height: 48px; color: var(--ink-light); margin-bottom: 12px;" id="aiCameraIcon"></i>
-              <p style="font-size: 13px; font-weight: 700; margin-bottom: 4px; color: var(--ink);" id="aiUploadStatus">Selfie Fotoğrafı Yükle</p>
-              <p style="font-size: 11px; color: var(--ink-light); margin-bottom: 16px; text-align: center;">veya test etmek için aşağıdaki hazır örnek modellerden birini seçin:</p>
-              
-              <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;" id="aiSampleSelfies">
-                <button type="button" class="tag-button" id="btnSelfieLight" style="font-size: 11px; background: #fdf5e6; color: #8b5a2b; border: 1px solid #e5c158; cursor: pointer; padding: 6px 12px; border-radius: 6px; font-weight: 700;">Açık Tenli Model</button>
-                <button type="button" class="tag-button" id="btnSelfieMedium" style="font-size: 11px; background: #f5deb3; color: #8b5a2b; border: 1px solid #cd9b1d; cursor: pointer; padding: 6px 12px; border-radius: 6px; font-weight: 700;">Buğday Tenli Model</button>
-                <button type="button" class="tag-button" id="btnSelfieDark" style="font-size: 11px; background: #cd853f; color: white; border: 1px solid #8b4513; cursor: pointer; padding: 6px 12px; border-radius: 6px; font-weight: 700;">Esmer Model</button>
-              </div>
-              
-              <input type="file" id="aiPhotoFileInput" accept="image/*" class="hidden">
-              
-              <!-- Face Preview and Makeup Canvas Container -->
-              <div id="aiFaceContainer" class="hidden" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 8; background: var(--bg-card); display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 10px;">
-                <img id="aiFacePreview" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block; visibility: visible; opacity: 1; position: relative; z-index: 1;">
-                <canvas id="aiMakeupCanvas" width="300" height="300" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: block; visibility: visible; opacity: 1; z-index: 2;"></canvas>
-
-                <!-- SVG AR HUD for face -->
-                <svg id="aiFaceSvgHud" viewBox="0 0 300 300" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9;">
-                  <defs>
-                    <linearGradient id="aiScanlineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stop-color="#ff7eb3" stop-opacity="0"></stop>
-                      <stop offset="50%" stop-color="#ff7eb3" stop-opacity="0.8"></stop>
-                      <stop offset="100%" stop-color="#ff7eb3" stop-opacity="0"></stop>
-                    </linearGradient>
-                  </defs>
-                  <!-- Face mesh simulation paths/reticles -->
-                  <circle cx="150" cy="150" r="80" stroke="#ff7eb3" stroke-width="1" stroke-dasharray="4, 4" fill="none" opacity="0.4" />
-                  <circle cx="150" cy="150" r="105" stroke="#ff7eb3" stroke-width="1.5" stroke-dasharray="8, 4" fill="none" opacity="0.6" />
-                  <line x1="150" y1="30" x2="150" y2="270" stroke="#ff7eb3" stroke-width="0.5" opacity="0.3" />
-                  <line x1="30" y1="150" x2="270" y2="150" stroke="#ff7eb3" stroke-width="0.5" opacity="0.3" />
-                  <path d="M 130 140 L 135 140 M 165 140 L 170 140 M 145 180 L 155 180" stroke="#ff7eb3" stroke-width="1.5" fill="none" opacity="0.7" />
-
-                  <!-- Scan line -->
-                  <rect id="aiScanLineRect" x="0" y="0" width="300" height="20" fill="url(#aiScanlineGrad)" class="hidden" />
-                </svg>
-
-                <!-- Reset button to clear image -->
-                <button id="btnResetAiSkin" type="button" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; border: 0; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 12;" title="Temizle">
-                  <i data-lucide="x" style="width: 16px; height: 16px;"></i>
-                </button>
-              </div>
-
-              <!-- Scan Laser Animation Overlay (initially hidden) -->
-              <div id="aiScanLaser" class="hidden" style="position: absolute; left: 0; right: 0; height: 3px; background: #ff7eb3; box-shadow: 0 0 10px #ff7eb3, 0 0 20px #ff7eb3; pointer-events: none; z-index: 10;"></div>
-            </div>
-            
-            <!-- Sağ Panel: Analiz Sonucu -->
-            <div id="aiAnalysisResultCard" class="hidden" style="background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
-                <span style="font-weight: 800; font-size: 14px; color: var(--green-dark);">Cilt Analiz Sonucu</span>
-                <span id="aiSkinToneTag" style="font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; background: rgba(40,122,80,0.1); color: var(--green-dark);">Nötr Alt Ton</span>
-              </div>
-              
-              <div style="display: flex; align-items: center; gap: 10px; font-size: 13px;">
-                <span>Algılanan Cilt Tipi:</span>
-                <span id="aiSkinToneColorIndicator" style="width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--line); display: inline-block; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);"></span>
-                <strong id="aiSkinToneName" style="color: var(--ink); font-size: 14px;">Açık/Fildişi</strong>
-              </div>
-              
-              <!-- Palet Önerileri -->
-              <div>
-                <span style="font-size: 12px; font-weight: 800; color: var(--ink-light); display: block; margin-bottom: 8px;">Önerilen Renk Paletiniz:</span>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;" id="aiPaletteColors">
-                  <!-- Ruj, Allık, Göz Farı renk daireleri -->
-                </div>
-              </div>
-              
-              <!-- Akıllı Ürün Uyumluluğu Soru Cevap Kutusu -->
-              <div style="border-top: 1px solid var(--line); padding-top: 14px; margin-top: 4px;">
-                <label style="display: block; font-size: 12px; font-weight: 800; color: var(--ink); margin-bottom: 8px;">Bu Ürün/Renk Tenime Uyar Mı?</label>
-                <div style="display: flex; gap: 8px;">
-                  <input type="text" id="aiColorQuestionInput" class="form-input" style="flex: 1; padding: 8px 12px; font-size: 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg-app); color: var(--ink);" placeholder="Örn: Şeftali tonu allık, kiremit kırmızısı ruj...">
-                  <button type="button" class="primary-button" id="askAiColorBtn" style="padding: 0 16px; font-size: 12px; height: 34px; border-radius: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; color: white; font-weight: 800; cursor: pointer;">Sor</button>
-                </div>
-                <div id="aiColorAnswerBox" class="hidden" style="margin-top: 10px; padding: 12px; background: rgba(255,117,140,0.04); border-left: 3px solid #ff7eb3; border-radius: 0 8px 8px 0; font-size: 12px; line-height: 1.5; color: var(--ink);">
-                  <!-- AI Yorumu gelecek -->
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- YAPAY ZEKA SANAL PROVA ODASI (Sadece Giyim & Moda Seçildiğinde Görünür) -->
-      <section class="content-section hidden" id="aiFashionSection">
-        <div class="glass-card" style="padding: 20px; border-radius: 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 24px;">
-          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-            <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 10px rgba(79,70,229,0.3);">
-              <i data-lucide="sparkles" style="width: 20px; height: 20px;"></i>
-            </div>
-            <div>
-              <h3 style="margin: 0; font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 18px; color: var(--green-dark);">Yapay Zeka Sanal Prova Odası</h3>
-              <p style="margin: 2px 0 0 0; font-size: 12px; color: var(--ink-light);">Modelinizi seçin ve tişörtü manken üstünde prova edin.</p>
-            </div>
-          </div>
-
-          <div class="ai-fashion-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
-            <!-- Sol Panel: Model ve Kıyafet Seçimi -->
-            <div style="background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
-              <div>
-                <label style="display: block; font-size: 12px; font-weight: 800; color: var(--ink-light); margin-bottom: 8px;">1. Model Seçin</label>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                  <button type="button" class="tag-button active" id="btnModelMale" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer;">Erkek Model</button>
-                  <button type="button" class="tag-button" id="btnModelFemale" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer;">Kadın Model</button>
-                  <button type="button" class="tag-button" id="btnModelUser" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                    <i data-lucide="upload" style="width: 12px; height: 12px;"></i> Fotoğraf Yükle
-                  </button>
-                </div>
-                <input type="file" id="fashionUserPhotoInput" accept="image/*" style="display: none;">
-              </div>
-
-              <div>
-                <label style="display: block; font-size: 12px; font-weight: 800; color: var(--ink-light); margin-bottom: 8px;">2. Kıyafet Seçin</label>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                  <button type="button" class="tag-button active" id="btnTshirtBlue" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer;">Mavi Tişört</button>
-                  <button type="button" class="tag-button" id="btnTshirtRed" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer;">Kırmızı Tişört</button>
-                  <button type="button" class="tag-button" id="btnTshirtUser" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                    <i data-lucide="upload" style="width: 12px; height: 12px;"></i> Tişört Yükle
-                  </button>
-                </div>
-                <input type="file" id="fashionUserGarmentInput" accept="image/*" style="display: none;">
-                <div style="margin-top: 8px;">
-                  <label style="display: block; font-size: 11px; font-weight: 700; color: var(--ink-light); margin-bottom: 4px;">Veya Kıyafet Görsel Linki:</label>
-                  <input type="url" id="fashionGarmentUrlInput" class="form-input" style="width: 100%; padding: 6px 10px; font-size: 12px; height: auto;" placeholder="https://example.com/tshirt.png">
-                </div>
-              </div>
-
-              <div style="border-top: 1px solid var(--line); padding-top: 14px;">
-                <button type="button" class="primary-button" id="btnStartTryOn" style="width: 100%; font-size: 13px; height: 38px; border-radius: 8px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border: 0; color: white; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                  <i data-lucide="play" style="width: 16px; height: 16px;"></i> Prova Et
-                </button>
-              </div>
-            </div>
-
-            <!-- Sağ Panel: Canvas Arayüzü ve Laser Efekti -->
-            <div style="border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; position: relative; background: var(--bg-card);">
-              <div style="position: relative; width: 300px; height: 300px; max-width: 100%;" class="glass-ui">
-                <canvas id="tryOnCanvas" width="300" height="300" style="position: relative; z-index: 2; width: 100%; height: 100%; border-radius: 8px; display: block; visibility: visible; opacity: 1; background: #eaeaea; cursor: move;"></canvas>
-
-                <!-- SVG AR HUD Overlay -->
-                <svg id="tryOnSvgHud" class="hidden" viewBox="0 0 300 300" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;">
-                  <defs>
-                    <linearGradient id="scanlineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stop-color="#00f0ff" stop-opacity="0"></stop>
-                      <stop offset="50%" stop-color="#00f0ff" stop-opacity="0.8"></stop>
-                      <stop offset="100%" stop-color="#00f0ff" stop-opacity="0"></stop>
-                    </linearGradient>
-                  </defs>
-                  <!-- Corner brackets -->
-                  <path d="M 15 30 L 15 15 L 30 15" stroke="#00f0ff" stroke-width="2" fill="none" />
-                  <path d="M 285 30 L 285 15 L 270 15" stroke="#00f0ff" stroke-width="2" fill="none" />
-                  <path d="M 15 270 L 15 285 L 30 285" stroke="#00f0ff" stroke-width="2" fill="none" />
-                  <path d="M 285 270 L 285 285 L 270 285" stroke="#00f0ff" stroke-width="2" fill="none" />
-
-                  <!-- Tech details inside scanning overlay -->
-                  <circle cx="150" cy="150" r="130" stroke="rgba(0, 240, 255, 0.05)" stroke-width="1" fill="none" stroke-dasharray="5, 5" />
-                  <circle cx="150" cy="150" r="80" stroke="rgba(0, 240, 255, 0.1)" stroke-width="1.5" fill="none" stroke-dasharray="12, 6" />
-
-                  <!-- Sweeping scanner line in SVG -->
-                  <rect id="tryOnSvgScanline" x="10" y="20" width="280" height="6" fill="url(#scanlineGrad)">
-                    <animate attributeName="y" values="20;280;20" dur="3s" repeatCount="indefinite" />
-                  </rect>
-                </svg>
-
-                <!-- Scan Laser Animation Overlay (initially hidden) -->
-                <div id="fashionScanLaser" class="hidden" style="position: absolute; left: 0; right: 0; height: 3px; background: #7c3aed; box-shadow: 0 0 10px #7c3aed, 0 0 20px #7c3aed; pointer-events: none; z-index: 10;"></div>
-              </div>
-
-              <!-- Yapay Zeka Başarı Bannerı -->
-              <div id="aiAnalysisSuccessBanner" class="hidden" style="width: 100%; max-width: 300px; margin-top: 10px; padding: 10px; border-radius: 8px; background: rgba(0, 150, 255, 0.08); border: 1px solid rgba(0, 150, 255, 0.2); display: flex; align-items: center; gap: 8px; justify-content: center;">
-                <i data-lucide="shield-check" style="color: #0096ff; width: 16px; height: 16px;"></i>
-                <span style="font-size: 11px; font-weight: 700; color: #0096ff; font-family: 'Manrope', sans-serif;">Yapay Zeka Analizi Başarılı!</span>
-              </div>
-
-              <!-- Gelişmiş Ayarlar (Katlanabilir) -->
-              <details style="width: 100%; max-width: 300px; margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: rgba(255,255,255,0.02);" id="tryOnAdvancedDetails">
-                <summary style="font-size: 11px; font-weight: 800; color: var(--ink-light); cursor: pointer; outline: pointer; outline: none; display: flex; align-items: center; gap: 4px;">
-                  <i data-lucide="settings-2" style="width: 12px; height: 12px;"></i> Gelişmiş Hizalama Ayarları
-                </summary>
-                <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
-                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                    <span style="font-size: 11px; font-weight: 700; color: var(--ink-light); display: flex; align-items: center; gap: 4px;"><i data-lucide="move" style="width:12px; height:12px;"></i> Boyut:</span>
-                    <input type="range" id="tryOnSizeSlider" min="50" max="250" value="150" style="flex: 1; accent-color: var(--green); cursor: pointer;" oninput="window.updateTryOnGarmentSize(this.value)">
-                  </div>
-                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                    <span style="font-size: 11px; font-weight: 700; color: var(--ink-light); display: flex; align-items: center; gap: 4px;"><i data-lucide="rotate-cw" style="width:12px; height:12px;"></i> Döndürme:</span>
-                    <input type="range" id="tryOnAngleSlider" min="-45" max="45" value="0" style="flex: 1; accent-color: var(--green); cursor: pointer;" oninput="window.updateTryOnGarmentAngle(this.value)">
-                  </div>
-                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                    <span style="font-size: 11px; font-weight: 700; color: var(--ink-light); display: flex; align-items: center; gap: 4px;"><i data-lucide="sliders" style="width:12px; height:12px;"></i> Hassasiyet:</span>
-                    <input type="range" id="tryOnChromaThreshold" min="150" max="255" value="235" style="flex: 1; accent-color: var(--green); cursor: pointer;" oninput="window.updateTryOnChromaThreshold(this.value)">
-                  </div>
-                </div>
-              </details>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="content-section" id="discoverView">
+<section class="content-section" id="discoverView">
         <div class="page-guide">
           <i data-lucide="link"></i>
           <span>Ürün linkini yapıştır veya barkod tara — sistem fiyatları otomatik karşılaştırır.</span>
@@ -578,7 +371,7 @@
             </button>
           </div>
         </div>
-        
+
         <div id="sharedListStatusContainer"></div>
 
         <div class="cart-split-layout">
@@ -673,7 +466,7 @@
                 <button class="mode-tab active" id="optModeSingle">Tek Market</button>
                 <button class="mode-tab" id="optModeSplit">Bölünmüş Market (Split)</button>
               </div>
-              
+
               <div class="optimizer-location-settings" style="display: flex; gap: 8px; margin-top: 12px; align-items: center; justify-content: space-between; font-size: 12px; background: rgba(0, 0, 0, 0.02); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 6px; flex: 1;">
                   <i data-lucide="map-pin" style="width: 15px; height: 15px; color: var(--green);"></i>
@@ -698,7 +491,7 @@
                   </select>
                 </div>
               </div>
-              
+
               <div id="optimizerResults" class="optimizer-results">
                 <!-- Optimizasyon sonuçları dinamik doldurulacak -->
                 <p class="empty-text">Listeye ürün ekleyerek karşılaştırın.</p>
@@ -707,6 +500,13 @@
           </div>
         </div>
       </section>
+
+      <footer style="border-top:1px solid var(--border,#dfe3dc); margin-top:40px; padding:20px 16px 90px; text-align:center; font-size:13px; color:var(--ink-2,#687068);">
+        <a href="/hakkinda" style="color:inherit; text-decoration:none; margin:0 10px;">Hakkında</a> ·
+        <a href="/gizlilik" style="color:inherit; text-decoration:none; margin:0 10px;">Gizlilik</a> ·
+        <a href="/iletisim" style="color:inherit; text-decoration:none; margin:0 10px;">İletişim</a>
+        <p style="margin:8px 0 0;">© 2026 Almadan</p>
+      </footer>
     </main>
 
     <nav class="mobile-nav" aria-label="Mobil menü">
@@ -732,6 +532,14 @@
       </button>
     </nav>
 
+    <!-- Yeni: Satıcı Seçim Ekranı -->
+    <dialog class="product-dialog" id="sellerSelectionDialog" style="max-width: 500px; border-radius: 12px; border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+      <button class="dialog-close icon-button" onclick="document.getElementById('sellerSelectionDialog').close()" aria-label="Pencereyi kapat" title="Kapat">
+        <i data-lucide="x"></i>
+      </button>
+      <div id="sellerSelectionContent" class="dialog-body" style="padding: 24px;"></div>
+    </dialog>
+
     <dialog class="product-dialog" id="productDialog">
       <button class="dialog-close icon-button" id="dialogClose" aria-label="Pencereyi kapat" title="Kapat">
         <i data-lucide="x"></i>
@@ -747,7 +555,7 @@
     </dialog>
 
     <!-- Search Loading Overlay -->
-    <div id="quantumScanOverlay" class="hidden" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(18, 20, 18, 0.88); backdrop-filter: blur(6px); z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; gap: 20px;">
+    <div id="quantumScanOverlay" class="hidden" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; color: var(--ink); gap: 20px;">
       <!-- Spinning ring -->
       <div style="position: relative; width: 72px; height: 72px;">
         <svg width="72" height="72" viewBox="0 0 72 72" style="animation: spin-clockwise 1.4s linear infinite;">
@@ -760,8 +568,8 @@
       </div>
 
       <div style="text-align: center;">
-        <h3 style="margin: 0 0 6px 0; font-family: 'Manrope', sans-serif; font-size: 17px; font-weight: 800; color: #ffffff; letter-spacing: 0;">Fırsatlar Aranıyor</h3>
-        <p style="margin: 0; font-size: 13px; color: rgba(255,255,255,0.55); font-family: 'DM Sans', sans-serif;" id="quantumScanProgress">Sizin için en uygun fırsatları ve ürünleri inceliyoruz...</p>
+        <h3 style="margin: 0 0 6px 0; font-family: 'Manrope', sans-serif; font-size: 17px; font-weight: 800; color: #121412; letter-spacing: 0;">Fırsatlar Aranıyor</h3>
+        <p style="margin: 0; font-size: 13px; color: #687068; font-family: 'DM Sans', sans-serif;" id="quantumScanProgress">Sizin için en uygun fiyatlar ve diğer satıcılar inceleniyor...</p>
       </div>
     </div>
 
@@ -840,7 +648,7 @@
       </div>
     </dialog>
 
-    <script defer src="/static/app.js?v=20260620-url-fix"></script>
+    <script defer src="/static/app.js?v=20260705-relevance-fix"></script>
     <script>
       /* Sprint 12 — auth fix: DOMContentLoaded sonrasi state.auth guncelle */
       document.addEventListener('DOMContentLoaded', function() {
@@ -1021,27 +829,6 @@
           });
           list.innerHTML=html;
         };
-        /* switchView'da bulletins eksik — click'te manuel duzelt */
-        var _bBtn = document.querySelector('[data-view="bulletins"]');
-        if (_bBtn) _bBtn.addEventListener('click', function() {
-          setTimeout(function() {
-            var bv = document.getElementById('bulletinsView');
-            if (!bv) return;
-            /* Eski app.js bulletinsView'i saklamıyor — manuel goster */
-            ['discoverView','trackingView','savingsView','cartView'].forEach(function(id){
-              var el=document.getElementById(id); if(el) el.classList.add('hidden');
-            });
-            bv.classList.remove('hidden');
-            /* 2s sonra hala loading var ise fallback goster */
-            setTimeout(function(){
-              var list=document.getElementById('storeList');
-              if(list && (list.querySelector('.loading-row')||list.innerHTML.includes('eklenmemiş')||list.innerHTML.includes('yüklenemedi'))){
-                window._almadanShowStores();
-              }
-            }, 2000);
-          }, 50);
-        });
-
         /* toggleFollow — eski app.js'de yok, burda tanimla */
         if (typeof toggleFollow === 'undefined') {
           window.storeFollowState = window.storeFollowState || {};
@@ -1115,12 +902,6 @@
               });
             }).catch(function(){});
         }
-        /* Bültenler sekmesi açılınca takip durumunu yükle (mağazalar render olduktan sonra) */
-        var _bBtnFollow = document.querySelector('[data-view="bulletins"]');
-        if (_bBtnFollow) _bBtnFollow.addEventListener('click', function() {
-          setTimeout(_loadFollowedStores, 600);
-        });
-
         /* Bildirim paneline mağaza bildirimleri ekle */
         var _notifBtn = document.getElementById('notificationButton');
         if (_notifBtn) {
@@ -1142,8 +923,7 @@
                   section.style.cssText = 'margin-top:20px;border-top:1px solid var(--border);padding-top:16px;';
                   var html = '<p style="font-size:10px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;margin:0 0 10px;">MAĞAZA BİLDİRİMLERİ</p>';
                   if (notifs.length === 0) {
-                    html += '<p style="font-size:13px;color:var(--ink-2);margin:0;">Henüz mağaza kampanya bildirimi yok. Bültenlere git ve mağaza takip et.</p>';
-                    html += '<button onclick="document.getElementById(\'productDialog\').close(); document.querySelector(\'[data-view=\\\'bulletins\\\']\').click();" style="margin-top:10px;padding:8px 16px;background:#287a50;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;">Mağaza Takip Et →</button>';
+                    html += '<p style="font-size:13px;color:var(--ink-2);margin:0;">Henüz mağaza kampanya bildirimi yok.</p>';
                   } else {
                     var toShow = notifs.slice(0, 8);
                     toShow.forEach(function(n){
@@ -1179,6 +959,218 @@
             var dot = document.querySelector('.notification-dot');
             if (dot) dot.style.display = unread.length ? '' : 'none';
           }).catch(function(){});
+
+        /* PWA Service Worker & Push Kaydı */
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/static/sw.js').then(function(reg) {
+              console.log('SW Kayıt Başarılı:', reg.scope);
+              if (Notification.permission === 'default') {
+                setTimeout(() => Notification.requestPermission(), 3000);
+              }
+            }).catch(function(err) {
+              console.log('SW Kayıt Hatası:', err);
+            });
+          });
+        }
+
+        /* ── GOOGLE SHEETS SYNC BUTONU ──────────────────────────────────────
+           Admin paneline "Google Sheets'e Gönder" butonu enjekte eder.
+        ─────────────────────────────────────────────────────────────────────── */
+        window._almadanSheetsSync = async function(btn) {
+          var orig = btn.innerHTML;
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner" style="display:inline-block;width:14px;height:14px;border-width:2px;border-color:#fff;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite;"></span> Gönderiliyor...';
+          try {
+            var csrfToken = document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('csrf_token=');});
+            var csrfVal = csrfToken ? csrfToken.split('=')[1] : '';
+            var res = await fetch('/api/admin/sync-google-sheets', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': csrfVal, 'Content-Type': 'application/json' } });
+            var text = await res.text();
+            var data; try { data = JSON.parse(text); } catch(je) { throw new Error('Sunucu hatası: ' + text.slice(0, 120)); }
+            if (!res.ok) throw new Error(data.detail || 'Hata');
+            btn.innerHTML = '✓ Gönderildi';
+            btn.style.background = '#287a50';
+            /* Sonuç linkini göster */
+            var resultDiv = btn.parentElement.querySelector('[data-sheets-result]');
+            if (resultDiv) {
+              resultDiv.innerHTML = '<a href="' + data.sheet_url + '" target="_blank" style="color:#287a50;font-size:12px;font-weight:600;text-decoration:none;">📊 Tabloyu Aç →</a>'
+                + '<span style="font-size:11px;color:var(--ink-2);margin-left:10px;">' + (data.users||0) + ' kullanıcı · ' + (data.links||0) + ' link · ' + (data.products||0) + ' ürün · ' + (data.stores||0) + ' mağaza</span>'
+                + (data.auth_api_snippet ? '<div style="font-size:10px;color:red;margin-top:4px;">Auth err ' + data.auth_api_status + ': ' + data.auth_api_snippet + '</div>' : '<div style="font-size:10px;color:green;margin-top:4px;">Auth OK · ' + (data.emails_found||0) + ' email</div>');
+              resultDiv.style.display = 'block';
+            }
+            setTimeout(function(){ btn.innerHTML = orig; btn.disabled = false; btn.style.background = ''; }, 4000);
+          } catch(e) {
+            btn.innerHTML = '⚠ ' + (e.message || 'Hata');
+            btn.style.background = '#c0392b';
+            setTimeout(function(){ btn.innerHTML = orig; btn.disabled = false; btn.style.background = ''; }, 4000);
+          }
+        };
+
+        /* Admin paneli açılınca butonu enjekte et — MutationObserver ile yakala */
+        function _injectSheetsBtn() {
+          var statsBody = document.getElementById('adminStatsBody');
+          if (!statsBody || statsBody.querySelector('[data-sheets-btn]')) return;
+          /* İçerik henüz yüklenmediyse (spinner varsa) tekrar dene */
+          if (statsBody.querySelector('.spinner') || statsBody.textContent.trim() === 'Yükleniyor...') {
+            setTimeout(_injectSheetsBtn, 400);
+            return;
+          }
+          var wrapper = document.createElement('div');
+          wrapper.style.cssText = 'margin-top:20px;padding-top:16px;border-top:1px solid var(--border);';
+          wrapper.innerHTML = '<p style="font-size:11px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;margin:0 0 10px;">VERİ DIŞA AKTARMA</p>'
+            + '<button type="button" data-sheets-btn="1" onclick="window._almadanSheetsSync(this)" style="background:#1a3d6e;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);">📊 Google Sheets\'e Gönder</button>'
+            + '<div data-sheets-result style="display:none;margin-top:8px;"></div>'
+            + '<p style="font-size:11px;color:var(--ink-2);margin:8px 0 0;">3 sekme: Yapıştırılan Linkler · Takip Edilen Ürünler · Takip Edilen Mağazalar</p>';
+          statsBody.appendChild(wrapper);
+        }
+        /* dialogContent değişimlerini izle */
+        var _adminObs = new MutationObserver(function() {
+          if (document.getElementById('adminStatsBody')) _injectSheetsBtn();
+        });
+        var _dlgContent = document.getElementById('dialogContent');
+        if (_dlgContent) _adminObs.observe(_dlgContent, { childList: true, subtree: true });
+
+        /* ── YENİ SATICI KARŞILAŞTIRMA EKRANI (app.js override) ─────────────
+           URL yapıştırıldıktan sonra 15+ satıcı/ürün listesi gösterir.
+           Kullanıcı seçim yapar → takip sayfasına geçer.
+        ─────────────────────────────────────────────────────────────────────── */
+        window.showSellerSelectionDialog = async function(parsed) {
+          var dialog  = document.getElementById('sellerSelectionDialog');
+          var content = document.getElementById('sellerSelectionContent');
+          if (!dialog || !content) return;
+
+          dialog.showModal();
+          content.innerHTML = '<div style="text-align:center;padding:36px 20px;">'
+            + '<span class="spinner" style="display:inline-block;width:28px;height:28px;border-color:#287a50;border-right-color:transparent;border-width:3px;"></span>'
+            + '<p style="margin-top:16px;font-weight:700;font-size:15px;color:var(--ink);">En İyi Teklifler Karşılaştırılıyor...</p>'
+            + '<p style="font-size:12px;color:var(--ink-2);margin-top:4px;">15+ satıcı ve alternatif tarıyor</p>'
+            + '</div>';
+
+          try {
+            /* find-alternatives'tan relevans sıralı sonuçları çek */
+            var csrfToken = (document.cookie.split('; ').find(function(r){return r.startsWith('csrf_token=');})||'').split('=').slice(1).join('=');
+            csrfToken = csrfToken ? decodeURIComponent(csrfToken) : '';
+            var faResp = await fetch('/api/find-alternatives', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+              body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url })
+            }).then(function(r){ return r.json(); });
+
+            var alts = (faResp.alternatives || []);
+
+            /* Trendyol / diğer satıcılar parsed içinden */
+            if (parsed.extra_info && parsed.extra_info.otherMerchants) {
+              var seen = new Set(alts.map(function(a){ return a.url; }));
+              parsed.extra_info.otherMerchants.forEach(function(m){
+                if (!seen.has(m.url)) { alts.push(m); seen.add(m.url); }
+              });
+            }
+
+            /* Asıl ürünü başa ekle (yoksa) */
+            if (parsed.price) {
+              var origFound = alts.find(function(a){
+                return Math.abs((a.price||0) - parsed.price) < 1
+                  && String(a.source||'').toLowerCase().includes(String(parsed.source||'').toLowerCase());
+              });
+              if (!origFound) {
+                alts.unshift({
+                  title: parsed.title, price: parsed.price, source: parsed.source,
+                  url: parsed.canonical_url, image_url: parsed.image_url,
+                  extra_info: parsed.extra_info || {}, _isOriginal: true
+                });
+              } else {
+                origFound._isOriginal = true;
+              }
+            }
+
+            /* Sıralama: backend relevans sırası korunur, sadece 0 fiyatlılar sona */
+            alts.sort(function(a,b){
+              if (!a.price && b.price) return 1;
+              if (a.price && !b.price) return -1;
+              return 0;
+            });
+
+            /* En çok değerlendirme */
+            var maxReviews = 0;
+            alts.forEach(function(a){ if ((a.extra_info||{}).review_count > maxReviews) maxReviews = a.extra_info.review_count; });
+            var maxReviewItem = maxReviews > 0 ? alts.find(function(a){ return (a.extra_info||{}).review_count === maxReviews; }) : null;
+
+            /* En yüksek puanlı */
+            var maxRating = 0;
+            alts.forEach(function(a){ var r = parseFloat((a.extra_info||{}).rating||0); if(r>maxRating) maxRating=r; });
+            var maxRatingItem = maxRating >= 8.5 ? alts.find(function(a){ return parseFloat((a.extra_info||{}).rating||0) === maxRating; }) : null;
+
+            if (alts.length === 0) {
+              content.innerHTML = '<div style="text-align:center;padding:30px 20px;">'
+                + '<p style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:12px;">Başka Satıcı Bulunamadı</p>'
+                + '<p style="font-size:13px;color:var(--ink-2);margin-bottom:20px;">Bu ürün yalnızca tek satıcıda görünüyor.</p>'
+                + '<button type="button" class="primary-button" style="width:100%;border-radius:10px;padding:12px;font-weight:700;" data-p=\'' + JSON.stringify(parsed).replace(/'/g,'&#39;') + '\' onclick="document.getElementById(\'sellerSelectionDialog\').close(); showParsedProduct(JSON.parse(this.getAttribute(\'data-p\')));"> Mevcut Ürünü Takip Et</button>'
+                + '</div>';
+              return;
+            }
+
+            var cheapestPrice = Math.min.apply(null, alts.filter(function(a){ return a.price > 0; }).map(function(a){ return a.price; }));
+
+            var html = '<div style="position:sticky;top:0;background:var(--bg);padding:0 0 12px;z-index:1;border-bottom:1px solid var(--border);margin-bottom:12px;">'
+              + '<h3 style="margin:0 0 4px;font-size:19px;font-weight:800;color:var(--ink);">🛒 Mağaza Karşılaştırması</h3>'
+              + '<p style="margin:0;font-size:13px;color:var(--ink-2);"><b style="color:var(--green);">' + alts.length + ' satıcı</b> bulundu — en uygununu seç, takibe al</p>'
+              + '</div>'
+              + '<div style="display:flex;flex-direction:column;gap:10px;max-height:58vh;overflow-y:auto;padding-right:4px;">';
+
+            alts.forEach(function(a, idx){
+              var badges = '';
+              if (a._isOriginal) badges += '<span style="background:rgba(25,118,210,.1);color:#1565c0;border:1px solid rgba(25,118,210,.25);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">📌 Sizin Aradığınız</span>';
+              if (a.price > 0 && a.price === cheapestPrice) badges += '<span style="background:#287a50;color:#fff;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">🏷 En Ucuz</span>';
+              if (maxRatingItem && a === maxRatingItem && !a._isOriginal) badges += '<span style="background:rgba(33,150,243,.1);color:#1976d2;border:1px solid rgba(33,150,243,.25);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">⭐ Yüksek Puanlı ('+(a.extra_info.rating)+')</span>';
+              if (maxReviewItem && a === maxReviewItem && !a._isOriginal) badges += '<span style="background:rgba(156,39,176,.1);color:#7b1fa2;border:1px solid rgba(156,39,176,.25);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">💬 En Çok Değerlendirilen</span>';
+              if ((a.extra_info||{}).fast_delivery) badges += '<span style="background:rgba(255,152,0,.1);color:#e65100;border:1px solid rgba(255,152,0,.3);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">⚡ Hızlı Teslimat</span>';
+
+              var priceStr = a.price ? ('₺' + a.price.toFixed(2)) : '—';
+              var escapedData = JSON.stringify(a).replace(/'/g, '&#39;');
+
+              html += '<div style="border:1.5px solid var(--border);border-radius:10px;padding:13px;cursor:pointer;transition:border-color .15s,transform .1s;background:var(--bg);" '
+                + 'onmouseover="this.style.borderColor=\'#287a50\';this.style.transform=\'translateY(-1px)\';" '
+                + 'onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'none\';" '
+                + 'onclick="window._almadanSelectSeller(this)" data-seller=\'' + escapedData + '\'>'
+                + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
+                +   '<div style="min-width:0;flex:1;">'
+                +     '<div style="font-size:14px;font-weight:700;color:var(--ink);">' + (a.source||'Satıcı') + '</div>'
+                +     '<div style="font-size:11px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">' + (a.title||'').slice(0,70) + '</div>'
+                +     (badges ? '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;">' + badges + '</div>' : '')
+                +   '</div>'
+                +   '<div style="text-align:right;flex-shrink:0;">'
+                +     '<div style="font-size:16px;font-weight:800;color:var(--green-dark);">' + priceStr + '</div>'
+                +     '<div style="font-size:11px;color:var(--green);font-weight:700;margin-top:3px;">Seç →</div>'
+                +   '</div>'
+                + '</div>'
+                + '</div>';
+            });
+
+            html += '</div>';
+            content.innerHTML = html;
+
+          } catch(err) {
+            console.error('Satıcı ekranı hatası:', err);
+            dialog.close();
+            if (typeof showParsedProduct === 'function') showParsedProduct(parsed);
+          }
+        };
+
+        /* Satıcı seçince takip sayfasına geç */
+        window._almadanSelectSeller = function(el) {
+          var a = JSON.parse(el.getAttribute('data-seller'));
+          document.getElementById('sellerSelectionDialog').close();
+          var newParsed = {
+            title: a.title, price: a.price, source: a.source,
+            canonical_url: a.url, image_url: a.image_url,
+            original_price: a.original_price, extra_info: a.extra_info,
+            warnings: [], confidence: 100
+          };
+          if (typeof showParsedProduct === 'function') showParsedProduct(newParsed);
+          else if (typeof selectSellerAndProceed === 'function') el.setAttribute('data-seller', JSON.stringify({...a, url: a.url})), selectSellerAndProceed(el);
+        };
+
       });
     </script>
   </body>

@@ -17,38 +17,6 @@
     {
       "path": "/cron/refresh-all",
       "schedule": "0 5 * * *"
-    },
-{
-      "path": "/cron/catalog-scan",
-      "schedule": "0 6 * * 1,4"
-    },
-    {
-      "path": "/cron/weekly-digest",
-      "schedule": "0 7 * * 1"
-    },
-    {
-      "path": "/cron/semantic-index",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/cron/group-buy-expire",
-      "schedule": "0 11 * * *"
-    },
-    {
-      "path": "/cron/cleanup-metrics",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/cron/check-reminders",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/cron/store-newsletters",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/cron/sync-sheets",
-      "schedule": "0 2 * * *"
     }
   ]
 }

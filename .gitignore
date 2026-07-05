@@ -12,3 +12,4 @@ n11_test.html
 n11_typo.html
 
 .vercel
+.env*

@@ -17,7 +17,7 @@
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
-    <link rel="stylesheet" href="/static/styles.css?v=20260620-url-fix">
+    <link rel="stylesheet" href="/static/styles.css?v=20260706-dark-seller">
     <style>
       /* Sprint 12 — eksik CSS degiskenleri (cache bypass) */
       :root {
@@ -59,6 +59,7 @@
         <button class="nav-item" data-view="tracking">Takiptekiler</button>
         <button class="nav-item" data-view="cart">Sepetim & Listelerim</button>
         <button class="nav-item" data-view="savings">Tasarrufum</button>
+        <button class="nav-item" data-view="bulletins">B&uuml;ltenler</button>
       </nav>
       <div class="topbar-actions">
         <span class="network-status" id="networkStatus" role="status" aria-live="polite">
@@ -186,224 +187,7 @@
 
         </div>
       </section>
-
-      <!-- YAPAY ZEKA CİLT VE MAKYAJ ANALİSTİ (Sadece Kozmetik Seçildiğinde Görünür) -->
-      <section class="content-section hidden" id="aiCosmeticsSection">
-        <div class="glass-card" style="padding: 20px; border-radius: 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 24px;">
-          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-            <div style="background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 10px rgba(255,117,140,0.3);">
-              <i data-lucide="sparkles" style="width: 20px; height: 20px;"></i>
-            </div>
-            <div>
-              <h3 style="margin: 0; font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 18px; color: var(--green-dark);">Yapay Zeka Cilt & Makyaj Analisti</h3>
-              <p style="margin: 2px 0 0 0; font-size: 12px; color: var(--ink-light);">Selfie fotoğrafınızı analiz ederek en uyumlu makyaj renk paletini belirleyin.</p>
-            </div>
-          </div>
-          
-          <div class="ai-analyst-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-            <!-- Sol Panel: Fotoğraf Yükleme/Seçme -->
-            <div style="border: 2px dashed var(--line); border-radius: 12px; padding: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 220px; position: relative; background: var(--bg-card); transition: all 0.2s;" id="aiPhotoDropzone">
-              <i data-lucide="camera" style="width: 48px; height: 48px; color: var(--ink-light); margin-bottom: 12px;" id="aiCameraIcon"></i>
-              <p style="font-size: 13px; font-weight: 700; margin-bottom: 4px; color: var(--ink);" id="aiUploadStatus">Selfie Fotoğrafı Yükle</p>
-              <p style="font-size: 11px; color: var(--ink-light); margin-bottom: 16px; text-align: center;">veya test etmek için aşağıdaki hazır örnek modellerden birini seçin:</p>
-              
-              <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;" id="aiSampleSelfies">
-                <button type="button" class="tag-button" id="btnSelfieLight" style="font-size: 11px; background: #fdf5e6; color: #8b5a2b; border: 1px solid #e5c158; cursor: pointer; padding: 6px 12px; border-radius: 6px; font-weight: 700;">Açık Tenli Model</button>
-                <button type="button" class="tag-button" id="btnSelfieMedium" style="font-size: 11px; background: #f5deb3; color: #8b5a2b; border: 1px solid #cd9b1d; cursor: pointer; padding: 6px 12px; border-radius: 6px; font-weight: 700;">Buğday Tenli Model</button>
-                <button type="button" class="tag-button" id="btnSelfieDark" style="font-size: 11px; background: #cd853f; color: white; border: 1px solid #8b4513; cursor: pointer; padding: 6px 12px; border-radius: 6px; font-weight: 700;">Esmer Model</button>
-              </div>
-              
-              <input type="file" id="aiPhotoFileInput" accept="image/*" class="hidden">
-              
-              <!-- Face Preview and Makeup Canvas Container -->
-              <div id="aiFaceContainer" class="hidden" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 8; background: var(--bg-card); display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 10px;">
-                <img id="aiFacePreview" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block; visibility: visible; opacity: 1; position: relative; z-index: 1;">
-                <canvas id="aiMakeupCanvas" width="300" height="300" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: block; visibility: visible; opacity: 1; z-index: 2;"></canvas>
-                
-                <!-- SVG AR HUD for face -->
-                <svg id="aiFaceSvgHud" viewBox="0 0 300 300" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9;">
-                  <defs>
-                    <linearGradient id="aiScanlineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stop-color="#ff7eb3" stop-opacity="0"></stop>
-                      <stop offset="50%" stop-color="#ff7eb3" stop-opacity="0.8"></stop>
-                      <stop offset="100%" stop-color="#ff7eb3" stop-opacity="0"></stop>
-                    </linearGradient>
-                  </defs>
-                  <!-- Face mesh simulation paths/reticles -->
-                  <circle cx="150" cy="150" r="80" stroke="#ff7eb3" stroke-width="1" stroke-dasharray="4, 4" fill="none" opacity="0.4" />
-                  <circle cx="150" cy="150" r="105" stroke="#ff7eb3" stroke-width="1.5" stroke-dasharray="8, 4" fill="none" opacity="0.6" />
-                  <line x1="150" y1="30" x2="150" y2="270" stroke="#ff7eb3" stroke-width="0.5" opacity="0.3" />
-                  <line x1="30" y1="150" x2="270" y2="150" stroke="#ff7eb3" stroke-width="0.5" opacity="0.3" />
-                  <path d="M 130 140 L 135 140 M 165 140 L 170 140 M 145 180 L 155 180" stroke="#ff7eb3" stroke-width="1.5" fill="none" opacity="0.7" />
-                  
-                  <!-- Scan line -->
-                  <rect id="aiScanLineRect" x="0" y="0" width="300" height="20" fill="url(#aiScanlineGrad)" class="hidden" />
-                </svg>
-                
-                <!-- Reset button to clear image -->
-                <button id="btnResetAiSkin" type="button" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; border: 0; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 12;" title="Temizle">
-                  <i data-lucide="x" style="width: 16px; height: 16px;"></i>
-                </button>
-              </div>
-              
-              <!-- Scan Laser Animation Overlay (initially hidden) -->
-              <div id="aiScanLaser" class="hidden" style="position: absolute; left: 0; right: 0; height: 3px; background: #ff7eb3; box-shadow: 0 0 10px #ff7eb3, 0 0 20px #ff7eb3; pointer-events: none; z-index: 10;"></div>
-            </div>
-            
-            <!-- Sağ Panel: Analiz Sonucu -->
-            <div id="aiAnalysisResultCard" class="hidden" style="background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
-                <span style="font-weight: 800; font-size: 14px; color: var(--green-dark);">Cilt Analiz Sonucu</span>
-                <span id="aiSkinToneTag" style="font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; background: rgba(40,122,80,0.1); color: var(--green-dark);">Nötr Alt Ton</span>
-              </div>
-              
-              <div style="display: flex; align-items: center; gap: 10px; font-size: 13px;">
-                <span>Algılanan Cilt Tipi:</span>
-                <span id="aiSkinToneColorIndicator" style="width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--line); display: inline-block; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);"></span>
-                <strong id="aiSkinToneName" style="color: var(--ink); font-size: 14px;">Açık/Fildişi</strong>
-              </div>
-              
-              <!-- Palet Önerileri -->
-              <div>
-                <span style="font-size: 12px; font-weight: 800; color: var(--ink-light); display: block; margin-bottom: 8px;">Önerilen Renk Paletiniz:</span>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;" id="aiPaletteColors">
-                  <!-- Ruj, Allık, Göz Farı renk daireleri -->
-                </div>
-              </div>
-              
-              <!-- Akıllı Ürün Uyumluluğu Soru Cevap Kutusu -->
-              <div style="border-top: 1px solid var(--line); padding-top: 14px; margin-top: 4px;">
-                <label style="display: block; font-size: 12px; font-weight: 800; color: var(--ink); margin-bottom: 8px;">Bu Ürün/Renk Tenime Uyar Mı?</label>
-                <div style="display: flex; gap: 8px;">
-                  <input type="text" id="aiColorQuestionInput" class="form-input" style="flex: 1; padding: 8px 12px; font-size: 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg-app); color: var(--ink);" placeholder="Örn: Şeftali tonu allık, kiremit kırmızısı ruj...">
-                  <button type="button" class="primary-button" id="askAiColorBtn" style="padding: 0 16px; font-size: 12px; height: 34px; border-radius: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; color: white; font-weight: 800; cursor: pointer;">Sor</button>
-                </div>
-                <div id="aiColorAnswerBox" class="hidden" style="margin-top: 10px; padding: 12px; background: rgba(255,117,140,0.04); border-left: 3px solid #ff7eb3; border-radius: 0 8px 8px 0; font-size: 12px; line-height: 1.5; color: var(--ink);">
-                  <!-- AI Yorumu gelecek -->
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- YAPAY ZEKA SANAL PROVA ODASI (Sadece Giyim & Moda Seçildiğinde Görünür) -->
-      <section class="content-section hidden" id="aiFashionSection">
-        <div class="glass-card" style="padding: 20px; border-radius: 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 24px;">
-          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-            <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 10px rgba(79,70,229,0.3);">
-              <i data-lucide="sparkles" style="width: 20px; height: 20px;"></i>
-            </div>
-            <div>
-              <h3 style="margin: 0; font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 18px; color: var(--green-dark);">Yapay Zeka Sanal Prova Odası</h3>
-              <p style="margin: 2px 0 0 0; font-size: 12px; color: var(--ink-light);">Modelinizi seçin ve tişörtü manken üstünde prova edin.</p>
-            </div>
-          </div>
-          
-          <div class="ai-fashion-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
-            <!-- Sol Panel: Model ve Kıyafet Seçimi -->
-            <div style="background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
-              <div>
-                <label style="display: block; font-size: 12px; font-weight: 800; color: var(--ink-light); margin-bottom: 8px;">1. Model Seçin</label>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                  <button type="button" class="tag-button active" id="btnModelMale" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer;">Erkek Model</button>
-                  <button type="button" class="tag-button" id="btnModelFemale" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer;">Kadın Model</button>
-                  <button type="button" class="tag-button" id="btnModelUser" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                    <i data-lucide="upload" style="width: 12px; height: 12px;"></i> Fotoğraf Yükle
-                  </button>
-                </div>
-                <input type="file" id="fashionUserPhotoInput" accept="image/*" style="display: none;">
-              </div>
-              
-              <div>
-                <label style="display: block; font-size: 12px; font-weight: 800; color: var(--ink-light); margin-bottom: 8px;">2. Kıyafet Seçin</label>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                  <button type="button" class="tag-button active" id="btnTshirtBlue" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer;">Mavi Tişört</button>
-                  <button type="button" class="tag-button" id="btnTshirtRed" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer;">Kırmızı Tişört</button>
-                  <button type="button" class="tag-button" id="btnTshirtUser" style="font-size: 11px; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                    <i data-lucide="upload" style="width: 12px; height: 12px;"></i> Tişört Yükle
-                  </button>
-                </div>
-                <input type="file" id="fashionUserGarmentInput" accept="image/*" style="display: none;">
-                <div style="margin-top: 8px;">
-                  <label style="display: block; font-size: 11px; font-weight: 700; color: var(--ink-light); margin-bottom: 4px;">Veya Kıyafet Görsel Linki:</label>
-                  <input type="url" id="fashionGarmentUrlInput" class="form-input" style="width: 100%; padding: 6px 10px; font-size: 12px; height: auto;" placeholder="https://example.com/tshirt.png">
-                </div>
-              </div>
-
-              <div style="border-top: 1px solid var(--line); padding-top: 14px;">
-                <button type="button" class="primary-button" id="btnStartTryOn" style="width: 100%; font-size: 13px; height: 38px; border-radius: 8px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border: 0; color: white; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                  <i data-lucide="play" style="width: 16px; height: 16px;"></i> Prova Et
-                </button>
-              </div>
-            </div>
-            
-            <!-- Sağ Panel: Canvas Arayüzü ve Laser Efekti -->
-            <div style="border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; position: relative; background: var(--bg-card);">
-              <div style="position: relative; width: 300px; height: 300px; max-width: 100%;" class="glass-ui">
-                <canvas id="tryOnCanvas" width="300" height="300" style="position: relative; z-index: 2; width: 100%; height: 100%; border-radius: 8px; display: block; visibility: visible; opacity: 1; background: #eaeaea; cursor: move;"></canvas>
-                
-                <!-- SVG AR HUD Overlay -->
-                <svg id="tryOnSvgHud" class="hidden" viewBox="0 0 300 300" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;">
-                  <defs>
-                    <linearGradient id="scanlineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stop-color="#00f0ff" stop-opacity="0"></stop>
-                      <stop offset="50%" stop-color="#00f0ff" stop-opacity="0.8"></stop>
-                      <stop offset="100%" stop-color="#00f0ff" stop-opacity="0"></stop>
-                    </linearGradient>
-                  </defs>
-                  <!-- Corner brackets -->
-                  <path d="M 15 30 L 15 15 L 30 15" stroke="#00f0ff" stroke-width="2" fill="none" />
-                  <path d="M 285 30 L 285 15 L 270 15" stroke="#00f0ff" stroke-width="2" fill="none" />
-                  <path d="M 15 270 L 15 285 L 30 285" stroke="#00f0ff" stroke-width="2" fill="none" />
-                  <path d="M 285 270 L 285 285 L 270 285" stroke="#00f0ff" stroke-width="2" fill="none" />
-                  
-                  <!-- Tech details inside scanning overlay -->
-                  <circle cx="150" cy="150" r="130" stroke="rgba(0, 240, 255, 0.05)" stroke-width="1" fill="none" stroke-dasharray="5, 5" />
-                  <circle cx="150" cy="150" r="80" stroke="rgba(0, 240, 255, 0.1)" stroke-width="1.5" fill="none" stroke-dasharray="12, 6" />
-                  
-                  <!-- Sweeping scanner line in SVG -->
-                  <rect id="tryOnSvgScanline" x="10" y="20" width="280" height="6" fill="url(#scanlineGrad)">
-                    <animate attributeName="y" values="20;280;20" dur="3s" repeatCount="indefinite" />
-                  </rect>
-                </svg>
-                
-                <!-- Scan Laser Animation Overlay (initially hidden) -->
-                <div id="fashionScanLaser" class="hidden" style="position: absolute; left: 0; right: 0; height: 3px; background: #7c3aed; box-shadow: 0 0 10px #7c3aed, 0 0 20px #7c3aed; pointer-events: none; z-index: 10;"></div>
-              </div>
-              
-              <!-- Yapay Zeka Başarı Bannerı -->
-              <div id="aiAnalysisSuccessBanner" class="hidden" style="width: 100%; max-width: 300px; margin-top: 10px; padding: 10px; border-radius: 8px; background: rgba(0, 150, 255, 0.08); border: 1px solid rgba(0, 150, 255, 0.2); display: flex; align-items: center; gap: 8px; justify-content: center;">
-                <i data-lucide="shield-check" style="color: #0096ff; width: 16px; height: 16px;"></i>
-                <span style="font-size: 11px; font-weight: 700; color: #0096ff; font-family: 'Manrope', sans-serif;">Yapay Zeka Analizi Başarılı!</span>
-              </div>
-
-              <!-- Gelişmiş Ayarlar (Katlanabilir) -->
-              <details style="width: 100%; max-width: 300px; margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: rgba(255,255,255,0.02);" id="tryOnAdvancedDetails">
-                <summary style="font-size: 11px; font-weight: 800; color: var(--ink-light); cursor: pointer; outline: pointer; outline: none; display: flex; align-items: center; gap: 4px;">
-                  <i data-lucide="settings-2" style="width: 12px; height: 12px;"></i> Gelişmiş Hizalama Ayarları
-                </summary>
-                <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
-                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                    <span style="font-size: 11px; font-weight: 700; color: var(--ink-light); display: flex; align-items: center; gap: 4px;"><i data-lucide="move" style="width:12px; height:12px;"></i> Boyut:</span>
-                    <input type="range" id="tryOnSizeSlider" min="50" max="250" value="150" style="flex: 1; accent-color: var(--green); cursor: pointer;" oninput="window.updateTryOnGarmentSize(this.value)">
-                  </div>
-                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                    <span style="font-size: 11px; font-weight: 700; color: var(--ink-light); display: flex; align-items: center; gap: 4px;"><i data-lucide="rotate-cw" style="width:12px; height:12px;"></i> Döndürme:</span>
-                    <input type="range" id="tryOnAngleSlider" min="-45" max="45" value="0" style="flex: 1; accent-color: var(--green); cursor: pointer;" oninput="window.updateTryOnGarmentAngle(this.value)">
-                  </div>
-                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                    <span style="font-size: 11px; font-weight: 700; color: var(--ink-light); display: flex; align-items: center; gap: 4px;"><i data-lucide="sliders" style="width:12px; height:12px;"></i> Hassasiyet:</span>
-                    <input type="range" id="tryOnChromaThreshold" min="150" max="255" value="235" style="flex: 1; accent-color: var(--green); cursor: pointer;" oninput="window.updateTryOnChromaThreshold(this.value)">
-                  </div>
-                </div>
-              </details>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="content-section" id="discoverView">
+<section class="content-section" id="discoverView">
         <div class="page-guide">
           <i data-lucide="link"></i>
           <span>Ürün linkini yapıştır veya barkod tara — sistem fiyatları otomatik karşılaştırır.</span>
@@ -426,6 +210,18 @@
           </div>
         </div>
 
+        <aside style="background:linear-gradient(135deg,#1a3d2a 0%,#0f2419 100%);border:1px solid rgba(40,122,80,.3);border-radius:14px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:8px;">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:40px;height:40px;background:rgba(40,122,80,.25);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i data-lucide="bell-ring" style="width:20px;height:20px;color:#4ade80;"></i>
+            </div>
+            <div>
+              <p style="margin:0 0 3px;font-size:13px;font-weight:700;color:#e8ede8;">BİM aktüel çıktı mı? Trendyol flaş indirimi mi?</p>
+              <p style="margin:0;font-size:12px;color:rgba(232,237,232,.55);">100+ mağazayı takibe al — kampanya başlar başlamaz bildirim al.</p>
+            </div>
+          </div>
+          <button onclick="document.querySelector('[data-view=\'bulletins\']').click()" style="background:#287a50;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s;" onmouseover="this.style.background='#1f6040'" onmouseout="this.style.background='#287a50'">Mağazaları Takip Et →</button>
+        </aside>
       </section>
 
       <section class="content-section hidden" id="trackingView">
@@ -541,6 +337,21 @@
         </div>
       </section>
 
+      <section class="content-section hidden" id="bulletinsView">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">MAĞAZA TAKİBİ</p>
+            <h2>Mağaza Bültenleri</h2>
+          </div>
+        </div>
+        <p style="font-size:13px;color:var(--ink-2);margin-bottom:16px;">
+          Takip ettiğin mağazalar kampanya başlattığında seni haberdar edelim.
+        </p>
+        <div id="storeList">
+          <div class="loading-row"><span class="spinner"></span><span>Mağazalar yükleniyor…</span></div>
+        </div>
+      </section>
+
       <section class="content-section hidden" id="cartView">
         <div class="page-guide">
           <i data-lucide="shopping-cart"></i>
@@ -560,7 +371,7 @@
             </button>
           </div>
         </div>
-        
+
         <div id="sharedListStatusContainer"></div>
 
         <div class="cart-split-layout">
@@ -655,7 +466,7 @@
                 <button class="mode-tab active" id="optModeSingle">Tek Market</button>
                 <button class="mode-tab" id="optModeSplit">Bölünmüş Market (Split)</button>
               </div>
-              
+
               <div class="optimizer-location-settings" style="display: flex; gap: 8px; margin-top: 12px; align-items: center; justify-content: space-between; font-size: 12px; background: rgba(0, 0, 0, 0.02); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 6px; flex: 1;">
                   <i data-lucide="map-pin" style="width: 15px; height: 15px; color: var(--green);"></i>
@@ -680,7 +491,7 @@
                   </select>
                 </div>
               </div>
-              
+
               <div id="optimizerResults" class="optimizer-results">
                 <!-- Optimizasyon sonuçları dinamik doldurulacak -->
                 <p class="empty-text">Listeye ürün ekleyerek karşılaştırın.</p>
@@ -714,6 +525,10 @@
       <button class="mobile-nav-item" data-view="savings">
         <i data-lucide="wallet-cards"></i>
         <span>Tasarruf</span>
+      </button>
+      <button class="mobile-nav-item" data-view="bulletins">
+        <i data-lucide="newspaper"></i>
+        <span>Bülten</span>
       </button>
     </nav>
 
@@ -805,6 +620,17 @@
               </div>
             </div>
           </div>
+          <div class="onboarding-step" data-step="3" style="display: none;">
+            <div style="display: flex; gap: 14px; align-items: flex-start; padding: 14px; background: rgba(40,122,80,0.05); border-radius: 10px;">
+              <div style="width: 36px; height: 36px; background: #287a50; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i data-lucide="store" style="width: 16px; height: 16px; color: #fff;"></i>
+              </div>
+              <div>
+                <strong style="font-size: 15px; display: block; margin-bottom: 4px;">Mağaza Bültenleri</strong>
+                <span style="font-size: 13px; color: var(--ink-light, #666);">Favori mağazanı takip et — kampanya başlatınca sana e-posta ile haber verelim.</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Dots -->
@@ -812,6 +638,7 @@
           <span class="onboarding-dot active" data-dot="0" style="width: 8px; height: 8px; border-radius: 50%; background: #287a50; display: inline-block; cursor: pointer;" onclick="goOnboardingStep(0)"></span>
           <span class="onboarding-dot" data-dot="1" style="width: 8px; height: 8px; border-radius: 50%; background: var(--line, #ddd); display: inline-block; cursor: pointer;" onclick="goOnboardingStep(1)"></span>
           <span class="onboarding-dot" data-dot="2" style="width: 8px; height: 8px; border-radius: 50%; background: var(--line, #ddd); display: inline-block; cursor: pointer;" onclick="goOnboardingStep(2)"></span>
+          <span class="onboarding-dot" data-dot="3" style="width: 8px; height: 8px; border-radius: 50%; background: var(--line, #ddd); display: inline-block; cursor: pointer;" onclick="goOnboardingStep(3)"></span>
         </div>
 
         <div style="display: flex; gap: 10px;">
@@ -1132,7 +959,7 @@
             var dot = document.querySelector('.notification-dot');
             if (dot) dot.style.display = unread.length ? '' : 'none';
           }).catch(function(){});
-          
+
         /* PWA Service Worker & Push Kaydı */
         if ('serviceWorker' in navigator) {
           window.addEventListener('load', function() {

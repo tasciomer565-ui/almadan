@@ -887,6 +887,38 @@ def _parse_trendyol_api(url: str) -> "ParsedProduct | None":
             elif isinstance(img, dict):
                 image_url = img.get("url") or img.get("src")
         canonical = f"https://www.trendyol.com/p-{content_id}"
+
+        # Diğer satıcıları çek (API direkt olarak bu bilgiyi de döndürür)
+        other_merchants = []
+        merchants_raw = result.get("otherMerchants") or result.get("merchants") or []
+        for merchant in merchants_raw:
+            merch_price_data = merchant.get("price") or {}
+            merch_price = (
+                merch_price_data.get("discountedPrice", {}).get("value")
+                or merch_price_data.get("sellingPrice", {}).get("value")
+            )
+            merch_info = merchant.get("merchant") or merchant
+            merch_name = merch_info.get("name") or merch_info.get("merchantName")
+            merch_url_path = merch_info.get("sellerLink") or merchant.get("sellerLink") or ""
+            merch_score = merch_info.get("sellerScore") or merch_info.get("score")
+            merch_delivery = merchant.get("deliveryInformation", {}).get("fastDeliveryOptions", [])
+            if merch_price and merch_name:
+                other_merchants.append({
+                    "title": str(title).strip() if title else "",
+                    "price": float(merch_price),
+                    "url": f"https://www.trendyol.com{merch_url_path}" if merch_url_path else canonical,
+                    "source": f"Trendyol ({merch_name})",
+                    "image_url": image_url,
+                    "extra_info": {
+                        "rating": merch_score,
+                        "fast_delivery": bool(merch_delivery),
+                    }
+                })
+
+        extra_info = {}
+        if other_merchants:
+            extra_info["otherMerchants"] = other_merchants
+
         if title and price:
             return ParsedProduct(
                 title=str(title).strip(),
@@ -897,7 +929,7 @@ def _parse_trendyol_api(url: str) -> "ParsedProduct | None":
                 confidence=90,
                 warnings=[],
                 original_price=float(original_price) if original_price else None,
-                extra_info={},
+                extra_info=extra_info,
             )
     except Exception:
         pass
@@ -1094,11 +1126,10 @@ def parse_product_url(url: str) -> ParsedProduct:
                             })
                     if parsed_merchants:
                         extra_info["otherMerchants"] = parsed_merchants
-                except Exception as e:
+                except Exception:
                     pass
                 break
-    else:
-        warnings.append("Başlık bulunamadı.")
+    # NOT: "else: warnings.append(...)" kaldırıldı - başlık yok uyarısı aşağıda fiyat bölümünde işleniyor
 
     if price:
         confidence += 35
@@ -1133,7 +1164,11 @@ def parse_product_url(url: str) -> ParsedProduct:
     if not isinstance(canonical_url, str):
         canonical_url = str(canonical_url or url)
 
-    extra_info = extract_extra_info(title, source, soup)
+    # extract_extra_info ile görüntrüür bilgileri al, ancak otherMerchants gibi önceden doldurulmuş
+    # alanları silme (birleştirme yap)
+    base_extra = extract_extra_info(title, source, soup)
+    base_extra.update(extra_info)  # extra_info (otherMerchants) öncelikli
+    extra_info = base_extra
 
     return ParsedProduct(
         title=title,

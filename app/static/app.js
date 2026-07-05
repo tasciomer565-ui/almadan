@@ -378,7 +378,7 @@ function optimizeForMobile() {
     console.log("Mobil Mod: Optimizasyonlar devreye alındı.");
     document.documentElement.style.setProperty('--animation-speed', '0s');
     window.SEARCH_TIMEOUT = 3000;
-    
+
     const svgWrapper = document.querySelector("#quantumScanOverlay div");
     if (svgWrapper) {
       svgWrapper.querySelectorAll("svg").forEach(svg => {
@@ -403,7 +403,7 @@ function persistQuantumState() {
 document.addEventListener("DOMContentLoaded", () => {
   applyTheme();
   optimizeForMobile();
-  
+
   if (window.requestIdleCallback) {
     requestIdleCallback(() => {
       lucide.createIcons();
@@ -445,7 +445,7 @@ function bindEvents() {
   document.getElementById("dialogClose").addEventListener("click", closeDialog);
   document.getElementById("notificationButton").addEventListener("click", showNotifications);
   document.getElementById("accountButton").addEventListener("click", showAccount);
-  
+
   const gpsPill = document.getElementById("gpsStatusIndicator");
   if (gpsPill) {
     gpsPill.addEventListener("click", () => {
@@ -457,7 +457,7 @@ function bindEvents() {
   if (globalCheckbox) {
     globalCheckbox.addEventListener("change", persistQuantumState);
   }
-  
+
   document.getElementById("themeToggleButton").addEventListener("click", toggleTheme);
   document.getElementById("quickCartAddBtn").addEventListener("click", addQuickCartItem);
   document.getElementById("quickCartInput").addEventListener("keypress", (e) => {
@@ -480,174 +480,6 @@ function bindEvents() {
   document.getElementById("optModeSplit").addEventListener("click", () => switchOptimizerMode("split"));
   document.getElementById("micButton").addEventListener("click", startVoiceSearch);
 
-  // AI Try-On buttons init
-  const btnModelMale = document.getElementById("btnModelMale");
-  const btnModelFemale = document.getElementById("btnModelFemale");
-  const btnTshirtBlue = document.getElementById("btnTshirtBlue");
-  const btnTshirtRed = document.getElementById("btnTshirtRed");
-  const btnStartTryOn = document.getElementById("btnStartTryOn");
-
-  const btnModelUser = document.getElementById("btnModelUser");
-  const userPhotoInput = document.getElementById("fashionUserPhotoInput");
-
-  if (btnModelMale) btnModelMale.addEventListener("click", () => {
-    window.selectedTryOnModel = "male";
-    btnModelMale.classList.add("active");
-    btnModelFemale.classList.remove("active");
-    if (btnModelUser) btnModelUser.classList.remove("active");
-    window.drawTryOnScene();
-  });
-  if (btnModelFemale) btnModelFemale.addEventListener("click", () => {
-    window.selectedTryOnModel = "female";
-    btnModelFemale.classList.add("active");
-    btnModelMale.classList.remove("active");
-    if (btnModelUser) btnModelUser.classList.remove("active");
-    window.drawTryOnScene();
-  });
-  if (btnModelUser) btnModelUser.addEventListener("click", () => {
-    if (userPhotoInput) userPhotoInput.click();
-  });
-  if (userPhotoInput) userPhotoInput.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target.result;
-      img.onload = () => {
-        const maxW = 600;
-        const maxH = 600;
-        let w = img.naturalWidth || img.width;
-        let h = img.naturalHeight || img.height;
-        if (w > maxW || h > maxH) {
-          if (w > h) {
-            h = Math.round(h * (maxW / w));
-            w = maxW;
-          } else {
-            w = Math.round(w * (maxH / h));
-            h = maxH;
-          }
-        }
-        const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = w;
-        tempCanvas.height = h;
-        const tempCtx = tempCanvas.getContext("2d");
-        tempCtx.drawImage(img, 0, 0, w, h);
-        
-        window.userTryOnPhoto = tempCanvas.toDataURL("image/jpeg", 0.85);
-        window.selectedTryOnModel = "user";
-        if (btnModelUser) btnModelUser.classList.add("active");
-        if (btnModelMale) btnModelMale.classList.remove("active");
-        if (btnModelFemale) btnModelFemale.classList.remove("active");
-        window.poseDetected = false;
-        window.drawTryOnScene();
-        
-        window.detectPoseAndFitGarment(window.userTryOnPhoto);
-      };
-    };
-    reader.readAsDataURL(file);
-  });
-
-  const btnTshirtUser = document.getElementById("btnTshirtUser");
-  const userGarmentInput = document.getElementById("fashionUserGarmentInput");
-  const garmentUrlInput = document.getElementById("fashionGarmentUrlInput");
-
-  if (btnTshirtBlue) btnTshirtBlue.addEventListener("click", () => {
-    window.selectedTryOnGarment = "blue";
-    btnTshirtBlue.classList.add("active");
-    btnTshirtRed.classList.remove("active");
-    if (btnTshirtUser) btnTshirtUser.classList.remove("active");
-    if (garmentUrlInput) garmentUrlInput.value = "";
-    window.drawTryOnScene();
-  });
-  if (btnTshirtRed) btnTshirtRed.addEventListener("click", () => {
-    window.selectedTryOnGarment = "red";
-    btnTshirtRed.classList.add("active");
-    btnTshirtBlue.classList.remove("active");
-    if (btnTshirtUser) btnTshirtUser.classList.remove("active");
-    if (garmentUrlInput) garmentUrlInput.value = "";
-    window.drawTryOnScene();
-  });
-  if (btnTshirtUser) btnTshirtUser.addEventListener("click", () => {
-    if (userGarmentInput) userGarmentInput.click();
-  });
-  if (userGarmentInput) userGarmentInput.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      window.userTryOnGarment = event.target.result;
-      window.selectedTryOnGarment = "user";
-      if (btnTshirtUser) btnTshirtUser.classList.add("active");
-      if (btnTshirtBlue) btnTshirtBlue.classList.remove("active");
-      if (btnTshirtRed) btnTshirtRed.classList.remove("active");
-      if (garmentUrlInput) garmentUrlInput.value = "";
-      window.drawTryOnScene();
-    };
-    reader.readAsDataURL(file);
-  });
-  if (garmentUrlInput) {
-    garmentUrlInput.addEventListener("input", () => {
-      const url = garmentUrlInput.value.trim();
-      if (!url) return;
-      window.userTryOnGarment = proxiedImageUrl(url);
-      window.selectedTryOnGarment = "user";
-      if (btnTshirtUser) btnTshirtUser.classList.remove("active");
-      if (btnTshirtBlue) btnTshirtBlue.classList.remove("active");
-      if (btnTshirtRed) btnTshirtRed.classList.remove("active");
-      window.drawTryOnScene();
-    });
-  }
-  if (btnStartTryOn) btnStartTryOn.addEventListener("click", window.runFashionTryOnAnimation);
-
-  const canvas = document.getElementById("tryOnCanvas");
-  if (canvas) {
-    let isDraggingGarment = false;
-    let dragStartX = 0;
-    let dragStartY = 0;
-
-    const getEventPos = (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      return {
-        x: (clientX - rect.left) * (canvas.width / rect.width),
-        y: (clientY - rect.top) * (canvas.height / rect.height)
-      };
-    };
-
-    const startDrag = (e) => {
-      const pos = getEventPos(e);
-      if (pos.x >= window.tryOnGarmentX && pos.x <= window.tryOnGarmentX + window.tryOnGarmentW &&
-          pos.y >= window.tryOnGarmentY && pos.y <= window.tryOnGarmentY + window.tryOnGarmentH) {
-        isDraggingGarment = true;
-        dragStartX = pos.x - window.tryOnGarmentX;
-        dragStartY = pos.y - window.tryOnGarmentY;
-        e.preventDefault();
-      }
-    };
-
-    const doDrag = (e) => {
-      if (!isDraggingGarment) return;
-      const pos = getEventPos(e);
-      window.tryOnGarmentX = pos.x - dragStartX;
-      window.tryOnGarmentY = pos.y - dragStartY;
-      window.drawTryOnScene();
-      e.preventDefault();
-    };
-
-    const stopDrag = () => {
-      isDraggingGarment = false;
-    };
-
-    canvas.addEventListener("mousedown", startDrag);
-    canvas.addEventListener("mousemove", doDrag);
-    window.addEventListener("mouseup", stopDrag);
-
-    canvas.addEventListener("touchstart", startDrag, { passive: false });
-    canvas.addEventListener("touchmove", doDrag, { passive: false });
-    window.addEventListener("touchend", stopDrag);
-  }
   window.addEventListener("online", () => {
     updateNetworkStatus();
     flushPendingSharedSync();
@@ -662,69 +494,6 @@ function bindEvents() {
   const categorySelector = document.getElementById("searchCategorySelector");
   if (categorySelector) {
     categorySelector.addEventListener("change", handleCategoryChange);
-  }
-
-  // AI Selfie model buttons
-  const btnSelfieLight = document.getElementById("btnSelfieLight");
-  const btnSelfieMedium = document.getElementById("btnSelfieMedium");
-  const btnSelfieDark = document.getElementById("btnSelfieDark");
-  
-  if (btnSelfieLight) btnSelfieLight.addEventListener("click", () => runAiSkinScan("light"));
-  if (btnSelfieMedium) btnSelfieMedium.addEventListener("click", () => runAiSkinScan("medium"));
-  if (btnSelfieDark) btnSelfieDark.addEventListener("click", () => runAiSkinScan("dark"));
-
-  // Dropzone click triggers hidden file input
-  const aiPhotoDropzone = document.getElementById("aiPhotoDropzone");
-  if (aiPhotoDropzone) {
-    aiPhotoDropzone.addEventListener("click", (e) => {
-      if (e.target.closest("#aiSampleSelfies")) return;
-      document.getElementById("aiPhotoFileInput").click();
-    });
-  }
-
-  // Hidden file input change listener
-  const aiPhotoFileInput = document.getElementById("aiPhotoFileInput");
-  if (aiPhotoFileInput) {
-    aiPhotoFileInput.addEventListener("change", () => {
-      if (aiPhotoFileInput.files && aiPhotoFileInput.files[0]) {
-        const file = aiPhotoFileInput.files[0];
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const img = new Image();
-          img.src = event.target.result;
-          img.onload = () => {
-            const maxW = 600;
-            const maxH = 600;
-            let w = img.naturalWidth || img.width;
-            let h = img.naturalHeight || img.height;
-            if (w > maxW || h > maxH) {
-              if (w > h) {
-                h = Math.round(h * (maxW / w));
-                w = maxW;
-              } else {
-                w = Math.round(w * (maxH / h));
-                h = maxH;
-              }
-            }
-            const tempCanvas = document.createElement("canvas");
-            tempCanvas.width = w;
-            tempCanvas.height = h;
-            const tempCtx = tempCanvas.getContext("2d");
-            tempCtx.drawImage(img, 0, 0, w, h);
-            
-            const compressedBase64 = tempCanvas.toDataURL("image/jpeg", 0.85);
-            runAiSkinScan("uploaded", compressedBase64);
-          };
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-  }
-
-  // Question submission button
-  const askAiColorBtn = document.getElementById("askAiColorBtn");
-  if (askAiColorBtn) {
-    askAiColorBtn.addEventListener("click", askAiColorSuitability);
   }
 }
 
@@ -851,14 +620,14 @@ function renderUnauthenticatedAuth(content) {
       <div class="dialog-body auth-dialog">
         <p class="eyebrow">ALMADAN HESABI</p>
         <h2>Takiplerini kaybetme.</h2>
-        
+
         <div class="auth-tabs" style="display: flex; gap: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 10px; width: 100%;">
           <button type="button" onclick="switchAuthMethod('email')" style="background: none; border: none; font-weight: bold; cursor: pointer; color: var(--green-dark); border-bottom: 2px solid var(--green-dark); padding-bottom: 8px; font-family: inherit; font-size: 14px;">E-posta ile Giriş</button>
           <button type="button" onclick="switchAuthMethod('sms')" style="background: none; border: none; cursor: pointer; color: var(--ink-light); padding-bottom: 8px; font-family: inherit; font-size: 14px;">SMS ile Giriş</button>
         </div>
-        
+
         <p class="auth-copy" style="margin-bottom: 16px; font-size: 13px; color: var(--ink-light);">E-posta ile giriş yap. Bu cihazdaki ürünlerin hesabına otomatik taşınsın.</p>
-        
+
         <div class="manual-fields">
           <label class="manual-field">
             <span>E-posta</span>
@@ -912,14 +681,14 @@ function renderUnauthenticatedAuth(content) {
       <div class="dialog-body auth-dialog">
         <p class="eyebrow">ALMADAN HESABI</p>
         <h2>SMS ile Hızlı Giriş.</h2>
-        
+
         <div class="auth-tabs" style="display: flex; gap: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 10px; width: 100%;">
           <button type="button" onclick="switchAuthMethod('email')" style="background: none; border: none; cursor: pointer; color: var(--ink-light); padding-bottom: 8px; font-family: inherit; font-size: 14px;">E-posta ile Giriş</button>
           <button type="button" onclick="switchAuthMethod('sms')" style="background: none; border: none; font-weight: bold; cursor: pointer; color: var(--green-dark); border-bottom: 2px solid var(--green-dark); padding-bottom: 8px; font-family: inherit; font-size: 14px;">SMS ile Giriş</button>
         </div>
-        
+
         <p class="auth-copy" style="margin-bottom: 16px; font-size: 13px; color: var(--ink-light);">Şifresiz giriş yap. Telefonuna gelecek tek kullanımlık SMS koduyla hesabına anında ulaş.</p>
-        
+
         <div class="manual-fields">
           <label class="manual-field">
             <span>Telefon Numarası</span>
@@ -932,10 +701,10 @@ function renderUnauthenticatedAuth(content) {
             </label>
           ` : ''}
         </div>
-        
+
         <p class="dialog-error" id="authError" hidden></p>
         <p class="dialog-success" id="authSuccess" hidden></p>
-        
+
         ${state.auth.enabled ? `
           <div class="dialog-actions" style="margin-top: 20px;">
             ${smsCodeSent ? `
@@ -1001,7 +770,7 @@ async function sendSmsCode() {
       method: "POST",
       body: JSON.stringify({ phone }),
     });
-    
+
     smsCodeSent = true;
     const content = document.getElementById("dialogContent");
     if (content) {
@@ -1031,7 +800,7 @@ async function verifySmsCode() {
       method: "POST",
       body: JSON.stringify({ phone, code }),
     });
-    
+
     state.auth = {
       enabled: true,
       authenticated: true,
@@ -1440,12 +1209,12 @@ function renderDeals() {
 
   grid.innerHTML = products.map((product) => {
     const discountPercent = product.discount_analysis?.discount_percent || 0;
-    const discountBadge = discountPercent > 0 
-      ? `<span class="discount-badge">-%${discountPercent}</span>` 
+    const discountBadge = discountPercent > 0
+      ? `<span class="discount-badge">-%${discountPercent}</span>`
       : "";
     const forecast = product.discount_forecast;
     const forecastBadge = forecast?.status === "ready"
-      ? `<span class="forecast-chip">%${forecast.probability} Â· 7 gün</span>`
+      ? `<span class="forecast-chip">%${forecast.probability} · 7 gün</span>`
       : `<span class="forecast-chip muted">Tahmin hazırlanıyor</span>`;
     return `
     <article class="deal-card">
@@ -1488,7 +1257,7 @@ function renderTracking() {
         <span class="tracking-thumb">${productImage(product)}</span>
         <span class="tracking-copy">
           <h3>${escapeHtml(product.title)}</h3>
-          <p>${escapeHtml(product.source)} Â· ${product.price_history.length} fiyat kaydı</p>
+          <p>${escapeHtml(product.source)} · ${product.price_history.length} fiyat kaydı</p>
           <span class="check-status">
             <span class="status-dot ${escapeHtml(product.last_check_status || "pending")}"></span>
             ${escapeHtml(checkStatusText(product))}
@@ -1808,7 +1577,7 @@ async function parseProduct(event) {
   const progressText = document.getElementById("quantumScanProgress");
   if (overlay) overlay.style.display = "flex";
   if (progressText) {
-    progressText.innerText = "Sizin için en uygun fırsatları ve ürünleri inceliyoruz...";
+    progressText.innerText = "Ürün bilgilerini getiriyoruz...";
   }
 
   // 2. Arama işlemini asenkron olarak bir sonraki frame'de başlat
@@ -1843,7 +1612,7 @@ async function parseProduct(event) {
         }
       } catch (error) {
         console.error("parseProduct hatası:", error);
-        
+
         if (overlay && progressText) {
           // 1. Durum bildirimini yeşil mod ve glitch ile güncelle
           const header = overlay.querySelector("h3");
@@ -1851,10 +1620,10 @@ async function parseProduct(event) {
             header.innerText = "Alternatif Sonuçlar Yükleniyor";
           }
           progressText.innerText = "Bağlantı yavaş, yakın alternatifler getiriliyor...";
-          
+
           // 2. Lokal CPU simülasyonu için 1.5 saniye bekle
           await new Promise(resolve => setTimeout(resolve, 1500));
-          
+
           // 3. Lokal rezonans fallback sonuçlarını oluştur
           showSearchResults({ products: [], query: val });
         } else {
@@ -2004,7 +1773,7 @@ async function forceRefreshSearch(query, cacheKey) {
 function showSearchResults(response) {
   const dialog = document.getElementById("productDialog");
   const content = document.getElementById("dialogContent");
-  
+
   const products = response.products || [];
   const suggestion = response.suggestion;
   const originalQuery = response.query || "";
@@ -2014,7 +1783,7 @@ function showSearchResults(response) {
     if (suggestion) {
       suggestionHtml = `
         <p style="margin-top: 16px; font-size: 15px; color: var(--ink);">
-          Bunu mu demek istediniz: 
+          Bunu mu demek istediniz:
           <a href="#" style="color: var(--green); font-weight: 700; text-decoration: underline;" onclick="event.preventDefault(); triggerSuggestionSearch(${inlineJsArg(suggestion)});">
             ${escapeHtml(suggestion)}
           </a>
@@ -2076,7 +1845,7 @@ function showSearchResults(response) {
   // Dynamic search refinement chips for generic products
   const queryLower = originalQuery.toLowerCase().trim();
   let matchingKey = Object.keys(genericProductSizes).find(key => queryLower === key || queryLower === key + "sı" || queryLower === key + "su" || queryLower === key + "yu");
-  
+
   let sizeChipsHtml = "";
   if (matchingKey) {
     const chips = genericProductSizes[matchingKey];
@@ -2100,7 +1869,7 @@ function showSearchResults(response) {
   if (isFashion) {
     const isShoe = ["ayakkabi", "ayakkabı", "bot", "çizme", "cizme", "terlik", "sneaker"].some(kw => originalQuery.toLowerCase().includes(kw)) ||
                    products.some(p => ["ayakkabi", "ayakkabı", "bot", "çizme", "cizme", "terlik", "sneaker"].some(kw => p.title.toLowerCase().includes(kw)));
-    
+
     categoryHeaderHtml = `
       <div class="fashion-size-selector-container" style="margin-bottom: 16px; background: var(--bg-card); border: 1px solid var(--line); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 8px;">
@@ -2229,13 +1998,13 @@ function showSearchResults(response) {
             : "border: 2px solid #10b981 !important; box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);";
 
           return `
-            <div class="${nodeClasses} search-result-card" 
-                 data-base-price="${item.price}" 
-                 data-base-original-price="${item.original_price || 0}" 
+            <div class="${nodeClasses} search-result-card"
+                 data-base-price="${item.price}"
+                 data-base-original-price="${item.original_price || 0}"
                  data-is-importer="${isImporter}"
                  style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; ${borderStyle} border-radius: 8px; background: white; transition: all 0.2s;">
               <div style="width: 50px; height: 50px; flex-shrink: 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; justify-content: center;">
-                ${item.image_url 
+                ${item.image_url
                   ? `<img src="${escapeHtml(proxiedImageUrl(item.image_url))}" alt="${escapeHtml(item.title)}" style="width: 100%; height: 100%; object-fit: contain;" onerror="imageFallback(this, '${getStoreIcon(item.source, item.title)}')">`
                   : `<span class="product-placeholder" style="width:100%; height:100%; display:grid; place-items:center;"><i data-lucide="${getStoreIcon(item.source, item.title)}" style="width:18px; height:18px;"></i></span>`}
               </div>
@@ -2246,7 +2015,7 @@ function showSearchResults(response) {
                   ${badgesHtml}
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                  ${isLocal 
+                  ${isLocal
                     ? `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: rgba(0,243,255,0.1); color: #00d2ff; border: 1px solid rgba(0,243,255,0.2); display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="truck" style="width:11px; height:11px;"></i> ${escapeHtml(item.delivery_time || '30-60 Dakika')} ${item.distance_km ? `(${item.distance_km} km)` : ''}</span>`
                     : `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: rgba(16,185,129,0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2); display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="globe" style="width:11px; height:11px;"></i> ${escapeHtml(item.delivery_time || '2 İş Günü')}</span>`
                   }
@@ -2283,7 +2052,7 @@ function showSearchResults(response) {
 
   if (!dialog.open) dialog.showModal();
   lucide.createIcons();
-  
+
   // Register node cards for bobbing animation
   dialog.querySelectorAll('.quantum-node-card').forEach(card => {
     if (window.registerForBobbing) window.registerForBobbing(card);
@@ -2377,12 +2146,12 @@ function showParsedProduct(parsed) {
   const content = document.getElementById("dialogContent");
   const title = parsed.title || "Ürün bilgisi tamamlanamadı";
 
-  const isSupplement = parsed.source === "supplementler" || 
-                       parsed.source === "proteinocean" || 
+  const isSupplement = parsed.source === "supplementler" ||
+                       parsed.source === "proteinocean" ||
                        (parsed.extra_info && parsed.extra_info.category === "supplement");
 
-  const isCosmetics = parsed.source === "gratis" || 
-                      parsed.source === "rossmann" || 
+  const isCosmetics = parsed.source === "gratis" ||
+                      parsed.source === "rossmann" ||
                       (parsed.extra_info && parsed.extra_info.category === "cosmetics");
 
   content.innerHTML = `
@@ -2466,7 +2235,7 @@ function showParsedProduct(parsed) {
   dialog.showModal();
   document.getElementById("parsedTitle").addEventListener("input", updateTrackButton);
   document.getElementById("parsedPrice").addEventListener("input", updateTrackButton);
-  
+
   const updateServingPrice = () => {
     const servingsInput = document.getElementById("parsedServings");
     const priceInput = document.getElementById("parsedPrice");
@@ -2498,7 +2267,7 @@ function showParsedProduct(parsed) {
 async function findAlternativeSellers(parsed) {
   const container = document.getElementById("alternativeSellersContainer");
   if (!container) return;
-  
+
   try {
     const data = await api("/api/find-alternatives", {
       method: "POST",
@@ -2510,7 +2279,7 @@ async function findAlternativeSellers(parsed) {
       container.innerHTML = `<p style="font-size:12px; color:#a0aab0; margin:0; text-align:center;">Alternatif satıcı bulunamadı.</p>`;
       return;
     }
-    
+
     let fakeDiscountWarning = "";
     if (parsed.original_price && parsed.price) {
       const prices = alts.map(a => a.price).filter(p => p > 0);
@@ -2526,7 +2295,7 @@ async function findAlternativeSellers(parsed) {
         }
       }
     }
-    
+
     const validPrices2 = alts.map(a => a.price).filter(p => p > 0);
     const minPrice2 = validPrices2.length > 0 ? Math.min(...validPrices2) : -1;
     const maxPrice2 = validPrices2.length > 0 ? Math.max(...validPrices2) : -1;
@@ -2591,9 +2360,9 @@ window.selectAlternativeSeller = function(el) {
   });
   el.style.border = '1.5px solid #287a50';
   el.style.background = 'rgba(40,122,80,0.08)';
-  
+
   const alt = JSON.parse(el.getAttribute('data-alt'));
-  
+
   const parsedPrice = document.getElementById("parsedPrice");
   const parsedTitle = document.getElementById("parsedTitle");
   if (parsedPrice) {
@@ -2604,10 +2373,10 @@ window.selectAlternativeSeller = function(el) {
     parsedTitle.value = alt.title;
     parsedTitle.dispatchEvent(new Event('input'));
   }
-  
+
   const sourceNameEl = document.querySelector(".dialog-body .source-name");
   if (sourceNameEl) sourceNameEl.innerText = alt.source;
-  
+
   if (state.parsedProduct) {
      state.parsedProduct.canonical_url = addAffiliateTag(alt.url || alt.canonical_url || state.parsedProduct.canonical_url, alt.source);
      state.parsedProduct.source = alt.source;
@@ -2615,7 +2384,7 @@ window.selectAlternativeSeller = function(el) {
      state.parsedProduct.title = alt.title;
      state.parsedProduct.price = alt.price;
      state.parsedProduct.original_price = alt.original_price;
-     
+
      const imgEl = document.querySelector(".dialog-product-image");
      if (imgEl && state.parsedProduct.image_url) {
        imgEl.innerHTML = `<img src="${escapeHtml(state.parsedProduct.image_url)}" alt="${escapeHtml(state.parsedProduct.title)}" style="max-height:100%;">`;
@@ -2805,7 +2574,7 @@ function openProduct(id) {
     const expDate = new Date(openingDate.getTime() + shelfMonths * 30 * 24 * 60 * 60 * 1000);
     const now = new Date();
     const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
-    
+
     let statusMsg = "";
     if (daysLeft < 0) {
       statusMsg = `<span style="color: var(--red); font-weight: 700;">Kullanım ömrü dolmuş! (${Math.abs(daysLeft)} gün önce)</span>`;
@@ -2965,7 +2734,7 @@ function openProduct(id) {
           <p>${escapeHtml(product.reason)}</p>
         </div>
       </div>
-      
+
       <!-- Akıllı Asistan Bilgileri -->
       ${assistantHtml}
 
@@ -2973,8 +2742,8 @@ function openProduct(id) {
         <span class="price">${currency.format(product.current_price)}</span>
         <span class="verdict">${escapeHtml(product.verdict)}</span>
       </div>
-      <p class="source-name">En düşük ${currency.format(lowest)} Â· En yüksek ${currency.format(highest)}</p>
-      
+      <p class="source-name">En düşük ${currency.format(lowest)} · En yüksek ${currency.format(highest)}</p>
+
       <!-- Fiyat Geçmişi Grafiği -->
       <div class="price-chart-container" style="margin: 18px 0; padding: 12px; background: #fbfcf9; border: 1px solid var(--line); border-radius: 6px;">
         <p class="source-name" style="margin-top: 0; margin-bottom: 8px; font-weight: 600; color: var(--ink);">Fiyat Değişim Grafiği</p>
@@ -3058,7 +2827,7 @@ function openProduct(id) {
 
   dialog.showModal();
   lucide.createIcons();
-  
+
   loadProductReviews(product.id);
 
   // Grafik çizimi
@@ -3159,10 +2928,10 @@ window.submitProductReview = async function(productId) {
   const commentInput = document.getElementById("reviewComment");
   const ratingInput = document.getElementById("reviewRating");
   if (!commentInput || !ratingInput) return;
-  
+
   const comment = commentInput.value.trim();
   if (!comment) return showToast("Lütfen bir yorum yazın.");
-  
+
   try {
     const res = await fetch(`/api/products/${productId}/reviews`, {
       method: "POST",
@@ -3309,7 +3078,7 @@ async function showNotifications() {
                 } else if (item.type === "catalog_match") {
                   badgeHtml = `<span class="analysis-status-badge bg-green" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; margin-right: 6px;">KATALOĞA DÜŞTÜ!</span>`;
                 }
-                
+
                 return `
                   <div class="notification-item">
                     <div style="display: flex; align-items: center; margin-bottom: 4px;">
@@ -3475,22 +3244,11 @@ function switchView(view) {
   if (view === "cart") {
     renderCart();
   }
-  if (view === "bulletins") {
-    loadStores();
-  }
   if (view === "savings") {
     loadReceipts(document.getElementById("receiptMonthFilter")?.value || "");
   }
-
-  // Handle try-on animation loop state
-  if (view !== "discover") {
-    window.tryOnAnimationActive = false;
-  } else {
-    const selector = document.getElementById("searchCategorySelector");
-    if (selector && selector.value === "fashion" && window.tryOnParticles && window.tryOnParticles.length > 0) {
-      window.tryOnAnimationActive = true;
-      window.animateTryOnCanvas();
-    }
+  if (view === "bulletins") {
+    loadStores();
   }
 
   window.scrollTo({ top: view === "discover" ? 0 : 180, behavior: "smooth" });
@@ -3674,9 +3432,9 @@ function addQuickCartItem() {
   const hasSize = /\d+\s*(ml|l|g|gr|kg|li|'lu|'li|'lü|'lu|'lü|adet|porsiyon|servis)/i.test(val);
   const lowerVal = val.toLowerCase();
   const isGeneric = Object.keys(genericProductSizes).some(key => lowerVal === key || lowerVal.includes(key));
-  
+
   input.value = "";
-  
+
   if (isGeneric && !hasSize) {
     showSizeSelectorDialog(val);
     return;
@@ -3693,7 +3451,7 @@ function addQuickCartItem() {
   state.cart.push(newItem);
   saveCartToLocalStorage();
   renderCart();
-  
+
   if (state.sharedListId) {
     syncSharedListWithServer();
   }
@@ -4432,7 +4190,7 @@ function getItemCategory(name) {
   if (healthKeywords.some(kw => lower.includes(kw))) return "health";
   if (homeKeywords.some(kw => lower.includes(kw))) return "home";
   if (groceryKeywords.some(kw => lower.includes(kw))) return "grocery";
-  
+
   return "grocery";
 }
 
@@ -4450,7 +4208,7 @@ function getPricesForOptimizerItem(name) {
   const lower = name.toLowerCase();
   const category = getItemCategory(name);
   const stores = CATEGORY_STORES[category] || CATEGORY_STORES.grocery;
-  
+
   let basePrice = 50.00;
   if (category === "electronics") {
     basePrice = 2500.00;
@@ -4497,788 +4255,24 @@ function getPricesForOptimizerItem(name) {
       basePrice = 140.00;
     }
   }
-  
+
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  
+
   const prices = {};
   stores.forEach((store, idx) => {
     const variance = 0.85 + ((Math.abs(hash + idx * 7) % 30) / 100);
     prices[store] = Math.round(basePrice * variance * 100) / 100;
   });
-  
+
   return prices;
 }
 
-window.selectedTryOnModel = "male";
-window.selectedTryOnGarment = "blue";
-window.userTryOnPhoto = null;
-window.userTryOnGarment = null;
-window.tryOnGarmentX = 75;
-window.tryOnGarmentY = 100;
-window.tryOnGarmentW = 150;
-window.tryOnGarmentH = 150;
-window.tryOnGarmentAngle = 0;
-window.tryOnChromaThreshold = 235;
-window.tryOnGarmentAspectRatio = 1.0;
-window.poseDetected = false;
-window.isBackendScanning = false;
-window.tryOnOriginalSrc = null;
-window.aiFaceOriginalSrc = null;
-window.tryOnRenderState = {
-  loading: false,
-  modelDrawn: false,
-  garmentDrawn: false,
-  lastDrawnAt: 0,
-};
-
-window.ensureTryOnLayerVisible = function() {
-  const canvas = document.getElementById("tryOnCanvas");
-  if (canvas) {
-    canvas.style.display = "block";
-    canvas.style.visibility = "visible";
-    canvas.style.opacity = "1";
-    canvas.style.position = "relative";
-    canvas.style.zIndex = "2";
-  }
-
-  const faceContainer = document.getElementById("aiFaceContainer");
-  const facePreview = document.getElementById("aiFacePreview");
-  const makeupCanvas = document.getElementById("aiMakeupCanvas");
-  if (faceContainer && facePreview?.src) {
-    faceContainer.classList.remove("hidden");
-    faceContainer.style.display = "flex";
-    faceContainer.style.visibility = "visible";
-    faceContainer.style.opacity = "1";
-    faceContainer.style.zIndex = "8";
-    facePreview.style.display = "block";
-    facePreview.style.visibility = "visible";
-    facePreview.style.opacity = "1";
-    facePreview.style.zIndex = "1";
-  }
-  if (makeupCanvas) {
-    makeupCanvas.style.display = "block";
-    makeupCanvas.style.visibility = "visible";
-    makeupCanvas.style.opacity = "1";
-    makeupCanvas.style.zIndex = "2";
-  }
-};
-
-window.restoreOriginalFace = function(reason = "unknown") {
-  console.error("Virtual Try-On fallback devrede:", reason);
-  window.isBackendScanning = false;
-  window.isScanningPose = false;
-  window.tryOnAnimationActive = false;
-  window.tryOnRenderState.loading = false;
-
-  const laserEl = document.getElementById("fashionScanLaser");
-  const svgHud = document.getElementById("tryOnSvgHud");
-  if (laserEl) laserEl.classList.add("hidden");
-  if (svgHud) svgHud.classList.add("hidden");
-
-  const facePreview = document.getElementById("aiFacePreview");
-  const faceOriginalSrc = facePreview?.dataset.originalSrc || window.aiFaceOriginalSrc;
-  if (facePreview && !facePreview.getAttribute("src") && faceOriginalSrc) {
-    facePreview.src = faceOriginalSrc;
-  }
-
-  window.ensureTryOnLayerVisible();
-
-  const canvas = document.getElementById("tryOnCanvas");
-  if (!canvas) return false;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return false;
-
-  const originalSrc = window.tryOnOriginalSrc
-    || (window.selectedTryOnModel === "user" ? window.userTryOnPhoto : null)
-    || (window.selectedTryOnModel === "female" ? "/static/fashion_female_model.png" : "/static/fashion_male_model.png");
-  if (!originalSrc) return false;
-
-  const originalImage = new Image();
-  originalImage.onload = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#eaeaea";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
-    canvas.style.opacity = "1";
-    window.tryOnRenderState.modelDrawn = true;
-    window.tryOnRenderState.garmentDrawn = false;
-    window.tryOnRenderState.lastDrawnAt = Date.now();
-    console.log("Virtual Try-On orijinal manken geri yüklendi:", window.tryOnRenderState);
-  };
-  originalImage.onerror = (error) => console.error("Orijinal manken görseli geri yüklenemedi:", error);
-  originalImage.src = originalSrc;
-  return true;
-};
-
-window.verifyTryOnVisual = function(context = "render", requireGarment = false) {
-  const canvas = document.getElementById("tryOnCanvas");
-  window.ensureTryOnLayerVisible();
-  const style = canvas ? window.getComputedStyle(canvas) : null;
-  const visible = Boolean(canvas)
-    && style.display !== "none"
-    && style.visibility !== "hidden"
-    && Number.parseFloat(style.opacity || "1") > 0;
-  const drawn = window.tryOnRenderState.modelDrawn
-    && (!requireGarment || window.tryOnRenderState.garmentDrawn);
-
-  console.log("Virtual Try-On DOM kontrolü:", {
-    context,
-    visible,
-    requireGarment,
-    state: { ...window.tryOnRenderState },
-    canvasDisplay: style?.display,
-    canvasVisibility: style?.visibility,
-    canvasOpacity: style?.opacity,
-  });
-
-  if (!visible || !drawn) {
-    window.restoreOriginalFace(`${context}: görsel DOM'a çizilemedi`);
-    return false;
-  }
-  canvas.style.opacity = "1";
-  return true;
-};
-
-window.detectPoseAndFitGarment = async function(photoBase64) {
-  const svgHud = document.getElementById("tryOnSvgHud");
-  const scanlineAnim = document.getElementById("tryOnSvgScanline")?.querySelector("animate");
-  
-  if (svgHud) svgHud.classList.remove("hidden");
-  if (scanlineAnim) scanlineAnim.setAttribute("dur", "1s");
-  
-  window.isBackendScanning = true;
-  window.tryOnAnimationActive = true;
-  window.animateTryOnCanvas();
-  showToast("[AI STATUS: Landmark taraması aktif. Vücut taranıyor...]");
-  
-  try {
-    const response = await fetch("/api/detect-pose", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: requestHeaders({}, "POST"),
-      body: JSON.stringify({ image_base64: photoBase64 })
-    });
-    if (!response.ok) throw new Error("API response error");
-    const data = await response.json();
-    if (data.success) {
-      console.log("Backend AI pose detection successful:", data);
-      
-      const bodyW = data.body_width * 300;
-      const tiltAngle = data.tilt_angle;
-      const neckX = data.neck_anchor[0] * 300;
-      const neckY = data.neck_anchor[1] * 300;
-      
-      window.tryOnGarmentW = Math.round(bodyW * 1.1);
-      window.tryOnGarmentH = Math.round(window.tryOnGarmentW / (window.tryOnGarmentAspectRatio || 1.0));
-      window.tryOnGarmentX = Math.round(neckX - window.tryOnGarmentW / 2);
-      window.tryOnGarmentY = Math.round(neckY);
-      window.tryOnGarmentAngle = tiltAngle;
-      
-      const angleSlider = document.getElementById("tryOnAngleSlider");
-      if (angleSlider) {
-        angleSlider.value = Math.round((tiltAngle * 180) / Math.PI);
-      }
-      const slider = document.getElementById("tryOnSizeSlider");
-      if (slider) slider.value = window.tryOnGarmentW;
-      
-      window.poseDetected = true;
-      showToast("[AI SUCCESS: Vücut hatları başarıyla çözümlendi.]");
-    } else {
-      console.warn("Backend pose detection success=false:", data.error_message);
-      window.autoFitGarmentOnUserPhoto();
-      window.poseDetected = true;
-      showToast("[AI ALERT: Pose saptanamadı. Lokal tarama aktif edildi.]");
-    }
-  } catch (err) {
-    console.warn("Backend pose detection call failed, using client scanning fallback:", err);
-    window.autoFitGarmentOnUserPhoto();
-    window.poseDetected = true;
-    showToast("[AI ALERT: API bağlantı hatası. Lokal yedek tarama devrede.]");
-  } finally {
-    window.isBackendScanning = false;
-    if (!window.isScanningPose) {
-      window.tryOnAnimationActive = false;
-      if (svgHud) svgHud.classList.add("hidden");
-    }
-    if (scanlineAnim) scanlineAnim.setAttribute("dur", "3s");
-    window.drawTryOnScene();
-  }
-};
-
-window.updateTryOnGarmentSize = function(sizeVal) {
-  const parsed = parseInt(sizeVal, 10);
-  window.tryOnGarmentW = parsed;
-  window.tryOnGarmentH = Math.round(parsed / (window.tryOnGarmentAspectRatio || 1.0));
-  window.drawTryOnScene();
-};
-
-window.updateTryOnGarmentAngle = function(angleVal) {
-  window.tryOnGarmentAngle = (parseInt(angleVal, 10) * Math.PI) / 180;
-  window.drawTryOnScene();
-};
-
-window.updateTryOnChromaThreshold = function(thresholdVal) {
-  window.tryOnChromaThreshold = parseInt(thresholdVal, 10);
-  window.drawTryOnScene();
-};
-
-window.drawGarmentTransparent = function(ctx, img, x, y, w, h) {
-  const tempCanvas = document.createElement("canvas");
-  tempCanvas.width = w;
-  tempCanvas.height = h;
-  const tempCtx = tempCanvas.getContext("2d");
-  tempCtx.drawImage(img, 0, 0, w, h);
-  
-  const imgData = tempCtx.getImageData(0, 0, w, h);
-  const data = imgData.data;
-  const threshold = window.tryOnChromaThreshold || 235;
-  
-  // Flood-fill border-connected white pixels
-  const visited = new Uint8Array(w * h);
-  const queue = [];
-  
-  const isWhite = (px, py) => {
-    const idx = (py * w + px) * 4;
-    const r = data[idx];
-    const g = data[idx + 1];
-    const b = data[idx + 2];
-    const a = data[idx + 3];
-    if (a < 50) return true;
-    return r > threshold && g > threshold && b > threshold;
-  };
-  
-  // Top and bottom borders
-  for (let px = 0; px < w; px++) {
-    if (isWhite(px, 0)) { queue.push(px, 0); visited[px] = 1; }
-    if (isWhite(px, h - 1)) { queue.push(px, h - 1); visited[(h - 1) * w + px] = 1; }
-  }
-  // Left and right borders
-  for (let py = 1; py < h - 1; py++) {
-    if (isWhite(0, py)) { queue.push(0, py); visited[py * w] = 1; }
-    if (isWhite(w - 1, py)) { queue.push(w - 1, py); visited[py * w + w - 1] = 1; }
-  }
-  
-  let head = 0;
-  const fillThreshold = Math.max(120, threshold - 20);
-  
-  while (head < queue.length) {
-    const cx = queue[head++];
-    const cy = queue[head++];
-    
-    const neighbors = [
-      cx - 1, cy,
-      cx + 1, cy,
-      cx, cy - 1,
-      cx, cy + 1
-    ];
-    
-    for (let j = 0; j < 8; j += 2) {
-      const nx = neighbors[j];
-      const ny = neighbors[j+1];
-      if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
-        const nIdx = ny * w + nx;
-        if (!visited[nIdx]) {
-          const idx = nIdx * 4;
-          const r = data[idx];
-          const g = data[idx+1];
-          const b = data[idx+2];
-          const a = data[idx+3];
-          
-          if (a < 50 || (r > fillThreshold && g > fillThreshold && b > fillThreshold)) {
-            visited[nIdx] = 1;
-            queue.push(nx, ny);
-          }
-        }
-      }
-    }
-  }
-  
-  for (let i = 0; i < visited.length; i++) {
-    if (visited[i]) {
-      data[i * 4 + 3] = 0;
-    }
-  }
-  
-  tempCtx.putImageData(imgData, 0, 0);
-  ctx.drawImage(tempCanvas, x, y);
-};
-
-window.tryOnAnimationActive = false;
-window.isScanningPose = false;
-window.scanStartTime = 0;
-window.tryOnParticles = [];
-
-window.initTryOnParticles = function() {
-  window.tryOnParticles = [];
-  for (let i = 0; i < 15; i++) {
-    window.tryOnParticles.push({
-      x: window.tryOnGarmentX + Math.random() * window.tryOnGarmentW,
-      y: window.tryOnGarmentY + Math.random() * window.tryOnGarmentH,
-      size: 1 + Math.random() * 2.5,
-      speed: 0.4 + Math.random() * 1.2,
-      opacity: 0.2 + Math.random() * 0.7
-    });
-  }
-};
-
-window.animateTryOnCanvas = function() {
-  const canvas = document.getElementById("tryOnCanvas");
-  if (!canvas) {
-    window.tryOnAnimationActive = false;
-    return;
-  }
-  if (!window.tryOnAnimationActive) return;
-  
-  window.drawTryOnScene();
-  requestAnimationFrame(window.animateTryOnCanvas);
-};
-
-window.drawTryOnScene = function() {
-  const canvas = document.getElementById("tryOnCanvas");
-  if (!canvas) {
-    window.restoreOriginalFace("tryOnCanvas bulunamadı");
-    return;
-  }
-  window.ensureTryOnLayerVisible();
-  window.tryOnRenderState.loading = true;
-  window.tryOnRenderState.modelDrawn = false;
-  window.tryOnRenderState.garmentDrawn = false;
-  const ctx = canvas.getContext("2d");
-  
-  ctx.clearRect(0, 0, 300, 300);
-  ctx.fillStyle = "#eaeaea";
-  ctx.fillRect(0, 0, 300, 300);
-  
-  const modelImg = new Image();
-  if (window.selectedTryOnModel === "user") {
-    if (!window.userTryOnPhoto) {
-      ctx.fillStyle = "#666";
-      ctx.font = "14px 'Manrope', sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("Lütfen fotoğraf yükleyin", 150, 150);
-      return;
-    }
-    modelImg.src = window.userTryOnPhoto;
-  } else {
-    modelImg.src = window.selectedTryOnModel === "male" ? "/static/fashion_male_model.png" : "/static/fashion_female_model.png";
-  }
-  window.tryOnOriginalSrc = modelImg.src;
-  
-  modelImg.onload = () => {
-    ctx.drawImage(modelImg, 0, 0, 300, 300);
-    window.tryOnRenderState.modelDrawn = true;
-    window.tryOnRenderState.lastDrawnAt = Date.now();
-    canvas.style.opacity = "1";
-    
-    if (window.isBackendScanning) {
-      // 1. Neon grid lines
-      ctx.strokeStyle = "rgba(0, 255, 255, 0.07)";
-      ctx.lineWidth = 1;
-      for (let g = 20; g < 300; g += 20) {
-        ctx.beginPath();
-        ctx.moveTo(g, 0); ctx.lineTo(g, 300);
-        ctx.moveTo(0, g); ctx.lineTo(300, g);
-        ctx.stroke();
-      }
-      
-      // 2. Fast Neon sweep scanning line
-      const lineY = (Math.floor(Date.now() / 2.5) % 300);
-      ctx.strokeStyle = "rgba(0, 240, 255, 0.8)";
-      ctx.lineWidth = 2.5;
-      ctx.shadowColor = "rgba(0, 240, 255, 0.75)";
-      ctx.shadowBlur = 10;
-      ctx.beginPath();
-      ctx.moveTo(10, lineY);
-      ctx.lineTo(290, lineY);
-      ctx.stroke();
-      ctx.shadowBlur = 0; // reset
-      
-      // 3. Technical scanning text
-      ctx.fillStyle = "rgba(0, 255, 255, 0.85)";
-      ctx.font = "9px monospace";
-      ctx.textAlign = "center";
-      ctx.fillText("[AI POSE LANDMARK DETECTION: ACTIVE]", 150, 140);
-      ctx.fillText("[ANALYZING BODY COORDINATES...]", 150, 160);
-      return;
-    }
-    
-    if (window.isScanningPose) {
-      const elapsed = Date.now() - window.scanStartTime;
-      const scanPercent = Math.min(1.0, elapsed / 2500);
-      
-      // 1. Neon grid lines
-      ctx.strokeStyle = "rgba(0, 255, 255, 0.07)";
-      ctx.lineWidth = 1;
-      for (let g = 20; g < 300; g += 20) {
-        ctx.beginPath();
-        ctx.moveTo(g, 0); ctx.lineTo(g, 300);
-        ctx.moveTo(0, g); ctx.lineTo(300, g);
-        ctx.stroke();
-      }
-      
-      // 2. Neon sweep scanning line
-      const lineY = scanPercent * 300;
-      ctx.strokeStyle = "rgba(0, 150, 255, 0.85)";
-      ctx.lineWidth = 3;
-      ctx.shadowColor = "rgba(0, 150, 255, 0.8)";
-      ctx.shadowBlur = 12;
-      ctx.beginPath();
-      ctx.moveTo(10, lineY);
-      ctx.lineTo(290, lineY);
-      ctx.stroke();
-      ctx.shadowBlur = 0; // reset
-      
-      // 3. Status text labels
-      ctx.fillStyle = "rgba(0, 255, 255, 0.85)";
-      ctx.font = "9px monospace";
-      ctx.textAlign = "left";
-      ctx.fillText(`[AI BODY SCANNING: ${Math.round(scanPercent * 100)}%]`, 15, 25);
-      ctx.fillText(`[OMUZ GENİŞLİĞİ: ${window.tryOnGarmentW}px]`, 15, 280);
-      
-      ctx.textAlign = "right";
-      ctx.fillText(`[AÇI: ${(window.tryOnGarmentAngle * 180 / Math.PI).toFixed(1)}Â°]`, 285, 25);
-      ctx.fillText(`[YAKA TESPİTİ: TAMAM]`, 285, 280);
-      
-      // 4. Detected target points
-      const leftS = { x: window.tryOnGarmentX, y: window.tryOnGarmentY + 15 };
-      const rightS = { x: window.tryOnGarmentX + window.tryOnGarmentW, y: window.tryOnGarmentY + 15 + Math.sin(window.tryOnGarmentAngle) * window.tryOnGarmentW };
-      const neckC = { x: window.tryOnGarmentX + window.tryOnGarmentW / 2, y: window.tryOnGarmentY };
-      
-      const drawReticle = (pt, label) => {
-        ctx.strokeStyle = "rgba(0, 255, 255, 0.75)";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
-        ctx.moveTo(pt.x - 10, pt.y); ctx.lineTo(pt.x + 10, pt.y);
-        ctx.moveTo(pt.x, pt.y - 10); ctx.lineTo(pt.x, pt.y + 10);
-        ctx.stroke();
-        
-        ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
-        ctx.font = "7px monospace";
-        ctx.textAlign = "center";
-        ctx.fillText(label, pt.x, pt.y - 12);
-      };
-      
-      drawReticle(leftS, "L_SHOULDER");
-      drawReticle(rightS, "R_SHOULDER");
-      drawReticle(neckC, "NECK_ANCHOR");
-      
-      // Bounding box skeleton line
-      ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
-      ctx.setLineDash([3, 3]);
-      ctx.beginPath();
-      ctx.moveTo(leftS.x, leftS.y);
-      ctx.lineTo(neckC.x, neckC.y);
-      ctx.lineTo(rightS.x, rightS.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      
-      return;
-    }
-    
-    // Normal drawing mode
-    const garmentImg = new Image();
-    if (window.selectedTryOnGarment === "user") {
-      if (!window.userTryOnGarment) {
-        ctx.fillStyle = "#666";
-        ctx.font = "14px 'Manrope', sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("Lütfen tişört yükleyin", 150, 150);
-        return;
-      }
-      garmentImg.src = window.userTryOnGarment;
-    } else {
-      garmentImg.src = window.selectedTryOnGarment === "blue" ? "/static/fashion_tshirt_blue.png" : "/static/fashion_tshirt_red.png";
-    }
-    
-    garmentImg.onload = () => {
-      const aspect = garmentImg.naturalWidth / garmentImg.naturalHeight;
-      window.tryOnGarmentAspectRatio = aspect;
-      window.tryOnGarmentH = Math.round(window.tryOnGarmentW / aspect);
-      
-      // Draw rising particles
-      if (window.tryOnParticles.length === 0) {
-        window.initTryOnParticles();
-      }
-      
-      ctx.fillStyle = "rgba(0, 150, 255, 0.45)";
-      window.tryOnParticles.forEach(p => {
-        p.y -= p.speed;
-        if (p.y < window.tryOnGarmentY - 20) {
-          p.y = window.tryOnGarmentY + window.tryOnGarmentH + 10;
-          p.x = window.tryOnGarmentX + Math.random() * window.tryOnGarmentW;
-        }
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      
-      ctx.save();
-      
-      // Floating / Bobbing logic
-      const bobOffset = Math.sin(Date.now() / 300) * 2.5;
-      
-      // Holographic Neon blue drop-shadow glow
-      ctx.shadowColor = "rgba(0, 150, 255, 0.45)";
-      ctx.shadowBlur = 15;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 6;
-      
-      // Align, translate, and rotate around center
-      const centerX = window.tryOnGarmentX + window.tryOnGarmentW / 2;
-      const centerY = window.tryOnGarmentY - 6 + bobOffset + window.tryOnGarmentH / 2;
-      ctx.translate(centerX, centerY);
-      ctx.rotate(window.tryOnGarmentAngle || 0);
-      
-      window.drawGarmentTransparent(ctx, garmentImg, -window.tryOnGarmentW / 2, -window.tryOnGarmentH / 2, window.tryOnGarmentW, window.tryOnGarmentH);
-      
-      ctx.restore();
-      window.tryOnRenderState.loading = false;
-      window.tryOnRenderState.garmentDrawn = true;
-      window.tryOnRenderState.lastDrawnAt = Date.now();
-      canvas.style.opacity = "1";
-      window.ensureTryOnLayerVisible();
-      console.log("Virtual Try-On çizimi tamamlandı:", { ...window.tryOnRenderState });
-    };
-    garmentImg.onerror = (error) => {
-      window.tryOnRenderState.loading = false;
-      console.error("Tişört görseli yüklenemedi:", garmentImg.src, error);
-      window.restoreOriginalFace("tişört görseli yüklenemedi");
-    };
-  };
-  modelImg.onerror = (error) => {
-    window.tryOnRenderState.loading = false;
-    console.error("Manken görseli yüklenemedi:", modelImg.src, error);
-    window.restoreOriginalFace("manken görseli yüklenemedi");
-  };
-};
-
-window.autoFitGarmentOnUserPhoto = function() {
-  if (window.selectedTryOnModel !== "user" || !window.userTryOnPhoto) return;
-  
-  const img = new Image();
-  img.src = window.userTryOnPhoto;
-  img.onload = () => {
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = 300;
-    tempCanvas.height = 300;
-    const tempCtx = tempCanvas.getContext("2d");
-    tempCtx.drawImage(img, 0, 0, 300, 300);
-    
-    let imgData;
-    try {
-      imgData = tempCtx.getImageData(0, 0, 300, 300);
-    } catch (e) {
-      console.warn("CORS or tainted canvas while scanning user photo. Using default fit.", e);
-      window.tryOnGarmentX = 75;
-      window.tryOnGarmentY = 110;
-      window.tryOnGarmentW = 150;
-      window.tryOnGarmentH = Math.round(150 / (window.tryOnGarmentAspectRatio || 1.0));
-      window.tryOnGarmentAngle = 0;
-      const angleSlider = document.getElementById("tryOnAngleSlider");
-      if (angleSlider) angleSlider.value = 0;
-      const slider = document.getElementById("tryOnSizeSlider");
-      if (slider) slider.value = 150;
-      window.drawTryOnScene();
-      return;
-    }
-    
-    const data = imgData.data;
-    
-    const getPixel = (x, y) => {
-      const idx = (y * 300 + x) * 4;
-      return {
-        r: data[idx],
-        g: data[idx + 1],
-        b: data[idx + 2],
-        a: data[idx + 3]
-      };
-    };
-    
-    const bgSamples = [
-      getPixel(5, 5), getPixel(150, 5), getPixel(295, 5),
-      getPixel(5, 150), getPixel(295, 150),
-      getPixel(5, 295), getPixel(295, 295)
-    ];
-    
-    const bgR = bgSamples.reduce((sum, p) => sum + p.r, 0) / bgSamples.length;
-    const bgG = bgSamples.reduce((sum, p) => sum + p.g, 0) / bgSamples.length;
-    const bgB = bgSamples.reduce((sum, p) => sum + p.b, 0) / bgSamples.length;
-    
-    const colorDiff = (p1, r, g, b) => {
-      return Math.sqrt((p1.r - r) ** 2 + (p1.g - g) ** 2 + (p1.b - b) ** 2);
-    };
-    
-    let lefts = [];
-    let rights = [];
-    
-    for (let y = 100; y < 240; y += 4) {
-      let firstX = -1;
-      let lastX = -1;
-      for (let x = 10; x < 290; x++) {
-        const p = getPixel(x, y);
-        if (colorDiff(p, bgR, bgG, bgB) > 35) {
-          if (firstX === -1) firstX = x;
-          lastX = x;
-        }
-      }
-      if (firstX !== -1 && lastX !== -1 && (lastX - firstX) > 40) {
-        lefts.push(firstX);
-        rights.push(lastX);
-      }
-    }
-    
-    if (lefts.length > 5) {
-      let totalW = 0;
-      let totalC = 0;
-      for (let i = 0; i < lefts.length; i++) {
-        totalW += (rights[i] - lefts[i]);
-        totalC += ((lefts[i] + rights[i]) / 2);
-      }
-      
-      let avgW = totalW / lefts.length;
-      let avgC = totalC / lefts.length;
-      
-      if (avgW < 70) avgW = 130;
-      if (avgW > 240) avgW = 160;
-      if (avgC < 60 || avgC > 240) avgC = 150;
-      
-      let minX = 300, minXY = 140;
-      let maxX = 0, maxXY = 140;
-      
-      for (let i = 0; i < lefts.length; i++) {
-        const y = 100 + i * 4;
-        if (y >= 120 && y <= 180) {
-          if (lefts[i] < minX) {
-            minX = lefts[i];
-            minXY = y;
-          }
-          if (rights[i] > maxX) {
-            maxX = rights[i];
-            maxXY = y;
-          }
-        }
-      }
-      
-      let shoulderAngle = 0;
-      if (maxX > minX && Math.abs(maxXY - minXY) < 40) {
-        shoulderAngle = Math.atan2(maxXY - minXY, maxX - minX);
-        if (Math.abs(shoulderAngle) > 0.35) {
-          shoulderAngle = 0;
-        }
-      }
-      window.tryOnGarmentAngle = shoulderAngle;
-      
-      const angleSlider = document.getElementById("tryOnAngleSlider");
-      if (angleSlider) {
-        angleSlider.value = Math.round((shoulderAngle * 180) / Math.PI);
-      }
-      
-      let detectedTopY = 110;
-      for (let y = 50; y < 150; y += 2) {
-        let countDiff = 0;
-        for (let x = 40; x < 260; x++) {
-          if (colorDiff(getPixel(x, y), bgR, bgG, bgB) > 35) {
-            countDiff++;
-          }
-        }
-        if (countDiff > 15) {
-          detectedTopY = y + 40;
-          break;
-        }
-      }
-      
-      detectedTopY = Math.max(90, Math.min(detectedTopY, 130));
-      
-      window.tryOnGarmentW = Math.round(avgW * 1.1);
-      window.tryOnGarmentH = Math.round(window.tryOnGarmentW / (window.tryOnGarmentAspectRatio || 1.0));
-      window.tryOnGarmentX = Math.round(avgC - window.tryOnGarmentW / 2);
-      window.tryOnGarmentY = detectedTopY;
-      
-      const slider = document.getElementById("tryOnSizeSlider");
-      if (slider) slider.value = window.tryOnGarmentW;
-    } else {
-      window.tryOnGarmentX = 75;
-      window.tryOnGarmentY = 110;
-      window.tryOnGarmentW = 150;
-      window.tryOnGarmentH = Math.round(150 / (window.tryOnGarmentAspectRatio || 1.0));
-      window.tryOnGarmentAngle = 0;
-      const angleSlider = document.getElementById("tryOnAngleSlider");
-      if (angleSlider) angleSlider.value = 0;
-      const slider = document.getElementById("tryOnSizeSlider");
-      if (slider) slider.value = 150;
-    }
-    
-    window.drawTryOnScene();
-  };
-};
-
-window.runFashionTryOnAnimation = function() {
-  if (window.selectedTryOnModel === "user" && !window.userTryOnPhoto) {
-    showToast("Lütfen önce kendi fotoğrafınızı yükleyin.");
-    return;
-  }
-  if (window.selectedTryOnGarment === "user" && !window.userTryOnGarment) {
-    showToast("Lütfen önce bir kıyafet yükleyin veya linkini girin.");
-    return;
-  }
-
-  const laserEl = document.getElementById("fashionScanLaser");
-  if (!laserEl) return;
-  
-  const successBanner = document.getElementById("aiAnalysisSuccessBanner");
-  if (successBanner) successBanner.classList.add("hidden");
-  
-  const svgHud = document.getElementById("tryOnSvgHud");
-  if (svgHud) svgHud.classList.remove("hidden");
-  
-  laserEl.classList.remove("hidden");
-  showToast("Yapay zeka prova işlemi başlatıldı...");
-  
-  if (window.selectedTryOnModel !== "user") {
-    window.tryOnGarmentX = 75;
-    window.tryOnGarmentY = 100;
-    window.tryOnGarmentW = 150;
-    window.tryOnGarmentH = Math.round(150 / (window.tryOnGarmentAspectRatio || 1.0));
-    window.tryOnGarmentAngle = 0;
-    const angleSlider = document.getElementById("tryOnAngleSlider");
-    if (angleSlider) angleSlider.value = 0;
-    const slider = document.getElementById("tryOnSizeSlider");
-    if (slider) slider.value = 150;
-  } else if (!window.poseDetected) {
-    window.autoFitGarmentOnUserPhoto();
-  }
-  
-  window.isScanningPose = true;
-  window.scanStartTime = Date.now();
-  window.tryOnAnimationActive = true;
-  window.animateTryOnCanvas();
-  
-  setTimeout(() => {
-    laserEl.classList.add("hidden");
-    if (svgHud) svgHud.classList.add("hidden");
-    window.isScanningPose = false;
-    window.initTryOnParticles();
-    
-    window.drawTryOnScene();
-    setTimeout(() => {
-      const renderSucceeded = window.verifyTryOnVisual("prova tamamlandı", true);
-      if (renderSucceeded) {
-        if (successBanner) successBanner.classList.remove("hidden");
-        showToast("Prova tamamlandı! Yapay zeka kıyafeti başarıyla giydirdi.");
-      } else {
-        if (successBanner) successBanner.classList.add("hidden");
-        showToast("Prova görseli oluşturulamadı. Orijinal manken geri getirildi.");
-      }
-    }, 350);
-  }, 2500);
-};
 
 window.saveRestockTracking = async function(productId) {
   const enabled = document.getElementById("enableRestockTracking").checked;
   const extra_info = {};
-  
+
   if (enabled) {
     const period = parseInt(document.getElementById("restockPeriodInput").value || 30, 10);
     const lastPurchased = document.getElementById("restockLastPurchasedInput").value || new Date().toISOString().split('T')[0];
@@ -5288,13 +4282,13 @@ window.saveRestockTracking = async function(productId) {
     extra_info.restock_period_days = null;
     extra_info.last_purchased_date = null;
   }
-  
+
   try {
     const updated = await api(`/products/${productId}/extra-info`, {
       method: "POST",
       body: JSON.stringify({ extra_info }),
     });
-    
+
     state.products = state.products.map((product) => (
       product.id === productId ? updated : product
     ));
@@ -5311,10 +4305,10 @@ window.updateFashionPrices = function(val) {
   cards.forEach(card => {
     const basePrice = parseFloat(card.getAttribute("data-base-price") || 0);
     const baseOriginalPrice = parseFloat(card.getAttribute("data-base-original-price") || 0);
-    
+
     let newPrice = basePrice;
     let newOriginalPrice = baseOriginalPrice;
-    
+
     if (val === "M") {
       newPrice = basePrice * 1.05;
       newOriginalPrice = baseOriginalPrice ? baseOriginalPrice * 1.05 : 0;
@@ -5334,7 +4328,7 @@ window.updateFashionPrices = function(val) {
       newPrice = basePrice + 35;
       newOriginalPrice = baseOriginalPrice ? baseOriginalPrice + 35 : 0;
     }
-    
+
     const priceStrong = card.querySelector(".price-display-strong");
     if (priceStrong) {
       priceStrong.innerText = currency.format(newPrice);
@@ -5440,7 +4434,7 @@ function renderBackendOptimization(result, mode) {
       </div>
     `;
     lucide.createIcons();
-    
+
     resultsDiv.querySelectorAll('.quantum-node-card').forEach(card => {
       if (window.registerForBobbing) window.registerForBobbing(card);
     });
@@ -5483,7 +4477,7 @@ function renderBackendOptimization(result, mode) {
     </div>
   `;
   lucide.createIcons();
-  
+
   resultsDiv.querySelectorAll('.quantum-node-card').forEach(card => {
     if (window.registerForBobbing) window.registerForBobbing(card);
   });
@@ -5564,19 +4558,19 @@ async function renderCart() {
   if (navigator.onLine) {
     const overlay = document.getElementById("quantumScanOverlay");
     const progressText = document.getElementById("quantumScanProgress");
-    
+
     // 1. Arayüzü anında güncelle (Zero-Blocking)
     if (overlay) overlay.style.display = "flex";
     if (progressText) {
       progressText.innerText = "Sepet veri spektrumu çözümleniyor...";
     }
-    
+
     // 2. Kuantum tarama işlemini asenkron olarak bir sonraki frame'de başlat
     requestAnimationFrame(() => {
       setTimeout(async () => {
         const progressText = document.getElementById("quantumScanProgress");
         var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Sepetiniz için en uygun mağazalar seçiliyor..."; }, 600);
-        
+
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 saniye kuralı
 
@@ -5610,7 +4604,7 @@ async function renderCart() {
         } catch (error) {
           clearTimeout(timeoutId);
           console.warn("Sepet optimizasyonu başarısız veya zaman aşımına uğradı, hata kurtarma protokolü devrede:", error);
-          
+
           if (overlay && progressText) {
             // overlay.classList.add("recovery-mode");
             const header = overlay.querySelector("h3");
@@ -5619,10 +4613,10 @@ async function renderCart() {
               header.innerText = "SİSTEM KURTARMA AKTİF: LOKAL ANALİZ";
             }
             progressText.innerText = "Sunucular yanıt vermedi. Alternatif analizler üzerinden sepet optimizasyonu sürdürülüyor...";
-            
+
             // Wait 1.5 seconds
             await new Promise(resolve => setTimeout(resolve, 1500));
-            
+
             // Build simulated optimizer result
             const mockOptResult = {
               available: true,
@@ -5665,7 +4659,7 @@ async function renderCart() {
               }
             };
             renderBackendOptimization(mockOptResult, state.optimizerMode);
-            
+
             // overlay.classList.remove("recovery-mode");
             if (header) {
               header.classList.remove("glitch-active");
@@ -5750,7 +4744,7 @@ async function renderCart() {
           Kategorileri en ucuz tekil mağazalarından alarak toplam <strong>${currency.format(grandTotal)}</strong> ödersiniz.
         </div>
       </div>
-      
+
       <div style="display: flex; flex-direction: column; gap: 14px;">
         ${categoryOptimizations.map(opt => `
           <div style="background: var(--bg-card); border: 1px solid var(--line); border-radius: 8px; padding: 12px;">
@@ -5769,7 +4763,7 @@ async function renderCart() {
                 </div>
               `).join("")}
             </div>
-            
+
             <div style="margin-top: 8px; font-size: 11px; color: var(--ink-light); display: flex; gap: 6px; flex-wrap: wrap;">
               <span>Alternatifler:</span>
               ${opt.options.slice(1, 4).map(o => `
@@ -5785,15 +4779,15 @@ async function renderCart() {
   } else {
     // Split Store Optimizer:
     const splitItems = [];
-    
+
     uncheckedItems.forEach(item => {
       const cat = getItemCategory(item.name);
       const stores = CATEGORY_STORES[cat] || CATEGORY_STORES.grocery;
       const prices = getPricesForOptimizerItem(item.name);
-      
+
       let cheapestStore = stores[0];
       let cheapestPrice = Infinity;
-      
+
       stores.forEach(store => {
         const price = prices[store];
         if (price !== undefined && price < cheapestPrice) {
@@ -5801,7 +4795,7 @@ async function renderCart() {
           cheapestStore = store;
         }
       });
-      
+
       splitItems.push({
         name: item.name,
         store: cheapestStore,
@@ -5863,7 +4857,7 @@ async function renderCart() {
           En iyi tekil mağaza toplamına kıyasla sepeti bölerek ek olarak <strong>${currency.format(splitBenefit)}</strong> kâr ediyorsunuz.
         </div>
       </div>
-      
+
       <div style="display: flex; flex-direction: column; gap: 10px;">
         ${Object.entries(grouped).map(([store, data]) => `
           <div class="opt-store-card">
@@ -5892,7 +4886,7 @@ function showShareLinkDialog(shareUrl) {
   const dialog = document.getElementById("productDialog");
   const content = document.getElementById("dialogContent");
   if (!dialog || !content) return;
-  
+
   content.innerHTML = `
     <div class="dialog-body auth-dialog">
       <p class="eyebrow">ORTAK LİSTE</p>
@@ -5939,12 +4933,12 @@ function leaveSharedList() {
     }
     state.sharedListId = null;
     state.sharedListVersion = 0;
-    
+
     // Remove query parameter from URL without page reload
     const url = new URL(window.location.href);
     url.searchParams.delete("list");
     window.history.replaceState({}, document.title, url.toString());
-    
+
     // Load cart back from local storage
     state.cart = JSON.parse(localStorage.getItem("almadan_cart") || "[]");
     renderCart();
@@ -5964,11 +4958,11 @@ async function shareCartList() {
       method: "POST",
       body: JSON.stringify({ items: state.cart })
     });
-    
+
     state.sharedListId = res.id;
     state.sharedListVersion = res.version || 1;
     const shareUrl = `${window.location.origin}/?list=${res.id}`;
-    
+
     // Attempt automatic clipboard copy
     let copied = false;
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -5979,16 +4973,16 @@ async function shareCartList() {
         console.warn("Navigator clipboard failed, falling back", e);
       }
     }
-    
+
     // Show copy result toast if auto-copied
     if (copied) {
       showToast("Bağlantı panoya kopyalandı!");
     }
-    
+
     // Always open share dialog so user can see the link and copy manually if needed
     showShareLinkDialog(shareUrl);
     renderCart(); // Update UI to show active status
-    
+
     // Start Polling loop if not active
     startPolling();
   } catch (error) {
@@ -6002,7 +4996,7 @@ async function checkSharedListUrl() {
   if (listId) {
     state.sharedListId = listId;
     showToast("Ortak aile listesi yüklendi. Canlı senkronizasyon aktif!");
-    
+
     try {
       const res = await api(`/api/lists/${listId}`);
       state.cart = res.items || [];
@@ -6010,7 +5004,7 @@ async function checkSharedListUrl() {
       saveCartToLocalStorage();
       switchView("cart");
       renderCart(); // Make sure cart items are instantly drawn on screen!
-      
+
       startPolling();
     } catch (error) {
       showToast("Paylaşılan liste yüklenemedi: " + error.message);
@@ -6131,416 +5125,7 @@ function startVoiceSearch() {
 /* KATEGORİ DEĞİŞİMİ VE AI CİLT ANALİZİ LOGIC */
 let currentSkinType = null; // light, medium, dark
 
-function displaySkinAnalysis(type, showToastMsg = false) {
-  currentSkinType = type;
-  const resultCard = document.getElementById("aiAnalysisResultCard");
-  const toneIndicator = document.getElementById("aiSkinToneColorIndicator");
-  const toneName = document.getElementById("aiSkinToneName");
-  const toneTag = document.getElementById("aiSkinToneTag");
-  const paletteDiv = document.getElementById("aiPaletteColors");
-  const statusEl = document.getElementById("aiUploadStatus");
-  const laserEl = document.getElementById("aiScanLaser");
-  const cameraIcon = document.getElementById("aiCameraIcon");
-
-  if (laserEl) laserEl.classList.add("hidden");
-  if (cameraIcon) cameraIcon.style.animation = "";
-  if (statusEl) {
-    const labels = { light: "Açık Tenli Model", medium: "Buğday Tenli Model", dark: "Esmer Model" };
-    statusEl.innerHTML = `<span style="color: var(--green);">Kayıtlı Analiz Yüklendi!</span> (${labels[type] || 'Kendi Analiziniz'})`;
-  }
-  
-  let colorHex = "#fdf5e6";
-  let colorName = "Açık / Porselen";
-  let undertone = "Soğuk Alt Ton";
-  let paletteHtml = "";
-  
-  if (type === "light") {
-    colorHex = "#fbe3d3";
-    colorName = "Açık / Porselen Fildişi";
-    undertone = "Soğuk Alt Ton";
-    paletteHtml = `
-      <div class="floating-product-card" data-color="#e06666" data-type="lipstick" style="border-left: 4px solid #e06666 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
-        <div style="background: rgba(224, 102, 102, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #e06666;">
-          <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
-        </div>
-        <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Gül Kurusu Kuantum Ruj</strong>
-          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 189,90 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#e06666" data-type="lipstick">Bu Ruju Prova Et</button>
-        </div>
-      </div>
-      <div class="floating-product-card" data-color="#ea9999" data-type="blush" style="border-left: 4px solid #ea9999 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
-        <div style="background: rgba(234, 153, 153, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #ea9999;">
-          <i data-lucide="smile" style="width: 18px; height: 18px;"></i>
-        </div>
-        <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Toz Pembe Foton Allığı</strong>
-          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 220,00 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#ea9999" data-type="blush">Bu Allığı Prova Et</button>
-        </div>
-      </div>
-      <div class="floating-product-card" data-color="#d5a6bd" data-type="eyeshadow" style="border-left: 4px solid #d5a6bd !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
-        <div style="background: rgba(213, 166, 189, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #d5a6bd;">
-          <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
-        </div>
-        <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Eflatun Spektral Göz Farı</strong>
-          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 145,50 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#d5a6bd" data-type="eyeshadow">Bu Farı Prova Et</button>
-        </div>
-      </div>
-    `;
-  } else if (type === "medium") {
-    colorHex = "#e8c39e";
-    colorName = "Buğday / Doğal Kumral";
-    undertone = "Sıcak Alt Ton";
-    paletteHtml = `
-      <div class="floating-product-card" data-color="#c00000" data-type="lipstick" style="border-left: 4px solid #c00000 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
-        <div style="background: rgba(192, 0, 0, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #c00000;">
-          <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
-        </div>
-        <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Kiremit Kırmızısı Kuantum Ruj</strong>
-          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 195,00 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#c00000" data-type="lipstick">Bu Ruju Prova Et</button>
-        </div>
-      </div>
-      <div class="floating-product-card" data-color="#f6b26b" data-type="blush" style="border-left: 4px solid #f6b26b !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
-        <div style="background: rgba(246, 178, 107, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #f6b26b;">
-          <i data-lucide="smile" style="width: 18px; height: 18px;"></i>
-        </div>
-        <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Şeftali Işıltılı Neon Allık</strong>
-          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 180,00 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#f6b26b" data-type="blush">Bu Allığı Prova Et</button>
-        </div>
-      </div>
-      <div class="floating-product-card" data-color="#b45f06" data-type="eyeshadow" style="border-left: 4px solid #b45f06 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
-        <div style="background: rgba(180, 95, 6, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #b45f06;">
-          <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
-        </div>
-        <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Bronz Optik Göz Farı</strong>
-          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 160,00 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#b45f06" data-type="eyeshadow">Bu Farı Prova Et</button>
-        </div>
-      </div>
-    `;
-  } else if (type === "dark") {
-    colorHex = "#a87a51";
-    colorName = "Esmer / Karamel Kahve";
-    undertone = "Nötr & Sıcak Alt Ton";
-    paletteHtml = `
-      <div class="floating-product-card" data-color="#741b47" data-type="lipstick" style="border-left: 4px solid #741b47 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
-        <div style="background: rgba(116, 27, 71, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #741b47;">
-          <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
-        </div>
-        <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Mürdüm Kuantum Ruj</strong>
-          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 210,00 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#741b47" data-type="lipstick">Bu Ruju Prova Et</button>
-        </div>
-      </div>
-      <div class="floating-product-card" data-color="#a64d79" data-type="blush" style="border-left: 4px solid #a64d79 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
-        <div style="background: rgba(166, 77, 121, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #a64d79;">
-          <i data-lucide="smile" style="width: 18px; height: 18px;"></i>
-        </div>
-        <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Koyu Mürdüm Foton Allığı</strong>
-          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 230,00 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#a64d79" data-type="blush">Bu Allığı Prova Et</button>
-        </div>
-      </div>
-      <div class="floating-product-card" data-color="#783f04" data-type="eyeshadow" style="border-left: 4px solid #783f04 !important; flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
-        <div style="background: rgba(120, 63, 4, 0.1); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #783f04;">
-          <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
-        </div>
-        <div style="flex: 1; display: flex; flex-direction: column;">
-          <strong style="font-size: 12px; color: var(--ink);">Bakır Spektral Göz Farı</strong>
-          <span style="font-size: 10px; color: var(--muted); margin-top: 2px;">Fiyat Spektrumu: 175,00 TL</span>
-          <button class="primary-button btn-makeup-tryon" style="padding: 4px 8px; font-size: 9px; height: auto; margin-top: 6px; background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); border: 0; align-self: flex-start; cursor: pointer; border-radius: 4px; font-weight: 700; color: white;" data-color="#783f04" data-type="eyeshadow">Bu Farı Prova Et</button>
-        </div>
-      </div>
-    `;
-  }
-  
-  if (toneIndicator) toneIndicator.style.backgroundColor = colorHex;
-  if (toneName) toneName.innerText = colorName;
-  if (toneTag) toneTag.innerText = undertone;
-  if (paletteDiv) {
-    paletteDiv.innerHTML = `<div style="display: flex; flex-direction: column; gap: 12px; width: 100%;">${paletteHtml}</div>`;
-    
-    // Create icons for newly generated Lucide elements
-    lucide.createIcons();
-    
-    // Register floating cards for synchronized bobbing animation
-    paletteDiv.querySelectorAll('.floating-product-card').forEach(card => {
-      if (window.registerForBobbing) window.registerForBobbing(card);
-    });
-    
-    // Bind click handlers for try-on button actions
-    paletteDiv.querySelectorAll('.btn-makeup-tryon').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const color = btn.getAttribute('data-color');
-        const type = btn.getAttribute('data-type');
-        if (window.runMakeupTryOnAnimation) {
-          window.runMakeupTryOnAnimation(btn, color, type);
-        }
-      });
-    });
-  }
-  
-  if (resultCard) resultCard.classList.remove("hidden");
-  
-  const answerBox = document.getElementById("aiColorAnswerBox");
-  const questionInput = document.getElementById("aiColorQuestionInput");
-  if (answerBox) answerBox.classList.add("hidden");
-  if (questionInput) questionInput.value = "";
-  
-  if (showToastMsg) {
-    showToast("Cilt tonu analiz edildi! Soru sorma paneli aktif.");
-  }
-}
-
-function handleCategoryChange() {
-  const selector = document.getElementById("searchCategorySelector");
-  if (!selector) return;
-  const category = selector.value;
-  const aiSection = document.getElementById("aiCosmeticsSection");
-  const aiFashionSection = document.getElementById("aiFashionSection");
-  
-  if (aiSection) {
-    if (category === "cosmetics") {
-      aiSection.classList.remove("hidden");
-      lucide.createIcons();
-      if (state.auth.authenticated && state.auth.user && state.auth.user.skin_type) {
-        displaySkinAnalysis(state.auth.user.skin_type, false);
-      } else {
-        const guestSkinType = localStorage.getItem("almadan_skin_type");
-        if (guestSkinType) {
-          displaySkinAnalysis(guestSkinType, false);
-        }
-      }
-    } else {
-      aiSection.classList.add("hidden");
-    }
-  }
-
-  if (aiFashionSection) {
-    if (category === "fashion") {
-      aiFashionSection.classList.remove("hidden");
-      lucide.createIcons();
-      window.drawTryOnScene();
-      
-      if (window.tryOnParticles && window.tryOnParticles.length > 0) {
-        window.tryOnAnimationActive = true;
-        window.animateTryOnCanvas();
-      }
-    } else {
-      aiFashionSection.classList.add("hidden");
-      window.tryOnAnimationActive = false;
-      const successBanner = document.getElementById("aiAnalysisSuccessBanner");
-      if (successBanner) successBanner.classList.add("hidden");
-    }
-  }
-}
-
-async function runAiSkinScan(type, base64Data = null) {
-  const statusEl = document.getElementById("aiUploadStatus");
-  const laserEl = document.getElementById("aiScanLaser");
-  const resultCard = document.getElementById("aiAnalysisResultCard");
-  const cameraIcon = document.getElementById("aiCameraIcon");
-  
-  resultCard.classList.add("hidden");
-  laserEl.classList.remove("hidden");
-  cameraIcon.style.animation = "pulse 1s infinite alternate";
-  
-  // Set up preview container and clear makeup canvas
-  const faceContainer = document.getElementById("aiFaceContainer");
-  const facePreview = document.getElementById("aiFacePreview");
-  const makeupCanvas = document.getElementById("aiMakeupCanvas");
-  const aiScanLineRect = document.getElementById("aiScanLineRect");
-  
-  window.activeMakeup = {};
-  if (makeupCanvas) {
-    const ctx = makeupCanvas.getContext("2d");
-    ctx.clearRect(0, 0, makeupCanvas.width, makeupCanvas.height);
-  }
-  
-  if (type === "uploaded") {
-    statusEl.innerHTML = `<span style="color: var(--green);">Fotoğraf Yüklendi!</span> Analiz ediliyor...`;
-    if (faceContainer && facePreview && base64Data) {
-      window.aiFaceOriginalSrc = base64Data;
-      facePreview.dataset.originalSrc = base64Data;
-      facePreview.src = base64Data;
-      faceContainer.classList.remove("hidden");
-      window.ensureTryOnLayerVisible();
-    }
-  } else {
-    const labels = { light: "Açık Tenli Model", medium: "Buğday Tenli Model", dark: "Esmer Model" };
-    statusEl.innerHTML = `<strong style="color: var(--green-dark);">${labels[type]}</strong> analiz ediliyor...`;
-    if (faceContainer && facePreview) {
-      const originalSrc = `/static/cosmetic_model_${type}.png`;
-      window.aiFaceOriginalSrc = originalSrc;
-      facePreview.dataset.originalSrc = originalSrc;
-      facePreview.src = originalSrc;
-      faceContainer.classList.remove("hidden");
-      window.ensureTryOnLayerVisible();
-    }
-  }
-  
-  if (facePreview) {
-    facePreview.onerror = (error) => {
-      console.error("Selfie/manken önizlemesi yüklenemedi:", facePreview.src, error);
-      window.restoreOriginalFace("selfie önizlemesi yüklenemedi");
-    };
-  }
-
-  laserEl.style.animation = "scanLaserAnim 1.5s infinite ease-in-out";
-  if (aiScanLineRect) {
-    aiScanLineRect.classList.remove("hidden");
-    aiScanLineRect.style.animation = "laserSweep 1.5s infinite ease-in-out";
-  }
-  
-  try {
-    if (type === "uploaded" && base64Data) {
-      showToast("[AI STATUS: Yüz/cilt analizi yapılıyor...]");
-      const response = await fetch("/api/analyze-skin", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: requestHeaders({}, "POST"),
-        body: JSON.stringify({ image_base64: base64Data })
-      });
-      if (!response.ok) throw new Error("Skin analysis API failed");
-      const data = await response.json();
-      if (data.success) {
-        currentSkinType = data.skin_type;
-        displaySkinAnalysis(currentSkinType, true);
-        
-        // Show actual detected details in the result card
-        const toneTag = document.getElementById("aiSkinToneTag");
-        if (toneTag) toneTag.textContent = data.undertone;
-        const toneName = document.getElementById("aiSkinToneName");
-        if (toneName) {
-          const names = { light: "Açık / Fildişi", medium: "Buğday / Nötr", dark: "Esmer / Koyu" };
-          toneName.textContent = names[data.skin_type] || "Belirlenemedi";
-        }
-        const indicator = document.getElementById("aiSkinToneColorIndicator");
-        if (indicator) indicator.style.backgroundColor = data.skin_color_hex;
-        
-        // Save to localStorage
-        localStorage.setItem("almadan_skin_type", currentSkinType);
-        
-        showToast("[AI SUCCESS: Cilt tonu analizi tamamlandı.]");
-      } else {
-        throw new Error(data.error_message || "detection unsuccessful");
-      }
-    } else {
-      currentSkinType = type;
-      displaySkinAnalysis(currentSkinType, true);
-      localStorage.setItem("almadan_skin_type", currentSkinType);
-      showToast("[AI SUCCESS: Örnek model yüklendi.]");
-    }
-    
-    // Save to authenticated user profile
-    if (state.auth.authenticated && state.auth.user) {
-      api("/auth/profile", {
-        method: "PUT",
-        body: JSON.stringify({
-          gender: state.auth.user.gender || "belirtilmemiş",
-          phone: state.auth.user.phone || "",
-          notification_pref: state.auth.user.notification_pref || "both",
-          skin_type: currentSkinType
-        })
-      }).then(result => {
-        state.auth.user = result.user;
-      }).catch(err => {
-        console.error("Skin type could not be saved to profile:", err);
-      });
-    }
-  } catch (err) {
-    console.warn("Backend skin analysis failed, using fallback simulation:", err);
-    if (type === "uploaded") {
-      const types = ["light", "medium", "dark"];
-      currentSkinType = types[Math.floor(Math.random() * types.length)];
-    } else {
-      currentSkinType = type;
-    }
-    displaySkinAnalysis(currentSkinType, true);
-    localStorage.setItem("almadan_skin_type", currentSkinType);
-    showToast("[AI ALERT: API hatası. Simüle cilt tonu yüklendi.]");
-  } finally {
-    laserEl.classList.add("hidden");
-    laserEl.style.animation = "none";
-    cameraIcon.style.animation = "none";
-    if (aiScanLineRect) {
-      aiScanLineRect.classList.add("hidden");
-      aiScanLineRect.style.animation = "none";
-    }
-  }
-}
-
-async function askAiColorSuitability() {
-  const query = document.getElementById("aiColorQuestionInput").value.trim();
-  const answerBox = document.getElementById("aiColorAnswerBox");
-  
-  if (!query) {
-    showToast("Lütfen analiz etmek istediğiniz bir renk veya makyaj ürünü yazın.");
-    return;
-  }
-  
-  if (!currentSkinType) {
-    showToast("Lütfen önce bir fotoğraf yükleyin veya model seçerek cilt analizi yapın.");
-    return;
-  }
-  
-  answerBox.classList.remove("hidden");
-  answerBox.innerHTML = `<em>Yapay zeka asistanı verileri süzüyor...</em>`;
-  
-  try {
-    const toneTag = document.getElementById("aiSkinToneTag")?.textContent || "Sıcak (Warm)";
-    const response = await fetch("/api/analyze-cosmetic-color", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: requestHeaders({}, "POST"),
-      body: JSON.stringify({
-        skin_type: currentSkinType,
-        undertone: toneTag,
-        query: query
-      })
-    });
-    if (!response.ok) throw new Error("API call failed");
-    const data = await response.json();
-    if (data.success) {
-      // Format response markdown to HTML
-      let formatted = data.comment;
-      formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
-      formatted = formatted.replace(/\n/g, '<br>');
-      answerBox.innerHTML = formatted;
-      answerBox.classList.add("neon-glow-active");
-      setTimeout(() => answerBox.classList.remove("neon-glow-active"), 4000);
-      showToast("[AI SUCCESS: Holografik öneriler yansıtıldı.]");
-    } else {
-      throw new Error("unsuccessful analysis");
-    }
-  } catch (err) {
-    console.warn("Backend cosmetic analysis failed, using local fallback rules:", err);
-    // Simple local fallback matching old logic
-    let comment = "â„¹ï¸ **[HOLOGRAFİK ANALİZ RAPORU]**\n\nCilt alt tonunuz analiz edildi. Belirttiğiniz ürün nötr spektrumda kalmaktadır.";
-    if (currentSkinType === "light" && (query.includes("pembe") || query.includes("mor"))) {
-      comment = "âœ¨ **[HOLOGRAFİK ANALİZ RAPORU]**\n\nCilt tonunuzla uyumlu! Pembe tonları ışık yansımasını optimize eder.";
-    } else if (currentSkinType === "medium" && (query.includes("şeftali") || query.includes("mercan"))) {
-      comment = "âœ¨ **[HOLOGRAFİK ANALİZ RAPORU]**\n\nHarika uyum! Şeftali tonları cildinize kuantum aurası kazandırır.";
-    }
-    let formatted = comment;
-    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    formatted = formatted.replace(/\n/g, '<br>');
-    answerBox.innerHTML = formatted;
-  }
-}
+function handleCategoryChange() {}
 
 /* EN YAKIN MAĞAZA VE EBAT SEÇİMİ BİLEŞENLERİ */
 const genericProductSizes = {
@@ -6581,7 +5166,7 @@ function getLocalStoreDistance(store, locName, coords) {
     const dist = 0.1 + Number(h % 30n) / 10;
     return Math.round(dist * 100) / 100;
   }
-  
+
   if (coords) {
     const offsets = {
       bim: [0.001, -0.001],
@@ -6592,7 +5177,7 @@ function getLocalStoreDistance(store, locName, coords) {
       migros: [-0.003, 0.004],
       metro: [0.045, -0.035]
     };
-    
+
     let dlat, dlng;
     if (offsets[store]) {
       [dlat, dlng] = offsets[store];
@@ -6603,16 +5188,16 @@ function getLocalStoreDistance(store, locName, coords) {
       dlat = Number((h % 50n) - 25n) / 10000.0;
       dlng = Number(((h >> 8n) % 50n) - 25n) / 10000.0;
     }
-    
+
     const lat2 = coords.lat + dlat;
     const lng2 = coords.lng + dlng;
-    
+
     const R = 6371;
     const dLat = (lat2 - coords.lat) * Math.PI / 180;
     const dLon = (lng2 - coords.lng) * Math.PI / 180;
-    const a = 
+    const a =
       Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(coords.lat * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.cos(coords.lat * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
       Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return Math.round(R * c * 100) / 100;
@@ -6624,17 +5209,17 @@ function showSizeSelectorDialog(itemName) {
   const dialog = document.getElementById("sizeSelectorDialog");
   const content = document.getElementById("sizeSelectorContent");
   if (!dialog || !content) return;
-  
+
   const lowerName = itemName.trim().toLowerCase();
   let matchKey = Object.keys(genericProductSizes).find(key => lowerName === key || lowerName.includes(key));
   const sizes = matchKey ? genericProductSizes[matchKey] : ["1 L", "1 kg", "500 gr"];
-  
+
   content.innerHTML = `
     <h3 style="margin-bottom: 12px; font-weight: 700; color: var(--ink);">Ebat/Miktar Seçin</h3>
     <p style="color: var(--muted); font-size: 13px; margin-bottom: 16px;">
       "${escapeHtml(itemName)}" için daha doğru birim fiyat karşılaştırması yapılabilmesi için bir ebat seçin:
     </p>
-    
+
     <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;">
       ${sizes.map(sz => `
         <button type="button" class="secondary-button" style="padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; height: auto;" onclick="addGenericCartItemWithSize(${inlineJsArg(itemName)}, ${inlineJsArg(sz)})">
@@ -6642,7 +5227,7 @@ function showSizeSelectorDialog(itemName) {
         </button>
       `).join("")}
     </div>
-    
+
     <div style="border-top: 1px solid var(--line); padding-top: 16px; margin-bottom: 16px;">
       <label style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--muted);">Özel Ebat Girin:</label>
       <div style="display: flex; gap: 8px;">
@@ -6650,7 +5235,7 @@ function showSizeSelectorDialog(itemName) {
         <button type="button" class="primary-button" style="width: auto; height: auto; padding: 8px 16px;" onclick="addGenericCartItemWithCustomSize(${inlineJsArg(itemName)})">Ekle</button>
       </div>
     </div>
-    
+
     <div style="display: flex; gap: 8px;">
       <button type="button" class="text-button" style="flex: 1; text-align: center; color: var(--muted);" onclick="addGenericCartItemWithoutSize(${inlineJsArg(itemName)})">
         Belirtmeden Ekle
@@ -6660,7 +5245,7 @@ function showSizeSelectorDialog(itemName) {
       </button>
     </div>
   `;
-  
+
   if (!dialog.open) dialog.showModal();
 }
 
@@ -6764,7 +5349,7 @@ async function updateUserLocation(val) {
     karsiyaka: { lat: 38.4558, lng: 27.1147 },
     bodrum: { lat: 37.0344, lng: 27.4305 }
   };
-  
+
   if (val === "gps") {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -6819,7 +5404,7 @@ function toggleSupportedStores() {
   const toggleBtn = document.querySelector(".supported-stores-toggle");
   const panel = document.getElementById("supportedStoresPanel");
   if (!panel || !toggleBtn) return;
-  
+
   const isOpen = panel.classList.toggle("open");
   toggleBtn.classList.toggle("active", isOpen);
 }
@@ -6847,350 +5432,25 @@ window.unregisterForBobbing = function(element) {
 window.startGlobalBobbingController = function() {
   if (window.globalBobbingActive) return;
   window.globalBobbingActive = true;
-  
+
   function step() {
     window.bobbingTime += 0.025; // Süzülme hızı
     const offset = Math.sin(window.bobbingTime) * 6; // +/- 6px salınım
-    
+
     // Geçersiz/silinmiş DOM elemanlarını temizle
     window.bobbingElements = window.bobbingElements.filter(el => document.body.contains(el));
-    
+
     window.bobbingElements.forEach(el => {
       // Senkronize dikey süzülme uyguluyoruz
       el.style.transform = `translateY(${offset}px)`;
     });
-    
+
     requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
 };
 
 // 2. Makyaj Prova Küresi Uçuş Animasyonu (Antigravity Drift)
-window.runMakeupTryOnAnimation = function(button, color, type) {
-  const facePreview = document.getElementById("aiFacePreview");
-  const faceContainer = document.getElementById("aiFaceContainer");
-  const originalSrc = facePreview?.dataset.originalSrc || window.aiFaceOriginalSrc;
-  if (facePreview && !facePreview.getAttribute("src") && originalSrc) {
-    facePreview.src = originalSrc;
-  }
-  window.ensureTryOnLayerVisible();
-  if (!facePreview || !faceContainer || faceContainer.classList.contains("hidden")) {
-    showToast("Lütfen önce bir fotoğraf yükleyin veya örnek modellerden birini seçerek cilt analizi yapın.");
-    return;
-  }
-  
-  // Spawning coordinates
-  const btnRect = button.getBoundingClientRect();
-  const containerRect = faceContainer.getBoundingClientRect();
-  
-  // Create flying glowing siber-orb
-  const orb = document.createElement("div");
-  orb.style.position = "fixed";
-  orb.style.top = `${btnRect.top + btnRect.height / 2 - 12}px`;
-  orb.style.left = `${btnRect.left + btnRect.width / 2 - 12}px`;
-  orb.style.width = "24px";
-  orb.style.height = "24px";
-  orb.style.borderRadius = "50%";
-  orb.style.background = `radial-gradient(circle, #00f0ff 0%, ${color} 80%)`;
-  orb.style.boxShadow = `0 0 15px #00f0ff, 0 0 30px ${color}`;
-  orb.style.zIndex = "99999";
-  orb.style.pointerEvents = "none";
-  orb.style.transition = "all 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
-  document.body.appendChild(orb);
-  
-  // Force reflow
-  orb.offsetHeight;
-  
-  // Fly towards center of face preview
-  const targetX = containerRect.left + containerRect.width / 2;
-  const targetY = containerRect.top + containerRect.height / 2;
-  
-  orb.style.transform = `translate(${targetX - (btnRect.left + btnRect.width / 2)}px, ${targetY - (btnRect.top + btnRect.height / 2)}px) scale(1.6)`;
-  orb.style.opacity = "0.7";
-  
-  setTimeout(() => {
-    orb.remove();
-    
-    // Trigger face laser scanner sweep inside face mesh SVG
-    const scanLine = document.getElementById("aiScanLineRect");
-    if (scanLine) {
-      scanLine.classList.remove("hidden");
-      scanLine.style.animation = "laserSweep 0.5s ease-in-out 2";
-      setTimeout(() => { scanLine.classList.add("hidden"); }, 1000);
-    }
-    
-    // Draw makeup pigments onto canvas
-    window.applyMakeupOnCanvas(color, type);
-    window.ensureTryOnLayerVisible();
-    console.log("Makyaj prova katmanı görünürlük kontrolü:", {
-      src: facePreview.getAttribute("src"),
-      display: window.getComputedStyle(facePreview).display,
-      visibility: window.getComputedStyle(facePreview).visibility,
-      opacity: window.getComputedStyle(facePreview).opacity,
-    });
-    
-    // Interactive futuristic success notification
-    const typeLabels = { lipstick: "Kuantum Ruj", blush: "Neon Allık", eyeshadow: "Foton Farı" };
-    showToast(`[AI STATUS: ${typeLabels[type] || 'Pigment'} entegrasyonu tamamlandı. Foton saçılımı %30 arttı.]`);
-  }, 900);
-};
-
-// 3. Canvas Üzerine Yarı Saydam Makyaj Çizimi
-window.applyMakeupOnCanvas = function(color, type) {
-  const canvas = document.getElementById("aiMakeupCanvas");
-  if (!canvas) return;
-  
-  const ctx = canvas.getContext("2d");
-  
-  // Sync canvas size with displaysize
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width || 300;
-  canvas.height = rect.height || 300;
-  
-  const w = canvas.width;
-  const h = canvas.height;
-  
-  if (!window.activeMakeup) {
-    window.activeMakeup = {};
-  }
-  
-  // Save/overwrite active color for this type
-  window.activeMakeup[type] = color;
-  
-  // Clear previous drawings
-  ctx.clearRect(0, 0, w, h);
-  
-  // Redraw all active layers
-  Object.entries(window.activeMakeup).forEach(([mType, mColor]) => {
-    if (mType === "lipstick") {
-      // Lips region: center bottom (x: 50%, y: 68%)
-      const lipsX = w * 0.5;
-      const lipsY = h * 0.68;
-      const rx = w * 0.08;
-      const ry = h * 0.025;
-      
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(lipsX, lipsY, rx, ry, 0, 0, 2 * Math.PI);
-      ctx.fillStyle = mColor;
-      ctx.globalAlpha = 0.55;
-      ctx.filter = "blur(3px)";
-      ctx.fill();
-      ctx.restore();
-    } else if (mType === "blush") {
-      // Cheeks region: left (x: 34%, y: 55%), right (x: 66%, y: 55%)
-      const cheekLeftX = w * 0.34;
-      const cheekRightX = w * 0.66;
-      const cheekY = h * 0.55;
-      const rCheek = w * 0.09;
-      
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(cheekLeftX, cheekY, rCheek, 0, 2 * Math.PI);
-      ctx.arc(cheekRightX, cheekY, rCheek, 0, 2 * Math.PI);
-      ctx.fillStyle = mColor;
-      ctx.globalAlpha = 0.28;
-      ctx.filter = "blur(7px)";
-      ctx.fill();
-      ctx.restore();
-    } else if (mType === "eyeshadow") {
-      // Eyes region: left (x: 38%, y: 44%), right (x: 62%, y: 44%)
-      const eyeLeftX = w * 0.38;
-      const eyeRightX = w * 0.62;
-      const eyeY = h * 0.44;
-      const rxEye = w * 0.06;
-      const ryEye = h * 0.02;
-      
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(eyeLeftX, eyeY - 2, rxEye, ryEye, 0, 0, 2 * Math.PI);
-      ctx.ellipse(eyeRightX, eyeY - 2, rxEye, ryEye, 0, 0, 2 * Math.PI);
-      ctx.fillStyle = mColor;
-      ctx.globalAlpha = 0.38;
-      ctx.filter = "blur(4px)";
-      ctx.fill();
-      ctx.restore();
-    }
-  });
-};
-
-// 4. Sıfırlama Butonu Tanımlaması ve Global Başlatıcılar
-function initMakeupHelpers() {
-  const btnResetSkin = document.getElementById("btnResetAiSkin");
-  if (btnResetSkin) {
-    btnResetSkin.addEventListener("click", () => {
-      const faceContainer = document.getElementById("aiFaceContainer");
-      if (faceContainer) faceContainer.classList.add("hidden");
-      
-      const fileInput = document.getElementById("aiPhotoFileInput");
-      if (fileInput) fileInput.value = "";
-      
-      const statusEl = document.getElementById("aiUploadStatus");
-      if (statusEl) statusEl.innerHTML = "Selfie Fotoğrafı Yükle";
-      
-      const canvas = document.getElementById("aiMakeupCanvas");
-      if (canvas) {
-        const ctx = canvas.getContext("2d");
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
-      window.activeMakeup = {};
-    });
-  }
-  
-  // Start the global synchronized bobbing controller
-  window.startGlobalBobbingController();
-}
-
-// Run helper setup on file load
-initMakeupHelpers();
-
-window.addEventListener("load", () => {
-  // A. Yükleme ekranını temizle (Overlay Sanitization)
-  const loader = document.getElementById("quantumScanOverlay");
-  if (loader) loader.style.display = "none";
-
-  // B. Hafızadan veriyi çek (Auto-Rehydrate)
-  const savedState = localStorage.getItem("almadan_state");
-  if (savedState) {
-    try {
-      const data = JSON.parse(savedState);
-      if (data) {
-        state.userCoords = data.userCoords || null;
-        state.userLocation = data.userLocation || "default";
-        
-        // UI Güncellemesi: Konum Seçici
-        const selector = document.getElementById("userLocationSelector");
-        if (selector) selector.value = state.userLocation;
-        
-        // UI Güncellemesi: Global/Yerel Modu
-        const globalCheckbox = document.getElementById("globalModeCheckbox");
-        if (globalCheckbox) {
-          globalCheckbox.checked = !!data.isGlobalActive;
-        }
-        
-        // UI Güncellemesi: GPS Pill
-        updateGpsStatusUI();
-        
-        console.log("Kuantum Hafıza: Durum geri yüklendi.", data);
-      }
-    } catch (e) {
-      console.error("Kuantum Hafıza bozuldu, sıfırlanıyor...", e);
-      localStorage.removeItem("almadan_state");
-    }
-  }
-
-  // Apple Privacy Bypass: Geolocation API'yi sayfa yüklenirken (load) asla otomatik çağırma.
-  // Otomatik konum izni isteklerini kaldırıyoruz. İzin sadece Kontrol Et veya GPS pill tıklandığında istenecek.
-
-  // Safe Mode: no AbortController, no timeouts, direct execution in window.onload
-  try {
-    loadProducts(null);
-    loadReceipts("", null);
-  } catch (err) {
-    console.error("Başlangıç veri yüklemesinde hata:", err);
-  }
-});
-
-function showInitialLoadFallback() {
-  const overlay = document.getElementById("quantumScanOverlay");
-  const progressText = document.getElementById("quantumScanProgress");
-  if (overlay && progressText) {
-    overlay.style.display = "flex";
-    // overlay.classList.add("recovery-mode");
-    const header = overlay.querySelector("h3");
-    if (header) {
-      header.classList.add("glitch-active");
-      header.innerText = "SİSTEM KURTARMA AKTİF: MOBİL HATA KURTARMA";
-    }
-    progressText.innerText = "Veri akışında gecikme: Yerel önbelleğe geçiliyor...";
-    
-    setTimeout(() => {
-      overlay.style.display = "none";
-      // overlay.classList.remove("recovery-mode");
-      if (header) {
-        header.classList.remove("glitch-active");
-        header.innerText = "EN İYİ FIRSATLAR ARANIYOR";
-      }
-      renderFallbackOpportunities();
-    }, 1500);
-  } else {
-    renderFallbackOpportunities();
-  }
-}
-
-/* ── Hatırlatıcı Hesaplama ───────────────────────────────────────────────── */
-
-function calcReminderDates(lastPurchaseDate, reorderDays, remindBeforeDays) {
-  const purchase = new Date(lastPurchaseDate);
-  const endDate  = new Date(purchase);
-  endDate.setDate(endDate.getDate() + Number(reorderDays));
-
-  const reminderDate = new Date(endDate);
-  reminderDate.setDate(reminderDate.getDate() - Number(remindBeforeDays));
-
-  const today    = new Date(); today.setHours(0, 0, 0, 0);
-  const daysLeft = Math.round((endDate - today) / 86400000);
-  const fmtDate  = d => d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
-
-  return { endDateStr: fmtDate(endDate), reminderDateStr: fmtDate(reminderDate), daysLeft };
-}
-
-function onReminderInput(itemId) {
-  const form      = document.getElementById(`rform-${itemId}`);
-  const resultEl  = document.getElementById(`rresult-${itemId}`);
-  const dateInput = form.querySelector(".r-date");
-  const daysInput = form.querySelector(".r-days");
-  const beforeInput = form.querySelector(".r-before");
-
-  if (!dateInput.value || !daysInput.value) { resultEl.classList.remove("show"); return; }
-
-  const { endDateStr, daysLeft } = calcReminderDates(dateInput.value, daysInput.value, beforeInput.value || 5);
-  resultEl.textContent = daysLeft >= 0
-    ? `📅 Ürün yaklaşık ${endDateStr} tarihinde biter — ${daysLeft} gün kaldı.`
-    : `⚠️ Tahmini bitiş tarihi (${endDateStr}) geçti.`;
-  resultEl.classList.add("show");
-}
-
-async function saveReminder(itemId) {
-  const form        = document.getElementById(`rform-${itemId}`);
-  const item        = state.products.find(w => w.id === itemId);
-  const dateInput   = form.querySelector(".r-date");
-  const daysInput   = form.querySelector(".r-days");
-  const beforeInput = form.querySelector(".r-before");
-  const saveBtn     = form.querySelector(".btn-reminder-save");
-
-  if (!dateInput.value || !daysInput.value) { toast("Tarih ve periyot alanlarını doldur."); return; }
-
-  saveBtn.disabled = true; saveBtn.textContent = "Kaydediliyor…";
-
-  try {
-    await api("/api/reminders", {
-      method: "POST",
-      body: JSON.stringify({
-        product_url:        item?.url || "",
-        product_title:      item?.title || String(itemId),
-        last_purchase_date: dateInput.value,
-        reorder_days:       Number(daysInput.value),
-        remind_before_days: Number(beforeInput.value || 5),
-      }),
-    });
-    toast("Hatırlatıcı kaydedildi ✓");
-    form.classList.remove("open");
-    saveBtn.textContent = "✓ Kaydedildi";
-  } catch {
-    toast("Kaydedilemedi — yerel olarak saklandı.");
-    const local = JSON.parse(localStorage.getItem("almadan_reminders") || "[]");
-    local.push({ itemId, lastPurchaseDate: dateInput.value, reorderDays: Number(daysInput.value), remindBeforeDays: Number(beforeInput.value || 5), savedAt: new Date().toISOString() });
-    localStorage.setItem("almadan_reminders", JSON.stringify(local));
-    saveBtn.textContent = "✓ Yerel kaydedildi";
-  } finally {
-    saveBtn.disabled = false;
-  }
-}
-
-function toggleReminderForm(itemId) {
-  document.getElementById(`rform-${itemId}`)?.classList.toggle("open");
-}
 
 /* ── Mağaza Bültenleri ───────────────────────────────────────────────────── */
 
@@ -7291,8 +5551,8 @@ async function toggleFollow(slug, name) {
     await api(`/api/stores/${encodeURIComponent(slug)}/follow`, {
       method: isFollowed ? "DELETE" : "POST",
     });
-    showToast(isFollowed 
-      ? `<strong>${escapeHtml(name)}</strong> takipten çıkarıldı.` 
+    showToast(isFollowed
+      ? `<strong>${escapeHtml(name)}</strong> takipten çıkarıldı.`
       : `<div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
            <strong>✓ ${escapeHtml(name)} takibe alındı</strong>
            <span style="font-size:11.5px; opacity:0.95;">Bu mağazada kampanya veya önemli fiyat düşüşleri olduğunda anında bildirim alacaksınız.</span>
@@ -7339,7 +5599,7 @@ const GUIDES = {
     title: "Mağaza bültenleri nasıl çalışır?",
     steps: [
       "Takip etmek istediğin mağazanın kartına tıkla",
-      "Mağaza kampanya başlatınca sana mail gönderilir",
+      "Mağaza kampanya başlatınca sana bildirim gönderilir",
       "Birden fazla mağazayı aynı anda takip edebilirsin",
     ],
   },
@@ -7395,7 +5655,7 @@ function showGuide(view) {
   `;
 
   // Her view'in ilk container'ına ekle
-  const viewId = view === "bulletins" ? "bulletinsView" : `${view}View`;
+  const viewId = `${view}View`;
   const viewEl = document.getElementById(viewId);
   if (!viewEl) return;
   const target = viewEl.querySelector(".section-heading, .page-guide, .intro-band");
@@ -7620,7 +5880,7 @@ async function showSellerSelectionDialog(parsed) {
   const dialog = document.getElementById("sellerSelectionDialog");
   const content = document.getElementById("sellerSelectionContent");
   if (!dialog || !content) return;
-  
+
   dialog.showModal();
   content.innerHTML = `
     <div style="text-align:center; padding: 30px 20px;">
@@ -7628,7 +5888,7 @@ async function showSellerSelectionDialog(parsed) {
       <p style="margin-top:16px; font-weight:700; font-size:15px; color:var(--ink);">En İyi Fırsatlar Avlanıyor...</p>
     </div>
   `;
-  
+
   try {
     const data = await api("/api/find-alternatives", {
       method: "POST",
@@ -7645,7 +5905,7 @@ async function showSellerSelectionDialog(parsed) {
         }
       });
     }
-    
+
     // Asıl ürünü listede yoksa başa ekle
     const origPrice = parsed.price || 0;
     const origFound = alts.find(a => Math.abs((a.price || 0) - origPrice) < 1 && String(a.source || "").toLowerCase().includes(String(parsed.source || "").toLowerCase()));
@@ -7659,7 +5919,7 @@ async function showSellerSelectionDialog(parsed) {
         extra_info: parsed.extra_info || {}
       });
     }
-    
+
     if (alts.length === 0) {
       content.innerHTML = `
         <div style="text-align:center; padding: 30px 20px;">
@@ -7672,7 +5932,7 @@ async function showSellerSelectionDialog(parsed) {
       `;
       return;
     }
-    
+
     const minPrice = Math.min(...alts.filter(a => a.price > 0).map(a => a.price));
     const maxPrice = Math.max(...alts.filter(a => a.price > 0).map(a => a.price));
     const savings = maxPrice - minPrice;
@@ -7722,7 +5982,7 @@ async function showSellerSelectionDialog(parsed) {
 
     listHtml += `</div>`;
     content.innerHTML = listHtml;
-    
+
   } catch(e) {
     console.error("Satıcı Seçim Ekranı Hatası:", e);
     dialog.close();
@@ -7733,7 +5993,7 @@ async function showSellerSelectionDialog(parsed) {
 function selectSellerAndProceed(element) {
   const sellerData = JSON.parse(element.getAttribute("data-seller"));
   document.getElementById("sellerSelectionDialog").close();
-  
+
   // Seçili satıcıyı sanki asıl taranan oymuş gibi asıl ekrana taşı
   const newParsed = {
     title: sellerData.title,
@@ -7746,6 +6006,6 @@ function selectSellerAndProceed(element) {
     warnings: [],
     confidence: 100
   };
-  
+
   showParsedProduct(newParsed);
 }
