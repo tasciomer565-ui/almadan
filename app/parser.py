@@ -71,12 +71,23 @@ def title_from_product_url(url: str) -> str | None:
     if not path:
         return None
     slug = path.split("/")[-1]
+    slug = re.sub(r"\.html?$", "", slug, flags=re.IGNORECASE)  # uzantıyı at
     slug = re.sub(r"-p-\d+(?:/.*)?$", "", slug, flags=re.IGNORECASE)
-    # DR: "dr-9789750718304" gibi ISBN/kod içeren son segmentleri atla, önceki segmente bak
-    if re.match(r"^(dr|p|urun|product)[-_]\d{5,}", slug, re.IGNORECASE):
-        parts = path.split("/")
-        slug = next((p for p in reversed(parts[:-1]) if len(p) > 4 and not re.match(r"^\d+$", p)), slug)
+    # DR/KitapYurdu: önce ISBN/kod tespiti (sondaki -\d strip'ten ÖNCE)
+    # "suc-ve-ceza" (2 tire) > "roman" > "edebiyat" — en bileşik segmenti al
+    _SKIP_SEGS = {"kitap", "urun", "product", "kategori", "category", "p", "tr"}
+    if (re.match(r"^(dr|p|urun|product)[-_]\d{5,}", slug, re.IGNORECASE)
+            or re.match(r"^\d{5,}$", slug)):
+        all_parts = [seg for seg in path.split("/") if seg]
+        candidates = [re.sub(r"\.html?$", "", seg, flags=re.IGNORECASE)
+                      for seg in all_parts[:-1]
+                      if len(seg) > 2 and seg.lower().split(".")[0] not in _SKIP_SEGS
+                      and not re.match(r"^\d+$", seg.split(".")[0])]
+        if candidates:
+            slug = max(candidates, key=lambda s: s.count("-") * 10 + len(s))
         slug = re.sub(r"-p-\d+(?:/.*)?$", "", slug, flags=re.IGNORECASE)
+    else:
+        slug = re.sub(r"-\d{5,}$", "", slug)  # N11/diğer: sondaki ürün ID'sini at
     words = [word for word in slug.replace("_", "-").split("-") if word]
     if len(words) < 2:
         return None
