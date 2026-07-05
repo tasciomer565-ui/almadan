@@ -230,6 +230,54 @@ def detect_source(url: str) -> str:
         return "metro"
     if "carrefoursa" in host:
         return "carrefoursa"
+    if "flo.com" in host:
+        return "flo"
+    if "kinetix" in host:
+        return "kinetix"
+    if "yargici" in host:
+        return "yargici"
+    if "kitapyurdu" in host:
+        return "kitapyurdu"
+    if "dr.com" in host:
+        return "dr"
+    if "ebebek" in host:
+        return "ebebek"
+    if "vivense" in host:
+        return "vivense"
+    if "evidea" in host:
+        return "evidea"
+    if "decathlon" in host:
+        return "decathlon"
+    if "adidas" in host:
+        return "adidas"
+    if "puma" in host:
+        return "puma"
+    if "nike" in host:
+        return "nike"
+    if "colins" in host:
+        return "colins"
+    if "ltb" in host:
+        return "ltb"
+    if "watsons" in host:
+        return "watsons"
+    if "sephora" in host:
+        return "sephora"
+    if "idefix" in host:
+        return "idefix"
+    if "remzi" in host:
+        return "remzi"
+    if "pandora" in host:
+        return "pandora"
+    if "derimod" in host:
+        return "derimod"
+    if "english" in host and "home" in host:
+        return "englishhome"
+    if "madamecoco" in host:
+        return "madamecoco"
+    if "ikea" in host:
+        return "ikea"
+    if "koctas" in host:
+        return "koctas"
 
     return "manual"
 
@@ -513,6 +561,52 @@ def extract_visible_price(soup: BeautifulSoup, source: str) -> float | None:
         "mavi": [
             ".price-current",
             ".price",
+        ],
+        "flo": [
+            ".product-detail-price",
+            ".price-new",
+            "[class*='price']",
+        ],
+        "kinetix": [
+            ".prc-dsc",
+            ".price",
+            "[class*='price']",
+        ],
+        "yargici": [
+            ".product-price",
+            ".price",
+            "[class*='price']",
+        ],
+        "kitapyurdu": [
+            ".price-new",
+            ".pd-price",
+            "[class*=price]",
+        ],
+        "dr": [
+            ".price-value",
+            ".product-price",
+            "[class*=price]",
+        ],
+        "ebebek": [
+            ".price",
+            ".product-price",
+            "[class*=price]",
+        ],
+        "vivense": [
+            ".price",
+            "[class*=price]",
+        ],
+        "decathlon": [
+            ".price",
+            "[class*=price]",
+        ],
+        "adidas": [
+            ".gl-price",
+            "[class*=price]",
+        ],
+        "nike": [
+            ".product-price",
+            "[class*=price]",
         ],
     }
 
