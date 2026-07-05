@@ -72,6 +72,11 @@ def title_from_product_url(url: str) -> str | None:
         return None
     slug = path.split("/")[-1]
     slug = re.sub(r"-p-\d+(?:/.*)?$", "", slug, flags=re.IGNORECASE)
+    # DR: "dr-9789750718304" gibi ISBN/kod içeren son segmentleri atla, önceki segmente bak
+    if re.match(r"^(dr|p|urun|product)[-_]\d{5,}", slug, re.IGNORECASE):
+        parts = path.split("/")
+        slug = next((p for p in reversed(parts[:-1]) if len(p) > 4 and not re.match(r"^\d+$", p)), slug)
+        slug = re.sub(r"-p-\d+(?:/.*)?$", "", slug, flags=re.IGNORECASE)
     words = [word for word in slug.replace("_", "-").split("-") if word]
     if len(words) < 2:
         return None
