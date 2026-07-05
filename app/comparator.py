@@ -669,7 +669,7 @@ def search_trendyol_direct(query: str) -> list[dict]:
         try:
             html = proxy_get(
                 f"https://www.trendyol.com/sr?q={urllib.parse.quote_plus(query)}&qt={urllib.parse.quote_plus(query)}&st=SEARCH",
-                render_js=True, timeout=20
+                render_js=False, timeout=12
             )
             if html:
                 soup = BeautifulSoup(html, "html.parser")
@@ -789,7 +789,7 @@ def search_hepsiburada_direct(query: str) -> list[dict]:
         from app.scraping_proxy import proxy_get, proxy_enabled
         if proxy_enabled():
             try:
-                html = proxy_get(f"https://www.hepsiburada.com/ara?q={urllib.parse.quote_plus(query)}", render_js=True, timeout=20)
+                html = proxy_get(f"https://www.hepsiburada.com/ara?q={urllib.parse.quote_plus(query)}", render_js=False, timeout=12)
                 if html:
                     soup = BeautifulSoup(html, "html.parser")
                     sb_results = []
@@ -933,21 +933,21 @@ def search_karaca(query: str) -> list[dict]:
     """Karaca ürün araması — JSON-LD + ScrapingBee render_js."""
     return _scrape_jsonld_itemlist(
         f"https://www.karaca.com/search?q={urllib.parse.quote_plus(query)}",
-        "karaca", render_js=True, timeout=15
+        "karaca", render_js=False, timeout=12
     )
 
 def search_watsons(query: str) -> list[dict]:
     """Watsons ürün araması — JSON-LD + ScrapingBee render_js."""
     return _scrape_jsonld_itemlist(
         f"https://www.watsons.com.tr/search?text={urllib.parse.quote_plus(query)}",
-        "watsons", render_js=True, timeout=15
+        "watsons", render_js=False, timeout=12
     )
 
 def search_gratis(query: str) -> list[dict]:
     """Gratis ürün araması — JSON-LD + ScrapingBee render_js."""
     return _scrape_jsonld_itemlist(
         f"https://www.gratis.com/search?q={urllib.parse.quote_plus(query)}",
-        "gratis", render_js=True, timeout=15
+        "gratis", render_js=False, timeout=12
     )
 
 def search_mediamarkt(query: str) -> list[dict]:
@@ -1060,34 +1060,34 @@ def search_boyner(query: str) -> list[dict]:
     """Boyner ürün araması — JSON-LD + ScrapingBee render_js."""
     return _scrape_jsonld_itemlist(
         f"https://www.boyner.com.tr/arama?searchTerm={urllib.parse.quote_plus(query)}",
-        "boyner", render_js=True, timeout=15
+        "boyner", render_js=False, timeout=12
     )
 
 def search_flo(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
     return _scrape_jsonld_itemlist(
         f"https://www.flo.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "flo", render_js=True, timeout=15
+        "flo", render_js=False, timeout=12
     )
 
 def search_decathlon(query: str) -> list[dict]:
     """Decathlon ürün araması — JSON-LD + ScrapingBee render_js."""
     return _scrape_jsonld_itemlist(
         f"https://www.decathlon.com.tr/search?Ntt={urllib.parse.quote_plus(query)}",
-        "decathlon", render_js=True, timeout=15
+        "decathlon", render_js=False, timeout=12
     )
 
 def search_lcwaikiki(query: str) -> list[dict]:
     """LC Waikiki ürün araması — JSON-LD + ScrapingBee render_js."""
     url = f"https://www.lcwaikiki.com/tr-TR/TR/search/index.aspx?searchvalue={urllib.parse.quote_plus(query)}"
-    return _scrape_jsonld_itemlist(url, "lcwaikiki", render_js=True, timeout=15)
+    return _scrape_jsonld_itemlist(url, "lcwaikiki", render_js=False, timeout=12)
 
 
 def search_mavi(query: str) -> list[dict]:
     """Mavi ürün araması — JSON-LD + ScrapingBee render_js."""
     return _scrape_jsonld_itemlist(
         f"https://www.mavi.com/search?q={urllib.parse.quote_plus(query)}",
-        "mavi", render_js=True, timeout=15
+        "mavi", render_js=False, timeout=12
     )
 
 def search_zara(query: str) -> list[dict]:
@@ -1184,7 +1184,7 @@ def search_rossmann(query: str) -> list[dict]:
     """Rossmann ürün araması — JSON-LD + ScrapingBee render_js."""
     return _scrape_jsonld_itemlist(
         f"https://www.rossmann.com.tr/ara?q={urllib.parse.quote_plus(query)}",
-        "rossmann", render_js=True, timeout=15
+        "rossmann", render_js=False, timeout=12
     )
 
 def search_supplementler(query: str) -> list[dict]:
@@ -1767,7 +1767,7 @@ def search_colins(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
     return _scrape_jsonld_itemlist(
         f"https://www.colins.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "colins", render_js=True, timeout=15
+        "colins", render_js=False, timeout=12
     )
 
 def search_twist(query: str) -> list[dict]:
@@ -1818,7 +1818,7 @@ def search_ltb(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
     return _scrape_jsonld_itemlist(
         f"https://www.ltb.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "ltb", render_js=True, timeout=15
+        "ltb", render_js=False, timeout=12
     )
 
 def search_modanisa(query: str) -> list[dict]:
@@ -1913,7 +1913,7 @@ def search_puma(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
     return _scrape_jsonld_itemlist(
         f"https://tr.puma.com/tr/tr/search?q={urllib.parse.quote_plus(query)}",
-        "puma", render_js=True, timeout=15
+        "puma", render_js=False, timeout=12
     )
 
 def search_newbalance(query: str) -> list[dict]:
@@ -1964,14 +1964,14 @@ def search_sportive(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
     return _scrape_jsonld_itemlist(
         f"https://www.sportive.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "sportive", render_js=True, timeout=15
+        "sportive", render_js=False, timeout=12
     )
 
 def search_flormar(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
     return _scrape_jsonld_itemlist(
         f"https://www.flormar.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "flormar", render_js=True, timeout=15
+        "flormar", render_js=False, timeout=12
     )
 
 def search_goldenrose(query: str) -> list[dict]:
@@ -2250,7 +2250,7 @@ def search_idefix(query: str) -> list[dict]:
     """Idefix ürün araması — JSON-LD + ScrapingBee render_js."""
     return _scrape_jsonld_itemlist(
         f"https://www.idefix.com/Search?q={urllib.parse.quote_plus(query)}",
-        "idefix", render_js=True, timeout=15
+        "idefix", render_js=False, timeout=12
     )
 
 def search_bebek(query: str) -> list[dict]:
@@ -3235,7 +3235,7 @@ def search_remzi(query: str) -> list[dict]:
     """Remzikitabevi ürün araması — JSON-LD + ScrapingBee render_js."""
     return _scrape_jsonld_itemlist(
         f"https://www.remzi.com/arama?q={urllib.parse.quote_plus(query)}",
-        "remzi", render_js=True, timeout=15
+        "remzi", render_js=False, timeout=12
     )
 
 def search_tazedirekt(query: str) -> list[dict]:
@@ -3375,7 +3375,7 @@ def search_defacto(query: str) -> list[dict]:
     """Defacto ürün araması — JSON-LD + ScrapingBee render_js."""
     return _scrape_jsonld_itemlist(
         f"https://www.defacto.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "defacto", render_js=True, timeout=15
+        "defacto", render_js=False, timeout=12
     )
 
 def search_kutahyaporselen(query: str) -> list[dict]:
@@ -3855,7 +3855,7 @@ def search_pandora(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
     return _scrape_jsonld_itemlist(
         f"https://tr.pandora.net/search?q={urllib.parse.quote_plus(query)}",
-        "pandora", render_js=True, timeout=15
+        "pandora", render_js=False, timeout=12
     )
 
 def search_altinyildiz(query: str) -> list[dict]:
@@ -3905,14 +3905,14 @@ def search_derimod(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
     return _scrape_jsonld_itemlist(
         f"https://www.derimod.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "derimod", render_js=True, timeout=15
+        "derimod", render_js=False, timeout=12
     )
 
 def search_lescon(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
     return _scrape_jsonld_itemlist(
         f"https://www.lescon.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "lescon", render_js=True, timeout=15
+        "lescon", render_js=False, timeout=12
     )
 
 def search_namet(query: str) -> list[dict]:
@@ -4091,14 +4091,14 @@ def search_hm(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
     return _scrape_jsonld_itemlist(
         f"https://www2.hm.com/tr_tr/search-results.html?q={urllib.parse.quote_plus(query)}",
-        "hm", render_js=True, timeout=15
+        "hm", render_js=False, timeout=12
     )
 
 def search_sephora(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
     return _scrape_jsonld_itemlist(
         f"https://www.sephora.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "sephora", render_js=True, timeout=15
+        "sephora", render_js=False, timeout=12
     )
 
 def search_koctas(query: str) -> list[dict]:
@@ -4140,7 +4140,7 @@ def search_adidas(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
     return _scrape_jsonld_itemlist(
         f"https://www.adidas.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "adidas", render_js=True, timeout=15
+        "adidas", render_js=False, timeout=12
     )
 
 def search_metro(query: str) -> list[dict]:
@@ -4719,14 +4719,14 @@ def search_reebok(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
     return _scrape_jsonld_itemlist(
         f"https://www.reebok.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "reebok", render_js=True, timeout=15
+        "reebok", render_js=False, timeout=12
     )
 
 def search_bershka(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
     return _scrape_jsonld_itemlist(
         f"https://www.bershka.com/tr/search?q={urllib.parse.quote_plus(query)}",
-        "bershka", render_js=True, timeout=15
+        "bershka", render_js=False, timeout=12
     )
 
 def search_ulker(query: str) -> list[dict]:
