@@ -819,10 +819,12 @@ def is_generic_title(title_str: str | None) -> bool:
         return True
     title_lower = title_str.lower()
     blocked_words = {
-        "cloudflare", "just a moment", "attention required", "access denied", 
+        "cloudflare", "just a moment", "attention required", "access denied",
         "access forbidden", "robot olmadığınızı", "güvenlik doğrulaması",
         "hata", "error", "403 forbidden", "404 not found", "distil networks",
-        "yasak", "güvenlik önlemi", "geçici olarak engellendi"
+        "yasak", "güvenlik önlemi", "geçici olarak engellendi",
+        "checking your browser", "recaptcha", "captcha", "doğrulama gerekiyor",
+        "bir dakika", "verifying you are human", "please wait",
     }
     if any(word in title_lower for word in blocked_words):
         return True
@@ -1078,6 +1080,15 @@ def parse_product_url(url: str) -> ParsedProduct:
         title = title_from_product_url(url)
         if title:
             warnings.append("Ürün adı bağlantı adresinden çıkarıldı.")
+
+    # Mağaza/pazarlama eklerini temizle: "... Fiyatı ve Özellikleri", "... | Teknosa" vb.
+    if title:
+        title = re.sub(
+            r"\s*[-|–]\s*(teknosa|mediamarkt|hepsiburada|trendyol|n11|amazon\.com\.tr|vatan bilgisayar)\s*$",
+            "", title, flags=re.IGNORECASE)
+        title = re.sub(
+            r"\s+(fiyatı( ve özellikleri)?|fiyatları( ve modelleri)?|özellikleri( ve fiyatı)?)\s*$",
+            "", title, flags=re.IGNORECASE).strip() or title
 
     # Orijinal üstü çizili fiyatı çek
     original_price = extract_original_price(soup, source)

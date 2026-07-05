@@ -1244,6 +1244,13 @@ async def find_alternatives(payload: AlternativesRequest):
     cleaned = re.sub(r'[^\w\s]', ' ', payload.title)
     # Sayıları koru (8 GB, 4K, vb.) — sadece harf/harf karışımı kelimeler için >1 şartı
     words = [w for w in cleaned.split() if len(w) > 1 or w.isdigit()]
+    # Pazarlama/dolgu kelimelerini at — ürün tipi kelimeleri (bebek arabası vb.) 6 kelime sınırına sığsın
+    _FILLER = {"tek", "tuşla", "tusla", "kolay", "katlanan", "katlanabilir", "yeni",
+               "orijinal", "garantili", "pratik", "şık", "sik", "özel", "ozel",
+               "fonksiyonlu", "ayarlanabilir", "ve", "ile", "için", "icin", "uyumlu"}
+    core = [w for w in words if w.lower() not in _FILLER]
+    if len(core) >= 2:
+        words = core
     # İlk 6 kelimeyi al — önemli model bilgisi (GB, RAM) kesilebilir
     query = " ".join(words[:6]) if words else payload.title
 
@@ -1328,9 +1335,20 @@ async def find_alternatives(payload: AlternativesRequest):
     VARIANT_SUFFIXES = {"fe", "plus", "ultra", "pro", "lite", "max", "mini", "neo", "edge", "fold", "flip"}
     query_variants = VARIANT_SUFFIXES & query_word_set
 
+    # Anlamlı sorgu kelimeleri (TR normalize, 3+ harf) — örtüşme kontrolü için
+    _tr_map = str.maketrans("şğıöüçâî", "sgioucai")
+    significant_words = {w.translate(_tr_map) for w in query_words if len(w) >= 3}
+
     def is_same_model(p: dict) -> bool:
         """Model kodu varsa başlıkta geçmeli; sorgu varyantı yoksa başlıkta da olmamalı."""
         title_words = set(re.findall(r'\w+', (p.get("title") or "").lower()))
+        # Sorguyla hiç anlamlı kelime örtüşmesi yoksa alakasız (fallback/popüler ürün sızıntısı)
+        if significant_words:
+            title_norm = {w.translate(_tr_map) for w in title_words}
+            overlap = len(significant_words & title_norm)
+            required = 1 if len(significant_words) <= 2 else 2
+            if overlap < required:
+                return False
         if model_codes and not (model_codes & title_words):
             return False  # S24 aranıyor ama başlıkta s24 yok → at
         if digit_models and not (digit_models & title_words):
