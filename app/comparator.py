@@ -1064,11 +1064,40 @@ def search_boyner(query: str) -> list[dict]:
     )
 
 def search_flo(query: str) -> list[dict]:
-    """ScrapingBee render_js ile JSON-LD araması."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.flo.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "flo", render_js=False, timeout=12
-    )
+    """FLO ürün araması — data-gtm-product JSON attribute."""
+    try:
+        url = f"https://www.flo.com.tr/search?q={urllib.parse.quote_plus(query)}"
+        r = requests.get(url, headers=_STD_HEADERS, timeout=10)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".product.product-list[data-gtm-product]")[:10]:
+            try:
+                gtm = json.loads(item.get("data-gtm-product", "{}"))
+            except Exception:
+                continue
+            name = gtm.get("name", "")
+            if not name:
+                continue
+            try:
+                price = float(str(gtm.get("price", 0)).replace(",", "."))
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            href = gtm.get("url", "")
+            prod_url = f"https://www.flo.com.tr{href}" if href.startswith("/") else href
+            img_el = item.select_one("img")
+            img = (img_el.get("src") or "") if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "flo", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
 
 def search_decathlon(query: str) -> list[dict]:
     """Decathlon ürün araması — JSON-LD + ScrapingBee render_js."""
@@ -2195,11 +2224,44 @@ def search_korkmaz(query: str) -> list[dict]:
 
 
 def search_kitapyurdu(query: str) -> list[dict]:
-    """Kitapyurdu ürün araması — JSON-LD + ScrapingBee render_js."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.kitapyurdu.com/index.php?route=product/search&filter_name={urllib.parse.quote_plus(query)}",
-        "kitapyurdu", render_js=False, timeout=12
-    )
+    """KitapYurdu ürün araması — .ky-product HTML selector."""
+    try:
+        url = f"https://www.kitapyurdu.com/index.php?route=product/search&filter_name={urllib.parse.quote_plus(query)}"
+        r = requests.get(url, headers=_STD_HEADERS, timeout=10)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select(".ky-product")[:10]:
+            name_el = item.select_one(".ky-product-title")
+            name = name_el.get_text(strip=True) if name_el else ""
+            if not name:
+                continue
+            price_els = item.select("[class*=price]")
+            price = None
+            for pel in price_els:
+                raw = re.sub(r"[^\d,.]", "", pel.get_text(strip=True)).replace(",", ".")
+                try:
+                    v = float(raw)
+                    if v > 0:
+                        price = v
+                        break
+                except Exception:
+                    continue
+            if not price:
+                continue
+            link_el = item.select_one("a[href]")
+            prod_url = link_el.get("href", "") if link_el else ""
+            img_el = item.select_one("img")
+            img = (img_el.get("src") or "") if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "kitapyurdu", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            })
+        return results
+    except Exception:
+        return []
 
 def search_dr(query: str) -> list[dict]:
     """D&R ürün araması — data-gtm attribute JSON."""
@@ -2215,7 +2277,7 @@ def search_dr(query: str) -> list[dict]:
             return []
         soup = BeautifulSoup(r.text, "html.parser")
         results = []
-        for item in soup.select("[data-gtm]")[:20]:
+        for item in soup.select("[data-gtm-product], .product-card[data-gtm]")[:20]:
             try:
                 gtm = json.loads(item.get("data-gtm", "{}"))
             except Exception:
