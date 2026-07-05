@@ -1,4 +1,4 @@
-const CACHE_VERSION = "almadan-v19";
+const CACHE_VERSION = "almadan-v20";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();

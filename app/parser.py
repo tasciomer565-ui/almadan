@@ -89,9 +89,11 @@ def title_from_product_url(url: str) -> str | None:
     else:
         slug = re.sub(r"-\d{5,}$", "", slug)  # N11/diğer: sondaki ürün ID'sini at
     words = [word for word in slug.replace("_", "-").split("-") if word]
-    if len(words) < 2:
+    # Ardışık tekrarları at: "nike-nike-cosmic" → "nike cosmic" (FLO marka tekrarı)
+    deduped_words = [w for i, w in enumerate(words) if i == 0 or w.lower() != words[i - 1].lower()]
+    if len(deduped_words) < 2:
         return None
-    return " ".join(words).title()
+    return " ".join(deduped_words).title()
 
 
 def is_public_product_url(url: str) -> bool:
