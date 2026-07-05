@@ -858,7 +858,7 @@
       </div>
     </dialog>
 
-    <script defer src="/static/app.js?v=20260620-url-fix"></script>
+    <script defer src="/static/app.js?v=20260705-relevance-fix"></script>
     <script>
       /* Sprint 12 — auth fix: DOMContentLoaded sonrasi state.auth guncelle */
       document.addEventListener('DOMContentLoaded', function() {
@@ -1285,28 +1285,18 @@
             + '</div>';
 
           try {
-            /* İki kaynaktan paralel çek */
-            var title = (parsed.title || '').split(/[,\|\-–]/)[0].trim().slice(0, 60);
+            /* find-alternatives'tan relevans sıralı sonuçları çek */
             var csrfToken = (document.cookie.split('; ').find(function(r){return r.startsWith('csrf_token=');})||'').split('=').slice(1).join('=');
             csrfToken = csrfToken ? decodeURIComponent(csrfToken) : '';
-            var results = await Promise.allSettled([
-              fetch('/api/find-alternatives', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-                body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url })
-              }).then(function(r){ return r.json(); }),
-              fetch('/api/search?query=' + encodeURIComponent(title) + '&category=general', {
-                credentials: 'same-origin'
-              }).then(function(r){ return r.json(); })
-            ]);
+            var faResp = await fetch('/api/find-alternatives', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+              body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url })
+            }).then(function(r){ return r.json(); });
 
-            var alts = [];
+            var alts = (faResp.alternatives || []);
 
-            /* find-alternatives sonuçları */
-            if (results[0].status === 'fulfilled') {
-              (results[0].value.alternatives || []).forEach(function(a){ alts.push(a); });
-            }
             /* Trendyol / diğer satıcılar parsed içinden */
             if (parsed.extra_info && parsed.extra_info.otherMerchants) {
               var seen = new Set(alts.map(function(a){ return a.url; }));
@@ -1314,27 +1304,8 @@
                 if (!seen.has(m.url)) { alts.push(m); seen.add(m.url); }
               });
             }
-            /* Arama sonuçlarını ekle */
-            if (results[1].status === 'fulfilled') {
-              var searchProducts = results[1].value.products || [];
-              var seenTitles = new Set(alts.map(function(a){ return (a.title||'').toLowerCase().slice(0,30); }));
-              searchProducts.forEach(function(p){
-                var key = (p.name||p.title||'').toLowerCase().slice(0,30);
-                if (!seenTitles.has(key) && p.price) {
-                  alts.push({
-                    title: p.name || p.title,
-                    price: parseFloat(p.price),
-                    source: p.store || p.source || '',
-                    url: p.url || '',
-                    image_url: p.image_url || '',
-                    extra_info: { rating: p.rating, review_count: p.review_count }
-                  });
-                  seenTitles.add(key);
-                }
-              });
-            }
 
-            /* Asıl ürünü başa ekle */
+            /* Asıl ürünü başa ekle (yoksa) */
             if (parsed.price) {
               var origFound = alts.find(function(a){
                 return Math.abs((a.price||0) - parsed.price) < 1
@@ -1351,8 +1322,12 @@
               }
             }
 
-            /* Fiyata göre sırala */
-            alts.sort(function(a,b){ return (a.price||999999) - (b.price||999999); });
+            /* Sıralama: backend relevans sırası korunur, sadece 0 fiyatlılar sona */
+            alts.sort(function(a,b){
+              if (!a.price && b.price) return 1;
+              if (a.price && !b.price) return -1;
+              return 0;
+            });
 
             /* En çok değerlendirme */
             var maxReviews = 0;
@@ -1373,7 +1348,7 @@
               return;
             }
 
-            var cheapestPrice = alts[0].price;
+            var cheapestPrice = Math.min.apply(null, alts.filter(function(a){ return a.price > 0; }).map(function(a){ return a.price; }));
 
             var html = '<div style="position:sticky;top:0;background:var(--bg);padding:0 0 12px;z-index:1;border-bottom:1px solid var(--border);margin-bottom:12px;">'
               + '<h3 style="margin:0 0 4px;font-size:19px;font-weight:800;color:var(--ink);">🛒 Mağaza Karşılaştırması</h3>'
@@ -1384,7 +1359,7 @@
             alts.forEach(function(a, idx){
               var badges = '';
               if (a._isOriginal) badges += '<span style="background:rgba(25,118,210,.1);color:#1565c0;border:1px solid rgba(25,118,210,.25);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">📌 Sizin Aradığınız</span>';
-              if (a.price === cheapestPrice && idx === 0) badges += '<span style="background:#287a50;color:#fff;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">🏷 En Ucuz</span>';
+              if (a.price > 0 && a.price === cheapestPrice) badges += '<span style="background:#287a50;color:#fff;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">🏷 En Ucuz</span>';
               if (maxRatingItem && a === maxRatingItem && !a._isOriginal) badges += '<span style="background:rgba(33,150,243,.1);color:#1976d2;border:1px solid rgba(33,150,243,.25);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">⭐ Yüksek Puanlı ('+(a.extra_info.rating)+')</span>';
               if (maxReviewItem && a === maxReviewItem && !a._isOriginal) badges += '<span style="background:rgba(156,39,176,.1);color:#7b1fa2;border:1px solid rgba(156,39,176,.25);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">💬 En Çok Değerlendirilen</span>';
               if ((a.extra_info||{}).fast_delivery) badges += '<span style="background:rgba(255,152,0,.1);color:#e65100;border:1px solid rgba(255,152,0,.3);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">⚡ Hızlı Teslimat</span>';

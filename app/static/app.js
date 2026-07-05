@@ -7660,9 +7660,6 @@ async function showSellerSelectionDialog(parsed) {
       });
     }
     
-    // Fiyata göre sırala
-    alts.sort((a, b) => a.price - b.price);
-    
     if (alts.length === 0) {
       content.innerHTML = `
         <div style="text-align:center; padding: 30px 20px;">

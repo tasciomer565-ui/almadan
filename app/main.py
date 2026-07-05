@@ -1615,25 +1615,52 @@ async def find_alternatives(payload: AlternativesRequest):
             except Exception as e:
                 pass
 
-    # Interleave results so each source gets fair representation
-    from collections import defaultdict
-    by_source = defaultdict(list)
     # Defensive: filter out non-dict entries (corrupt cache data)
     products = [p for p in products if isinstance(p, dict)]
+
+    # İlgililik skoru: model numarası eşleşmesini güçlü şekilde ağırlıklandır
+    query_words = re.findall(r'\w+', query.lower())
+    query_word_set = set(query_words)
+    # Model kodu: harf ile başlayıp rakam içeren (S24, A54, vb.)
+    # Rakamla başlayanları (8gb, 256gb) dışla — bunlar spec, model numarası değil
+    model_codes = {w for w in query_words
+                   if 2 <= len(w) <= 5 and re.match(r'[a-z]', w) and re.search(r'\d', w)}
+
+    def relevance(p: dict) -> float:
+        title_lower = (p.get("title") or "").lower()
+        title_words = set(re.findall(r'\w+', title_lower))
+        base = len(query_word_set & title_words) / max(len(query_word_set), 1)
+        if model_codes:
+            matching = model_codes & title_words
+            model_bonus = len(matching) * 5
+            title_model_codes = {w for w in title_words
+                                 if 2 <= len(w) <= 5 and re.match(r'[a-z]', w) and re.search(r'\d', w)}
+            wrong_models = title_model_codes - model_codes
+            model_penalty = sum(5 for m in wrong_models if m not in query_word_set)
+        else:
+            model_bonus = 0
+            model_penalty = 0
+        return base + model_bonus - model_penalty
+
+    products.sort(key=lambda p: (-relevance(p), p.get("price") or 0))
+
+    # Her kaynaktan en fazla 3 ürün al (tekrarlayan mağazaları sınırla)
+    from collections import defaultdict
+    source_count: dict[str, int] = defaultdict(int)
+    deduped = []
+    seen_urls: set[str] = set()
     for p in products:
-        by_source[p.get("source", "other")].append(p)
-    interleaved = []
-    max_per_source = 5
-    seen_sources = list(by_source.keys())
-    for i in range(max_per_source):
-        for src in seen_sources:
-            if i < len(by_source[src]):
-                interleaved.append(by_source[src][i])
-    if not interleaved:
-        interleaved = products
+        url_key = (p.get("url") or "").split("?")[0]
+        if url_key in seen_urls:
+            continue
+        seen_urls.add(url_key)
+        src = p.get("source", "other")
+        if source_count[src] < 3:
+            deduped.append(p)
+            source_count[src] += 1
 
     return {
-        "alternatives": interleaved[:20]
+        "alternatives": deduped[:20]
     }
 
 
