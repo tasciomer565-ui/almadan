@@ -5247,3 +5247,36 @@ async def cron_sync_sheets(request: Request):
         import traceback
         logger.error("cron/sync-sheets hatası: %s", traceback.format_exc())
         return {"ok": False, "error": str(exc)}
+
+
+@app.get("/api/_debug_scrapecheck_9f3a71bc", include_in_schema=False)
+async def _debug_scrapecheck(store: str = "trendyol", q: str = "iphone 16"):
+    """
+    GEÇİCİ tanılama uç noktası — ScrapingBee'nin Cloudflare korumalı mağazaları
+    (Trendyol/Hepsiburada vb.) gerçekten aşıp aşmadığını prod'da test eder.
+    Tahmin edilemez path ile korunur. İş bitince kaldırılacak.
+    """
+    from app.scraping_proxy import proxy_enabled, proxy_get
+
+    targets = {
+        "trendyol": f"https://www.trendyol.com/sr?q={q.replace(' ', '+')}",
+        "hepsiburada": f"https://www.hepsiburada.com/ara?q={q.replace(' ', '+')}",
+        "defacto": f"https://www.defacto.com.tr/arama?q={q.replace(' ', '+')}",
+        "lcwaikiki": f"https://www.lcw.com/arama?q={q.replace(' ', '+')}",
+    }
+    url = targets.get(store, targets["trendyol"])
+    results = {}
+    for label, render_js in (("no_js", False), ("js", True)):
+        try:
+            html = await asyncio.to_thread(proxy_get, url, render_js, 25)
+            snippet = ""
+            blocked = False
+            if html:
+                low = html.lower()
+                blocked = any(s in low for s in ["attention required", "cloudflare", "access denied", "just a moment", "captcha"])
+                snippet = html[:300]
+            results[label] = {"ok": bool(html), "blocked": blocked, "len": len(html) if html else 0, "snippet": snippet}
+        except Exception as exc:
+            results[label] = {"ok": False, "error": str(exc)}
+
+    return {"proxy_enabled": proxy_enabled(), "url": url, "results": results}
