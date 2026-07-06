@@ -24,6 +24,10 @@
     {
       "path": "/cron/refresh-all",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/cron/store-newsletters",
+      "schedule": "0 6 * * *"
     }
   ]
 }

@@ -4757,12 +4757,159 @@ async def create_campaign(slug: str, request: Request, admin=Depends(require_adm
     return data[0] if data else {}
 
 
+# Bilinen haftalık aktüel katalog günleri (0=Pzt … 6=Paz) — gerçek pazar bilgisi
+_WEEKLY_CATALOG_STORES = {
+    "bim": {"days": {0, 3}, "url": "https://www.bim.com.tr/", "name": "BİM"},
+    "a101": {"days": {3}, "url": "https://www.a101.com.tr/", "name": "A101"},
+    "sok": {"days": {2}, "url": "https://www.sokmarket.com.tr/", "name": "ŞOK"},
+}
+
+
+def _normalize_store_slug(source: str) -> str:
+    """'trendyol (Satıcı Adı)' -> 'trendyol', 'MediaMarkt' -> 'mediamarkt'."""
+    s = (source or "").lower().strip()
+    s = s.split("(")[0].strip()
+    return re.sub(r"[^a-z0-9]", "", s)
+
+
+def _parse_iso_dt(value):
+    from datetime import datetime
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+
+async def _auto_generate_campaigns() -> dict:
+    """
+    Elle admin panel olmadığı için kampanya verisini iki kaynaktan otomatik üretir:
+      1. Bilinen haftalık aktüel katalog günü olan marketler (BİM/A101/ŞOK).
+      2. Takip edilen ürünlerde tespit edilen mağaza bazlı büyük fiyat düşüşleri.
+    Aynı hafta içinde aynı türde tekrar kampanya oluşturmamak için
+    valid_from >= bu haftanın pazartesi kontrolü yapılır.
+    """
+    from datetime import date, timedelta, timezone, datetime as dt
+
+    if not supabase_enabled():
+        return {"auto_created": []}
+
+    try:
+        sb_url = supabase_base_url()
+        sb_hdrs = supabase_headers()
+    except Exception:
+        return {"auto_created": []}
+    today = date.today()
+    week_start = (today - timedelta(days=today.weekday())).isoformat()
+    created: list[str] = []
+
+    def _already_created_this_week(slug: str, title: str) -> bool:
+        try:
+            r = requests.get(
+                f"{sb_url}/rest/v1/store_campaigns",
+                headers=sb_hdrs,
+                params={
+                    "store_slug": f"eq.{slug}",
+                    "title": f"eq.{title}",
+                    "valid_from": f"gte.{week_start}",
+                    "select": "id",
+                    "limit": "1",
+                },
+                timeout=10,
+            )
+            return bool(r.ok and r.json())
+        except Exception:
+            return True  # emin olamıyorsak tekrar oluşturma, sessiz geç
+
+    # 1) Haftalık aktüel katalog (BİM/A101/ŞOK)
+    for slug, info in _WEEKLY_CATALOG_STORES.items():
+        if today.weekday() not in info["days"]:
+            continue
+        title = "Haftalık Aktüel Katalog Yayında!"
+        if _already_created_this_week(slug, title):
+            continue
+        row = {
+            "store_slug": slug,
+            "title": title,
+            "description": f"{info['name']} bu haftanın yeni aktüel ürünlerini yayınladı.",
+            "catalog_url": info["url"],
+            "valid_from": today.isoformat(),
+            "valid_until": (today + timedelta(days=7)).isoformat(),
+            "notified": False,
+        }
+        try:
+            resp = requests.post(f"{sb_url}/rest/v1/store_campaigns", headers=sb_hdrs, json=row, timeout=10)
+            if resp.ok:
+                created.append(f"{slug}:weekly")
+        except Exception:
+            pass
+
+    # 2) Büyük fiyat düşüşü tespiti — takip edilen ürünler üzerinden mağaza bazlı
+    known_slugs = {slug for slugs in ALL_STORES_MAP.values() for slug in slugs}
+    cutoff = dt.now(timezone.utc) - timedelta(hours=48)
+    drops_by_store: dict[str, list[float]] = {}
+
+    try:
+        db = load_db()
+        for p in db.get("products", []):
+            slug = _normalize_store_slug(p.get("source", ""))
+            if slug not in known_slugs:
+                continue
+            history = p.get("price_history") or []
+            if len(history) < 2:
+                continue
+            recent_seen = any(
+                (parsed_ts := _parse_iso_dt(h.get("seen_at"))) and parsed_ts >= cutoff
+                for h in history
+            )
+            if not recent_seen:
+                continue
+            prices = [h["price"] for h in history if isinstance(h.get("price"), (int, float)) and h["price"] > 0]
+            if len(prices) < 2:
+                continue
+            old_p, new_p = prices[0], prices[-1]
+            if old_p > new_p:
+                drop_pct = (old_p - new_p) / old_p
+                if drop_pct >= 0.15:
+                    drops_by_store.setdefault(slug, []).append(drop_pct)
+    except Exception:
+        drops_by_store = {}
+
+    for slug, drops in drops_by_store.items():
+        if len(drops) < 2:
+            continue
+        title = "Büyük İndirim Tespit Edildi!"
+        if _already_created_this_week(slug, title):
+            continue
+        avg_drop = sum(drops) / len(drops)
+        store_name = _format_store_name(slug)
+        row = {
+            "store_slug": slug,
+            "title": title,
+            "description": f"{store_name}'de takip ettiğin ürünlerde ortalama %{avg_drop * 100:.0f} fiyat düşüşü tespit edildi.",
+            "catalog_url": "",
+            "valid_from": today.isoformat(),
+            "valid_until": (today + timedelta(days=3)).isoformat(),
+            "notified": False,
+        }
+        try:
+            resp = requests.post(f"{sb_url}/rest/v1/store_campaigns", headers=sb_hdrs, json=row, timeout=10)
+            if resp.ok:
+                created.append(f"{slug}:bigsale")
+        except Exception:
+            pass
+
+    return {"auto_created": created}
+
+
 @app.get("/cron/store-newsletters")
 async def cron_store_newsletters(request: Request):
     """
     Vercel Cron: Her gün 09:00'da çalışır.
 
     Mantık:
+      0. Kampanya verisi otomatik üretilir (haftalık katalog + fiyat düşüşü tespiti).
       1. Bugünün haftanın gününe göre publication_day eşleşen mağazaları bul.
       2. O mağazaların notified=False kampanyaları varsa bildirim gönder.
       3. Takipçi sayısını hesapla, notify_store_update() çağır.
@@ -4771,6 +4918,8 @@ async def cron_store_newsletters(request: Request):
     require_cron_request(request)
     from datetime import date
     from app.notifier import notify_store_update
+
+    auto_result = await _auto_generate_campaigns()
 
     today_weekday = date.today().weekday()  # 0=Pzt … 6=Paz
     today_str     = date.today().isoformat()
@@ -4902,7 +5051,12 @@ async def cron_store_newsletters(request: Request):
                 )
             triggered.append({"slug": slug, "campaigns_notified": len(ids), "followers": follower_count})
 
-    return {"date": today_str, "triggered": triggered, "total_stores_checked": len(active_stores)}
+    return {
+        "date": today_str,
+        "auto_generated": auto_result.get("auto_created", []),
+        "triggered": triggered,
+        "total_stores_checked": len(active_stores),
+    }
 
 
 @app.get("/cron/sync-sheets")
