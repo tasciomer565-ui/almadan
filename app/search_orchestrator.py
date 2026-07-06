@@ -726,6 +726,10 @@ async def master_search(
     from app.cache import make_cache_key, cache_get, cache_set, cache_get_stale
     _cache_key = make_cache_key(query, category)
     cached = cache_get(_cache_key, query=query, category=category)
+    # Eski/bozuk semali cache kayitlari (dict olmayan oge, bos liste vb.)
+    # gecerli sayilmasin -- yoksa taze taramaya hic gecilmez, kalici bos
+    # sonuc donmeye devam eder.
+    cached = [p for p in cached if isinstance(p, dict) and p.get("title") and p.get("url")] if cached else None
     if cached:
         return cached
     # cache miss → metrik kaydet
