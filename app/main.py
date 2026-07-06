@@ -4144,9 +4144,10 @@ def _debug_hb(q: str = "laptop"):
         "application/ld+json": "application/ld+json" in html,
         "productCard": "productCard" in html or "product-card" in html,
     }
-    moria_idx = html.find("MORIA")
-    snippet = html[max(0, moria_idx-100):moria_idx+800] if moria_idx >= 0 else html[:800]
-    return {"ok": True, "len": len(html), "markers": markers, "snippet": snippet}
+    vf_idx = html.find("VERTICALFILTER")
+    snippet = html[max(0, vf_idx-100):vf_idx+1500] if vf_idx >= 0 else html[:800]
+    vf_count = html.count("VERTICALFILTER")
+    return {"ok": True, "len": len(html), "markers": markers, "vf_count": vf_count, "snippet": snippet}
 
 
 @app.get("/api/status")
