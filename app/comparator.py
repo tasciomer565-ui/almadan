@@ -3436,9 +3436,9 @@ def search_tarimkredi(query: str) -> list[dict]:
 
 # ScrapingBee-gated
 def search_defacto(query: str) -> list[dict]:
-    """Defacto ürün araması — JSON-LD + ScrapingBee render_js."""
+    """Defacto ürün araması — JSON-LD + ScrapingBee render_js. (URL: /arama, eski /search artık kategoriye yönlendiriyor)"""
     return _scrape_jsonld_itemlist(
-        f"https://www.defacto.com.tr/search?q={urllib.parse.quote_plus(query)}",
+        f"https://www.defacto.com.tr/arama?q={urllib.parse.quote_plus(query)}",
         "defacto", render_js=False, timeout=12
     )
 
