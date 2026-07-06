@@ -4128,6 +4128,24 @@ def _read_last_test() -> dict:
     return {}
 
 
+@app.get("/api/_debug_wa", include_in_schema=False)
+def _debug_wa(secret: str):
+    """GECICI - WhatsApp entegrasyonunu Meta'nin onayli ornek sablonuyla test eder.
+    Kotuye kullanima karsi: numara sabit (kayitli test alicisi), sadece
+    ADMIN_DEBUG_SECRET ortam degiskeniyle eslesen istekler kabul edilir."""
+    import hmac
+    expected = os.getenv("ADMIN_DEBUG_SECRET", "").strip()
+    if not expected or not hmac.compare_digest(secret, expected):
+        raise HTTPException(status_code=404, detail="Not Found")
+    from app.whatsapp import whatsapp_enabled, send_whatsapp_template
+    if not whatsapp_enabled():
+        return {"ok": False, "reason": "env degiskenleri eksik"}
+    ok = send_whatsapp_template(
+        "905551663380", "jaspers_market_order_confirmation_v1", lang="en_US", params=["Test"]
+    )
+    return {"ok": ok}
+
+
 @app.get("/api/status")
 async def api_status():
     """
