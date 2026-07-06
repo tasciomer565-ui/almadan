@@ -556,7 +556,8 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category == "GIDA":
         for fn in (search_bim, search_a101, search_sokmarket, search_tarimkredi,
-                   search_metro, search_bizimtoptan, search_tazedirekt):
+                   search_metro, search_bizimtoptan, search_tazedirekt,
+                   search_migros_proxy, search_carrefoursa):
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category in ("GENEL", "KİTAP"):
         for fn in (search_kitapyurdu, search_dr, search_remzi, search_idefix,
@@ -737,46 +738,12 @@ async def master_search(
     try:
         async with asyncio.timeout(8.0):
             if mode == "global" or lat is None or lon is None:
-                if category == "GENEL":
-                    results = await marketplace_scan(query)
-                elif category == "GIDA":
-                    from app.comparator import search_n11_direct
-                    n11_task = loop.run_in_executor(None, search_n11_direct, query)
-                    migros_task = loop.run_in_executor(None, search_migros_proxy, query)
-                    carrefour_task = loop.run_in_executor(None, search_carrefoursa, query)
-                    (n11_res, _), migros_res, carrefour_res = await asyncio.gather(
-                        n11_task, migros_task, carrefour_task
-                    )
-                    seen = set()
-                    for p in carrefour_res + migros_res + n11_res:
-                        key = p["url"].split("?")[0]
-                        if key not in seen:
-                            seen.add(key)
-                            results.append(p)
-                else:
-                    results = await marketplace_scan(query)
+                results = await marketplace_scan(query, forced_category=category)
             elif mode == "local":
                 local_res = await scan_worker(query, category)
                 results = [r for r in local_res if r["source"] in LOCAL_SOURCES]
             else:  # hybrid
-                if category == "GENEL":
-                    results = await marketplace_scan(query)
-                elif category == "GIDA":
-                    from app.comparator import search_n11_direct
-                    n11_task = loop.run_in_executor(None, search_n11_direct, query)
-                    migros_task = loop.run_in_executor(None, search_migros_proxy, query)
-                    carrefour_task = loop.run_in_executor(None, search_carrefoursa, query)
-                    (n11_res, _), migros_res, carrefour_res = await asyncio.gather(
-                        n11_task, migros_task, carrefour_task
-                    )
-                    seen = set()
-                    for p in carrefour_res + migros_res + n11_res:
-                        key = p["url"].split("?")[0]
-                        if key not in seen:
-                            seen.add(key)
-                            results.append(p)
-                else:
-                    results = await marketplace_scan(query)
+                results = await marketplace_scan(query, forced_category=category)
     except (asyncio.TimeoutError, Exception):
         results = []
 
