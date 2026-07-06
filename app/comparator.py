@@ -4394,15 +4394,19 @@ def search_products_by_name(
     output = (output_in_stock + output_out_of_stock)[:limit]
     
     # 9. Suspicious Price Warning Check (extreme low price drop alert)
+    # Not: karisik sonuc listesinde (farkli varyant/boyut/gramaj) dogal fiyat
+    # farki normaldir -- 0.6 esigi "En Ucuz" etiketli gercek urunleri bile
+    # sahte indirim sanip yanlis damgaliyordu. Sadece gercekten anormal
+    # (medyanin 1/4'unden az) ve yeterince genis bir ornek (>=5) varsa uyar.
     valid_prices = [p["price"] for p in output_in_stock if p["price"] > 0]
-    if len(valid_prices) >= 3:
+    if len(valid_prices) >= 5:
         sorted_prices = sorted(valid_prices)
         n = len(sorted_prices)
         median_price = sorted_prices[n // 2] if n % 2 != 0 else (sorted_prices[n // 2 - 1] + sorted_prices[n // 2]) / 2.0
-        
+
         for p in output:
             if not p["extra_info"].get("out_of_stock") and p["price"] > 0:
-                if p["price"] < 0.6 * median_price:
+                if p["price"] < 0.25 * median_price:
                     p["extra_info"]["suspicious"] = True
                     p["extra_info"]["suspicious_warning"] = "Güvenlik Uyarısı: Bu fiyat piyasa ortalamasının şüpheli derecede altındadır. Güvenliğiniz için dikkatli olmanızı öneririz."
                     if "Şüpheli Fiyat" not in p["labels"]:
