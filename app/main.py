@@ -4147,7 +4147,13 @@ def _debug_hb(q: str = "laptop"):
     vf_idx = html.find("VERTICALFILTER")
     snippet = html[max(0, vf_idx-100):vf_idx+1500] if vf_idx >= 0 else html[:800]
     vf_count = html.count("VERTICALFILTER")
-    return {"ok": True, "len": len(html), "markers": markers, "vf_count": vf_count, "snippet": snippet}
+    from app.comparator import search_hepsiburada_direct
+    try:
+        parsed = search_hepsiburada_direct(q)
+        parse_result = {"count": len(parsed), "sample": parsed[:2]}
+    except Exception as e:
+        parse_result = {"error": str(e)}
+    return {"ok": True, "len": len(html), "markers": markers, "vf_count": vf_count, "snippet": snippet, "parse_result": parse_result}
 
 
 @app.get("/api/status")
