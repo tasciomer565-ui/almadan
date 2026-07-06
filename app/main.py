@@ -4176,9 +4176,14 @@ def _debug_hb(q: str = "laptop"):
                 js = _extract_balanced_json(html, brace_idx)
                 entry["json_len"] = len(js) if js else None
                 if js:
-                    cleaned = js.replace('\\"', '"')
+                    cleaned = _re.sub(
+                        r'\\\\|\\"',
+                        lambda m: "\\" if m.group(0) == "\\\\" else '"',
+                        js,
+                    )
                     entry["cleaned_head"] = cleaned[:200]
                     entry["cleaned_tail"] = cleaned[-100:]
+                    entry["cleaned_around_283"] = cleaned[240:340]
                     try:
                         d = _json.loads(cleaned)
                         entry["keys"] = list(d.keys())
