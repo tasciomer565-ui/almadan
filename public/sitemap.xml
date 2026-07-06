@@ -21,6 +21,41 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/kategori/market</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/kategori/tech</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/kategori/beauty</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/kategori/fashion</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/kategori/health</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/kategori/home</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/kategori/online</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/magaza/bim</loc>
     <changefreq>daily</changefreq>
     <priority>0.5</priority>

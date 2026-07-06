@@ -4869,6 +4869,110 @@ async def store_page(slug: str):
       <div class="bp-feature-grid">
         {campaigns_html}
       </div>
+      <p class="bp-body"><a href="/kategori/{store.get("category", "")}">{category} kategorisindeki diğer mağazalar</a></p>
+      <a class="bp-cta bp-cta-block" href="/"><i data-lucide="arrow-right"></i> Tüm Mağazalarda Karşılaştır</a>
+    </main>
+
+    <footer class="bp-footer">
+      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
+      <p>© 2026 Almadan</p>
+    </footer>
+    <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
+  </body>
+</html>"""
+    return HTMLResponse(page)
+
+
+_CATEGORY_DISPLAY = {
+    "market": ("Market / Gıda", "BİM, A101, ŞOK, Migros ve daha fazla marketten güncel kampanyalar ve fiyat karşılaştırması."),
+    "tech": ("Teknoloji", "Teknosa, MediaMarkt, Vatan Bilgisayar ve daha fazla teknoloji mağazasından fiyat karşılaştırması."),
+    "beauty": ("Kozmetik", "Gratis, Watsons, Rossmann ve daha fazla kozmetik mağazasından fiyat karşılaştırması."),
+    "fashion": ("Moda", "LC Waikiki, Mavi, Boyner, Zara ve daha fazla moda mağazasından fiyat karşılaştırması."),
+    "health": ("Sağlık / Bebek", "e-bebek, optik zincirleri ve daha fazla sağlık/bebek mağazasından fiyat karşılaştırması."),
+    "home": ("Ev / Yaşam", "Karaca, English Home, IKEA ve daha fazla ev/yaşam mağazasından fiyat karşılaştırması."),
+    "online": ("Pazaryeri", "Trendyol, Hepsiburada, Amazon, n11 gibi büyük pazaryerlerinden fiyat karşılaştırması."),
+}
+
+
+@app.get("/kategori/{category}", response_class=HTMLResponse)
+async def category_page(category: str):
+    """Kategori bazli SEO sayfasi -- ilgili tum magazalara link verir."""
+    import html as _html
+
+    if category not in ALL_STORES_MAP:
+        return HTMLResponse(
+            "<h1>Kategori bulunamadı</h1><p><a href=\"/\">Ana sayfaya dön</a></p>",
+            status_code=404,
+        )
+
+    display_name, description = _CATEGORY_DISPLAY.get(category, (category.capitalize(), ""))
+    display_name = _html.escape(display_name)
+    description = _html.escape(description)
+
+    store_links = []
+    for slug in ALL_STORES_MAP[category]:
+        store_name = _html.escape(_format_store_name(slug))
+        store_links.append(
+            f'<a class="bp-feature" href="/magaza/{slug}"><h3>{store_name}</h3><p>Kampanyaları ve fiyatları gör</p></a>'
+        )
+    stores_html = "".join(store_links)
+
+    page = f"""<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#121412">
+    <title>{display_name} Fiyat Karşılaştırma — Almadan</title>
+    <meta name="description" content="{description}">
+    <link rel="canonical" href="https://www.almadan.app/kategori/{category}">
+    <meta name="robots" content="index, follow">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Almadan">
+    <meta property="og:title" content="{display_name} Fiyat Karşılaştırma — Almadan">
+    <meta property="og:description" content="{description}">
+    <meta property="og:url" content="https://www.almadan.app/kategori/{category}">
+    <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
+    <meta property="og:locale" content="tr_TR">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+    <script type="application/ld+json">
+    {{
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "url": "https://www.almadan.app/kategori/{category}",
+      "name": "{display_name} Fiyat Karşılaştırma — Almadan",
+      "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app" }}
+    }}
+    </script>
+    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
+  </head>
+  <body>
+    <header class="bp-header">
+      <a href="/" class="bp-logo"><span class="bp-logo-mark">A</span>almadan</a>
+      <nav class="bp-nav">
+        <a href="/hakkinda">Hakkında</a>
+        <a href="/gizlilik">Gizlilik</a>
+        <a href="/iletisim">İletişim</a>
+      </nav>
+    </header>
+
+    <section class="bp-hero">
+      <div class="bp-hero-inner">
+        <p class="bp-eyebrow">KATEGORİ</p>
+        <h1>{display_name} Fiyat Karşılaştırma</h1>
+        <p class="bp-hero-copy">{description}</p>
+        <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> Şimdi Karşılaştır</a>
+      </div>
+    </section>
+
+    <main class="bp-main">
+      <h2><i data-lucide="store"></i> Bu Kategorideki Mağazalar</h2>
+      <div class="bp-feature-grid">
+        {stores_html}
+      </div>
       <a class="bp-cta bp-cta-block" href="/"><i data-lucide="arrow-right"></i> Tüm Mağazalarda Karşılaştır</a>
     </main>
 
