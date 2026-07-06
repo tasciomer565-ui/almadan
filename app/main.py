@@ -4782,6 +4782,176 @@ def _parse_iso_dt(value):
         return None
 
 
+# JS-render gerektiren (kampanya metni client-side API'den yüklenen) mağazalar için
+# tam metin okumak yerine sayfa içeriğinin DEĞİŞTİĞİNİ tespit ediyoruz — çok daha
+# stabil, mağaza başına özel parser gerektirmez.
+def _notify_store_followers(
+    sb_url: str, sb_hdrs: dict, slug: str, store_name: str,
+    title: str, body: str, catalog_url: str = "",
+) -> int:
+    """
+    Bir mağazanın takipçilerine uygulama-içi bildirim + e-posta gönderir.
+    store_newsletters.active alanına bağımlı DEĞİLDİR — followed_stores
+    tablosundan doğrudan okur, bu yüzden admin panel/tablo eksikliğinden
+    etkilenmez. Dönüş: kaç takipçiye ulaşıldı.
+    """
+    try:
+        fr = requests.get(
+            f"{sb_url}/rest/v1/followed_stores",
+            headers=sb_hdrs,
+            params={"store_slug": f"eq.{slug}", "select": "user_id,email"},
+            timeout=10,
+        )
+        followers = fr.json() if fr.ok else []
+    except Exception:
+        return 0
+
+    for follower in followers:
+        uid = follower.get("user_id")
+        email = follower.get("email") or ""
+
+        if uid:
+            try:
+                requests.post(
+                    f"{sb_url}/rest/v1/user_notifications",
+                    headers=sb_hdrs,
+                    json={
+                        "user_id": uid, "store_slug": slug,
+                        "title": title, "body": body,
+                        "url": catalog_url or "/", "is_read": False,
+                    },
+                    timeout=10,
+                )
+            except Exception:
+                pass
+
+        if email:
+            try:
+                import os, smtplib
+                from email.mime.multipart import MIMEMultipart
+                from email.mime.text import MIMEText
+                smtp_host = os.getenv("SMTP_HOST", "").strip()
+                smtp_port = int(os.getenv("SMTP_PORT", "587"))
+                smtp_user = os.getenv("SMTP_USER", "").strip()
+                smtp_pass = os.getenv("SMTP_PASS", "").strip()
+                from_addr = os.getenv("SMTP_FROM", smtp_user).strip() or smtp_user
+                if smtp_host and smtp_user:
+                    catalog_btn = (
+                        f'<a href="{catalog_url}" style="display:inline-block;margin-top:16px;padding:10px 20px;'
+                        f'background:#287a50;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;">'
+                        f'İncele →</a>' if catalog_url else ""
+                    )
+                    html = f"""<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#287a50;margin:0 0 8px;">🏪 {store_name} — {title}</h2>
+  <p style="color:#444;margin:0 0 4px;">{body}</p>
+  {catalog_btn}
+  <hr style="margin:24px 0;border:none;border-top:1px solid #eee;">
+  <p style="font-size:11px;color:#888;">Bu bildirim, <a href="https://www.almadan.app">Almadan</a>'dan {store_name} mağazasını takip ettiğin için gönderildi.</p>
+</div>"""
+                    msg = MIMEMultipart("alternative")
+                    msg["Subject"] = f"[Almadan] {store_name} — {title}"
+                    msg["From"] = f"Almadan <{from_addr}>"
+                    msg["To"] = email
+                    msg.attach(MIMEText(body, "plain", "utf-8"))
+                    msg.attach(MIMEText(html, "html", "utf-8"))
+                    if smtp_port == 465:
+                        with smtplib.SMTP_SSL(smtp_host, 465, timeout=8) as srv:
+                            srv.login(smtp_user, smtp_pass)
+                            srv.sendmail(from_addr, email, msg.as_string())
+                    else:
+                        with smtplib.SMTP(smtp_host, smtp_port, timeout=8) as srv:
+                            srv.starttls()
+                            srv.login(smtp_user, smtp_pass)
+                            srv.sendmail(from_addr, email, msg.as_string())
+            except Exception:
+                pass
+
+    return len(followers)
+
+
+_CAMPAIGN_PAGE_STORES = {
+    "gratis": {"url": "https://www.gratis.com/kampanyalar", "name": "Gratis"},
+    "mavi": {"url": "https://www.mavi.com/kampanyalar", "name": "Mavi"},
+    "boyner": {"url": "https://www.boyner.com.tr/content/kampanyalar", "name": "Boyner"},
+    "rossmann": {"url": "https://www.rossmann.com.tr/kampanyalar", "name": "Rossmann"},
+    "lcwaikiki": {"url": "https://www.lcw.com/anasayfa/firsatalani", "name": "LC Waikiki"},
+    "koton": {"url": "https://www.koton.com/kampanyalarimiz", "name": "Koton"},
+}
+
+
+async def _check_campaign_page_changes() -> list[str]:
+    """
+    Her mağaza için kampanya sayfasının görünür metnini (script/style hariç)
+    hash'ler ve bir önceki taramayla karşılaştırır. Fark varsa takipçilere
+    "kampanya sayfası güncellendi, incele" bildirimi + doğrudan link üretir.
+    İlk çalıştırmada sadece taban çizgi (baseline) kaydedilir, bildirim gönderilmez.
+    """
+    import hashlib
+    from datetime import date, timedelta
+    from bs4 import BeautifulSoup as _BS
+    from app.scraping_proxy import proxy_get
+
+    if not supabase_enabled():
+        return []
+
+    try:
+        sb_url = supabase_base_url()
+        sb_hdrs = supabase_headers()
+    except Exception:
+        return []
+
+    try:
+        db = load_db()
+    except Exception:
+        return []
+    hashes: dict = db.setdefault("campaign_page_hashes", {})
+    changed: list[str] = []
+    today = date.today()
+
+    for slug, info in _CAMPAIGN_PAGE_STORES.items():
+        try:
+            html = await asyncio.to_thread(proxy_get, info["url"], False, 15)
+            if not html:
+                continue
+            soup = _BS(html, "html.parser")
+            for tag in soup(["script", "style", "noscript"]):
+                tag.decompose()
+            text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True))
+            fingerprint = hashlib.sha256(text.encode("utf-8", errors="ignore")).hexdigest()
+        except Exception:
+            continue
+
+        prev = hashes.get(slug)
+        hashes[slug] = fingerprint
+        if prev is None or prev == fingerprint:
+            continue  # ilk tarama ya da değişiklik yok
+
+        title = "Kampanya Sayfası Güncellendi!"
+        body = f"{info['name']} kampanya sayfasında güncelleme var, hemen incele!"
+        row = {
+            "store_slug": slug,
+            "title": title,
+            "description": body,
+            "catalog_url": info["url"],
+            "valid_from": today.isoformat(),
+            "valid_until": (today + timedelta(days=7)).isoformat(),
+            "notified": True,  # takipçiler aşağıda doğrudan bildirilir
+        }
+        try:
+            requests.post(f"{sb_url}/rest/v1/store_campaigns", headers=sb_hdrs, json=row, timeout=10)
+        except Exception:
+            pass
+        n = _notify_store_followers(sb_url, sb_hdrs, slug, info["name"], title, body, info["url"])
+        changed.append(f"{slug}:page_changed:{n}_takipci")
+
+    try:
+        save_db(db)
+    except Exception:
+        pass
+
+    return changed
+
+
 async def _auto_generate_campaigns() -> dict:
     """
     Elle admin panel olmadığı için kampanya verisini iki kaynaktan otomatik üretir:
@@ -4829,21 +4999,22 @@ async def _auto_generate_campaigns() -> dict:
         title = "Haftalık Aktüel Katalog Yayında!"
         if _already_created_this_week(slug, title):
             continue
+        body = f"{info['name']} bu haftanın yeni aktüel ürünlerini yayınladı."
         row = {
             "store_slug": slug,
             "title": title,
-            "description": f"{info['name']} bu haftanın yeni aktüel ürünlerini yayınladı.",
+            "description": body,
             "catalog_url": info["url"],
             "valid_from": today.isoformat(),
             "valid_until": (today + timedelta(days=7)).isoformat(),
-            "notified": False,
+            "notified": True,  # takipçiler aşağıda doğrudan bildirilir
         }
         try:
-            resp = requests.post(f"{sb_url}/rest/v1/store_campaigns", headers=sb_hdrs, json=row, timeout=10)
-            if resp.ok:
-                created.append(f"{slug}:weekly")
+            requests.post(f"{sb_url}/rest/v1/store_campaigns", headers=sb_hdrs, json=row, timeout=10)
         except Exception:
             pass
+        n = _notify_store_followers(sb_url, sb_hdrs, slug, info["name"], title, body, info["url"])
+        created.append(f"{slug}:weekly:{n}_takipci")
 
     # 2) Büyük fiyat düşüşü tespiti — takip edilen ürünler üzerinden mağaza bazlı
     known_slugs = {slug for slugs in ALL_STORES_MAP.values() for slug in slugs}
@@ -4884,21 +5055,22 @@ async def _auto_generate_campaigns() -> dict:
             continue
         avg_drop = sum(drops) / len(drops)
         store_name = _format_store_name(slug)
+        body = f"{store_name}'de takip ettiğin ürünlerde ortalama %{avg_drop * 100:.0f} fiyat düşüşü tespit edildi."
         row = {
             "store_slug": slug,
             "title": title,
-            "description": f"{store_name}'de takip ettiğin ürünlerde ortalama %{avg_drop * 100:.0f} fiyat düşüşü tespit edildi.",
+            "description": body,
             "catalog_url": "",
             "valid_from": today.isoformat(),
             "valid_until": (today + timedelta(days=3)).isoformat(),
-            "notified": False,
+            "notified": True,  # takipçiler aşağıda doğrudan bildirilir
         }
         try:
-            resp = requests.post(f"{sb_url}/rest/v1/store_campaigns", headers=sb_hdrs, json=row, timeout=10)
-            if resp.ok:
-                created.append(f"{slug}:bigsale")
+            requests.post(f"{sb_url}/rest/v1/store_campaigns", headers=sb_hdrs, json=row, timeout=10)
         except Exception:
             pass
+        n = _notify_store_followers(sb_url, sb_hdrs, slug, store_name, title, body)
+        created.append(f"{slug}:bigsale:{n}_takipci")
 
     return {"auto_created": created}
 
@@ -4920,6 +5092,7 @@ async def cron_store_newsletters(request: Request):
     from app.notifier import notify_store_update
 
     auto_result = await _auto_generate_campaigns()
+    page_changes = await _check_campaign_page_changes()
 
     today_weekday = date.today().weekday()  # 0=Pzt … 6=Paz
     today_str     = date.today().isoformat()
@@ -5054,6 +5227,7 @@ async def cron_store_newsletters(request: Request):
     return {
         "date": today_str,
         "auto_generated": auto_result.get("auto_created", []),
+        "campaign_page_changes": page_changes,
         "triggered": triggered,
         "total_stores_checked": len(active_stores),
     }
