@@ -377,13 +377,24 @@ def is_logical_product(query: str, product_title: str) -> bool:
         "shell helix", "liqui moly", "lubex"
     }
     
+    # Temizlik/kozmetik urunler yemeklik yag adiyla pazarlaniyor olabilir
+    # (orn. "zeytinyagli sivi sabun") -- bu, yemeklik yag aramasinda alakasiz
+    # sonuc olarak cikmamali.
+    cleaning_cosmetic_terms = {
+        "sabun", "deterjan", "şampuan", "sampuan", "losyon", "krem",
+        "duş jeli", "dus jeli", "saç bakım", "sac bakim", "vücut yağı", "vucut yagi",
+    }
+
     has_cooking_query = any(t in query_lower for t in cooking_oil_terms)
     has_motor_query = any(t in query_lower for t in motor_oil_terms)
-    
+    has_cleaning_query = any(t in query_lower for t in cleaning_cosmetic_terms)
+
     if has_cooking_query:
         if any(t in title_lower for t in motor_oil_terms) and not has_motor_query:
             return False
-            
+        if any(t in title_lower for t in cleaning_cosmetic_terms) and not has_cleaning_query:
+            return False
+
     if has_motor_query:
         if any(t in title_lower for t in cooking_oil_terms) and not has_cooking_query:
             return False
