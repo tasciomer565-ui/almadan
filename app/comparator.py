@@ -4469,17 +4469,18 @@ def search_products_by_name(
             title_clean = p["title"].lower().replace("-", "")
             if brand_lower in title_clean:
                 brand_filtered.append(p)
-    # Ensure at least one returned product contains at least one word from the query or corrected query
-    # (prevents random N11 fallback results for bogus queries)
+    # Sorgu kelimelerinden hicbirini icermeyen tek tek urunleri ele --
+    # eskiden bu kontrol tum listeye "en az bir eslesme var mi" seklinde
+    # bakiyordu, listede bir-iki alakasiz urun (orn. "makarna" aramasinda
+    # bir maskara) diger gercek eslesmeler yuzunden gozden kaciyordu.
     query_words = [w.strip() for w in corrected_query.lower().split() if len(w.strip()) > 2]
-    if query_words and filtered_products:
-        has_any_match = False
-        for p in filtered_products:
-            p_title_lower = p["title"].lower()
-            if any(w in p_title_lower for w in query_words):
-                has_any_match = True
-                break
-        if not has_any_match:
+    if query_words:
+        matching = [p for p in filtered_products if any(w in p["title"].lower() for w in query_words)]
+        # Hicbiri eslesmiyorsa (bogus sorgu) tum listeyi degil, orijinali koru
+        # -- eslesen varsa sadece eslesmeyenleri disarida birak.
+        if matching:
+            filtered_products = matching
+        else:
             filtered_products = []
 
     # Title bazlı deduplicate: aynı ürün farklı satıcıdan geliyorsa en ucuzunu tut
