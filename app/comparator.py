@@ -666,6 +666,23 @@ def _extract_balanced_json(text: str, start_idx: int) -> str | None:
     return None
 
 
+def _extract_json_string_literal(text: str, start_idx: int) -> str | None:
+    """text[start_idx] cift tirnak ile baslamali; kacisli (\\") string
+    literalini (baslangic/bitis tirnaklari dahil) dondurur."""
+    if start_idx < 0 or start_idx >= len(text) or text[start_idx] != '"':
+        return None
+    escape = False
+    for i in range(start_idx + 1, len(text)):
+        ch = text[i]
+        if escape:
+            escape = False
+        elif ch == "\\":
+            escape = True
+        elif ch == '"':
+            return text[start_idx:i + 1]
+    return None
+
+
 def search_hepsiburada_direct(query: str) -> list[dict]:
     """
     Hepsiburada arama — gerçek veri kaynağı: HTML'e SSR ile gömülü
@@ -701,13 +718,28 @@ def search_hepsiburada_direct(query: str) -> list[dict]:
         state_idx = html.find("'STATE':", idx)
         if state_idx == -1 or state_idx - idx > 500:
             continue
-        json_start = html.find("{", state_idx)
-        json_str = _extract_balanced_json(html, json_start)
-        if not json_str:
-            continue
-        try:
-            data = _json.loads(json_str)
-        except Exception:
+        # 'STATE' degeri cift-tirnakli bir JS string'i (icinde kacisli \"
+        # JSON metni tasiyor) -- once string literalini cikarip bir kez
+        # json.loads ile kac isimlerini coz, sonra gercek objeyi parse et.
+        quote_idx = html.find('"', state_idx)
+        brace_idx = html.find("{", state_idx)
+        data = None
+        if quote_idx != -1 and (brace_idx == -1 or quote_idx < brace_idx):
+            literal = _extract_json_string_literal(html, quote_idx)
+            if literal:
+                try:
+                    inner = _json.loads(literal)
+                    data = _json.loads(inner)
+                except Exception:
+                    data = None
+        if data is None and brace_idx != -1:
+            json_str = _extract_balanced_json(html, brace_idx)
+            if json_str:
+                try:
+                    data = _json.loads(json_str)
+                except Exception:
+                    data = None
+        if data is None:
             continue
         prods = (data.get("data") or {}).get("products")
         if prods:
