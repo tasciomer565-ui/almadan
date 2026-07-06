@@ -5259,10 +5259,11 @@ async def _debug_scrapecheck(store: str = "trendyol", q: str = "iphone 16"):
     from app.scraping_proxy import proxy_enabled, proxy_get
 
     targets = {
-        "trendyol": f"https://www.trendyol.com/sr?q={q.replace(' ', '+')}",
+        "trendyol": f"https://www.trendyol.com/sr?q={q.replace(' ', '+')}&qt={q.replace(' ', '+')}&st=SEARCH",
         "hepsiburada": f"https://www.hepsiburada.com/ara?q={q.replace(' ', '+')}",
-        "defacto": f"https://www.defacto.com.tr/arama?q={q.replace(' ', '+')}",
-        "lcwaikiki": f"https://www.lcw.com/arama?q={q.replace(' ', '+')}",
+        "defacto": f"https://www.defacto.com.tr/search?q={q.replace(' ', '+')}",
+        "lcwaikiki": f"https://www.lcwaikiki.com/tr-TR/TR/search/index.aspx?searchvalue={q.replace(' ', '+')}",
+        "mavi": f"https://www.mavi.com/search?q={q.replace(' ', '+')}",
     }
     url = targets.get(store, targets["trendyol"])
     results = {}
@@ -5271,11 +5272,20 @@ async def _debug_scrapecheck(store: str = "trendyol", q: str = "iphone 16"):
             html = await asyncio.to_thread(proxy_get, url, render_js, 25)
             snippet = ""
             blocked = False
+            structure = {}
             if html:
                 low = html.lower()
                 blocked = any(s in low for s in ["attention required", "cloudflare", "access denied", "just a moment", "captcha"])
                 snippet = html[:300]
-            results[label] = {"ok": bool(html), "blocked": blocked, "len": len(html) if html else 0, "snippet": snippet}
+                from bs4 import BeautifulSoup as _BS2
+                _soup = _BS2(html, "html.parser")
+                structure = {
+                    "jsonld_scripts": len(_soup.find_all("script", type="application/ld+json")),
+                    "has_next_data": bool(_soup.find("script", id="__NEXT_DATA__")),
+                    "has_search_app_state": "__SEARCH_APP_INITIAL_STATE__" in html,
+                    "title": (_soup.title.get_text(strip=True) if _soup.title else ""),
+                }
+            results[label] = {"ok": bool(html), "blocked": blocked, "len": len(html) if html else 0, "snippet": snippet, "structure": structure}
         except Exception as exc:
             results[label] = {"ok": False, "error": str(exc)}
 
