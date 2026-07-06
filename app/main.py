@@ -4166,17 +4166,12 @@ def _debug_hb(q: str = "laptop"):
         state_idx = html.find("'STATE':", idx)
         entry = {"idx": idx, "state_idx": state_idx, "gap": (state_idx - idx) if state_idx >= 0 else None}
         if state_idx >= 0:
-            json_start = html.find("{", state_idx)
-            js = _extract_balanced_json(html, json_start)
-            entry["json_len"] = len(js) if js else None
-            if js:
-                try:
-                    d = _json.loads(js)
-                    entry["keys"] = list(d.keys())
-                    entry["products_len"] = len((d.get("data") or {}).get("products") or [])
-                except Exception as e2:
-                    entry["json_error"] = str(e2)
-                    entry["json_head"] = js[:200]
+            around = html[state_idx:state_idx + 30]
+            entry["around_state"] = around
+            quote_idx = html.find('"', state_idx)
+            brace_idx = html.find("{", state_idx)
+            entry["quote_idx"] = quote_idx
+            entry["brace_idx"] = brace_idx
         trace.append(entry)
 
     return {"ok": True, "len": len(html), "markers": markers, "vf_count": vf_count, "snippet": snippet, "parse_result": parse_result, "trace": trace}
