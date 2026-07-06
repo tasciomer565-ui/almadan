@@ -666,6 +666,36 @@ def _extract_balanced_json(text: str, start_idx: int) -> str | None:
     return None
 
 
+def _extract_balanced_escaped_json(text: str, start_idx: int) -> str | None:
+    """Hepsiburada'nin STATE blogu gibi bastan sona \\" ile kacisli (disinda
+    sarici tirnak olmayan) ham metinler icin dengeli parca cikarir.
+    Not: ic ice kacis da olabiliyor (orn. 15.3\\\" boyut ifadesi, yani bir
+    string DEGERININ icinde kacisli tirnak) -- bu yuzden '"' bazli string
+    durumu takibi guvenilir degil (yanlis pozitif toggle olusturuyor).
+    Bunun yerine: her '\\X' cifti (ne olursa olsun) opak kabul edilip
+    atlanir; sadece KACISSIZ (bare) '{'/'}' karakterleri yapisal sayilir --
+    JSON'da suslu parantezler asla escape gerektirmedigi icin bu guvenilir
+    bir ayirt edicidir."""
+    if start_idx < 0 or start_idx >= len(text) or text[start_idx] != "{":
+        return None
+    depth = 0
+    i = start_idx
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if ch == "\\" and i + 1 < n:
+            i += 2
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start_idx:i + 1]
+        i += 1
+    return None
+
+
 
 
 def search_hepsiburada_direct(query: str) -> list[dict]:
@@ -711,7 +741,7 @@ def search_hepsiburada_direct(query: str) -> list[dict]:
         brace_idx = html.find("{", state_idx)
         data = None
         if brace_idx != -1:
-            json_str = _extract_balanced_json(html, brace_idx)
+            json_str = _extract_balanced_escaped_json(html, brace_idx)
             if json_str:
                 cleaned = re.sub(
                     r'\\\\|\\"',
