@@ -763,27 +763,35 @@ def search_hepsiburada_direct(query: str) -> list[dict]:
 
     results = []
     for p in products[:10]:
-        variants = p.get("variantList") or []
-        if not variants:
+        try:
+            variants = p.get("variantList") or []
+            if not variants:
+                continue
+            v = variants[0]
+            name = v.get("name") or ""
+            if not name:
+                continue
+            listing = v.get("listing") or {}
+            price_info = listing.get("priceInfo") or {}
+            price = price_info.get("price") or 0
+            original = price_info.get("originalPrice")
+            slug = (v.get("url") or "").split("?")[0]
+            prod_url = f"https://www.hepsiburada.com{slug}" if slug.startswith("/") else (slug or "")
+            imgs = v.get("images") or {}
+            if isinstance(imgs, dict):
+                img = imgs.get("0") or (list(imgs.values())[0] if imgs else "")
+            elif isinstance(imgs, list):
+                img = imgs[0] if imgs else ""
+            else:
+                img = ""
+            results.append({
+                "title": name, "price": float(price),
+                "original_price": float(original) if original and original != price else None,
+                "image_url": img, "source": "hepsiburada", "url": prod_url,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": price == 0},
+            })
+        except Exception:
             continue
-        v = variants[0]
-        name = v.get("name") or ""
-        if not name:
-            continue
-        listing = v.get("listing") or {}
-        price_info = listing.get("priceInfo") or {}
-        price = price_info.get("price") or 0
-        original = price_info.get("originalPrice")
-        slug = (v.get("url") or "").split("?")[0]
-        prod_url = f"https://www.hepsiburada.com{slug}" if slug.startswith("/") else (slug or "")
-        imgs = v.get("images") or {}
-        img = imgs.get("0") or (list(imgs.values())[0] if isinstance(imgs, dict) and imgs else "")
-        results.append({
-            "title": name, "price": float(price),
-            "original_price": float(original) if original and original != price else None,
-            "image_url": img, "source": "hepsiburada", "url": prod_url,
-            "labels": ["Önerilen"], "extra_info": {"out_of_stock": price == 0},
-        })
     return results
 
 
