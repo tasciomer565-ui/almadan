@@ -5162,12 +5162,19 @@ def _seo_price_slug_map() -> dict[str, str]:
     global _SEO_PRICE_TERMS_CACHE, _SEO_PRICE_SLUGS_CACHE
     if _SEO_PRICE_SLUGS_CACHE is not None:
         return _SEO_PRICE_SLUGS_CACHE
+    import re as _re
     terms = get_seo_price_terms()
     _SEO_PRICE_TERMS_CACHE = terms
     tr_to_ascii = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
     mapping: dict[str, str] = {}
     for t in terms:
         slug = t.translate(tr_to_ascii).replace(" ", "-")
+        # URL/XML-guvenli olmayan karakterleri (&, /, vb.) temizle -- orn.
+        # "h&m" slug'a girip sitemap.xml'i bozmasin.
+        slug = _re.sub(r"[^a-z0-9\-]", "", slug.lower())
+        slug = _re.sub(r"-+", "-", slug).strip("-")
+        if not slug:
+            continue
         mapping[slug] = t
     _SEO_PRICE_SLUGS_CACHE = mapping
     return mapping
