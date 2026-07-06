@@ -973,17 +973,118 @@ def search_decathlon(query: str) -> list[dict]:
     )
 
 def search_lcwaikiki(query: str) -> list[dict]:
-    """LC Waikiki ürün araması — JSON-LD + ScrapingBee render_js."""
-    url = f"https://www.lcwaikiki.com/tr-TR/TR/search/index.aspx?searchvalue={urllib.parse.quote_plus(query)}"
-    return _scrape_jsonld_itemlist(url, "lcwaikiki", render_js=False, timeout=12)
+    """
+    LC Waikiki ürün araması — gerçek veri kaynağı: HTML'e SSR ile gömülü
+    "var catalogModel = {...}" script bloğu (2026-07 itibarıyla doğrulandı;
+    eski /tr-TR/TR/search/index.aspx yolu artık ana sayfaya düşüyor).
+    """
+    import json as _json
+    from app.scraping_proxy import proxy_get, proxy_enabled
+
+    url = f"https://www.lcw.com/arama?q={urllib.parse.quote_plus(query)}"
+    html = None
+    if proxy_enabled():
+        html = proxy_get(url, render_js=False, timeout=12)
+    if not html:
+        try:
+            r = requests.get(url, headers=_STD_HEADERS, timeout=8)
+            html = r.text if r.ok else None
+        except Exception:
+            return []
+    if not html:
+        return []
+
+    m = re.search(r'var\s+catalogModel\s*=\s*(\{.+?\})\s*;\s*(?:var|\n\s*</script>)', html, re.DOTALL)
+    if not m:
+        return []
+    try:
+        state = _json.loads(m.group(1))
+    except Exception:
+        return []
+
+    items = ((state.get("CatalogList") or {}).get("Items")) or []
+    results = []
+    for p in items[:10]:
+        name = p.get("ProductDescription") or ""
+        if not name:
+            continue
+        price = p.get("PriceValue") or 0
+        old_price = p.get("MinOldPrice") or p.get("MaxCurrentPrice")
+        slug = p.get("ModelUrl") or ""
+        prod_url = f"https://www.lcw.com{slug}" if slug.startswith("/") else ""
+        imgs = p.get("OptionImageUrlList") or []
+        img = imgs[0] if imgs else ""
+        results.append({
+            "title": name, "price": float(price),
+            "original_price": float(old_price) if old_price and old_price != price else None,
+            "image_url": img, "source": "lcwaikiki", "url": prod_url,
+            "labels": ["Önerilen"], "extra_info": {"out_of_stock": price == 0},
+        })
+    return results
 
 
 def search_mavi(query: str) -> list[dict]:
-    """Mavi ürün araması — JSON-LD + ScrapingBee render_js."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.mavi.com/search?q={urllib.parse.quote_plus(query)}",
-        "mavi", render_js=False, timeout=12
-    )
+    """
+    Mavi ürün araması — gerçek veri kaynağı: sayfadaki application/ld+json
+    script'i, mainEntity.offers['@graph'].itemListElement (2026-07 itibarıyla
+    doğrulandı; eski /search?q= yolu artık /search/?text= olarak çalışıyor).
+    """
+    import json as _json
+    from app.scraping_proxy import proxy_get, proxy_enabled
+
+    url = f"https://www.mavi.com/search/?text={urllib.parse.quote_plus(query)}"
+    html = None
+    if proxy_enabled():
+        html = proxy_get(url, render_js=False, timeout=12)
+    if not html:
+        try:
+            r = requests.get(url, headers=_STD_HEADERS, timeout=8)
+            html = r.text if r.ok else None
+        except Exception:
+            return []
+    if not html:
+        return []
+
+    soup = BeautifulSoup(html, "html.parser")
+    items = []
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = _json.loads(script.string or "{}")
+            graph = ((data.get("mainEntity") or {}).get("offers") or {}).get("@graph") or {}
+            elems = graph.get("itemListElement") or []
+            if elems:
+                items = elems
+                break
+        except Exception:
+            continue
+    if not items:
+        return []
+
+    results = []
+    for elem in items[:10]:
+        p = elem.get("item") or {}
+        name = p.get("name") or ""
+        if not name:
+            continue
+        offers = p.get("offers") or {}
+        if isinstance(offers, list):
+            offers = offers[0] if offers else {}
+        try:
+            price = float(offers.get("price") or 0)
+        except (TypeError, ValueError):
+            continue
+        if price <= 0:
+            continue
+        prod_url = offers.get("url") or ""
+        img = p.get("image") or ""
+        if isinstance(img, list):
+            img = img[0] if img else ""
+        results.append({
+            "title": name, "price": price, "original_price": None,
+            "image_url": img, "source": "mavi", "url": prod_url,
+            "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+        })
+    return results
 
 def search_zara(query: str) -> list[dict]:
     """Zara Türkiye ürün araması."""
