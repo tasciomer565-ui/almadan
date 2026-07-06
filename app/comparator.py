@@ -1336,10 +1336,19 @@ def search_sokmarket(query: str) -> list[dict]:
     """
     try:
         url = f"https://www.sokmarket.com.tr/arama?q={urllib.parse.quote_plus(query)}"
-        r = requests.get(url, headers=_STD_HEADERS, timeout=8)
-        if not r.ok:
+        html = None
+        try:
+            from app.scraping_proxy import proxy_get, proxy_enabled
+            if proxy_enabled():
+                html = proxy_get(url, render_js=False, timeout=12)
+        except Exception:
+            html = None
+        if not html:
+            r = requests.get(url, headers=_STD_HEADERS, timeout=8)
+            html = r.text if r.ok else None
+        if not html:
             return []
-        soup = BeautifulSoup(r.text, "html.parser")
+        soup = BeautifulSoup(html, "html.parser")
         results = []
         for item in soup.select("[class*='CProductCard-module_productCardWrapper']")[:10]:
             name_el = item.select_one("[class*='CProductCard-module_title']")
