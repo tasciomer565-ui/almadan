@@ -704,14 +704,20 @@ def search_hepsiburada_direct(query: str) -> list[dict]:
         if state_idx == -1 or state_idx - idx > 500:
             continue
         # 'STATE' degerinin ici bastan sona \" ile kacisli ham metin (disinda
-        # sarici tirnak yok) -- dengeli parcayi cikarip \" -> " donusumu
-        # yaptiktan sonra parse ediyoruz.
+        # sarici tirnak yok). Icerikte bazen gercekten kacisli backslash da
+        # var (orn. 15.3\" boyut ifadesi) -- naif \" -> " degisimi bunlari
+        # bozuyordu. Tek gecisli, sirali unescape (\\ -> \, \" -> ") dogru
+        # sonucu veriyor.
         brace_idx = html.find("{", state_idx)
         data = None
         if brace_idx != -1:
             json_str = _extract_balanced_json(html, brace_idx)
             if json_str:
-                cleaned = json_str.replace('\\"', '"')
+                cleaned = re.sub(
+                    r'\\\\|\\"',
+                    lambda m: "\\" if m.group(0) == "\\\\" else '"',
+                    json_str,
+                )
                 try:
                     data = _json.loads(cleaned)
                 except Exception:
