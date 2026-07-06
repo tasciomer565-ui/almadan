@@ -784,6 +784,10 @@ def search_hepsiburada_direct(query: str) -> list[dict]:
                 img = imgs[0] if imgs else ""
             else:
                 img = ""
+            if isinstance(img, dict):
+                img = img.get("link") or img.get("url") or ""
+            if img and "{size}" in img:
+                img = img.replace("{size}", "216x216")
             results.append({
                 "title": name, "price": float(price),
                 "original_price": float(original) if original and original != price else None,
