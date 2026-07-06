@@ -443,6 +443,16 @@ def normalize_turkish_search_query(query: str) -> str:
         "kulaklik": "kulaklık",
         "ayakkabi": "ayakkabı",
         "gomlek": "gömlek",
+        "canta": "çanta",
+        "corap": "çorap",
+        "supurge": "süpürge",
+        "catal": "çatal",
+        "kasik": "kaşık",
+        "bicak": "bıçak",
+        "carsaf": "çarşaf",
+        "yastik": "yastık",
+        "hali": "halı",
+        "firin": "fırın",
     }
     normalized = str(query or "").strip()
     for plain, turkish in replacements.items():
