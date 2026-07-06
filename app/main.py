@@ -5279,4 +5279,27 @@ async def _debug_scrapecheck(store: str = "trendyol", q: str = "iphone 16"):
         except Exception as exc:
             results[label] = {"ok": False, "error": str(exc)}
 
-    return {"proxy_enabled": proxy_enabled(), "url": url, "results": results}
+    # Gerçek arama fonksiyonlarını da doğrudan çağır — asıl soru bu
+    from app import comparator as _cmp
+    fn_map = {
+        "trendyol": _cmp.search_trendyol_direct,
+        "hepsiburada": _cmp.search_hepsiburada_direct,
+        "defacto": _cmp.search_defacto,
+        "lcwaikiki": _cmp.search_lcwaikiki,
+        "mavi": _cmp.search_mavi,
+    }
+    real_results = []
+    fn = fn_map.get(store)
+    if fn:
+        try:
+            real_results = await asyncio.to_thread(fn, q)
+        except Exception as exc:
+            real_results = [{"error": str(exc)}]
+
+    return {
+        "proxy_enabled": proxy_enabled(),
+        "url": url,
+        "raw_html_check": results,
+        "real_function_result_count": len(real_results),
+        "real_function_sample": real_results[:3],
+    }
