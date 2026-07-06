@@ -16,7 +16,7 @@ from uuid import uuid4
 
 import requests
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, BackgroundTasks
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -4754,6 +4754,132 @@ async def store_campaigns(slug: str):
     )
     rows = r.json() if r.ok else []
     return {"slug": slug, "campaigns": rows}
+
+
+@app.get("/magaza/{slug}", response_class=HTMLResponse)
+async def store_page(slug: str):
+    """
+    Her magaza icin sunucu tarafinda render edilen, aramaya acik (SEO)
+    statik icerikli sayfa. Google'in indexleyebilecegi tek gercek
+    kaynak burasi -- ana uygulama tamamen client-side render oldugu icin
+    arama motorlari urun/magaza icerigini goremiyordu.
+    """
+    import html as _html
+
+    store = next((s for s in DEFAULT_STORE_NEWSLETTERS if s["slug"] == slug), None)
+    if not store:
+        return HTMLResponse(
+            "<h1>Mağaza bulunamadı</h1><p><a href=\"/\">Ana sayfaya dön</a></p>",
+            status_code=404,
+        )
+
+    name = _html.escape(store["name"])
+    description = _html.escape(store.get("description") or f"{name} kampanya ve fiyat karşılaştırması.")
+    category = _html.escape(store.get("category") or "")
+
+    campaigns = []
+    if supabase_enabled():
+        try:
+            from datetime import date
+            today = date.today().isoformat()
+            r = requests.get(
+                f"{supabase_base_url()}/rest/v1/store_campaigns",
+                headers=supabase_headers(),
+                params={
+                    "store_slug": f"eq.{slug}",
+                    "select": "*",
+                    "or": f"(valid_until.is.null,valid_until.gte.{today})",
+                    "order": "created_at.desc",
+                    "limit": "20",
+                },
+                timeout=10,
+            )
+            campaigns = r.json() if r.ok else []
+        except Exception:
+            campaigns = []
+
+    if campaigns:
+        items = []
+        for c in campaigns:
+            title = _html.escape(c.get("title") or "Kampanya")
+            desc = _html.escape(c.get("description") or "")
+            catalog_url = _html.escape(c.get("catalog_url") or "")
+            link_html = f'<a href="{catalog_url}" rel="nofollow noopener" target="_blank">Kataloğu Gör</a>' if catalog_url else ""
+            items.append(
+                f'<div class="bp-feature"><h3>{title}</h3><p>{desc}</p>{link_html}</div>'
+            )
+        campaigns_html = "".join(items)
+    else:
+        campaigns_html = '<p class="bp-body">Şu anda listelenen aktif bir kampanya yok. Ana sayfadan arama yaparak güncel fiyatları karşılaştırabilirsin.</p>'
+
+    page = f"""<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#121412">
+    <title>{name} Kampanyaları ve Fiyat Karşılaştırma — Almadan</title>
+    <meta name="description" content="{description}">
+    <link rel="canonical" href="https://www.almadan.app/magaza/{slug}">
+    <meta name="robots" content="index, follow">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Almadan">
+    <meta property="og:title" content="{name} Kampanyaları — Almadan">
+    <meta property="og:description" content="{description}">
+    <meta property="og:url" content="https://www.almadan.app/magaza/{slug}">
+    <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
+    <meta property="og:locale" content="tr_TR">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+    <script type="application/ld+json">
+    {{
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "url": "https://www.almadan.app/magaza/{slug}",
+      "name": "{name} Kampanyaları — Almadan",
+      "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app" }},
+      "about": {{ "@type": "Organization", "name": "{name}" }}
+    }}
+    </script>
+    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
+  </head>
+  <body>
+    <header class="bp-header">
+      <a href="/" class="bp-logo"><span class="bp-logo-mark">A</span>almadan</a>
+      <nav class="bp-nav">
+        <a href="/hakkinda">Hakkında</a>
+        <a href="/gizlilik">Gizlilik</a>
+        <a href="/iletisim">İletişim</a>
+      </nav>
+    </header>
+
+    <section class="bp-hero">
+      <div class="bp-hero-inner">
+        <p class="bp-eyebrow">{category.upper()}</p>
+        <h1>{name} Kampanyaları ve Fiyat Karşılaştırma</h1>
+        <p class="bp-hero-copy">{description}</p>
+        <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> {name} Fiyatlarını Karşılaştır</a>
+      </div>
+    </section>
+
+    <main class="bp-main">
+      <h2><i data-lucide="megaphone"></i> Güncel Kampanyalar</h2>
+      <div class="bp-feature-grid">
+        {campaigns_html}
+      </div>
+      <a class="bp-cta bp-cta-block" href="/"><i data-lucide="arrow-right"></i> Tüm Mağazalarda Karşılaştır</a>
+    </main>
+
+    <footer class="bp-footer">
+      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
+      <p>© 2026 Almadan</p>
+    </footer>
+    <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
+  </body>
+</html>"""
+    return HTMLResponse(page)
 
 
 @app.get("/api/campaigns/latest")
