@@ -465,9 +465,11 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
     loop = asyncio.get_running_loop()
     from app.comparator import (
         search_n11_direct, search_amazon_tr,
+        search_trendyol_direct, search_hepsiburada_direct,
         search_mediamarkt, search_teknosa, search_ebebek,
         search_yargici, search_vivense, search_evidea,
         search_kinetix, search_flo, search_kitapyurdu, search_dr,
+        search_lcwaikiki, search_mavi,
     )
 
     category = forced_category or classify_intent(query)
@@ -476,6 +478,8 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
     base_tasks = [
         loop.run_in_executor(None, search_n11_direct, query),
         loop.run_in_executor(None, search_amazon_tr, query),
+        loop.run_in_executor(None, search_trendyol_direct, query),
+        loop.run_in_executor(None, search_hepsiburada_direct, query),
     ]
 
     # Kategoriye göre uzman mağazalar
@@ -492,6 +496,8 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         extra_tasks.append(loop.run_in_executor(None, search_yargici, query))
         extra_tasks.append(loop.run_in_executor(None, search_kinetix, query))
         extra_tasks.append(loop.run_in_executor(None, search_flo, query))
+        extra_tasks.append(loop.run_in_executor(None, search_lcwaikiki, query))
+        extra_tasks.append(loop.run_in_executor(None, search_mavi, query))
     elif category in ("GENEL", "KİTAP"):
         extra_tasks.append(loop.run_in_executor(None, search_kitapyurdu, query))
         extra_tasks.append(loop.run_in_executor(None, search_dr, query))
