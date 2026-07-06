@@ -109,6 +109,8 @@ class GDPRService:
         ("group_buy_members",   "user_id"),
         ("vision_analyses",     "user_id"),
         ("user_analytics_events", "user_id"),
+        ("followed_stores",     "user_id"),
+        ("user_notifications",  "user_id"),
     ]
 
     # user_id = NULL yapılacak tablolar (istatistik korunur)
@@ -178,6 +180,31 @@ class GDPRService:
         except Exception as exc:
             result.errors.append(f"user_points: {exc}")
 
+        # 3b. Ana JSON blob (app_state) içindeki kişisel veriler:
+        # takip edilen ürünler (fiyat geçmişi dahil) ve push abonelikleri.
+        # Bunlar Supabase tablosu değil, storage.py'nin tek satırlık blob'unda saklanır.
+        try:
+            from app.storage import load_db, save_db
+            owner_key = f"user:{user_id}"
+            db = load_db()
+            before_products = len(db.get("products", []))
+            db["products"] = [p for p in db.get("products", []) if p.get("owner_id") != owner_key]
+            removed_products = before_products - len(db["products"])
+
+            before_push = len(db.get("push_subscriptions", []))
+            db["push_subscriptions"] = [
+                s for s in db.get("push_subscriptions", []) if s.get("owner_id") != owner_key
+            ]
+            removed_push = before_push - len(db["push_subscriptions"])
+
+            save_db(db)
+            if removed_products:
+                result.deleted_tables.append(f"products (blob, {removed_products} kayıt)")
+            if removed_push:
+                result.deleted_tables.append(f"push_subscriptions (blob, {removed_push} kayıt)")
+        except Exception as exc:
+            result.errors.append(f"app_state blob: {exc}")
+
         # 4. Supabase Auth kullanıcı silme (admin API)
         try:
             r = _req.delete(
@@ -219,6 +246,8 @@ class GDPRService:
             "group_buy_members",
             "vision_analyses",
             "ab_assignments",
+            "followed_stores",
+            "user_notifications",
         ]
 
         for table in tables_to_export:
@@ -232,6 +261,19 @@ class GDPRService:
                 data[table] = r.json() if r.ok else []
             except Exception:
                 data[table] = []
+
+        # Ana JSON blob (app_state): takip edilen ürünler ve push abonelikleri
+        try:
+            from app.storage import load_db
+            owner_key = f"user:{user_id}"
+            db = load_db()
+            data["products"] = [p for p in db.get("products", []) if p.get("owner_id") == owner_key]
+            data["push_subscriptions"] = [
+                s for s in db.get("push_subscriptions", []) if s.get("owner_id") == owner_key
+            ]
+        except Exception:
+            data["products"] = []
+            data["push_subscriptions"] = []
 
         self._log_request(user_id, "export", None)
         return SARResult(user_id=user_id, data=data)
