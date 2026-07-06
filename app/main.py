@@ -4995,6 +4995,7 @@ _SEO_GENDERS = ["kadın", "erkek"]
 _SEO_COLORS = [
     "kırmızı", "mavi", "siyah", "beyaz", "yeşil", "sarı", "mor",
     "pembe", "gri", "lacivert", "bej", "kahverengi", "turuncu", "bordo",
+    "turkuaz", "haki", "krem", "gümüş", "altın",
 ]
 # Marka isimleri (fashion/home_keywords icinde de gecen) -- renk/cinsiyet
 # on ekiyle anlamsiz kombinasyon olusturmasinlar diye eleniyor (orn.
@@ -5125,6 +5126,28 @@ def get_seo_price_terms() -> list[str]:
     ]
     for b in fashion_brands:
         for g in fashion_generics:
+            _add(f"{b} {g}")
+
+    home_brands = [
+        "ikea", "karaca", "tefal", "arzum", "korkmaz", "englishhome",
+        "madamecoco", "philips", "bosch", "siemens", "vestel", "arçelik",
+        "beko", "schafer", "koctas",
+    ]
+    home_generics = [
+        "tencere", "tava", "halı", "koltuk", "nevresim", "yastık",
+        "perde", "avize", "süpürge", "blender", "kettle", "toaster",
+    ]
+    for b in home_brands:
+        for g in home_generics:
+            _add(f"{b} {g}")
+
+    cosmetics_brands = [
+        "flormar", "golden rose", "gratis", "rossmann", "watsons",
+        "sephora", "mac", "kiko milano", "yves rocher",
+    ]
+    cosmetics_generics = ["ruj", "oje", "far", "fondöten", "maskara", "parfüm"]
+    for b in cosmetics_brands:
+        for g in cosmetics_generics:
             _add(f"{b} {g}")
 
     return clean
