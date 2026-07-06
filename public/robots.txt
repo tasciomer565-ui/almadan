@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /products
+Disallow: /login
+Disallow: /cron/
+
+Sitemap: https://www.almadan.app/sitemap.xml

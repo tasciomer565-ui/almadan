@@ -4,10 +4,48 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#121412">
-    <title>Hakkında — Almadan</title>
+
+    <title>Hakkında — Almadan | Fiyat Karşılaştırma Asistanı</title>
+    <meta name="description" content="Almadan, Trendyol, Hepsiburada, Amazon, N11 ve 100'den fazla mağazada ürün fiyatlarını karşılaştıran ücretsiz alışveriş asistanıdır. Link yapıştır, en ucuzu bul.">
+    <link rel="canonical" href="https://www.almadan.app/hakkinda">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Almadan">
+    <meta property="og:title" content="Hakkında — Almadan | Fiyat Karşılaştırma Asistanı">
+    <meta property="og:description" content="Türkiye'nin en kapsamlı ürün fiyat karşılaştırma asistanı. 100+ mağazada tek tıkla en ucuzu bul.">
+    <meta property="og:url" content="https://www.almadan.app/hakkinda">
+    <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
+    <meta property="og:locale" content="tr_TR">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Hakkında — Almadan">
+    <meta name="twitter:description" content="100+ mağazada ürün fiyatlarını tek tıkla karşılaştır.">
+    <meta name="twitter:image" content="https://www.almadan.app/static/icon-512.png">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "AboutPage",
+      "url": "https://www.almadan.app/hakkinda",
+      "name": "Hakkında — Almadan",
+      "isPartOf": {
+        "@type": "WebSite",
+        "name": "Almadan",
+        "url": "https://www.almadan.app"
+      },
+      "mainEntity": {
+        "@type": "Organization",
+        "name": "Almadan",
+        "url": "https://www.almadan.app",
+        "description": "Türkiye'deki online mağazalarda ürün fiyatlarını karşılaştıran alışveriş karar asistanı.",
+        "logo": "https://www.almadan.app/static/icon-512.png",
+        "sameAs": []
+      }
+    }
+    </script>
     <style>
       :root { --ink:#1c221c; --ink-2:#687068; --bg:#fbfcfa; --card:#fff; --border:#dfe3dc; --green:#287a50; }
       * { box-sizing:border-box; margin:0; }
@@ -22,8 +60,14 @@
       p { margin-bottom:14px; }
       ul { padding-left:22px; margin-bottom:14px; }
       li { margin-bottom:6px; }
+      .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:28px 0; }
+      .stat { background:var(--card); border:1.5px solid var(--border); border-radius:12px; padding:16px; text-align:center; }
+      .stat b { display:block; font-family:Manrope,sans-serif; font-size:22px; color:var(--green); }
+      .stat span { font-size:12px; color:var(--ink-2); }
+      .cta { display:inline-block; margin-top:8px; padding:12px 22px; background:var(--green); color:#fff; text-decoration:none; border-radius:10px; font-weight:700; }
       footer { border-top:1px solid var(--border); padding:24px; text-align:center; color:var(--ink-2); font-size:13px; }
       footer a { color:var(--green); text-decoration:none; margin:0 10px; }
+      @media (max-width:480px) { .stats { grid-template-columns:1fr; } }
     </style>
   </head>
   <body>
@@ -32,22 +76,30 @@
       <h1>Hakkında</h1>
       <p class="sub">Satın almadan önce karşılaştır.</p>
 
-      <p><strong>Almadan</strong>, Türkiye'deki online mağazalarda ürün fiyatlarını tek tıkla karşılaştırmanı sağlayan bir alışveriş karar asistanıdır. Bir ürün linkini yapıştır ya da barkodunu tara — aynı ürünü satan diğer mağazaları ve fiyatlarını saniyeler içinde önüne getirir.</p>
+      <p><strong>Almadan</strong>, Türkiye'deki online mağazalarda ürün fiyatlarını tek tıkla karşılaştırmanı sağlayan ücretsiz bir alışveriş karar asistanıdır. Bir ürün linkini yapıştır ya da barkodunu tara — aynı ürünü satan diğer mağazaları ve fiyatlarını saniyeler içinde önüne getirir.</p>
+
+      <div class="stats">
+        <div class="stat"><b>100+</b><span>desteklenen mağaza</span></div>
+        <div class="stat"><b>7</b><span>kategori: teknoloji, moda, ev, kozmetik, bebek, gıda, kitap</span></div>
+        <div class="stat"><b>0₺</b><span>ücretsiz kullanım</span></div>
+      </div>
 
       <h2>Neler yapabilirsin?</h2>
       <ul>
         <li><strong>Link ile karşılaştırma:</strong> Trendyol, Hepsiburada, Amazon, N11 ve 100'den fazla mağazadan aldığın ürün linkini yapıştır, aynı ürünün diğer mağazalardaki fiyatlarını gör.</li>
-        <li><strong>Fiyat takibi:</strong> Ürünü takibe al, hedef fiyatına düştüğünde haber al.</li>
-        <li><strong>Barkod tarama:</strong> Mağazadayken ürünün barkodunu okut, online fiyatlarla karşılaştır.</li>
+        <li><strong>Fiyat takibi:</strong> Ürünü takibe al, hedef fiyatına düştüğünde e-posta veya push bildirimiyle haberdar ol.</li>
+        <li><strong>Barkod tarama:</strong> Mağazadayken ürünün barkodunu okut, online fiyatlarla anında karşılaştır.</li>
         <li><strong>Sahte indirim tespiti:</strong> "İndirimli" görünen fiyat piyasa ortalamasının üzerindeyse seni uyarır.</li>
         <li><strong>Tasarruf takibi:</strong> Karşılaştırmalar sayesinde ne kadar tasarruf ettiğini gör.</li>
       </ul>
 
       <h2>Nasıl çalışır?</h2>
-      <p>Almadan, herkese açık mağaza sayfalarındaki güncel fiyat bilgilerini toplar ve aynı ürünü model bazında eşleştirir. Yanlış model veya alakasız aksesuarların (kılıf, koruyucu vb.) sonuçlara karışmaması için akıllı filtreleme uygular.</p>
+      <p>Almadan, herkese açık mağaza sayfalarındaki güncel fiyat bilgilerini toplar ve aynı ürünü model bazında eşleştirir — kılıf, koruyucu gibi alakasız aksesuarların ya da yanlış modellerin (ör. S24 yerine A54) sonuçlara karışmaması için akıllı filtreleme uygular. Bir mağazada bulamadığımızda seni elin boş bırakmayız: sorguyu daraltıp tekrar arar, olmazsa büyük mağazaların hazır arama linklerini sunarız.</p>
 
       <h2>Bağımsızlık</h2>
       <p>Almadan hiçbir mağazaya ait değildir. Sıralamalar yalnızca ürün eşleşme kalitesine ve fiyata göre yapılır. Bazı mağaza bağlantıları ortaklık (affiliate) bağlantısı olabilir; bu, senin ödediğin fiyatı değiştirmez.</p>
+
+      <a class="cta" href="/">Şimdi Dene →</a>
     </main>
     <footer>
       <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
