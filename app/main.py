@@ -4131,6 +4131,7 @@ def _read_last_test() -> dict:
 def _debug_hb(q: str = "laptop"):
     """GECICI tanilama - Hepsiburada HTML yapisini incelemek icin. Is bitince kaldirilacak."""
     import urllib.parse as _up
+    import json as _json
     from app.scraping_proxy import proxy_get, proxy_enabled
     url = f"https://www.hepsiburada.com/ara?q={_up.quote_plus(q)}"
     html = proxy_get(url, render_js=False, timeout=12) if proxy_enabled() else None
@@ -4147,13 +4148,38 @@ def _debug_hb(q: str = "laptop"):
     vf_idx = html.find("VERTICALFILTER")
     snippet = html[max(0, vf_idx-100):vf_idx+1500] if vf_idx >= 0 else html[:800]
     vf_count = html.count("VERTICALFILTER")
-    from app.comparator import search_hepsiburada_direct
+    from app.comparator import search_hepsiburada_direct, _extract_balanced_json
     try:
         parsed = search_hepsiburada_direct(q)
         parse_result = {"count": len(parsed), "sample": parsed[:2]}
     except Exception as e:
         parse_result = {"error": str(e)}
-    return {"ok": True, "len": len(html), "markers": markers, "vf_count": vf_count, "snippet": snippet, "parse_result": parse_result}
+
+    trace = []
+    search_pos = 0
+    for _ in range(6):
+        idx = html.find("VERTICALFILTER", search_pos)
+        if idx == -1:
+            trace.append({"idx": -1})
+            break
+        search_pos = idx + 1
+        state_idx = html.find("'STATE':", idx)
+        entry = {"idx": idx, "state_idx": state_idx, "gap": (state_idx - idx) if state_idx >= 0 else None}
+        if state_idx >= 0:
+            json_start = html.find("{", state_idx)
+            js = _extract_balanced_json(html, json_start)
+            entry["json_len"] = len(js) if js else None
+            if js:
+                try:
+                    d = _json.loads(js)
+                    entry["keys"] = list(d.keys())
+                    entry["products_len"] = len((d.get("data") or {}).get("products") or [])
+                except Exception as e2:
+                    entry["json_error"] = str(e2)
+                    entry["json_head"] = js[:200]
+        trace.append(entry)
+
+    return {"ok": True, "len": len(html), "markers": markers, "vf_count": vf_count, "snippet": snippet, "parse_result": parse_result, "trace": trace}
 
 
 @app.get("/api/status")
