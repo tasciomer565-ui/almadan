@@ -4338,7 +4338,20 @@ def search_products_by_name(
         from app.search_orchestrator import master_search
         all_products = run_async(master_search(query, selected_category=category, lat=lat, lon=lon, mode=mode))
     corrected_query = query
-    
+
+    # Cache'ten (Supabase) gelen kayitlar eski sema olabilir -- eksik alanlari
+    # tamamla, aksi halde asagidaki post-processing KeyError ile 500 doner.
+    for p in all_products:
+        if not isinstance(p.get("extra_info"), dict):
+            p["extra_info"] = {}
+        if not isinstance(p.get("labels"), list):
+            p["labels"] = []
+        p.setdefault("original_price", None)
+        if not isinstance(p.get("price"), (int, float)):
+            p["price"] = 0
+        p.setdefault("title", "")
+        p.setdefault("url", "")
+
     # 5. Filter out accessory/irrelevant products (like cloth, case, cables)
     filtered_products = [p for p in all_products if is_logical_product(corrected_query, p["title"])]
     
