@@ -470,6 +470,7 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         search_yargici, search_vivense, search_evidea,
         search_kinetix, search_flo, search_kitapyurdu, search_dr,
         search_lcwaikiki, search_mavi,
+        search_gratis, search_rossmann, search_boyner,
     )
 
     category = forced_category or classify_intent(query)
@@ -498,6 +499,10 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         extra_tasks.append(loop.run_in_executor(None, search_flo, query))
         extra_tasks.append(loop.run_in_executor(None, search_lcwaikiki, query))
         extra_tasks.append(loop.run_in_executor(None, search_mavi, query))
+        extra_tasks.append(loop.run_in_executor(None, search_boyner, query))
+    elif category == "KOZMETİK":
+        extra_tasks.append(loop.run_in_executor(None, search_gratis, query))
+        extra_tasks.append(loop.run_in_executor(None, search_rossmann, query))
     elif category in ("GENEL", "KİTAP"):
         extra_tasks.append(loop.run_in_executor(None, search_kitapyurdu, query))
         extra_tasks.append(loop.run_in_executor(None, search_dr, query))
