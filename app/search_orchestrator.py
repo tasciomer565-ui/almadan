@@ -466,11 +466,41 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
     from app.comparator import (
         search_n11_direct, search_amazon_tr,
         search_trendyol_direct, search_hepsiburada_direct,
-        search_mediamarkt, search_teknosa, search_ebebek,
-        search_yargici, search_vivense, search_evidea,
-        search_kinetix, search_flo, search_kitapyurdu, search_dr,
-        search_lcwaikiki, search_mavi,
-        search_gratis, search_rossmann, search_boyner,
+        # Teknoloji
+        search_mediamarkt, search_teknosa, search_vatanbilgisayar, search_itopya,
+        search_casper, search_huawei, search_xiaomi, search_lenovo, search_asusrog,
+        search_lg, search_sony, search_hp, search_canon, search_epson,
+        search_turkcell, search_dsmart,
+        # Bebek/oyuncak
+        search_ebebek, search_toyzz, search_bebek, search_lego, search_frigg,
+        # Ev/mobilya
+        search_vivense, search_evidea, search_karaca, search_englishhome,
+        search_madamecoco, search_koctas, search_bauhaus, search_istikbal,
+        search_bellona, search_dogtas, search_kelebek, search_schafer,
+        search_korkmaz, search_bosch, search_tefal, search_arzum, search_fakir,
+        search_philips,
+        # Moda/spor
+        search_yargici, search_kinetix, search_flo, search_lcwaikiki, search_mavi,
+        search_boyner, search_zara, search_hm, search_bershka, search_colins,
+        search_ltb, search_vakko, search_beymen, search_sarar, search_twist,
+        search_penti, search_pierrecardin, search_altinyildiz, search_derimod,
+        search_damattween, search_shein, search_modanisa, search_bigjoy,
+        search_decathlon, search_nike, search_adidas, search_puma, search_reebok,
+        search_newbalance, search_sportive, search_lescon, search_pandora,
+        # Kozmetik
+        search_gratis, search_rossmann, search_watsons, search_sephora,
+        search_flormar, search_goldenrose, search_farmasi,
+        # Gıda/market
+        search_bim, search_a101, search_sokmarket, search_tarimkredi,
+        search_metro, search_bizimtoptan, search_tazedirekt,
+        # Kitap/genel
+        search_kitapyurdu, search_dr, search_remzi, search_idefix,
+        search_muzikdunyasi, search_ufukkirtasiye, search_ofissepeti,
+        # Pazaryeri (uluslararası)
+        search_pazarama, search_aliexpress, search_temu,
+        # Ek: evcil hayvan, takviye
+        search_evpet, search_petbis, search_petlebi, search_zopet,
+        search_proteinocean, search_supplementler, search_runnutrition,
     )
 
     category = forced_category or classify_intent(query)
@@ -481,31 +511,54 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         loop.run_in_executor(None, search_amazon_tr, query),
         loop.run_in_executor(None, search_trendyol_direct, query),
         loop.run_in_executor(None, search_hepsiburada_direct, query),
+        loop.run_in_executor(None, search_pazarama, query),
+        loop.run_in_executor(None, search_aliexpress, query),
+        loop.run_in_executor(None, search_temu, query),
     ]
 
     # Kategoriye göre uzman mağazalar
     extra_tasks = []
     if category == "TEKNOLOJİ":
-        extra_tasks.append(loop.run_in_executor(None, search_mediamarkt, query))
-        extra_tasks.append(loop.run_in_executor(None, search_teknosa, query))
+        for fn in (search_mediamarkt, search_teknosa, search_vatanbilgisayar,
+                   search_itopya, search_casper, search_huawei, search_xiaomi,
+                   search_lenovo, search_asusrog, search_lg, search_sony,
+                   search_hp, search_canon, search_epson, search_turkcell,
+                   search_dsmart):
+            extra_tasks.append(loop.run_in_executor(None, fn, query))
     elif category == "BEBEK":
-        extra_tasks.append(loop.run_in_executor(None, search_ebebek, query))
+        for fn in (search_ebebek, search_toyzz, search_bebek, search_lego, search_frigg):
+            extra_tasks.append(loop.run_in_executor(None, fn, query))
     elif category in ("EV", "MOBİLYA"):
-        extra_tasks.append(loop.run_in_executor(None, search_vivense, query))
-        extra_tasks.append(loop.run_in_executor(None, search_evidea, query))
+        for fn in (search_vivense, search_evidea, search_karaca, search_englishhome,
+                   search_madamecoco, search_koctas, search_bauhaus, search_istikbal,
+                   search_bellona, search_dogtas, search_kelebek, search_schafer,
+                   search_korkmaz, search_bosch, search_tefal, search_arzum,
+                   search_fakir, search_philips):
+            extra_tasks.append(loop.run_in_executor(None, fn, query))
     elif category in ("MODA", "SPOR"):
-        extra_tasks.append(loop.run_in_executor(None, search_yargici, query))
-        extra_tasks.append(loop.run_in_executor(None, search_kinetix, query))
-        extra_tasks.append(loop.run_in_executor(None, search_flo, query))
-        extra_tasks.append(loop.run_in_executor(None, search_lcwaikiki, query))
-        extra_tasks.append(loop.run_in_executor(None, search_mavi, query))
-        extra_tasks.append(loop.run_in_executor(None, search_boyner, query))
+        for fn in (search_yargici, search_kinetix, search_flo, search_lcwaikiki,
+                   search_mavi, search_boyner, search_zara, search_hm, search_bershka,
+                   search_colins, search_ltb, search_vakko, search_beymen, search_sarar,
+                   search_twist, search_penti, search_pierrecardin, search_altinyildiz,
+                   search_derimod, search_damattween, search_shein, search_modanisa,
+                   search_bigjoy, search_decathlon, search_nike, search_adidas,
+                   search_puma, search_reebok, search_newbalance, search_sportive,
+                   search_lescon, search_pandora):
+            extra_tasks.append(loop.run_in_executor(None, fn, query))
     elif category == "KOZMETİK":
-        extra_tasks.append(loop.run_in_executor(None, search_gratis, query))
-        extra_tasks.append(loop.run_in_executor(None, search_rossmann, query))
+        for fn in (search_gratis, search_rossmann, search_watsons, search_sephora,
+                   search_flormar, search_goldenrose, search_farmasi):
+            extra_tasks.append(loop.run_in_executor(None, fn, query))
+    elif category == "GIDA":
+        for fn in (search_bim, search_a101, search_sokmarket, search_tarimkredi,
+                   search_metro, search_bizimtoptan, search_tazedirekt):
+            extra_tasks.append(loop.run_in_executor(None, fn, query))
     elif category in ("GENEL", "KİTAP"):
-        extra_tasks.append(loop.run_in_executor(None, search_kitapyurdu, query))
-        extra_tasks.append(loop.run_in_executor(None, search_dr, query))
+        for fn in (search_kitapyurdu, search_dr, search_remzi, search_idefix,
+                   search_muzikdunyasi, search_ufukkirtasiye, search_ofissepeti,
+                   search_evpet, search_petbis, search_petlebi, search_zopet,
+                   search_proteinocean, search_supplementler, search_runnutrition):
+            extra_tasks.append(loop.run_in_executor(None, fn, query))
     else:
         # GENEL/bilinmeyen → MediaMarkt + Teknosa da dene
         extra_tasks.append(loop.run_in_executor(None, search_mediamarkt, query))
