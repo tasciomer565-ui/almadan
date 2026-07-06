@@ -4127,6 +4127,28 @@ def _read_last_test() -> dict:
         pass
     return {}
 
+@app.get("/api/_debug_hb", include_in_schema=False)
+def _debug_hb(q: str = "laptop"):
+    """GECICI tanilama - Hepsiburada HTML yapisini incelemek icin. Is bitince kaldirilacak."""
+    import urllib.parse as _up
+    from app.scraping_proxy import proxy_get, proxy_enabled
+    url = f"https://www.hepsiburada.com/ara?q={_up.quote_plus(q)}"
+    html = proxy_get(url, render_js=False, timeout=12) if proxy_enabled() else None
+    if not html:
+        return {"ok": False, "proxy_enabled": proxy_enabled(), "len": 0}
+    import re as _re
+    markers = {
+        "window.MORIA": "window.MORIA" in html,
+        "Object.assign(window.MORIA": "Object.assign(window.MORIA" in html,
+        "__NEXT_DATA__": "__NEXT_DATA__" in html,
+        "application/ld+json": "application/ld+json" in html,
+        "productCard": "productCard" in html or "product-card" in html,
+    }
+    moria_idx = html.find("MORIA")
+    snippet = html[max(0, moria_idx-100):moria_idx+800] if moria_idx >= 0 else html[:800]
+    return {"ok": True, "len": len(html), "markers": markers, "snippet": snippet}
+
+
 @app.get("/api/status")
 async def api_status():
     """
