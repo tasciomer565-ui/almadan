@@ -1340,7 +1340,9 @@ def search_sokmarket(query: str) -> list[dict]:
         try:
             from app.scraping_proxy import proxy_get, proxy_enabled
             if proxy_enabled():
-                html = proxy_get(url, render_js=False, timeout=12)
+                # Vercel'in ust taramada uyguladigi 7s'lik sinirdan once bitmesi
+                # sart -- yoksa istek gonderilmeden container donduruluyor.
+                html = proxy_get(url, render_js=False, timeout=5)
         except Exception:
             html = None
         if not html:

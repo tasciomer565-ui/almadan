@@ -555,7 +555,12 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
                    search_flormar, search_goldenrose, search_farmasi):
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category == "GIDA":
-        for fn in (search_bim, search_a101, search_sokmarket, search_tarimkredi,
+        # search_a101 canli taramadan cikarildi: render_js=True ScrapingBee
+        # istegi 10-20s surebiliyor, Vercel Hobby'nin kesin 10s fonksiyon
+        # limitiyle yapisal olarak uyusmuyor -- istek container donana kadar
+        # tamamlanamiyor ve hic ScrapingBee'ye ulasmiyor. Cron/toplu tarama
+        # icin fonksiyon comparator.py'de duruyor.
+        for fn in (search_bim, search_sokmarket, search_tarimkredi,
                    search_metro, search_bizimtoptan, search_tazedirekt,
                    search_migros_proxy, search_carrefoursa):
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
