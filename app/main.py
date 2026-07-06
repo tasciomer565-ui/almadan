@@ -4986,56 +4986,147 @@ async def category_page(category: str):
     return HTMLResponse(page)
 
 
-def get_seo_price_terms() -> list[str]:
-    """
-    search_orchestrator'daki kategori anahtar kelime setlerinden temiz,
-    benzersiz (Turkce/ASCII duplikasi elenmis), aksesuar-disi urun
-    terimleri cikarir. Bu liste hem /fiyat/{terim} rotasinin izin
-    verdigi (whitelist) sorgulari hem de sitemap'i besler.
-    """
-    # classify_intent'in kendi mantigini degistirmeden, kaynak kodundaki
-    # literal anahtar kelime setlerini okuyup cikariyoruz (guvenli, salt-okunur).
+_SEO_BLOCK_SUBSTR = [
+    "koruyucu", "kılıf", "kilif", "kablo", "vida", "aparat", "yedek",
+    "kutusu", "aksesuar", "temizleme mendili", "standı", "askı",
+]
+_SEO_TR_TO_ASCII = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
+_SEO_GENDERS = ["kadın", "erkek"]
+_SEO_COLORS = [
+    "kırmızı", "mavi", "siyah", "beyaz", "yeşil", "sarı", "mor",
+    "pembe", "gri", "lacivert", "bej", "kahverengi", "turuncu", "bordo",
+]
+# Marka isimleri (fashion/home_keywords icinde de gecen) -- renk/cinsiyet
+# on ekiyle anlamsiz kombinasyon olusturmasinlar diye eleniyor (orn.
+# "kırmızı ikea", "kadın arçelik" gibi).
+_SEO_BRAND_TOKENS = {
+    "ikea", "karaca", "korkmaz", "schafer", "porland", "hisar", "englishhome",
+    "madamecoco", "linens", "bellamaison", "karacahome", "koctas", "koçtaş",
+    "bauhaus", "tekzen", "zara", "bershka", "pullandbear", "stradivarius",
+    "massimodutti", "hm", "h&m", "mango", "boyner", "vakko", "beymen", "sarar",
+    "suvari", "süvari", "hatemoglu", "hatemoğlu", "tudors", "ipekyol", "twist",
+    "machka", "penti", "decathlon", "nike", "adidas", "puma", "reebok",
+    "columbia", "skechers", "colins", "ltb", "altinyildiz", "altınyıldız",
+    "kigili", "kiğılı", "ozdilek", "özdilek", "trendyolmilla", "pasabahce",
+    "paşabahçe", "bernardo", "jumbo", "hisar", "arçelik", "arcelik", "vestel",
+    "bosch", "siemens", "philips", "arzum", "tefal", "beko",
+}
+
+
+def _seo_clean_term(t: str) -> str | None:
+    tl = t.lower().strip()
+    if len(tl) < 3 or len(tl) > 30:
+        return None
+    if any(b in tl for b in _SEO_BLOCK_SUBSTR):
+        return None
+    if any(ch.isdigit() for ch in tl):
+        return None
+    return tl
+
+
+def _seo_extract_keyword_sets() -> dict[str, set[str]]:
+    """classify_intent'in kendi mantigini degistirmeden, kaynak kodundaki
+    literal anahtar kelime setlerini okuyup cikarir (guvenli, salt-okunur)."""
     import inspect
     import re as _re
     from app import search_orchestrator as _so
     src = inspect.getsource(_so.classify_intent)
-    all_terms: set[str] = set()
+    result: dict[str, set[str]] = {}
     for kw_name in (
         "grocery_keywords", "tech_keywords", "cosmetics_keywords",
         "fashion_keywords", "home_keywords",
     ):
         m = _re.search(kw_name + r"\s*=\s*\{(.*?)\n    \}", src, _re.DOTALL)
-        if m:
-            all_terms.update(_re.findall(r'"([^"]+)"', m.group(1)))
+        result[kw_name] = set(_re.findall(r'"([^"]+)"', m.group(1))) if m else set()
+    return result
 
-    # Marka listesinden de gercek, ayirt edici ek terimler ekle
+
+def get_seo_price_terms() -> list[str]:
+    """
+    search_orchestrator'daki kategori anahtar kelime setlerinden + marka
+    listesinden temiz, benzersiz temel urun terimleri, ayrica gercek
+    e-ticaret sitelerinde de yaygin olan cinsiyet x moda ve renk x
+    moda/ev KOMBINASYONLARINI dondurur. Bu liste hem /fiyat/{terim}
+    rotasinin izin verdigi (whitelist) sorgulari hem de sitemap'i besler.
+
+    Kombinasyonlarin bir kismi gercek envanterde karsiligi olmayabilir --
+    bu durumda price_landing_page route'u GERCEK 404 dondurur (sahte
+    "sonuc yok" sayfasi degil), boylece Google hicbir bos sayfayi
+    indexlemez ve "thin content" cezasi riski olusmaz.
+    """
+    kw_sets = _seo_extract_keyword_sets()
+    all_terms: set[str] = set()
+    for s in kw_sets.values():
+        all_terms.update(s)
+
     from app import comparator as _cmp
+    import inspect
+    import re as _re
     brand_src = inspect.getsource(_cmp.detect_brand_in_query)
     bm = _re.search(r"brands\s*=\s*\[(.*?)\n    \]", brand_src, _re.DOTALL)
     if bm:
         all_terms.update(_re.findall(r'"([^"]+)"', bm.group(1)))
 
-    block_substr = [
-        "koruyucu", "kılıf", "kilif", "kablo", "vida", "aparat", "yedek",
-        "kutusu", "aksesuar", "temizleme mendili", "standı", "askı",
-    ]
-    tr_to_ascii = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
-
     seen_ascii: set[str] = set()
     clean: list[str] = []
-    for t in sorted(all_terms, key=lambda x: (-len(x), x)):
-        tl = t.lower().strip()
-        if len(tl) < 3 or len(tl) > 30:
-            continue
-        if any(b in tl for b in block_substr):
-            continue
-        if any(ch.isdigit() for ch in tl):
-            continue
-        key = tl.translate(tr_to_ascii)
+
+    def _add(term: str) -> None:
+        cleaned = _seo_clean_term(term)
+        if cleaned is None:
+            return
+        key = cleaned.translate(_SEO_TR_TO_ASCII)
         if key in seen_ascii:
-            continue
+            return
         seen_ascii.add(key)
-        clean.append(tl)
+        clean.append(cleaned)
+
+    for t in sorted(all_terms, key=lambda x: (-len(x), x)):
+        _add(t)
+
+    # Cinsiyet x moda kombinasyonlari (orn. "kadın elbise", "erkek gömlek")
+    # -- marka isimleri haric (orn. "kadın zara" anlamsiz).
+    for t in sorted(kw_sets.get("fashion_keywords", set())):
+        if _seo_clean_term(t) is None or t.lower() in _SEO_BRAND_TOKENS:
+            continue
+        for g in _SEO_GENDERS:
+            _add(f"{g} {t}")
+
+    # Renk x moda/ev kombinasyonlari (orn. "kırmızı elbise", "mavi halı")
+    for t in sorted(kw_sets.get("fashion_keywords", set()) | kw_sets.get("home_keywords", set())):
+        if _seo_clean_term(t) is None or t.lower() in _SEO_BRAND_TOKENS:
+            continue
+        for c in _SEO_COLORS:
+            _add(f"{c} {t}")
+
+    # Marka x urun-tipi kombinasyonlari -- gercek e-ticaret aramalarinda
+    # cok yaygin bir desen (orn. "samsung telefon", "nike ayakkabı").
+    tech_brands = [
+        "samsung", "apple", "xiaomi", "redmi", "huawei", "oppo", "realme",
+        "vivo", "asus", "lenovo", "hp", "dell", "acer", "msi", "sony", "lg",
+        "philips", "casper", "monster", "toshiba", "jbl", "bose",
+        "sennheiser", "anker", "logitech", "razer", "corsair",
+    ]
+    tech_generics = [
+        "telefon", "laptop", "tv", "tablet", "kulaklık", "saat", "kamera",
+        "mouse", "klavye", "monitör", "powerbank", "hoparlör",
+    ]
+    for b in tech_brands:
+        for g in tech_generics:
+            _add(f"{b} {g}")
+
+    fashion_brands = [
+        "nike", "adidas", "puma", "reebok", "zara", "mango", "boyner",
+        "lcwaikiki", "defacto", "koton", "mavi", "colins", "ltb",
+        "decathlon", "columbia", "skechers",
+    ]
+    fashion_generics = [
+        "ayakkabı", "tişört", "pantolon", "elbise", "ceket", "mont",
+        "gömlek", "eşofman", "çanta", "sweatshirt",
+    ]
+    for b in fashion_brands:
+        for g in fashion_generics:
+            _add(f"{b} {g}")
+
     return clean
 
 
@@ -5088,25 +5179,32 @@ async def price_landing_page(slug: str):
     except Exception:
         products = []
 
+    # Gercek icerik yoksa GERCEK 404 don (sahte 200 + "sonuc yok" mesaji
+    # degil) -- boylece binlerce kombinasyon terimi uretsek bile Google
+    # bos sayfalari hic indexlemez, "thin content" cezasi riski olusmaz.
+    # Kendi kendini temizleyen bir sistem: sadece gercekten envanteri olan
+    # kombinasyonlar canli kalir.
+    if len(products) < 2:
+        return HTMLResponse(
+            "<h1>Sayfa bulunamadı</h1><p><a href=\"/\">Ana sayfaya dön</a></p>",
+            status_code=404,
+        )
+
     title_term = _html.escape(term.capitalize())
-    if products:
-        rows = []
-        for p in products[:15]:
-            p_title = _html.escape(p.get("title", ""))
-            price = p.get("price") or 0
-            source = _html.escape(p.get("source", ""))
-            url = _html.escape(p.get("url", ""))
-            rows.append(
-                f'<div class="bp-feature"><h3>{p_title}</h3>'
-                f'<p>{price:.2f} ₺ — {source}</p>'
-                f'<a href="{url}" rel="nofollow noopener" target="_blank">Ürüne Git</a></div>'
-            )
-        products_html = "".join(rows)
-        cheapest = min((p.get("price") or 0 for p in products if p.get("price")), default=0)
-        intro = f"{title_term} için {len(products)} mağazadan güncel fiyat karşılaştırması. En ucuz: {cheapest:.2f} ₺." if cheapest else f"{title_term} için güncel fiyat karşılaştırması."
-    else:
-        products_html = '<p class="bp-body">Şu anda bu ürün için canlı sonuç bulunamadı. Ana sayfadan tekrar aramayı deneyebilirsin.</p>'
-        intro = f"{title_term} için fiyat karşılaştırması."
+    rows = []
+    for p in products[:15]:
+        p_title = _html.escape(p.get("title", ""))
+        price = p.get("price") or 0
+        source = _html.escape(p.get("source", ""))
+        url = _html.escape(p.get("url", ""))
+        rows.append(
+            f'<div class="bp-feature"><h3>{p_title}</h3>'
+            f'<p>{price:.2f} ₺ — {source}</p>'
+            f'<a href="{url}" rel="nofollow noopener" target="_blank">Ürüne Git</a></div>'
+        )
+    products_html = "".join(rows)
+    cheapest = min((p.get("price") or 0 for p in products if p.get("price")), default=0)
+    intro = f"{title_term} için {len(products)} mağazadan güncel fiyat karşılaştırması. En ucuz: {cheapest:.2f} ₺." if cheapest else f"{title_term} için güncel fiyat karşılaştırması."
 
     intro_escaped = _html.escape(intro)
     page = f"""<!doctype html>
