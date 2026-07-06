@@ -5284,6 +5284,8 @@ async def _debug_scrapecheck(store: str = "trendyol", q: str = "iphone 16"):
                     "has_next_data": bool(_soup.find("script", id="__NEXT_DATA__")),
                     "has_search_app_state": "__SEARCH_APP_INITIAL_STATE__" in html,
                     "title": (_soup.title.get_text(strip=True) if _soup.title else ""),
+                    "window_vars": list(dict.fromkeys(re.findall(r"window\.(__[A-Za-z_]+__)\s*=", html)))[:15],
+                    "og_url": (_soup.find("meta", property="og:url") or {}).get("content", ""),
                 }
             results[label] = {"ok": bool(html), "blocked": blocked, "len": len(html) if html else 0, "snippet": snippet, "structure": structure}
         except Exception as exc:
