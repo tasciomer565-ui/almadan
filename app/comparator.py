@@ -399,6 +399,21 @@ def is_logical_product(query: str, product_title: str) -> bool:
         if any(t in title_lower for t in cooking_oil_terms) and not has_cooking_query:
             return False
 
+    # Cihaz aramasinda (orn. "laptop") o cihaz icin canta/kilif gibi bir
+    # aksesuar cikmamali -- baslikta hem cihaz adi hem aksesuar kelimesi
+    # AYRI AYRI geciyorsa (tam ifade degil, AliExpress tarzi basliklarda
+    # "Women's Laptop & Briefcase" gibi) bu genelde asil cihaz degildir.
+    device_terms = {"laptop", "notebook", "telefon", "phone", "tablet"}
+    accessory_terms = {
+        "bag", "case", "sleeve", "briefcase", "backpack",
+        "çanta", "canta", "kılıf", "kilif",
+    }
+    has_device_query = any(t in query_lower for t in device_terms)
+    has_accessory_query = any(t in query_lower for t in accessory_terms)
+    if has_device_query and not has_accessory_query:
+        if any(t in title_lower for t in device_terms) and any(t in title_lower for t in accessory_terms):
+            return False
+
     irrelevant_terms = [
         "bezi", "spreyi", "solüsyonu", "temizleme",
         "kılıfı", "kutusu", "kabı", "kılıf", "kapak",
@@ -407,7 +422,7 @@ def is_logical_product(query: str, product_title: str) -> bool:
         "şarj kablosu", "yedek parça", "aksesuar",
         "tornavida", "yedek cam", "vidası", "vida",
         "temizleyici", "koruyucu", "kutusu", "çantası", "çanta",
-        "kordonu", "kordon", "kılıfı", "askı aparatı", "temizleme mendili"
+        "kordonu", "kordon", "kılıfı", "askı aparatı", "temizleme mendili",
     ]
     
     for term in irrelevant_terms:
