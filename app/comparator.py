@@ -1328,40 +1328,35 @@ def search_a101(query: str) -> list[dict]:
 
 
 def search_sokmarket(query: str) -> list[dict]:
-    """SOK Market ürün araması."""
+    """
+    ŞOK Market ürün araması — DOM tabanlı (2026-07 itibarıyla doğrulandı).
+    URL zaten doğruydu (/arama?q=), sadece selector'lar CSS Modules ile
+    değişmiş (kısmi class eşleşmesiyle stabil: CProductCard-module_*,
+    CPriceBox-module_*). İçerik SSR, render_js gerekmiyor.
+    """
     try:
         url = f"https://www.sokmarket.com.tr/arama?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
+        r = requests.get(url, headers=_STD_HEADERS, timeout=8)
         if not r.ok:
             return []
         soup = BeautifulSoup(r.text, "html.parser")
         results = []
-        for item in soup.select(".product-item, [class*='product-card'], .product")[:10]:
-            name_el = item.select_one(".product-name, h3, [class*='name']")
+        for item in soup.select("[class*='CProductCard-module_productCardWrapper']")[:10]:
+            name_el = item.select_one("[class*='CProductCard-module_title']")
             name = name_el.get_text(strip=True) if name_el else ""
             if not name:
                 continue
-            price_el = item.select_one("[class*='price'], .price")
+            price_el = item.select_one("[class*='CPriceBox-module_price']")
             if not price_el:
                 continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
+            price = parse_price(price_el.get_text(strip=True))
+            if not price or price <= 0:
                 continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
+            link_el = item.select_one("a[href]") or item.find_parent("a")
+            href = link_el.get("href", "") if link_el else ""
             prod_url = f"https://www.sokmarket.com.tr{href}" if href.startswith("/") else href
             img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
             results.append({
                 "title": name, "price": price, "original_price": None,
                 "image_url": img, "source": "sokmarket", "url": prod_url,
