@@ -4128,6 +4128,17 @@ def _read_last_test() -> dict:
     return {}
 
 
+@app.get("/api/_debug_hb2", include_in_schema=False)
+def _debug_hb2(q: str = "laptop"):
+    from app.comparator import search_hepsiburada_direct
+    try:
+        r = search_hepsiburada_direct(q)
+        return {"count": len(r), "sample": r[:2]}
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "tb": traceback.format_exc()[-1500:]}
+
+
 @app.get("/api/status")
 async def api_status():
     """
