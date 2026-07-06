@@ -1274,48 +1274,57 @@ def search_englishhome(query: str) -> list[dict]:
 
 
 def search_a101(query: str) -> list[dict]:
-    """A101 ürün araması."""
-    try:
-        url = f"https://www.a101.com.tr/arama?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
+    """
+    A101 ürün araması — DOM tabanlı (2026-07 itibarıyla doğrulandı).
+    URL: /arama?k= (eski ?q= geçersiz). JSON-LD/__NEXT_DATA__ yok, ürün
+    kartları .dashboard-product-container, fiyat "₺" ile başlıyor,
+    indirimli üründe eski fiyat "line-through" class'ıyla ayırt ediliyor.
+    """
+    from app.scraping_proxy import proxy_get, proxy_enabled
+
+    url = f"https://www.a101.com.tr/arama?k={urllib.parse.quote_plus(query)}"
+    html = None
+    if proxy_enabled():
+        # A101 ürün listesini tamamen client-side render ediyor (statik HTML'de
+        # kart yok) — render_js=True şart, yoksa 0 sonuç döner.
+        html = proxy_get(url, render_js=True, timeout=20)
+    if not html:
+        try:
+            r = requests.get(url, headers=_STD_HEADERS, timeout=8)
+            html = r.text if r.ok else None
+        except Exception:
             return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, [class*='product-card'], .product")[:10]:
-            name_el = item.select_one(".product-name, h3, [class*='name']")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.a101.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "a101", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
+    if not html:
         return []
+
+    soup = BeautifulSoup(html, "html.parser")
+    results = []
+    for card in soup.select(".dashboard-product-container")[:10]:
+        name_el = card.select_one("h3")
+        name = name_el.get_text(strip=True) if name_el else ""
+        if not name:
+            continue
+        price_spans = [s for s in card.find_all("span") if "₺" in s.get_text()]
+        if not price_spans:
+            continue
+        current_el = next((s for s in price_spans if "line-through" not in (s.get("class") or [])), price_spans[-1])
+        original_el = next((s for s in price_spans if "line-through" in (s.get("class") or [])), None)
+        price = parse_price(current_el.get_text(strip=True))
+        original = parse_price(original_el.get_text(strip=True)) if original_el else None
+        if not price or price <= 0:
+            continue
+        link_el = card.find_parent("a") or card.select_one("a[href]")
+        href = link_el.get("href", "") if link_el else ""
+        prod_url = f"https://www.a101.com.tr{href}" if href.startswith("/") else href
+        img_el = card.select_one("img")
+        img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
+        results.append({
+            "title": name, "price": price,
+            "original_price": original if original and original != price else None,
+            "image_url": img, "source": "a101", "url": prod_url,
+            "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+        })
+    return results
 
 
 def search_sokmarket(query: str) -> list[dict]:
