@@ -4341,6 +4341,9 @@ def search_products_by_name(
 
     # Cache'ten (Supabase) gelen kayitlar eski sema olabilir -- eksik alanlari
     # tamamla, aksi halde asagidaki post-processing KeyError ile 500 doner.
+    # Bazi scraper'lar dict olmayan ogeler de sizdirabiliyor (orn. N11'in
+    # tuple donusu) -- once bunlari ele.
+    all_products = [p for p in all_products if isinstance(p, dict)]
     for p in all_products:
         if not isinstance(p.get("extra_info"), dict):
             p["extra_info"] = {}
