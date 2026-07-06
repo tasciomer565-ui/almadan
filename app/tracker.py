@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 from uuid import uuid4
 
@@ -60,15 +61,25 @@ import json
 def log_sms_notification(owner_id: str | None, title: str, message: str) -> None:
     if not owner_id or not owner_id.startswith("user:"):
         return
-    
+
     db = load_db()
     user_info = db.get("users", {}).get(owner_id, {})
     pref = user_info.get("notification_pref", "both")
     phone = user_info.get("phone")
-    
+
     if pref not in ("sms", "both") or not phone:
         return
-        
+
+    # Gercek WhatsApp bildirimi -- Meta onayli bir sablon (WHATSAPP_TEMPLATE_NAME)
+    # gerektirir; onaylanana kadar sessizce basarisiz olur (loglama devam eder).
+    try:
+        from app.whatsapp import whatsapp_enabled, send_whatsapp_template
+        if whatsapp_enabled():
+            template_name = os.getenv("WHATSAPP_TEMPLATE_NAME", "price_alert").strip()
+            send_whatsapp_template(phone, template_name, params=[title, message])
+    except Exception:
+        pass
+
     from app.storage import DATA_DIR, utc_now
     sms_file = DATA_DIR / "sms_logs.json"
     
