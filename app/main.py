@@ -5252,22 +5252,29 @@ async def cron_sync_sheets(request: Request):
 @app.get("/api/_debug_scrapecheck_9f3a71bc", include_in_schema=False)
 async def _debug_scrapecheck(store: str = "trendyol", q: str = "iphone 16"):
     """
-    GEÇİCİ tanılama uç noktası — ScrapingBee'nin Cloudflare korumalı mağazaları
-    (Trendyol/Hepsiburada vb.) gerçekten aşıp aşmadığını prod'da test eder.
+    GEÇİCİ tanılama uç noktası — sabit whitelist'teki mağaza arama URL'lerini
+    ScrapingBee üzerinden dener. Serbest URL kabul ETMEZ (SSRF riski).
     Tahmin edilemez path ile korunur. İş bitince kaldırılacak.
     """
     from app.scraping_proxy import proxy_enabled, proxy_get
 
+    q_enc = q.replace(" ", "+")
+    # Aday URL formatları — her mağaza için birden fazla deneme
     targets = {
-        "trendyol": f"https://www.trendyol.com/sr?q={q.replace(' ', '+')}&qt={q.replace(' ', '+')}&st=SEARCH",
-        "hepsiburada": f"https://www.hepsiburada.com/ara?q={q.replace(' ', '+')}",
-        "defacto": f"https://www.defacto.com.tr/search?q={q.replace(' ', '+')}",
-        "lcwaikiki": f"https://www.lcwaikiki.com/tr-TR/TR/search/index.aspx?searchvalue={q.replace(' ', '+')}",
-        "mavi": f"https://www.mavi.com/search?q={q.replace(' ', '+')}",
+        "trendyol": f"https://www.trendyol.com/sr?q={q_enc}&qt={q_enc}&st=SEARCH",
+        "hepsiburada": f"https://www.hepsiburada.com/ara?q={q_enc}",
+        "defacto": f"https://www.defacto.com.tr/search?q={q_enc}",
+        "defacto_v2": f"https://www.defacto.com.tr/arama?q={q_enc}",
+        "defacto_v3": f"https://www.defacto.com.tr/tr/search?text={q_enc}",
+        "lcwaikiki": f"https://www.lcwaikiki.com/tr-TR/TR/search/index.aspx?searchvalue={q_enc}",
+        "lcwaikiki_v2": f"https://www.lcw.com/search?searchTerm={q_enc}",
+        "lcwaikiki_v3": f"https://www.lcw.com/Arama?searchValue={q_enc}",
+        "mavi": f"https://www.mavi.com/search?q={q_enc}",
+        "mavi_v2": f"https://www.mavi.com/arama?q={q_enc}",
     }
     url = targets.get(store, targets["trendyol"])
     results = {}
-    for label, render_js in (("no_js", False), ("js", True)):
+    for label, render_js in (("no_js", False),):
         try:
             html = await asyncio.to_thread(proxy_get, url, render_js, 25)
             snippet = ""
