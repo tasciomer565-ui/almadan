@@ -4986,6 +4986,197 @@ async def category_page(category: str):
     return HTMLResponse(page)
 
 
+def get_seo_price_terms() -> list[str]:
+    """
+    search_orchestrator'daki kategori anahtar kelime setlerinden temiz,
+    benzersiz (Turkce/ASCII duplikasi elenmis), aksesuar-disi urun
+    terimleri cikarir. Bu liste hem /fiyat/{terim} rotasinin izin
+    verdigi (whitelist) sorgulari hem de sitemap'i besler.
+    """
+    # classify_intent'in kendi mantigini degistirmeden, kaynak kodundaki
+    # literal anahtar kelime setlerini okuyup cikariyoruz (guvenli, salt-okunur).
+    import inspect
+    import re as _re
+    from app import search_orchestrator as _so
+    src = inspect.getsource(_so.classify_intent)
+    all_terms: set[str] = set()
+    for kw_name in (
+        "grocery_keywords", "tech_keywords", "cosmetics_keywords",
+        "fashion_keywords", "home_keywords",
+    ):
+        m = _re.search(kw_name + r"\s*=\s*\{(.*?)\n    \}", src, _re.DOTALL)
+        if m:
+            all_terms.update(_re.findall(r'"([^"]+)"', m.group(1)))
+
+    # Marka listesinden de gercek, ayirt edici ek terimler ekle
+    from app import comparator as _cmp
+    brand_src = inspect.getsource(_cmp.detect_brand_in_query)
+    bm = _re.search(r"brands\s*=\s*\[(.*?)\n    \]", brand_src, _re.DOTALL)
+    if bm:
+        all_terms.update(_re.findall(r'"([^"]+)"', bm.group(1)))
+
+    block_substr = [
+        "koruyucu", "kılıf", "kilif", "kablo", "vida", "aparat", "yedek",
+        "kutusu", "aksesuar", "temizleme mendili", "standı", "askı",
+    ]
+    tr_to_ascii = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
+
+    seen_ascii: set[str] = set()
+    clean: list[str] = []
+    for t in sorted(all_terms, key=lambda x: (-len(x), x)):
+        tl = t.lower().strip()
+        if len(tl) < 3 or len(tl) > 30:
+            continue
+        if any(b in tl for b in block_substr):
+            continue
+        if any(ch.isdigit() for ch in tl):
+            continue
+        key = tl.translate(tr_to_ascii)
+        if key in seen_ascii:
+            continue
+        seen_ascii.add(key)
+        clean.append(tl)
+    return clean
+
+
+_SEO_PRICE_TERMS_CACHE: list[str] | None = None
+_SEO_PRICE_SLUGS_CACHE: dict[str, str] | None = None
+
+
+def _seo_price_slug_map() -> dict[str, str]:
+    """slug -> orijinal terim eslemesi (URL icin ascii-guvenli slug uretir)."""
+    global _SEO_PRICE_TERMS_CACHE, _SEO_PRICE_SLUGS_CACHE
+    if _SEO_PRICE_SLUGS_CACHE is not None:
+        return _SEO_PRICE_SLUGS_CACHE
+    terms = get_seo_price_terms()
+    _SEO_PRICE_TERMS_CACHE = terms
+    tr_to_ascii = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
+    mapping: dict[str, str] = {}
+    for t in terms:
+        slug = t.translate(tr_to_ascii).replace(" ", "-")
+        mapping[slug] = t
+    _SEO_PRICE_SLUGS_CACHE = mapping
+    return mapping
+
+
+@app.get("/fiyat/{slug}", response_class=HTMLResponse)
+async def price_landing_page(slug: str):
+    """
+    Populer urun terimleri icin gercek, canlı fiyat karsilastirma
+    sonuclarini sunucu tarafinda render eden SEO sayfasi (orn. "sut
+    fiyatlari", "iphone fiyatlari"). Guvenlik/maliyet nedeniyle sadece
+    onceden belirlenmis (whitelist) terimler kabul edilir -- rastgele
+    sorguyla kotuye kullanima (scraping/DoS maliyeti) kapali.
+    """
+    import html as _html
+
+    slug_map = _seo_price_slug_map()
+    term = slug_map.get(slug.lower())
+    if not term:
+        return HTMLResponse(
+            "<h1>Sayfa bulunamadı</h1><p><a href=\"/\">Ana sayfaya dön</a></p>",
+            status_code=404,
+        )
+
+    from app.comparator import (
+        normalize_turkish_search_query,
+        search_products_by_name,
+    )
+    query = normalize_turkish_search_query(term)
+    try:
+        products = search_products_by_name(query, category="general")
+    except Exception:
+        products = []
+
+    title_term = _html.escape(term.capitalize())
+    if products:
+        rows = []
+        for p in products[:15]:
+            p_title = _html.escape(p.get("title", ""))
+            price = p.get("price") or 0
+            source = _html.escape(p.get("source", ""))
+            url = _html.escape(p.get("url", ""))
+            rows.append(
+                f'<div class="bp-feature"><h3>{p_title}</h3>'
+                f'<p>{price:.2f} ₺ — {source}</p>'
+                f'<a href="{url}" rel="nofollow noopener" target="_blank">Ürüne Git</a></div>'
+            )
+        products_html = "".join(rows)
+        cheapest = min((p.get("price") or 0 for p in products if p.get("price")), default=0)
+        intro = f"{title_term} için {len(products)} mağazadan güncel fiyat karşılaştırması. En ucuz: {cheapest:.2f} ₺." if cheapest else f"{title_term} için güncel fiyat karşılaştırması."
+    else:
+        products_html = '<p class="bp-body">Şu anda bu ürün için canlı sonuç bulunamadı. Ana sayfadan tekrar aramayı deneyebilirsin.</p>'
+        intro = f"{title_term} için fiyat karşılaştırması."
+
+    intro_escaped = _html.escape(intro)
+    page = f"""<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#121412">
+    <title>{title_term} Fiyatları — Almadan</title>
+    <meta name="description" content="{intro_escaped}">
+    <link rel="canonical" href="https://www.almadan.app/fiyat/{slug}">
+    <meta name="robots" content="index, follow">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Almadan">
+    <meta property="og:title" content="{title_term} Fiyatları — Almadan">
+    <meta property="og:description" content="{intro_escaped}">
+    <meta property="og:url" content="https://www.almadan.app/fiyat/{slug}">
+    <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
+    <meta property="og:locale" content="tr_TR">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+    <script type="application/ld+json">
+    {{
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      "name": "{title_term} Fiyatları",
+      "url": "https://www.almadan.app/fiyat/{slug}"
+    }}
+    </script>
+    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
+  </head>
+  <body>
+    <header class="bp-header">
+      <a href="/" class="bp-logo"><span class="bp-logo-mark">A</span>almadan</a>
+      <nav class="bp-nav">
+        <a href="/hakkinda">Hakkında</a>
+        <a href="/gizlilik">Gizlilik</a>
+        <a href="/iletisim">İletişim</a>
+      </nav>
+    </header>
+
+    <section class="bp-hero">
+      <div class="bp-hero-inner">
+        <p class="bp-eyebrow">FİYAT KARŞILAŞTIRMA</p>
+        <h1>{title_term} Fiyatları</h1>
+        <p class="bp-hero-copy">{intro_escaped}</p>
+        <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> Tüm Sonuçları Gör</a>
+      </div>
+    </section>
+
+    <main class="bp-main">
+      <h2><i data-lucide="tag"></i> Güncel Fiyatlar</h2>
+      <div class="bp-feature-grid">
+        {products_html}
+      </div>
+      <a class="bp-cta bp-cta-block" href="/"><i data-lucide="arrow-right"></i> Başka Ürün Ara</a>
+    </main>
+
+    <footer class="bp-footer">
+      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
+      <p>© 2026 Almadan</p>
+    </footer>
+    <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
+  </body>
+</html>"""
+    return HTMLResponse(page)
+
+
 @app.get("/api/campaigns/latest")
 async def latest_campaigns(limit: int = 12):
     """
