@@ -3403,11 +3403,57 @@ def search_tarimkredi(query: str) -> list[dict]:
 
 # ScrapingBee-gated
 def search_defacto(query: str) -> list[dict]:
-    """Defacto ürün araması — JSON-LD + ScrapingBee render_js. (URL: /arama, eski /search artık kategoriye yönlendiriyor)"""
-    return _scrape_jsonld_itemlist(
-        f"https://www.defacto.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "defacto", render_js=False, timeout=12
-    )
+    """
+    Defacto ürün araması — DOM tabanlı (2026-07 itibarıyla doğrulandı).
+    JSON-LD'de ürün listesi yok (bozuk/çoklu-obje script + sadece BreadcrumbList),
+    ürün kartları .catalog-products__item olarak sunucu tarafında render ediliyor.
+    URL: /arama (eski /search artık kategori sayfasına yönlendiriyor).
+    """
+    from app.scraping_proxy import proxy_get, proxy_enabled
+
+    url = f"https://www.defacto.com.tr/arama?q={urllib.parse.quote_plus(query)}"
+    html = None
+    if proxy_enabled():
+        html = proxy_get(url, render_js=False, timeout=12)
+    if not html:
+        try:
+            r = requests.get(url, headers=_STD_HEADERS, timeout=8)
+            html = r.text if r.ok else None
+        except Exception:
+            return []
+    if not html:
+        return []
+
+    soup = BeautifulSoup(html, "html.parser")
+    results = []
+    for card in soup.select(".catalog-products__item")[:10]:
+        name_el = card.select_one(".product-card__title")
+        name = name_el.get_text(strip=True) if name_el else ""
+        if not name:
+            continue
+        discounted_el = card.select_one(".campaing-base-price")
+        base_els = card.select(".base-price")
+        if discounted_el:
+            price = parse_price(discounted_el.get_text(strip=True))
+            original_els = [e for e in base_els if e is not discounted_el]
+            original = parse_price(original_els[0].get_text(strip=True)) if original_els else None
+        else:
+            price = parse_price(base_els[0].get_text(strip=True)) if base_els else None
+            original = None
+        if not price or price <= 0:
+            continue
+        link_el = card.select_one("a[href]")
+        href = link_el.get("href", "") if link_el else ""
+        prod_url = f"https://www.defacto.com.tr{href}" if href.startswith("/") else href
+        img_el = card.select_one("img")
+        img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
+        results.append({
+            "title": name, "price": price,
+            "original_price": original if original and original != price else None,
+            "image_url": img, "source": "defacto", "url": prod_url,
+            "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+        })
+    return results
 
 def search_kutahyaporselen(query: str) -> list[dict]:
     try:
