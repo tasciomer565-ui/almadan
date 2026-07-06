@@ -2882,6 +2882,10 @@ function openProduct(id) {
         <i data-lucide="refresh-cw"></i>
         Şimdi otomatik kontrol et
       </button>
+      <button class="card-button" onclick="shareProduct('${product.id}')">
+        <i data-lucide="share-2"></i>
+        Bu fırsatı paylaş
+      </button>
 
       <!-- Topluluk İncelemeleri -->
       <div class="manual-fields" style="margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px;">
@@ -3073,6 +3077,29 @@ async function removeTrackedProduct(productId) {
   } catch (error) {
     showToast(error.message);
   }
+}
+
+async function shareProduct(productId) {
+  const product = state.products.find((item) => item.id === productId);
+  if (!product) return;
+
+  const price = currency.format(product.current_price);
+  const storeName = escapeHtml(product.source || "mağaza");
+  const text = `${product.title} — ${storeName}'da ${price}! Almadan ile karşılaştır:`;
+  const url = product.url || window.location.href;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: product.title, text, url });
+      return;
+    } catch (e) {
+      if (e.name === "AbortError") return; // kullanıcı paylaşımı iptal etti
+      // diğer tüm hatalarda WhatsApp fallback'ine düş
+    }
+  }
+
+  const waText = encodeURIComponent(`${text} ${url}`);
+  window.open(`https://wa.me/?text=${waText}`, "_blank", "noopener,noreferrer");
 }
 
 async function refreshSingleProduct(productId) {
