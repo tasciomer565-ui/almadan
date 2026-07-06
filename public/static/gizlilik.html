@@ -23,6 +23,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -34,71 +35,79 @@
       "inLanguage": "tr-TR"
     }
     </script>
-    <style>
-      :root { --ink:#1c221c; --ink-2:#687068; --bg:#fbfcfa; --card:#fff; --border:#dfe3dc; --green:#287a50; }
-      * { box-sizing:border-box; margin:0; }
-      body { font-family:"DM Sans",sans-serif; background:var(--bg); color:var(--ink); line-height:1.7; }
-      header { background:#121412; padding:16px 24px; }
-      header a { color:#fff; text-decoration:none; font-family:Manrope,sans-serif; font-weight:800; font-size:20px; display:inline-flex; align-items:center; gap:10px; }
-      header a span.logo { background:#c8d94a; color:#121412; width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; font-size:18px; }
-      main { max-width:760px; margin:0 auto; padding:48px 24px 64px; }
-      h1 { font-family:Manrope,sans-serif; font-size:32px; margin-bottom:8px; }
-      .sub { color:var(--ink-2); margin-bottom:32px; }
-      h2 { font-family:Manrope,sans-serif; font-size:20px; margin:32px 0 12px; }
-      p { margin-bottom:14px; }
-      ul { padding-left:22px; margin-bottom:14px; }
-      li { margin-bottom:6px; }
-      footer { border-top:1px solid var(--border); padding:24px; text-align:center; color:var(--ink-2); font-size:13px; }
-      footer a { color:var(--green); text-decoration:none; margin:0 10px; }
-    </style>
+    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
   </head>
   <body>
-    <header><a href="/"><span class="logo">A</span>almadan</a></header>
-    <main>
-      <h1>Gizlilik Politikası</h1>
-      <p class="sub">Son güncelleme: 5 Temmuz 2026</p>
+    <header class="bp-header">
+      <a href="/" class="bp-logo"><span class="bp-logo-mark">A</span>almadan</a>
+      <nav class="bp-nav">
+        <a href="/hakkinda">Hakkında</a>
+        <a href="/gizlilik" class="active">Gizlilik</a>
+        <a href="/iletisim">İletişim</a>
+      </nav>
+    </header>
 
-      <h2>Hangi verileri topluyoruz?</h2>
-      <ul>
-        <li><strong>Hesap bilgileri:</strong> Kayıt olursan e-posta adresin ve tercihlerin saklanır. Kayıt olmadan da temel özellikleri kullanabilirsin.</li>
-        <li><strong>Cihaz tanımlayıcısı:</strong> Takip listeni cihazına bağlamak için rastgele üretilen anonim bir kimlik kullanılır.</li>
-        <li><strong>Kullanım verileri:</strong> Yapıştırdığın ürün linkleri ve takibe aldığın ürünler, sana fiyat bildirimi gönderebilmek için saklanır.</li>
+    <section class="bp-hero" style="padding-bottom:44px;">
+      <div class="bp-hero-inner">
+        <p class="bp-eyebrow">ŞEFFAFLIK</p>
+        <h1>Gizlilik Politikası</h1>
+        <p class="bp-hero-copy">Verilerini nasıl topladığımızı, kullandığımızı ve haklarını açıkça anlatıyoruz. Hiçbir veri satılmaz veya reklam amacıyla paylaşılmaz.</p>
+      </div>
+    </section>
+
+    <main class="bp-main">
+      <span class="bp-updated"><i data-lucide="clock" style="width:13px;height:13px;"></i> Son güncelleme: 5 Temmuz 2026</span>
+
+      <h2><i data-lucide="database"></i> Hangi verileri topluyoruz?</h2>
+      <ul class="bp-list">
+        <li><i data-lucide="user"></i><span><strong>Hesap bilgileri:</strong> Kayıt olursan e-posta adresin ve tercihlerin saklanır. Kayıt olmadan da temel özellikleri kullanabilirsin.</span></li>
+        <li><i data-lucide="smartphone"></i><span><strong>Cihaz tanımlayıcısı:</strong> Takip listeni cihazına bağlamak için rastgele üretilen anonim bir kimlik kullanılır.</span></li>
+        <li><i data-lucide="link"></i><span><strong>Kullanım verileri:</strong> Yapıştırdığın ürün linkleri ve takibe aldığın ürünler, sana fiyat bildirimi gönderebilmek için saklanır.</span></li>
       </ul>
 
-      <h2>Verilerini nasıl kullanıyoruz?</h2>
-      <ul>
-        <li>Fiyat karşılaştırması ve takip hizmetini sunmak için</li>
-        <li>Hedef fiyat bildirimlerini göndermek için</li>
-        <li>Hizmeti iyileştirmek için (toplu, anonim istatistikler)</li>
+      <h2><i data-lucide="settings-2"></i> Verilerini nasıl kullanıyoruz?</h2>
+      <ul class="bp-list">
+        <li><i data-lucide="check"></i><span>Fiyat karşılaştırması ve takip hizmetini sunmak için</span></li>
+        <li><i data-lucide="check"></i><span>Hedef fiyat bildirimlerini göndermek için</span></li>
+        <li><i data-lucide="check"></i><span>Hizmeti iyileştirmek için (toplu, anonim istatistikler)</span></li>
       </ul>
-      <p>Verilerin üçüncü taraflara <strong>satılmaz</strong> ve reklam amacıyla paylaşılmaz.</p>
+      <p class="bp-body">Verilerin üçüncü taraflara <strong>satılmaz</strong> ve reklam amacıyla paylaşılmaz.</p>
 
-      <h2>Çerezler</h2>
-      <p>Yalnızca hizmetin çalışması için zorunlu çerezler kullanılır: oturum kimliği, cihaz kimliği ve güvenlik (CSRF) çerezi. Reklam veya izleme çerezi kullanılmaz.</p>
+      <h2><i data-lucide="cookie"></i> Çerezler</h2>
+      <p class="bp-body">Yalnızca hizmetin çalışması için zorunlu çerezler kullanılır: oturum kimliği, cihaz kimliği ve güvenlik (CSRF) çerezi. Reklam veya izleme çerezi kullanılmaz.</p>
 
-      <h2>KVKK haklerin</h2>
-      <p>6698 sayılı KVKK ve GDPR kapsamında şu haklara sahipsin:</p>
-      <ul>
-        <li><strong>Erişim hakkı:</strong> Hakkında sakladığımız tüm veriyi indirebilirsin (hesap ayarlarından "Verilerimi indir").</li>
-        <li><strong>Unutulma hakkı:</strong> Hesabını ve tüm verilerini kalıcı olarak silebilirsin (hesap ayarlarından "Beni unut").</li>
-        <li><strong>Düzeltme hakkı:</strong> Bilgilerini dilediğin zaman güncelleyebilirsin.</li>
-      </ul>
+      <h2><i data-lucide="scale"></i> KVKK haklerin</h2>
+      <p class="bp-body">6698 sayılı KVKK ve GDPR kapsamında şu haklara sahipsin:</p>
+      <div class="bp-card">
+        <h3><i data-lucide="download"></i> Erişim hakkı</h3>
+        <p>Hakkında sakladığımız tüm veriyi indirebilirsin (hesap ayarlarından "Verilerimi indir").</p>
+      </div>
+      <div class="bp-card">
+        <h3><i data-lucide="trash-2"></i> Unutulma hakkı</h3>
+        <p>Hesabını ve tüm verilerini kalıcı olarak silebilirsin (hesap ayarlarından "Beni unut").</p>
+      </div>
+      <div class="bp-card">
+        <h3><i data-lucide="pencil"></i> Düzeltme hakkı</h3>
+        <p>Bilgilerini dilediğin zaman güncelleyebilirsin.</p>
+      </div>
 
-      <h2>Veri güvenliği</h2>
-      <p>Veriler şifreli bağlantı (HTTPS) üzerinden taşınır ve erişim kontrolü uygulanan altyapıda saklanır.</p>
+      <h2><i data-lucide="lock"></i> Veri güvenliği</h2>
+      <p class="bp-body">Veriler şifreli bağlantı (HTTPS) üzerinden taşınır ve erişim kontrolü uygulanan altyapıda saklanır.</p>
 
-      <h2>Veri saklama süresi</h2>
-      <p>Takip ettiğin ürünler ve fiyat geçmişi, sen silmediğin veya hesabını kapatmadığın sürece saklanır. Hesabını silmen halinde tüm verilerin 30 gün içinde kalıcı olarak temizlenir.</p>
+      <h2><i data-lucide="calendar-clock"></i> Veri saklama süresi</h2>
+      <p class="bp-body">Takip ettiğin ürünler ve fiyat geçmişi, sen silmediğin veya hesabını kapatmadığın sürece saklanır. Hesabını silmen halinde tüm verilerin 30 gün içinde kalıcı olarak temizlenir.</p>
 
-      <h2>Çocukların gizliliği</h2>
-      <p>Almadan 18 yaş altındaki kullanıcılara yönelik değildir ve bilerek çocuklardan veri toplamaz.</p>
+      <h2><i data-lucide="baby"></i> Çocukların gizliliği</h2>
+      <p class="bp-body">Almadan 18 yaş altındaki kullanıcılara yönelik değildir ve bilerek çocuklardan veri toplamaz.</p>
 
-      <h2>İletişim</h2>
-      <p>Gizlilikle ilgili soruların için <a href="/iletisim" style="color:var(--green);">iletişim sayfasından</a> bize ulaşabilirsin.</p>
+      <h2><i data-lucide="mail-question"></i> İletişim</h2>
+      <p class="bp-body">Gizlilikle ilgili soruların için <a href="/iletisim" class="bp-link">iletişim sayfasından</a> bize ulaşabilirsin.</p>
     </main>
-    <footer>
+
+    <footer class="bp-footer">
       <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
-      <p style="margin-top:8px;">© 2026 Almadan</p>
+      <p>© 2026 Almadan</p>
     </footer>
+    <script>window.addEventListener('load', () => { if (window.lucide) lucide.createIcons(); });</script>
   </body>
 </html>

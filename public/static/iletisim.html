@@ -22,6 +22,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -31,64 +32,73 @@
       "isPartOf": { "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app" }
     }
     </script>
-    <style>
-      :root { --ink:#1c221c; --ink-2:#687068; --bg:#fbfcfa; --card:#fff; --border:#dfe3dc; --green:#287a50; }
-      * { box-sizing:border-box; margin:0; }
-      body { font-family:"DM Sans",sans-serif; background:var(--bg); color:var(--ink); line-height:1.7; }
-      header { background:#121412; padding:16px 24px; }
-      header a { color:#fff; text-decoration:none; font-family:Manrope,sans-serif; font-weight:800; font-size:20px; display:inline-flex; align-items:center; gap:10px; }
-      header a span.logo { background:#c8d94a; color:#121412; width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; font-size:18px; }
-      main { max-width:760px; margin:0 auto; padding:48px 24px 64px; }
-      h1 { font-family:Manrope,sans-serif; font-size:32px; margin-bottom:8px; }
-      .sub { color:var(--ink-2); margin-bottom:32px; }
-      .card { background:var(--card); border:1.5px solid var(--border); border-radius:12px; padding:24px; margin-bottom:16px; }
-      .card h2 { font-family:Manrope,sans-serif; font-size:18px; margin-bottom:8px; }
-      .card p { color:var(--ink-2); margin-bottom:8px; }
-      .card a { color:var(--green); font-weight:600; text-decoration:none; }
-      footer { border-top:1px solid var(--border); padding:24px; text-align:center; color:var(--ink-2); font-size:13px; }
-      footer a { color:var(--green); text-decoration:none; margin:0 10px; }
-    </style>
+    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
   </head>
   <body>
-    <header><a href="/"><span class="logo">A</span>almadan</a></header>
-    <main>
-      <h1>İletişim</h1>
-      <p class="sub">Soru, öneri veya sorun bildirimi için bize ulaş.</p>
+    <header class="bp-header">
+      <a href="/" class="bp-logo"><span class="bp-logo-mark">A</span>almadan</a>
+      <nav class="bp-nav">
+        <a href="/hakkinda">Hakkında</a>
+        <a href="/gizlilik">Gizlilik</a>
+        <a href="/iletisim" class="active">İletişim</a>
+      </nav>
+    </header>
 
-      <div class="card">
-        <h2>📧 E-posta</h2>
-        <p>Genel sorular, öneriler ve destek talepleri:</p>
-        <a href="mailto:tasciomer564@gmail.com">tasciomer564@gmail.com</a>
+    <section class="bp-hero" style="padding-bottom:44px;">
+      <div class="bp-hero-inner">
+        <p class="bp-eyebrow">BİZE ULAŞ</p>
+        <h1>Sana nasıl<br>yardımcı olabiliriz?</h1>
+        <p class="bp-hero-copy">Soru, öneri ya da sorun bildirimi için buradayız. Genelde birkaç saat içinde dönüş yaparız.</p>
+        <a class="bp-cta" href="mailto:tasciomer564@gmail.com"><i data-lucide="mail"></i> E-posta Gönder</a>
+      </div>
+    </section>
+
+    <main class="bp-main">
+      <h2><i data-lucide="message-circle"></i> Nasıl yardımcı olabiliriz?</h2>
+      <div class="bp-feature-grid">
+        <div class="bp-feature">
+          <i data-lucide="mail"></i>
+          <h3>Genel destek</h3>
+          <p>Soru, öneri ve destek talepleri için: <a href="mailto:tasciomer564@gmail.com" class="bp-link" style="color:var(--green);font-weight:700;">tasciomer564@gmail.com</a></p>
+        </div>
+        <div class="bp-feature">
+          <i data-lucide="shield-check"></i>
+          <h3>Gizlilik ve KVKK</h3>
+          <p>Veri erişim/silme taleplerini hesap ayarlarından anında yapabilirsin; yardım için "KVKK" konu başlığıyla yaz.</p>
+        </div>
+        <div class="bp-feature">
+          <i data-lucide="store"></i>
+          <h3>Mağaza ekleme önerisi</h3>
+          <p>Desteklenmesini istediğin bir mağaza mı var? Adını ve web sitesini gönder, değerlendirelim.</p>
+        </div>
+        <div class="bp-feature">
+          <i data-lucide="bug"></i>
+          <h3>Hata bildirimi</h3>
+          <p>Yanlış eşleşme ya da hatalı fiyat mı gördün? Ürün linkini paylaş, en kısa sürede düzeltelim.</p>
+        </div>
       </div>
 
-      <div class="card">
-        <h2>🔒 Gizlilik ve KVKK talepleri</h2>
-        <p>Veri erişim veya silme taleplerini hesap ayarlarından anında gerçekleştirebilirsin; yardım gerekirse yukarıdaki adrese "KVKK" konu başlığıyla yazabilirsin.</p>
-      </div>
-
-      <div class="card">
-        <h2>🏪 Mağaza ekleme önerisi</h2>
-        <p>Desteklenmesini istediğin bir mağaza mı var? Mağaza adını ve web sitesini e-posta ile gönder, değerlendirmeye alalım.</p>
-      </div>
-
-      <div class="card">
-        <h2>🐞 Hata bildirimi</h2>
-        <p>Yanlış eşleşme, hatalı fiyat ya da başka bir hata mı gördün? Ürün linkini ve ne beklediğini yazarak bize bildir — en kısa sürede düzeltiriz.</p>
-      </div>
-
-      <h2 style="margin-top:8px;">Sık Sorulan Sorular</h2>
-      <div class="card">
-        <h2 style="font-size:15px;">Almadan ücretsiz mi?</h2>
+      <h2><i data-lucide="help-circle"></i> Sık Sorulan Sorular</h2>
+      <div class="bp-card">
+        <h3><i data-lucide="badge-percent"></i> Almadan ücretsiz mi?</h3>
         <p>Evet, tüm karşılaştırma ve takip özellikleri ücretsizdir.</p>
       </div>
-      <div class="card">
-        <h2 style="font-size:15px;">Hesap oluşturmam gerekiyor mu?</h2>
+      <div class="bp-card">
+        <h3><i data-lucide="user-check"></i> Hesap oluşturmam gerekiyor mu?</h3>
         <p>Hayır. Cihazına bağlı anonim bir kimlikle takip listeni kullanabilirsin; e-posta bildirimleri için hesap oluşturman yeterli.</p>
       </div>
+      <div class="bp-card">
+        <h3><i data-lucide="clock-3"></i> Ne kadar sürede dönüş alırım?</h3>
+        <p>Genellikle birkaç saat içinde, en geç 1-2 iş günü içinde yanıtlıyoruz.</p>
+      </div>
+
+      <a class="bp-cta bp-cta-block" href="/"><i data-lucide="arrow-right"></i> Almadan'ı Dene</a>
     </main>
-    <footer>
+
+    <footer class="bp-footer">
       <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
-      <p style="margin-top:8px;">© 2026 Almadan</p>
+      <p>© 2026 Almadan</p>
     </footer>
+    <script>window.addEventListener('load', () => { if (window.lucide) lucide.createIcons(); });</script>
   </body>
 </html>
