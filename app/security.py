@@ -108,6 +108,7 @@ CSRF_EXEMPT_PATHS = {
     "/cron/",
     "/parse-url",
     "/api/client-error",  # sendBeacon header taşıyamaz; endpoint salt-log, durum değiştirmez
+    "/api/find-alternatives",  # salt-okunur arama (DB'ye yazmaz); tarayıcı uzantısı 3. taraf sayfadan çağırır, csrf_token cookie'sine erişimi yok
 }
 CSRF_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 

@@ -250,6 +250,26 @@ async def csrf_protection_middleware(request: Request, call_next):
     return await csrf_middleware(request, call_next)
 
 
+# Tarayıcı uzantısının mağaza sayfalarından (trendyol.com vb.) doğrudan
+# find-alternatives'e istek atabilmesi için — en son eklenen middleware en
+# dış katman olduğundan CORS preflight'ı diğer middleware'lerden önce yakalar.
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://www.almadan.app",
+        "https://www.trendyol.com",
+        "https://www.hepsiburada.com",
+        "https://www.amazon.com.tr",
+        "https://www.n11.com",
+    ],
+    allow_credentials=False,
+    allow_methods=["POST", "GET"],
+    allow_headers=["Content-Type"],
+)
+
+
 @app.exception_handler(StorageError)
 async def storage_error_handler(_, exc: StorageError) -> JSONResponse:
     return JSONResponse(
