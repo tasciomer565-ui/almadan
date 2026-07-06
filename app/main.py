@@ -5315,9 +5315,37 @@ async def _debug_scrapecheck(store: str = "trendyol", q: str = "iphone 16"):
         except Exception as exc:
             real_results = [{"error": str(exc)}]
 
+    # Fonksiyonun gerçekte kullandığı URL'deki JSON-LD ham yapısını incele (arama sonucu 0 ise teşhis için)
+    jsonld_debug = []
+    real_url_map = {
+        "defacto": f"https://www.defacto.com.tr/arama?q={q_enc}",
+        "lcwaikiki": f"https://www.lcwaikiki.com/tr-TR/TR/search/index.aspx?searchvalue={q_enc}",
+        "mavi": f"https://www.mavi.com/search?q={q_enc}",
+    }
+    if store in real_url_map:
+        try:
+            import json as _json_dbg
+            from bs4 import BeautifulSoup as _BS3
+            _html = await asyncio.to_thread(proxy_get, real_url_map[store], False, 20)
+            if _html:
+                _soup3 = _BS3(_html, "html.parser")
+                for script in _soup3.find_all("script", type="application/ld+json")[:3]:
+                    try:
+                        data = _json_dbg.loads(script.string or "{}")
+                        jsonld_debug.append({
+                            "type": data.get("@type"),
+                            "keys": list(data.keys())[:10],
+                            "item_count": len(data.get("itemListElement", [])) if isinstance(data.get("itemListElement"), list) else None,
+                        })
+                    except Exception as e:
+                        jsonld_debug.append({"parse_error": str(e)})
+        except Exception as e:
+            jsonld_debug.append({"fetch_error": str(e)})
+
     return {
         "proxy_enabled": proxy_enabled(),
         "url": url,
+        "jsonld_debug": jsonld_debug,
         "raw_html_check": results,
         "real_function_result_count": len(real_results),
         "real_function_sample": real_results[:3],
