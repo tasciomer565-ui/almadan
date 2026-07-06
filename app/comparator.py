@@ -637,12 +637,43 @@ def search_trendyol_direct(query: str) -> list[dict]:
     return results
 
 
+def _extract_balanced_json(text: str, start_idx: int) -> str | None:
+    """text[start_idx] '{' ile baslamali; esli parantezi (string/escape'lere
+    dikkat ederek) bulup dengeli JSON alt-dizesini dondurur."""
+    if start_idx < 0 or start_idx >= len(text) or text[start_idx] != "{":
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start_idx, len(text)):
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start_idx:i + 1]
+    return None
+
+
 def search_hepsiburada_direct(query: str) -> list[dict]:
     """
-    Hepsiburada arama — gerçek veri kaynağı: HTML <head> içine SSR ile gömülü
-    birden çok "window.MORIA = {...}" script bloğu (2026-07 itibarıyla
-    doğrulandı; mobil API/eski __NEXT_DATA__ yolları artık çalışmıyor).
-    Ürünler: MORIA.VERTICALFILTER[<dinamik-uuid>].STATE.data.products[].variantList[0]
+    Hepsiburada arama — gerçek veri kaynağı: HTML'e SSR ile gömülü
+    "window.MORIA.VERTICALFILTER = Object.assign(window.MORIA.VERTICALFILTER
+    || {}, {'<uuid>': {'STATE': {"data":{"products":[...]}}}})" script bloğu
+    (2026-07 itibarıyla doğrulandı). Dış sarmalayıcı JS obje literali
+    (tek tırnaklı) ama 'STATE' degeri gecerli cift-tirnakli JSON oldugu icin
+    dogrudan o kismi parantez dengeleyerek cikarip json.loads ediyoruz.
     """
     import json as _json
     from app.scraping_proxy import proxy_get, proxy_enabled
@@ -661,23 +692,26 @@ def search_hepsiburada_direct(query: str) -> list[dict]:
         return []
 
     products = None
-    for m in re.finditer(r'window\.MORIA\s*=\s*(\{.+?\})\s*;\s*</script>', html, re.DOTALL):
+    search_pos = 0
+    while True:
+        idx = html.find("VERTICALFILTER", search_pos)
+        if idx == -1:
+            break
+        search_pos = idx + 1
+        state_idx = html.find("'STATE':", idx)
+        if state_idx == -1 or state_idx - idx > 500:
+            continue
+        json_start = html.find("{", state_idx)
+        json_str = _extract_balanced_json(html, json_start)
+        if not json_str:
+            continue
         try:
-            data = _json.loads(m.group(1))
+            data = _json.loads(json_str)
         except Exception:
             continue
-        vf = data.get("VERTICALFILTER")
-        if not isinstance(vf, dict) or not vf:
-            continue
-        for vf_key in vf:
-            try:
-                prods = vf[vf_key]["STATE"]["data"]["products"]
-                if prods:
-                    products = prods
-                    break
-            except Exception:
-                continue
-        if products:
+        prods = (data.get("data") or {}).get("products")
+        if prods:
+            products = prods
             break
     if not products:
         return []
