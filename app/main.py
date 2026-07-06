@@ -4172,6 +4172,19 @@ def _debug_hb(q: str = "laptop"):
             brace_idx = html.find("{", state_idx)
             entry["quote_idx"] = quote_idx
             entry["brace_idx"] = brace_idx
+            if brace_idx != -1:
+                js = _extract_balanced_json(html, brace_idx)
+                entry["json_len"] = len(js) if js else None
+                if js:
+                    cleaned = js.replace('\\"', '"')
+                    entry["cleaned_head"] = cleaned[:200]
+                    entry["cleaned_tail"] = cleaned[-100:]
+                    try:
+                        d = _json.loads(cleaned)
+                        entry["keys"] = list(d.keys())
+                        entry["products_len"] = len((d.get("data") or {}).get("products") or [])
+                    except Exception as e2:
+                        entry["json_error"] = str(e2)
         trace.append(entry)
 
     return {"ok": True, "len": len(html), "markers": markers, "vf_count": vf_count, "snippet": snippet, "parse_result": parse_result, "trace": trace}
