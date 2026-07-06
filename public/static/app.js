@@ -451,7 +451,46 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   loadSession();
   checkSharedListUrl();
+  loadLatestCampaigns();
 });
+
+/* ── "Haftanın En Çok Düşenleri" vitrini ──────────────────────────────── */
+async function loadLatestCampaigns() {
+  const section = document.getElementById("latestCampaignsSection");
+  const grid = document.getElementById("latestCampaignsGrid");
+  if (!section || !grid) return;
+  try {
+    const res = await fetch("/api/campaigns/latest?limit=10");
+    if (!res.ok) return;
+    const data = await res.json();
+    const campaigns = data.campaigns || [];
+    if (!campaigns.length) return;
+
+    grid.innerHTML = campaigns
+      .map((c) => {
+        const storeName = escapeHtml(c.store_name || c.store_slug || "Mağaza");
+        const title = escapeHtml(c.title || "Yeni Kampanya");
+        const desc = escapeHtml((c.description || "").slice(0, 90));
+        const url = c.catalog_url ? escapeHtml(c.catalog_url) : "";
+        const brand = getStoreBrand(c.store_slug);
+        return `
+          <a href="${url || "#"}" target="_blank" rel="noopener"
+             style="flex:0 0 240px;background:var(--bg-card,#181b20);border:1.5px solid var(--border,#2e3240);border-radius:12px;padding:14px;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:6px;transition:border-color .15s;"
+             onmouseover="this.style.borderColor='#287a50'" onmouseout="this.style.borderColor='var(--border,#2e3240)'">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:28px;height:28px;border-radius:7px;background:${brand.bg};color:${brand.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;">${storeName.charAt(0).toUpperCase()}</div>
+              <span style="font-size:12.5px;font-weight:700;color:var(--ink,#e2e4e9);">${storeName}</span>
+            </div>
+            <div style="font-size:13px;font-weight:700;color:var(--ink,#e2e4e9);">🔥 ${title}</div>
+            ${desc ? `<div style="font-size:11.5px;color:var(--ink-2,#848c96);line-height:1.4;">${desc}</div>` : ""}
+          </a>`;
+      })
+      .join("");
+    section.classList.remove("hidden");
+  } catch (e) {
+    // Sessizce geç — ana sayfa deneyimini bozmasın
+  }
+}
 
 function bindEvents() {
   document.querySelectorAll("[data-view]").forEach((button) => {

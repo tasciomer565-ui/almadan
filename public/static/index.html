@@ -223,6 +223,16 @@
           <i data-lucide="link"></i>
           <span>Ürün linkini yapıştır veya barkod tara — sistem fiyatları otomatik karşılaştırır.</span>
         </div>
+        <div id="latestCampaignsSection" class="hidden" style="margin-bottom:22px;">
+          <div class="section-heading" style="margin-bottom:10px;">
+            <div>
+              <p class="eyebrow">GÜNCEL FIRSATLAR</p>
+              <h2 style="font-size:18px;">Haftanın En Çok Düşenleri</h2>
+            </div>
+          </div>
+          <div id="latestCampaignsGrid" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;"></div>
+        </div>
+
         <div class="section-heading">
           <div>
             <p class="eyebrow">TAKİP LİSTEN</p>
@@ -679,7 +689,7 @@
       </div>
     </dialog>
 
-    <script defer src="/static/app.js?v=20260706-err-report"></script>
+    <script defer src="/static/app.js?v=20260706-vitrin"></script>
     <script>
       /* Sprint 12 — auth fix: DOMContentLoaded sonrasi state.auth guncelle */
       document.addEventListener('DOMContentLoaded', function() {

@@ -4755,6 +4755,48 @@ async def store_campaigns(slug: str):
     return {"slug": slug, "campaigns": rows}
 
 
+@app.get("/api/campaigns/latest")
+async def latest_campaigns(limit: int = 12):
+    """
+    "Haftanın En Çok Düşenleri" vitrini — tüm mağazalardan en güncel
+    kampanyaları (haftalık katalog, büyük indirim, kampanya sayfası
+    değişikliği) tek listede döner. Herkese açık, giriş gerektirmez.
+    """
+    from datetime import date
+    if not supabase_enabled():
+        return {"campaigns": []}
+    today = date.today().isoformat()
+    limit = max(1, min(limit, 30))
+    try:
+        r = requests.get(
+            f"{supabase_base_url()}/rest/v1/store_campaigns",
+            headers=supabase_headers(),
+            params={
+                "select": "store_slug,title,description,catalog_url,valid_from,valid_until,created_at",
+                "or": f"(valid_until.is.null,valid_until.gte.{today})",
+                "order": "created_at.desc",
+                "limit": str(limit),
+            },
+            timeout=10,
+        )
+        rows = r.json() if r.ok else []
+    except Exception:
+        rows = []
+
+    campaigns = [
+        {
+            "store_slug": row.get("store_slug"),
+            "store_name": _format_store_name(row.get("store_slug", "")),
+            "title": row.get("title"),
+            "description": row.get("description"),
+            "catalog_url": row.get("catalog_url"),
+            "created_at": row.get("created_at"),
+        }
+        for row in rows
+    ]
+    return {"campaigns": campaigns}
+
+
 @app.post("/api/admin/stores/{slug}/campaign")
 async def create_campaign(slug: str, request: Request, admin=Depends(require_admin)):
     """Admin: mağaza için yeni kampanya kaydı ekler."""
