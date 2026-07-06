@@ -17,6 +17,11 @@ from app.comparator import (
 
 LOCAL_SOURCES = {"migros", "carrefoursa", "sokmarket", "metro"}
 
+# marketplace_scan artık kategori başına 10-40 paralel istek atabiliyor;
+# asyncio'nun varsayılan executor'ı (~CPU sayısı+4) bu kadar isteği paralel
+# çalıştıramaz, sıraya girip toplam süreyi katlar. Kendi geniş havuzumuzu kullanıyoruz.
+_SCAN_EXECUTOR = ThreadPoolExecutor(max_workers=48, thread_name_prefix="scan")
+
 YAHOO_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 WORKER_SITES = {
@@ -507,13 +512,13 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
 
     # Pazaryerleri her kategoride çalışır
     base_tasks = [
-        loop.run_in_executor(None, search_n11_direct, query),
-        loop.run_in_executor(None, search_amazon_tr, query),
-        loop.run_in_executor(None, search_trendyol_direct, query),
-        loop.run_in_executor(None, search_hepsiburada_direct, query),
-        loop.run_in_executor(None, search_pazarama, query),
-        loop.run_in_executor(None, search_aliexpress, query),
-        loop.run_in_executor(None, search_temu, query),
+        loop.run_in_executor(_SCAN_EXECUTOR, search_n11_direct, query),
+        loop.run_in_executor(_SCAN_EXECUTOR, search_amazon_tr, query),
+        loop.run_in_executor(_SCAN_EXECUTOR, search_trendyol_direct, query),
+        loop.run_in_executor(_SCAN_EXECUTOR, search_hepsiburada_direct, query),
+        loop.run_in_executor(_SCAN_EXECUTOR, search_pazarama, query),
+        loop.run_in_executor(_SCAN_EXECUTOR, search_aliexpress, query),
+        loop.run_in_executor(_SCAN_EXECUTOR, search_temu, query),
     ]
 
     # Kategoriye göre uzman mağazalar
@@ -524,17 +529,17 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
                    search_lenovo, search_asusrog, search_lg, search_sony,
                    search_hp, search_canon, search_epson, search_turkcell,
                    search_dsmart):
-            extra_tasks.append(loop.run_in_executor(None, fn, query))
+            extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category == "BEBEK":
         for fn in (search_ebebek, search_toyzz, search_bebek, search_lego, search_frigg):
-            extra_tasks.append(loop.run_in_executor(None, fn, query))
+            extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category in ("EV", "MOBİLYA"):
         for fn in (search_vivense, search_evidea, search_karaca, search_englishhome,
                    search_madamecoco, search_koctas, search_bauhaus, search_istikbal,
                    search_bellona, search_dogtas, search_kelebek, search_schafer,
                    search_korkmaz, search_bosch, search_tefal, search_arzum,
                    search_fakir, search_philips):
-            extra_tasks.append(loop.run_in_executor(None, fn, query))
+            extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category in ("MODA", "SPOR"):
         for fn in (search_yargici, search_kinetix, search_flo, search_lcwaikiki,
                    search_mavi, search_boyner, search_zara, search_hm, search_bershka,
@@ -544,28 +549,42 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
                    search_bigjoy, search_decathlon, search_nike, search_adidas,
                    search_puma, search_reebok, search_newbalance, search_sportive,
                    search_lescon, search_pandora):
-            extra_tasks.append(loop.run_in_executor(None, fn, query))
+            extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category == "KOZMETİK":
         for fn in (search_gratis, search_rossmann, search_watsons, search_sephora,
                    search_flormar, search_goldenrose, search_farmasi):
-            extra_tasks.append(loop.run_in_executor(None, fn, query))
+            extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category == "GIDA":
         for fn in (search_bim, search_a101, search_sokmarket, search_tarimkredi,
                    search_metro, search_bizimtoptan, search_tazedirekt):
-            extra_tasks.append(loop.run_in_executor(None, fn, query))
+            extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category in ("GENEL", "KİTAP"):
         for fn in (search_kitapyurdu, search_dr, search_remzi, search_idefix,
                    search_muzikdunyasi, search_ufukkirtasiye, search_ofissepeti,
                    search_evpet, search_petbis, search_petlebi, search_zopet,
                    search_proteinocean, search_supplementler, search_runnutrition):
-            extra_tasks.append(loop.run_in_executor(None, fn, query))
+            extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     else:
         # GENEL/bilinmeyen → MediaMarkt + Teknosa da dene
-        extra_tasks.append(loop.run_in_executor(None, search_mediamarkt, query))
-        extra_tasks.append(loop.run_in_executor(None, search_teknosa, query))
+        extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, search_mediamarkt, query))
+        extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, search_teknosa, query))
 
     all_tasks = base_tasks + extra_tasks
-    results_raw = await asyncio.gather(*all_tasks, return_exceptions=True)
+    try:
+        # Kategori başına 10-40 mağaza aranabiliyor; yavaş/yanıt vermeyen birkaç
+        # kaynak tüm isteği bekletmesin diye üst süre sınırı koyuyoruz.
+        results_raw = await asyncio.wait_for(
+            asyncio.gather(*all_tasks, return_exceptions=True), timeout=7.0
+        )
+    except asyncio.TimeoutError:
+        # Süre dolduğunda o ana kadar biten task'ların sonucunu kullan, geri kalanı iptal et.
+        results_raw = []
+        for t in all_tasks:
+            if t.done() and not t.cancelled():
+                exc = t.exception()
+                results_raw.append(exc if exc else t.result())
+            else:
+                t.cancel()
 
     all_products = []
     seen_urls = set()
