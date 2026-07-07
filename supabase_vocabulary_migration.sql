@@ -59,7 +59,9 @@ $$ language plpgsql;
 -- (backend zaten SUPABASE_SERVICE_KEY ile bağlanıyor, aynı diğer tablolar gibi).
 alter table public.vocabulary enable row level security;
 
-create policy if not exists "service_role_all_vocabulary"
+drop policy if exists "service_role_all_vocabulary" on public.vocabulary;
+
+create policy "service_role_all_vocabulary"
     on public.vocabulary
     for all
     to service_role
