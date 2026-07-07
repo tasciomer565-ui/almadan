@@ -74,6 +74,66 @@ def _heuristic_price_card_scan(soup: "BeautifulSoup", source: str, base_url: str
         })
         if len(results) >= 10:
             break
+
+    if results:
+        return results
+
+    # İkinci geçiş: bazı sitelerde fiyat tek bir metin düğümünde değil,
+    # birden fazla küçük etikete bölünmüş oluyor (ör. <span>18</span>
+    # <span>,90</span><span>TL</span>). Bu durumda küçük konteynerlerin
+    # birleşik metnini (join ile) tarıyoruz.
+    for el in soup.find_all(["div", "li", "article", "a", "span", "p"]):
+        if len(el.find_all()) > 15:
+            continue  # çok büyük konteyner, ürün kartı değil
+        text = el.get_text(" ", strip=True)
+        price_match = _PRICE_RE.search(text)
+        if not price_match:
+            continue
+        try:
+            price = float(price_match.group(1).replace(".", "").replace(" ", "").replace(",", "."))
+        except Exception:
+            continue
+        if price <= 0:
+            continue
+        link_el = el if el.name == "a" and el.get("href") else el.find("a", href=True)
+        title = ""
+        if not link_el:
+            # Link fiyat elemanının altında değilse üst atalarda ara
+            container = el.parent
+            for _ in range(6):
+                if container is None:
+                    break
+                if link_el is None:
+                    link_el = container.find("a", href=True)
+                img_el = container.find("img")
+                candidate_title = (img_el.get("alt", "").strip() if img_el else "") or (
+                    link_el.get("title", "").strip() if link_el else ""
+                )
+                if candidate_title and len(candidate_title) > len(title):
+                    title = candidate_title
+                if link_el and title:
+                    break
+                container = container.parent
+        if not link_el:
+            continue
+        if not title:
+            img_el = el.find("img")
+            title = (img_el.get("alt", "").strip() if img_el else "") or link_el.get("title", "").strip()
+        if not title or len(title) < 3:
+            continue
+        href = link_el.get("href", "")
+        prod_url = href if href.startswith("http") else urllib.parse.urljoin(base_url, href)
+        if prod_url in seen_urls:
+            continue
+        seen_urls.add(prod_url)
+        img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
+        results.append({
+            "title": title, "price": price, "original_price": None,
+            "image_url": img, "source": source, "url": prod_url,
+            "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+        })
+        if len(results) >= 10:
+            break
     return results
 
 
@@ -3380,91 +3440,21 @@ def search_remzi(query: str) -> list[dict]:
     )
 
 def search_tazedirekt(query: str) -> list[dict]:
-    try:
-        url = f"https://www.tazedirekt.com/?s={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, [class*='product-card'], .product")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True)
-            raw = re.sub(r"[^\d,.]", "", raw).replace(",", ".")
-            try:
-                price = float(raw.split(".")[0] + ("." + raw.split(".")[-1] if raw.count(".") == 1 else ""))
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.tazedirekt.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "tazedirekt", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
+    """Tazedirekt — URL doğru (?s=, statik HTML'de gerçek fiyatlar var),
+    eski selector'lar sitenin güncel yapısıyla eşleşmiyordu."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.tazedirekt.com/?s={urllib.parse.quote_plus(query)}",
+        "tazedirekt", render_js=False, timeout=12
+    )
 
 
 def search_bizimtoptan(query: str) -> list[dict]:
-    try:
-        url = f"https://www.bizimtoptan.com.tr/search?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, [class*='product-card'], [class*='ProductCard']")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True)
-            raw = re.sub(r"[^\d,.]", "", raw).replace(",", ".")
-            try:
-                price = float(raw.split(".")[0] + ("." + raw.split(".")[-1] if raw.count(".") == 1 else ""))
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.bizimtoptan.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "bizimtoptan", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
+    """Bizim Toptan — URL doğru (/search?q=, form action'ından doğrulandı),
+    eski selector'lar sitenin güncel yapısıyla eşleşmiyordu."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.bizimtoptan.com.tr/search?q={urllib.parse.quote_plus(query)}",
+        "bizimtoptan", render_js=False, timeout=12
+    )
 
 
 def search_tarimkredi(query: str) -> list[dict]:
