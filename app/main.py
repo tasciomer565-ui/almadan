@@ -4147,7 +4147,11 @@ def _debug_wa(secret: str):
         "template": {
             "name": "jaspers_market_order_confirmation_v1",
             "language": {"code": "en_US"},
-            "components": [{"type": "body", "parameters": [{"type": "text", "text": "Test"}]}],
+            "components": [{"type": "body", "parameters": [
+                {"type": "text", "text": "Test"},
+                {"type": "text", "text": "123456"},
+                {"type": "text", "text": "Jul 8, 2026"},
+            ]}],
         },
     }
     r = requests.post(
