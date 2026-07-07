@@ -2463,47 +2463,12 @@ def search_idefix(query: str) -> list[dict]:
     )
 
 def search_bebek(query: str) -> list[dict]:
-    try:
-        url = f"https://www.bebek.com/arama?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, [class*='product-card'], [class*='ProductCard']")[:10]:
-            name_el = item.select_one("[class*='product-name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True)
-            raw = re.sub(r"[^\d,.]", "", raw).replace(",", ".")
-            try:
-                price = float(raw.split(".")[0] + ("." + raw.split(".")[-1] if raw.count(".") == 1 else ""))
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.bebek.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "bebek", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
+    """bebek.com — Next.js App Router, statik HTML'de ürün/fiyat yok
+    (istemci tarafında render ediliyor), ScrapingBee render_js=True gerekiyor."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.bebek.com/arama?q={urllib.parse.quote_plus(query)}",
+        "bebek", render_js=True, timeout=15
+    )
 
 
 def search_ebebek(query: str) -> list[dict]:
@@ -2559,47 +2524,12 @@ def search_ebebek(query: str) -> list[dict]:
 
 
 def search_toyzz(query: str) -> list[dict]:
-    try:
-        url = f"https://www.toyzzshop.com/arama?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, [class*='product-card'], .product")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True)
-            raw = re.sub(r"[^\d,.]", "", raw).replace(",", ".")
-            try:
-                price = float(raw.split(".")[0] + ("." + raw.split(".")[-1] if raw.count(".") == 1 else ""))
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.toyzzshop.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "toyzz", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
+    """Toyzz Shop — statik HTML'de fiyat yok (no-cache başlıkları ve boş
+    yapı JS-render edildiğini gösteriyor), ScrapingBee render_js=True gerekiyor."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.toyzzshop.com/arama?q={urllib.parse.quote_plus(query)}",
+        "toyzz", render_js=True, timeout=15
+    )
 
 
 # EV ALETLERİ & MUTFAK
@@ -5020,42 +4950,13 @@ def search_ulker(query: str) -> list[dict]:
 
 
 def search_lego(query: str) -> list[dict]:
-    try:
-        url = f"https://www.lego.com/tr-tr/search?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select("[class*='product-item'], [class*='product-leaf'], [class*='ProductCard']")[:10]:
-            name_el = item.select_one("[class*='product-title'], [class*='title'], [class*='name'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price")
-            if not price_el:
-                continue
-            raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.lego.com{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({"title": name, "price": price, "original_price": None, "image_url": img, "source": "lego", "url": prod_url, "labels": ["Önerilen"], "extra_info": {"out_of_stock": False}})
-        return results
-    except Exception:
-        return []
+    """LEGO TR — URL doğru (lego.tr'ye yönleniyor, statik HTML'de gerçek
+    fiyatlar var) ama eski selector'lar sitenin güncel yapısıyla eşleşmiyordu.
+    Paylaşılan sezgisel fiyat-kart tarayıcısına geçirildi."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.lego.com/tr-tr/search?q={urllib.parse.quote_plus(query)}",
+        "lego", render_js=False, timeout=12
+    )
 
 
 def search_epson(query: str) -> list[dict]:
@@ -5363,33 +5264,12 @@ def search_oyundeposu(query: str) -> list[dict]:
 
 
 def search_frigg(query: str) -> list[dict]:
-    try:
-        url = f"https://www.frigg.com.tr/?s={urllib.parse.quote_plus(query)}"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36", "Accept-Language": "tr-TR,tr;q=0.9", "Accept": "text/html,application/xhtml+xml,*/*;q=0.8"}
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product, .product-item, [class*='product-card']")[:10]:
-            name_el = item.select_one("[class*='title'], [class*='name'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name: continue
-            price_el = item.select_one("[class*='price'], .price")
-            if not price_el: continue
-            raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
-            try: price = float(raw)
-            except: continue
-            if price <= 0: continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.frigg.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({"title": name, "price": price, "original_price": None, "image_url": img, "source": "frigg", "url": prod_url, "labels": ["Önerilen"], "extra_info": {"out_of_stock": False}})
-        return results
-    except Exception:
-        return []
+    """Frigg — WordPress/WooCommerce arama URL'si doğru, eski selector'lar
+    eşleşmiyordu. Paylaşılan sezgisel fiyat-kart tarayıcısına geçirildi."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.frigg.com.tr/?s={urllib.parse.quote_plus(query)}",
+        "frigg", render_js=False, timeout=12
+    )
 
 
 def search_asusrog(query: str) -> list[dict]:

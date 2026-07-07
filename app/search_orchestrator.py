@@ -545,7 +545,9 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
                    search_dsmart):
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category == "BEBEK":
-        for fn in (search_ebebek, search_toyzz, search_bebek, search_lego, search_frigg):
+        # search_toyzz/search_bebek render_js=True gerektiriyor (10-20s),
+        # canli taramadan cikarildi -- bkz. app/slow_store_cache_warmer.py
+        for fn in (search_ebebek, search_lego, search_frigg):
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category in ("EV", "MOBİLYA"):
         for fn in (search_vivense, search_evidea, search_karaca, search_englishhome,
