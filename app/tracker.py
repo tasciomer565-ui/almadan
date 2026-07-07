@@ -270,7 +270,14 @@ def queue_or_dispatch_notification(db: dict, product: dict, notification: dict) 
         log_email_notification(owner_id, notification["title"], notification["message"])
 
 
-def queue_or_dispatch_catalog_notification(db: dict, owner_id: str, notification: dict) -> None:
+def queue_or_dispatch_catalog_notification(
+    db: dict,
+    owner_id: str,
+    notification: dict,
+    wa_template: str | None = None,
+    wa_params: list[str] | None = None,
+    wa_button_param: str | None = None,
+) -> None:
     if is_in_silence_hours(owner_id):
         db.setdefault("queued_notifications", []).append({
             "owner_id": owner_id,
@@ -278,7 +285,10 @@ def queue_or_dispatch_catalog_notification(db: dict, owner_id: str, notification
         })
         save_db(db)
     else:
-        log_sms_notification(owner_id, notification["title"], notification["message"])
+        log_sms_notification(
+            owner_id, notification["title"], notification["message"],
+            wa_template=wa_template, wa_params=wa_params, wa_button_param=wa_button_param,
+        )
         log_email_notification(owner_id, notification["title"], notification["message"])
         try:
             payload = {
@@ -558,7 +568,15 @@ def _trigger_weekly_catalogs_legacy() -> None:
 
 
 def trigger_weekly_catalogs() -> None:
-    from app.catalogs import catalog_matches_product, fetch_all_catalogs
+    """
+    Her market (BİM, A101, ŞOK vb.) icin o haftaki aktuel/katalog verisi
+    degistiginde takipci kullanicilara TEK bir bildirim gonderir --
+    kullanicinin takip ettigi urunlerle eslesme aranmaz (aktuel zaten
+    degisken/cesitli urunler iceriyor, eslesme mantiksal olarak dar
+    kapsamli kaliyordu). WhatsApp butonu /aktuel/{store} sayfasina
+    yonlenir, orada o haftanin gercek katalog icerigi listelenir.
+    """
+    from app.catalogs import fetch_all_catalogs
 
     db = load_db()
     checked_at = utc_now()
@@ -592,50 +610,29 @@ def trigger_weekly_catalogs() -> None:
 
     notifications_added = False
     for owner_id in unique_users:
-        owner_products = [
-            product
-            for product in db.get("products", [])
-            if product.get("owner_id") == owner_id
-        ]
         for catalog in changed_catalogs:
+            item_count = len(catalog.get("items", []))
             notification = {
                 "id": str(uuid4()),
                 "owner_id": owner_id,
                 "title": catalog["title"],
                 "message": (
-                    f"{catalog['title']} resmî kaynağında güncellendi. "
-                    f"{len(catalog.get('items', []))} katalog başlığı tarandı."
+                    f"{catalog['title']} bu hafta güncellendi. "
+                    f"{item_count} ürün taranıyor, hemen göz at."
                 ),
-                "url": catalog["url"],
+                "url": f"/aktuel/{catalog['store']}",
                 "created_at": checked_at,
                 "read": False,
                 "type": f"catalog_{catalog['store']}",
             }
             db["notifications"].insert(0, notification)
             notifications_added = True
-            queue_or_dispatch_catalog_notification(db, owner_id, notification)
-
-            for product in owner_products:
-                product_title = product.get("title", "")
-                if not product_title or not catalog_matches_product(catalog, product_title):
-                    continue
-                match_notification = {
-                    "id": str(uuid4()),
-                    "product_id": product["id"],
-                    "owner_id": owner_id,
-                    "title": "Kataloğa Düştü!",
-                    "message": (
-                        f"Takip ettiğin '{product_title}' ürünü "
-                        f"{catalog['title']} içeriğiyle eşleşti."
-                    ),
-                    "url": catalog["url"],
-                    "created_at": checked_at,
-                    "read": False,
-                    "type": "catalog_match",
-                }
-                db["notifications"].insert(0, match_notification)
-                notifications_added = True
-                queue_or_dispatch_notification(db, product, match_notification)
+            queue_or_dispatch_catalog_notification(
+                db, owner_id, notification,
+                wa_template=os.getenv("WHATSAPP_CATALOG_TEMPLATE_NAME", "catalog_alert").strip(),
+                wa_params=[catalog["title"], f"{item_count} ürün taranıyor"],
+                wa_button_param=f"aktuel/{catalog['store']}",
+            )
 
     if notifications_added or fetched:
         save_db(db)

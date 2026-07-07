@@ -5039,6 +5039,92 @@ async def store_page(slug: str):
     return HTMLResponse(page)
 
 
+@app.get("/aktuel/{store}", response_class=HTMLResponse)
+async def catalog_page(store: str):
+    """
+    Bir marketin (BİM, A101, ŞOK vb.) o haftaki gerçek aktüel/katalog
+    içeriğini gösteren sayfa. WhatsApp catalog_alert bildirimindeki
+    "Kataloğu Gör" butonu buraya yönleniyor -- daha önce bu veri
+    (db["catalog_snapshots"]) toplanıyordu ama hiçbir sayfada
+    gösterilmiyordu.
+    """
+    import html as _html
+
+    db = load_db()
+    snapshot = db.get("catalog_snapshots", {}).get(store)
+
+    if not snapshot:
+        return HTMLResponse(
+            "<h1>Bu mağaza için henüz katalog verisi yok</h1>"
+            "<p><a href=\"/\">Ana sayfaya dön</a></p>",
+            status_code=404,
+        )
+
+    title = _html.escape(snapshot.get("title") or store.upper())
+    source_url = _html.escape(snapshot.get("url") or "")
+    items = snapshot.get("items") or []
+    checked_at = _html.escape(str(snapshot.get("last_checked_at") or snapshot.get("checked_at") or ""))
+
+    if items:
+        items_html = "".join(
+            f'<div class="bp-feature"><p>{_html.escape(item)}</p></div>' for item in items
+        )
+    else:
+        items_html = '<p class="bp-body">Bu haftaki katalog henüz taranamadı, kısa süre sonra tekrar kontrol et.</p>'
+
+    page = f"""<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#121412">
+    <title>{title} — Bu Haftaki Aktüel — Almadan</title>
+    <meta name="description" content="{title} bu hafta neler var? Güncel aktüel ürün listesi.">
+    <link rel="canonical" href="https://www.almadan.app/aktuel/{store}">
+    <meta name="robots" content="index, follow">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
+  </head>
+  <body>
+    <header class="bp-header">
+      <a href="/" class="bp-logo"><span class="bp-logo-mark">A</span>almadan</a>
+      <nav class="bp-nav">
+        <a href="/hakkinda">Hakkında</a>
+        <a href="/gizlilik">Gizlilik</a>
+        <a href="/iletisim">İletişim</a>
+      </nav>
+    </header>
+
+    <section class="bp-hero">
+      <div class="bp-hero-inner">
+        <p class="bp-eyebrow">BU HAFTA AKTÜEL</p>
+        <h1>{title}</h1>
+        <p class="bp-hero-copy">Son tarama: {checked_at}</p>
+        {f'<a class="bp-cta" href="{source_url}" rel="nofollow noopener" target="_blank"><i data-lucide="external-link"></i> Resmî Kaynağı Gör</a>' if source_url else ""}
+      </div>
+    </section>
+
+    <main class="bp-main">
+      <h2><i data-lucide="shopping-bag"></i> Bu Haftaki Ürünler</h2>
+      <div class="bp-feature-grid">
+        {items_html}
+      </div>
+      <a class="bp-cta bp-cta-block" href="/"><i data-lucide="arrow-right"></i> Tüm Mağazalarda Fiyat Karşılaştır</a>
+    </main>
+
+    <footer class="bp-footer">
+      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
+      <p>© 2026 Almadan</p>
+    </footer>
+    <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
+  </body>
+</html>"""
+    return HTMLResponse(page)
+
+
 _CATEGORY_DISPLAY = {
     "market": ("Market / Gıda", "BİM, A101, ŞOK, Migros ve daha fazla marketten güncel kampanyalar ve fiyat karşılaştırması."),
     "tech": ("Teknoloji", "Teknosa, MediaMarkt, Vatan Bilgisayar ve daha fazla teknoloji mağazasından fiyat karşılaştırması."),
