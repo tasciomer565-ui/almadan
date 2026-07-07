@@ -550,11 +550,12 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         for fn in (search_ebebek, search_lego, search_frigg):
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category in ("EV", "MOBİLYA"):
+        # search_koctas/bauhaus/korkmaz/bosch/istikbal render_js=True
+        # gerektiriyor (10-20s), canli taramadan cikarildi -- bkz.
+        # app/slow_store_cache_warmer.py
         for fn in (search_vivense, search_evidea, search_karaca, search_englishhome,
-                   search_madamecoco, search_koctas, search_bauhaus, search_istikbal,
-                   search_bellona, search_dogtas, search_kelebek, search_schafer,
-                   search_korkmaz, search_bosch, search_tefal, search_arzum,
-                   search_fakir, search_philips):
+                   search_bellona, search_dogtas, search_kelebek,
+                   search_schafer, search_tefal, search_arzum, search_fakir):
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category in ("MODA", "SPOR"):
         for fn in (search_yargici, search_kinetix, search_flo, search_lcwaikiki,

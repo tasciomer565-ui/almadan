@@ -25,6 +25,10 @@ _SLOW_JS_STORES: dict[str, list[str]] = {
     "BEBEK": [
         "search_toyzz", "search_bebek",
     ],
+    "EV": [
+        "search_koctas", "search_bauhaus", "search_korkmaz", "search_bosch",
+        "search_istikbal", "search_madamecoco", "search_philips",
+    ],
 }
 
 # Kategori başına ısıtılacak popüler sorgular (catalog_crawler.py'deki
@@ -35,6 +39,9 @@ _WARM_QUERIES: dict[str, list[str]] = {
     ],
     "BEBEK": [
         "bebek bezi", "bebek maması", "oyuncak", "emzik", "bebek arabası",
+    ],
+    "EV": [
+        "tencere", "boya", "matkap", "çamaşır makinesi", "koltuk",
     ],
 }
 
