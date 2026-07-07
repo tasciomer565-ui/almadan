@@ -102,6 +102,7 @@ def whatsapp_args_for_notification(notification: dict, product: dict | None = No
         return {
             "wa_template": os.getenv("WHATSAPP_CATALOG_TEMPLATE_NAME", "catalog_alert").strip(),
             "wa_params": [product.get("title", ""), notification.get("title", "")],
+            "wa_button_param": _product_url_suffix(product.get("url")),
         }
 
     return {}
