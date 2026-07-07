@@ -580,14 +580,6 @@ def trigger_weekly_catalogs() -> None:
 
     db = load_db()
     checked_at = utc_now()
-    unique_users = {
-        item.get("owner_id")
-        for collection in ("products", "push_subscriptions", "notifications")
-        for item in db.get(collection, [])
-        if str(item.get("owner_id", "")).startswith("user:")
-    }
-    if not unique_users:
-        return
 
     fetched = fetch_all_catalogs()
     stored_snapshots = db.setdefault("catalog_snapshots", {})
@@ -608,9 +600,36 @@ def trigger_weekly_catalogs() -> None:
         if snapshot["changed"]:
             changed_catalogs.append(snapshot)
 
+    if not changed_catalogs:
+        save_db(db)
+        return
+
+    # Yalnizca o magazayi GERCEKTEN takip eden kullanicilara bildirim
+    # gonderilir (followed_stores tablosu) -- daha once TUM kullanicilara
+    # gonderiliyordu, bu yanlisti.
+    def _store_followers(store_slug: str) -> set[str]:
+        import requests
+        from app.storage import supabase_enabled, supabase_base_url, supabase_headers
+        if not supabase_enabled():
+            return set()
+        try:
+            resp = requests.get(
+                f"{supabase_base_url()}/rest/v1/followed_stores",
+                headers=supabase_headers(),
+                params={"store_slug": f"eq.{store_slug}", "select": "user_id"},
+                timeout=10,
+            )
+            rows = resp.json() if resp.ok else []
+            return {f"user:{row['user_id']}" for row in rows if row.get("user_id")}
+        except Exception:
+            return set()
+
     notifications_added = False
-    for owner_id in unique_users:
-        for catalog in changed_catalogs:
+    for catalog in changed_catalogs:
+        followers = _store_followers(catalog["store"])
+        if not followers:
+            continue
+        for owner_id in followers:
             item_count = len(catalog.get("items", []))
             notification = {
                 "id": str(uuid4()),
