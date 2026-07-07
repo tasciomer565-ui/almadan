@@ -58,14 +58,62 @@ import json
 #         smtp.login(SMTP_USER, SMTP_PASSWORD)
 #         smtp.send_message(mail)
 
+def _whatsapp_display_name(user_info: dict) -> str:
+    full_name = (user_info.get("full_name") or "").strip()
+    email = user_info.get("email") or ""
+    return (
+        full_name.split()[0].capitalize() if full_name
+        else (email.split("@")[0].capitalize() if email else "")
+    ) or "Değerli kullanıcımız"
+
+
+def _product_url_suffix(product_url: str | None) -> str:
+    return (product_url or "").replace("https://www.almadan.app/", "").lstrip("/") or "urun"
+
+
+def whatsapp_args_for_notification(notification: dict, product: dict | None = None) -> dict:
+    """
+    Bildirim turune gore dogru WhatsApp sablonu + parametrelerini secer.
+    Bos dict donerse cagiran taraf genel (general_notification) sablona
+    duser -- ozel bir sablon icin yeterli/anlamli veri yoksa budur.
+    """
+    ntype = notification.get("type")
+
+    if ntype == "target_price_alert" and product:
+        history = product.get("price_history", [])
+        new_price = current_price(product)
+        old_price = float(history[-2]["price"]) if len(history) >= 2 else None
+        if old_price and old_price > new_price:
+            return {
+                "wa_template": os.getenv("WHATSAPP_TEMPLATE_NAME", "price_alert").strip(),
+                "wa_params": [product.get("title", ""), f"{new_price:.2f}", f"{old_price - new_price:.2f}"],
+                "wa_button_param": _product_url_suffix(product.get("url")),
+            }
+
+    if ntype == "stock_back" and product:
+        new_price = current_price(product)
+        return {
+            "wa_template": os.getenv("WHATSAPP_STOCK_TEMPLATE_NAME", "stock_alert").strip(),
+            "wa_params": [product.get("title", ""), f"{new_price:.2f}"],
+            "wa_button_param": _product_url_suffix(product.get("url")),
+        }
+
+    if ntype == "catalog_match" and product:
+        return {
+            "wa_template": os.getenv("WHATSAPP_CATALOG_TEMPLATE_NAME", "catalog_alert").strip(),
+            "wa_params": [product.get("title", ""), notification.get("title", "")],
+        }
+
+    return {}
+
+
 def log_sms_notification(
     owner_id: str | None,
     title: str,
     message: str,
-    product_title: str | None = None,
-    new_price: float | None = None,
-    saved_amount: float | None = None,
-    product_url: str | None = None,
+    wa_template: str | None = None,
+    wa_params: list[str] | None = None,
+    wa_button_param: str | None = None,
 ) -> None:
     if not owner_id or not owner_id.startswith("user:"):
         return
@@ -78,31 +126,20 @@ def log_sms_notification(
     if pref not in ("sms", "both") or not phone:
         return
 
-    # Gercek WhatsApp bildirimi. Iki sablon var:
-    # 1) price_alert: zengin fiyat verisi oldugunda (isim, urun, yeni fiyat,
-    #    kazanc + dinamik urun linki) -- en iyi gorunumlu format.
-    # 2) general_notification: diger TUM bildirim turleri icin (stok geldi,
-    #    kataloga dustu, market bulteni vb.) -- zaten hazirlanmis title/
-    #    message metnini kullanir, urune ozel veri gerektirmez.
-    # Meta onayli sablonlar onaylanana kadar gonderim sessizce basarisiz olur.
+    # Gercek WhatsApp bildirimi -- notification turune ozel bir sablon
+    # (wa_template/wa_params, bkz. whatsapp_args_for_notification) varsa o
+    # kullanilir; yoksa TUM diger bildirim turleri icin general_notification
+    # (isim + hazirlanmis title/message metni) devreye girer. Meta onayli
+    # sablonlar onaylanana kadar gonderim sessizce basarisiz olur.
     try:
         from app.whatsapp import whatsapp_enabled, send_whatsapp_template
         if whatsapp_enabled():
-            full_name = (user_info.get("full_name") or "").strip()
-            email = user_info.get("email") or ""
-            display_name = (
-                full_name.split()[0].capitalize() if full_name
-                else (email.split("@")[0].capitalize() if email else "")
-            ) or "Değerli kullanıcımız"
-
-            if product_title is not None and new_price is not None and saved_amount is not None:
-                template_name = os.getenv("WHATSAPP_TEMPLATE_NAME", "price_alert").strip()
-                url_suffix = (product_url or "").replace("https://www.almadan.app/", "").lstrip("/") or "urun"
+            display_name = _whatsapp_display_name(user_info)
+            if wa_template and wa_params is not None:
                 send_whatsapp_template(
-                    phone,
-                    template_name,
-                    params=[display_name, product_title, f"{new_price:.2f}", f"{saved_amount:.2f}"],
-                    button_param=url_suffix,
+                    phone, wa_template,
+                    params=[display_name] + wa_params,
+                    button_param=wa_button_param,
                 )
             else:
                 general_template = os.getenv("WHATSAPP_GENERAL_TEMPLATE_NAME", "general_notification").strip()
@@ -225,23 +262,10 @@ def queue_or_dispatch_notification(db: dict, product: dict, notification: dict) 
         except Exception:
             pass
 
-        # WhatsApp sablonu sadece gercek fiyat verisi tasiyan bildirim
-        # turlerinde (hedef fiyata ulasildi) anlamli -- diger turlerde
-        # (stok geldi, kataloga dustu vb.) urun/fiyat/kazanc esleşmiyor.
-        wa_kwargs = {}
-        if notification.get("type") == "target_price_alert":
-            history = product.get("price_history", [])
-            new_price = current_price(product)
-            old_price = float(history[-2]["price"]) if len(history) >= 2 else None
-            if old_price and old_price > new_price:
-                wa_kwargs = {
-                    "product_title": product.get("title", ""),
-                    "new_price": new_price,
-                    "saved_amount": old_price - new_price,
-                    "product_url": product.get("url", ""),
-                }
-
-        log_sms_notification(owner_id, notification["title"], notification["message"], **wa_kwargs)
+        log_sms_notification(
+            owner_id, notification["title"], notification["message"],
+            **whatsapp_args_for_notification(notification, product),
+        )
         log_email_notification(owner_id, notification["title"], notification["message"])
 
 
@@ -285,20 +309,10 @@ def flush_queued_notifications() -> None:
             product_id = item.get("product_id")
             product = next((p for p in db["products"] if p["id"] == product_id), None) if product_id else None
 
-            wa_kwargs = {}
-            if product and notification.get("type") == "target_price_alert":
-                history = product.get("price_history", [])
-                new_price = current_price(product)
-                old_price = float(history[-2]["price"]) if len(history) >= 2 else None
-                if old_price and old_price > new_price:
-                    wa_kwargs = {
-                        "product_title": product.get("title", ""),
-                        "new_price": new_price,
-                        "saved_amount": old_price - new_price,
-                        "product_url": product.get("url", ""),
-                    }
-
-            log_sms_notification(owner_id, notification["title"], notification["message"], **wa_kwargs)
+            log_sms_notification(
+                owner_id, notification["title"], notification["message"],
+                **whatsapp_args_for_notification(notification, product),
+            )
             log_email_notification(owner_id, notification["title"], notification["message"])
 
             try:

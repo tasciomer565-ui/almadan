@@ -59,6 +59,8 @@ class DigestPayload:
     points_balance: int
     streak_days: int
     watchlist_count: int
+    phone: str | None = None
+    notification_pref: str | None = None
 
     def is_worth_sending(self) -> bool:
         """Boş digest gönderme — en az 1 indirim veya 10 puan kazanılmış olmalı."""
@@ -269,12 +271,14 @@ class RetentionService:
             points_balance=points,
             streak_days=streak,
             watchlist_count=watchlist_count,
+            phone=meta.get("phone"),
+            notification_pref=meta.get("notification_pref", "both"),
         )
 
     # ── Gönderim ─────────────────────────────────────────────
 
     def _send_digest(self, payload: DigestPayload) -> bool:
-        """E-posta VE push bildirimi gönderir (mevcut her kanal)."""
+        """E-posta, push VE WhatsApp bildirimi gönderir (mevcut her kanal)."""
         results = []
 
         # 1. E-posta (SMTP varsa)
@@ -283,6 +287,10 @@ class RetentionService:
 
         # 2. Push bildirimi
         results.append(self._send_push_digest(payload))
+
+        # 3. WhatsApp (telefon numarasi ve tercih uygunsa)
+        if payload.phone and payload.notification_pref in ("sms", "both"):
+            results.append(self._send_whatsapp_digest(payload))
 
         return any(results)
 
@@ -333,6 +341,26 @@ class RetentionService:
                 except Exception:
                     pass
             return sent
+        except Exception:
+            return False
+
+    def _send_whatsapp_digest(self, payload: DigestPayload) -> bool:
+        """Haftalik tasarruf ozetini WhatsApp sablonu ile gonderir."""
+        try:
+            from app.whatsapp import whatsapp_enabled, send_whatsapp_template
+            if not whatsapp_enabled():
+                return False
+            template_name = os.getenv("WHATSAPP_WEEKLY_TEMPLATE_NAME", "weekly_summary").strip()
+            display_name = (payload.display_name or "").split()[0].capitalize() or "Değerli kullanıcımız"
+            return send_whatsapp_template(
+                payload.phone,
+                template_name,
+                params=[
+                    display_name,
+                    f"{payload.total_saved_week:.2f}",
+                    str(len(payload.top_deals)),
+                ],
+            )
         except Exception:
             return False
 

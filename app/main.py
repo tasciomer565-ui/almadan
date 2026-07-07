@@ -873,6 +873,8 @@ def auth_profile_update(request: Request, payload: ProfileUpdateRequest) -> dict
             detail="SMS bildirimleri için telefon numarası gereklidir.",
         )
 
+    had_phone_before = bool((request.state.user_metadata or {}).get("phone"))
+
     metadata = {
         **(request.state.user_metadata or {}),
         "gender": payload.gender,
@@ -894,6 +896,20 @@ def auth_profile_update(request: Request, payload: ProfileUpdateRequest) -> dict
         {"email": request.state.user_email, **metadata}
     )
     save_db(db)
+
+    # Telefon numarasi ilk kez eklendiyse (WhatsApp bildirimlerine yeni
+    # katildi) hos geldin mesaji gonder.
+    if phone and not had_phone_before and payload.notification_pref in ("sms", "both"):
+        try:
+            from app.whatsapp import whatsapp_enabled, send_whatsapp_template
+            from app.tracker import _whatsapp_display_name
+            if whatsapp_enabled():
+                user_info = db["users"][owner_id]
+                display_name = _whatsapp_display_name(user_info)
+                welcome_template = os.getenv("WHATSAPP_WELCOME_TEMPLATE_NAME", "welcome").strip()
+                send_whatsapp_template(phone, welcome_template, params=[display_name])
+        except Exception:
+            pass
 
     return {
         "status": "ok",
