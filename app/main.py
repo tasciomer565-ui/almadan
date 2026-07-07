@@ -5848,6 +5848,30 @@ async def cron_store_newsletters(request: Request):
                 except Exception as mail_err:
                     logger.warning("Follower email gönderilemedi %s: %s", email, mail_err)
 
+            # Takipçiye WhatsApp bildirimi -- magazanin GERCEK bu haftaki
+            # kampanyasi (campaign_title, catalog_url), belirli bir urunle
+            # alakasi yok. Buton /magaza/{slug} SEO sayfamiza gidiyor,
+            # orada da ayni magazanin guncel kampanyalari gosteriliyor.
+            if uid:
+                try:
+                    from app.whatsapp import whatsapp_enabled, send_whatsapp_template
+                    from app.tracker import _whatsapp_display_name
+                    if whatsapp_enabled():
+                        local_db = load_db()
+                        user_info = local_db.get("users", {}).get(f"user:{uid}", {})
+                        phone = user_info.get("phone")
+                        pref = user_info.get("notification_pref", "both")
+                        if phone and pref in ("sms", "both"):
+                            display_name = _whatsapp_display_name(user_info)
+                            campaign_template = os.getenv("WHATSAPP_CAMPAIGN_TEMPLATE_NAME", "campaign_alert").strip()
+                            send_whatsapp_template(
+                                phone, campaign_template,
+                                params=[display_name, store["name"], campaign_title or "Yeni kampanya"],
+                                button_param=slug,
+                            )
+                except Exception as wa_err:
+                    logger.warning("Follower WhatsApp gönderilemedi user=%s: %s", uid, wa_err)
+
         if follower_count > 0 or any(result.values()):
             ids = [c["id"] for c in campaigns]
             for cid in ids:
