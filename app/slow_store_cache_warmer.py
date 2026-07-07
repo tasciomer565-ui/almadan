@@ -29,6 +29,10 @@ _SLOW_JS_STORES: dict[str, list[str]] = {
         "search_koctas", "search_bauhaus", "search_korkmaz", "search_bosch",
         "search_istikbal", "search_madamecoco", "search_philips",
     ],
+    "TEKNOLOJİ": [
+        "search_huawei", "search_xiaomi", "search_lenovo", "search_asusrog",
+        "search_sony", "search_hp", "search_canon", "search_epson", "search_dsmart",
+    ],
 }
 
 # Kategori başına ısıtılacak popüler sorgular (catalog_crawler.py'deki
@@ -42,6 +46,9 @@ _WARM_QUERIES: dict[str, list[str]] = {
     ],
     "EV": [
         "tencere", "boya", "matkap", "çamaşır makinesi", "koltuk",
+    ],
+    "TEKNOLOJİ": [
+        "telefon", "laptop", "televizyon", "yazıcı", "kamera",
     ],
 }
 

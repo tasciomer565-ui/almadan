@@ -538,11 +538,11 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
     # Kategoriye göre uzman mağazalar
     extra_tasks = []
     if category == "TEKNOLOJİ":
+        # search_huawei/xiaomi/lenovo/asusrog/sony/hp/canon/epson/dsmart
+        # render_js=True gerektiriyor (10-20s), canli taramadan cikarildi
+        # -- bkz. app/slow_store_cache_warmer.py
         for fn in (search_mediamarkt, search_teknosa, search_vatanbilgisayar,
-                   search_itopya, search_casper, search_huawei, search_xiaomi,
-                   search_lenovo, search_asusrog, search_lg, search_sony,
-                   search_hp, search_canon, search_epson, search_turkcell,
-                   search_dsmart):
+                   search_itopya, search_casper, search_lg, search_turkcell):
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category == "BEBEK":
         # search_toyzz/search_bebek render_js=True gerektiriyor (10-20s),
