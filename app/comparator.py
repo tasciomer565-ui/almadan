@@ -15,8 +15,71 @@ _STD_HEADERS = {
 }
 
 
+_PRICE_RE = re.compile(r"(\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})?)\s*(?:TL|₺)")
+
+
+def _heuristic_price_card_scan(soup: "BeautifulSoup", source: str, base_url: str) -> list[dict]:
+    """JSON-LD bulunamadığında son çare: fiyat deseni (₺/TL) içeren ve içinde
+    bir link barındıran en küçük tekrarlayan konteynerleri ürün kartı olarak
+    dener. JS-render edilen modern SPA'larda (Vue/React) JSON-LD hiç olmayabilir
+    ama render sonrası HTML'de fiyatlar düz metin olarak bulunur."""
+    results = []
+    seen_urls = set()
+    price_nodes = [
+        el for el in soup.find_all(string=_PRICE_RE)
+        if el.strip()
+    ]
+    for text_node in price_nodes[:40]:
+        price_match = _PRICE_RE.search(text_node)
+        if not price_match:
+            continue
+        try:
+            price = float(price_match.group(1).replace(".", "").replace(" ", "").replace(",", "."))
+        except Exception:
+            continue
+        if price <= 0:
+            continue
+        # En yakın atadan (üst) bir <a href> ve makul uzunlukta bir başlık bul
+        container = text_node.parent
+        link_el = None
+        title = ""
+        for _ in range(6):
+            if container is None:
+                break
+            if link_el is None:
+                link_el = container.find("a", href=True)
+            img_el = container.find("img")
+            candidate_title = (
+                (img_el.get("alt", "").strip() if img_el else "")
+                or (link_el.get("title", "").strip() if link_el else "")
+            )
+            if candidate_title and len(candidate_title) > len(title):
+                title = candidate_title
+            container = container.parent
+        if not link_el or not title or len(title) < 3:
+            continue
+        href = link_el.get("href", "")
+        if not href:
+            continue
+        prod_url = href if href.startswith("http") else urllib.parse.urljoin(base_url, href)
+        if prod_url in seen_urls:
+            continue
+        seen_urls.add(prod_url)
+        img_el = link_el.find("img") or (link_el.parent.find("img") if link_el.parent else None)
+        img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
+        results.append({
+            "title": title, "price": price, "original_price": None,
+            "image_url": img, "source": source, "url": prod_url,
+            "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+        })
+        if len(results) >= 10:
+            break
+    return results
+
+
 def _scrape_jsonld_itemlist(url: str, source: str, render_js: bool = False, timeout: int = 10) -> list[dict]:
-    """JSON-LD ItemList olan sayfalardan ürün çeker. ScrapingBee varsa proxy kullanır."""
+    """JSON-LD ItemList olan sayfalardan ürün çeker. ScrapingBee varsa proxy kullanır.
+    JSON-LD bulunamazsa (modern JS-SPA'larda sık) fiyat-deseni sezgisel taramasına düşer."""
     from app.scraping_proxy import proxy_get, proxy_enabled
     html = None
     if proxy_enabled():
@@ -63,6 +126,11 @@ def _scrape_jsonld_itemlist(url: str, source: str, render_js: bool = False, time
                 return results
         except Exception:
             continue
+    if not results:
+        try:
+            results = _heuristic_price_card_scan(soup, source, url)
+        except Exception:
+            results = []
     return results
 
 def clean_product_title(title: str) -> str:
@@ -930,17 +998,19 @@ def search_karaca(query: str) -> list[dict]:
     )
 
 def search_watsons(query: str) -> list[dict]:
-    """Watsons ürün araması — JSON-LD + ScrapingBee render_js."""
+    """Watsons ürün araması — doğrudan istekte 403 (bot koruması) alıyor,
+    ScrapingBee render_js=True ile JS render edilmiş sayfa üzerinden dener."""
     return _scrape_jsonld_itemlist(
         f"https://www.watsons.com.tr/search?text={urllib.parse.quote_plus(query)}",
-        "watsons", render_js=False, timeout=12
+        "watsons", render_js=True, timeout=15
     )
 
 def search_gratis(query: str) -> list[dict]:
-    """Gratis ürün araması — JSON-LD + ScrapingBee render_js."""
+    """Gratis ürün araması — modern JS-SPA, statik HTML'de JSON-LD/fiyat yok,
+    ScrapingBee render_js=True gerekiyor."""
     return _scrape_jsonld_itemlist(
         f"https://www.gratis.com/search?q={urllib.parse.quote_plus(query)}",
-        "gratis", render_js=False, timeout=12
+        "gratis", render_js=True, timeout=15
     )
 
 def search_mediamarkt(query: str) -> list[dict]:
@@ -1304,9 +1374,10 @@ def search_bim(query: str) -> list[dict]:
 
 
 def search_rossmann(query: str) -> list[dict]:
-    """Rossmann ürün araması — JSON-LD + ScrapingBee render_js."""
+    """Rossmann ürün araması — Magento platformu, doğru arama URL'si
+    catalogsearch/result/ (eski /ara?q= adresi 404 veriyordu)."""
     return _scrape_jsonld_itemlist(
-        f"https://www.rossmann.com.tr/ara?q={urllib.parse.quote_plus(query)}",
+        f"https://www.rossmann.com.tr/catalogsearch/result/?q={urllib.parse.quote_plus(query)}",
         "rossmann", render_js=False, timeout=12
     )
 
@@ -2113,47 +2184,14 @@ def search_flormar(query: str) -> list[dict]:
     )
 
 def search_goldenrose(query: str) -> list[dict]:
-    try:
-        url = f"https://www.goldenrose.com.tr/?s={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product, .product-item, [class*='product']")[:10]:
-            name_el = item.select_one("[class*='title'], [class*='name'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.goldenrose.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "goldenrose", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
+    """Golden Rose — www.goldenrose.com.tr sadece tanıtım sitesi, asıl
+    mağaza shop.goldenrose.com.tr'de (meta-refresh ile yönlendiriyordu,
+    eski kod yanlış domain'i kullanıyordu). Vue.js tabanlı dinamik arama
+    (dynamic-search) kullandığı için render_js=True gerekiyor."""
+    return _scrape_jsonld_itemlist(
+        f"https://shop.goldenrose.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "goldenrose", render_js=True, timeout=15
+    )
 
 
 def search_istikbal(query: str) -> list[dict]:
@@ -3813,46 +3851,13 @@ def search_philips(query: str) -> list[dict]:
 
 
 def search_farmasi(query: str) -> list[dict]:
-    try:
-        url = f"https://www.farmasi.com.tr/search?q={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        }
-        r = requests.get(url, headers=headers, timeout=8)
-        if not r.ok:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        results = []
-        for item in soup.select(".product-item, [class*='product-card'], [class*='ProductCard']")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
-            if not name:
-                continue
-            price_el = item.select_one("[class*='price'], .price")
-            if not price_el:
-                continue
-            raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
-            try:
-                price = float(raw)
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href", "") if link_el else ""
-            prod_url = f"https://www.farmasi.com.tr{href}" if href.startswith("/") else href
-            img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
-            results.append({
-                "title": name, "price": price, "original_price": None,
-                "image_url": img, "source": "farmasi", "url": prod_url,
-                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
-            })
-        return results
-    except Exception:
-        return []
+    """Farmasi — Next.js sayfası ama arama sonuçları sunucu tarafında
+    render edilmiyor (pageProps boş, client-side fetch ile geliyor).
+    ScrapingBee render_js=True ile JS çalıştırılmış hali üzerinden dener."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.farmasi.com.tr/search?q={urllib.parse.quote_plus(query)}",
+        "farmasi", render_js=True, timeout=15
+    )
 
 
 def search_dsmart(query: str) -> list[dict]:
@@ -4314,10 +4319,12 @@ def search_hm(query: str) -> list[dict]:
     )
 
 def search_sephora(query: str) -> list[dict]:
-    """ScrapingBee render_js ile JSON-LD araması."""
+    """Sephora TR — eski /search?q= adresi 404 veriyordu; gerçek arama rotası
+    /catalogsearch/result/ (Magento benzeri) ama doğrudan istekte 403 (bot
+    koruması) alıyor, ScrapingBee proxy + render_js=True gerekiyor."""
     return _scrape_jsonld_itemlist(
-        f"https://www.sephora.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "sephora", render_js=False, timeout=12
+        f"https://www.sephora.com.tr/catalogsearch/result/?q={urllib.parse.quote_plus(query)}",
+        "sephora", render_js=True, timeout=15
     )
 
 def search_koctas(query: str) -> list[dict]:
