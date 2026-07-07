@@ -696,6 +696,10 @@ function renderUnauthenticatedAuth(content) {
 
         <div class="manual-fields">
           <label class="manual-field">
+            <span>Ad Soyad</span>
+            <input id="authFullName" type="text" autocomplete="name" maxlength="120" placeholder="Ad Soyad">
+          </label>
+          <label class="manual-field">
             <span>E-posta</span>
             <input id="authEmail" type="email" autocomplete="email" placeholder="ornek@email.com">
           </label>
@@ -1147,6 +1151,8 @@ async function submitAuth(mode) {
       payload.gender = gender;
       payload.notification_pref = notificationPref;
       if (phone) payload.phone = phone;
+      const fullName = document.getElementById("authFullName")?.value.trim() || "";
+      if (fullName) payload.full_name = fullName;
     }
 
     const result = await api(`/auth/${mode}`, {

@@ -501,6 +501,7 @@ class AuthCredentials(BaseModel):
     gender: str | None = None
     phone: str | None = None
     notification_pref: str | None = None
+    full_name: str | None = Field(default=None, max_length=120)
 
 
 class PasswordResetRequest(BaseModel):
@@ -719,6 +720,7 @@ def auth_signup(
         payload.gender,
         payload.phone,
         payload.notification_pref,
+        sanitize(payload.full_name, max_length=120) if payload.full_name else None,
     )
     user = session.get("user") or {}
  
@@ -737,6 +739,7 @@ def auth_signup(
             "phone": user.get("user_metadata", {}).get("phone") if user else None,
             "notification_pref": user.get("user_metadata", {}).get("notification_pref") if user else None,
             "skin_type": user.get("user_metadata", {}).get("skin_type") if user else None,
+            "full_name": user.get("user_metadata", {}).get("full_name") if user else None,
         }
         save_db(db)
 
@@ -750,6 +753,7 @@ def auth_signup(
             "phone": user.get("user_metadata", {}).get("phone") if user else None,
             "notification_pref": user.get("user_metadata", {}).get("notification_pref") if user else None,
             "skin_type": user.get("user_metadata", {}).get("skin_type") if user else None,
+            "full_name": user.get("user_metadata", {}).get("full_name") if user else None,
         },
     }
  
@@ -777,6 +781,7 @@ def auth_login(
             "phone": user.get("user_metadata", {}).get("phone") if user else None,
             "notification_pref": user.get("user_metadata", {}).get("notification_pref") if user else None,
             "skin_type": user.get("user_metadata", {}).get("skin_type") if user else None,
+            "full_name": user.get("user_metadata", {}).get("full_name") if user else None,
         }
         save_db(db)
 
@@ -789,6 +794,7 @@ def auth_login(
             "phone": user.get("user_metadata", {}).get("phone") if user else None,
             "notification_pref": user.get("user_metadata", {}).get("notification_pref") if user else None,
             "skin_type": user.get("user_metadata", {}).get("skin_type") if user else None,
+            "full_name": user.get("user_metadata", {}).get("full_name") if user else None,
         },
     }
 
@@ -831,6 +837,7 @@ def auth_otp_verify(
             "phone": normalized_phone,
             "notification_pref": user.get("user_metadata", {}).get("notification_pref") if user else None,
             "skin_type": user.get("user_metadata", {}).get("skin_type") if user else None,
+            "full_name": user.get("user_metadata", {}).get("full_name") if user else None,
         }
         save_db(db)
 
@@ -843,6 +850,7 @@ def auth_otp_verify(
             "phone": normalized_phone,
             "notification_pref": user.get("user_metadata", {}).get("notification_pref") if user else None,
             "skin_type": user.get("user_metadata", {}).get("skin_type") if user else None,
+            "full_name": user.get("user_metadata", {}).get("full_name") if user else None,
         },
     }
 

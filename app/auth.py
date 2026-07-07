@@ -83,6 +83,7 @@ def sign_up(
     gender: str | None = None,
     phone: str | None = None,
     notification_pref: str | None = None,
+    full_name: str | None = None,
 ) -> dict[str, Any]:
     from app.storage import SUPABASE_KEY
 
@@ -102,6 +103,8 @@ def sign_up(
             admin_payload["phone"] = phone
         if notification_pref:
             admin_payload["user_metadata"]["notification_pref"] = notification_pref
+        if full_name:
+            admin_payload["user_metadata"]["full_name"] = full_name
 
         try:
             headers = {
@@ -141,6 +144,8 @@ def sign_up(
         metadata["phone"] = phone
     if notification_pref:
         metadata["notification_pref"] = notification_pref
+    if full_name:
+        metadata["full_name"] = full_name
 
     if metadata:
         payload["options"] = {"data": metadata}

@@ -21,11 +21,21 @@ def _normalize_phone(phone: str) -> str:
     return phone.strip().lstrip("+").replace(" ", "").replace("-", "")
 
 
-def send_whatsapp_template(to_phone: str, template_name: str, lang: str = "tr", params: list[str] | None = None) -> bool:
+def send_whatsapp_template(
+    to_phone: str,
+    template_name: str,
+    lang: str = "tr",
+    params: list[str] | None = None,
+    button_param: str | None = None,
+) -> bool:
     """
     Onaylanmis bir WhatsApp sablonunu (template) gonderir. Business-initiated
     mesajlar (kullanicinin 24 saattir yazmadigi durumlar) SADECE onceden Meta
     tarafindan onaylanmis sablonlarla gonderilebilir -- serbest metin degil.
+
+    button_param: sablonda dinamik URL butonu varsa (orn. price_alert
+    sablonundaki "Urunu Gor" butonu https://www.almadan.app/{{1}}), butonun
+    {{1}} kismina eklenecek yol/parca (orn. "urun/samsung-galaxy-s24").
     """
     if not whatsapp_enabled():
         return False
@@ -39,10 +49,20 @@ def send_whatsapp_template(to_phone: str, template_name: str, lang: str = "tr", 
             "language": {"code": lang},
         },
     }
+    components = []
     if params:
-        body["template"]["components"] = [
+        components.append(
             {"type": "body", "parameters": [{"type": "text", "text": p} for p in params]}
-        ]
+        )
+    if button_param:
+        components.append({
+            "type": "button",
+            "sub_type": "url",
+            "index": "0",
+            "parameters": [{"type": "text", "text": button_param}],
+        })
+    if components:
+        body["template"]["components"] = components
     try:
         resp = requests.post(
             f"{WHATSAPP_API_URL}/{WHATSAPP_PHONE_NUMBER_ID}/messages",
