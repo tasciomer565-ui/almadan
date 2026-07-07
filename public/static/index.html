@@ -385,6 +385,9 @@
             <p class="eyebrow">MAĞAZA TAKİBİ</p>
             <h2>Mağaza Bültenleri</h2>
           </div>
+          <button class="icon-button" onclick="document.getElementById('bulletinInfoDialog').showModal()" aria-label="Nasıl çalışır?" title="Nasıl çalışır?" style="border:1px solid var(--line);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
+            <i data-lucide="info" style="width:18px;height:18px;color:#287a50;"></i>
+          </button>
         </div>
         <p style="font-size:13px;color:var(--ink-2);margin-bottom:16px;">
           Takip ettiğin mağazalar kampanya başlattığında seni haberdar edelim.
@@ -594,6 +597,27 @@
         <i data-lucide="x"></i>
       </button>
       <div id="sizeSelectorContent" class="dialog-body" style="padding: 24px;"></div>
+    </dialog>
+
+    <dialog class="product-dialog" id="bulletinInfoDialog" style="max-width: 460px; border-radius: 16px; border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+      <button class="dialog-close icon-button" onclick="document.getElementById('bulletinInfoDialog').close()" aria-label="Pencereyi kapat" title="Kapat">
+        <i data-lucide="x"></i>
+      </button>
+      <div class="dialog-body" style="padding: 28px 24px 24px;">
+        <div style="width:52px;height:52px;border-radius:14px;background:rgba(40,122,80,0.1);display:flex;align-items:center;justify-content:center;margin-bottom:16px;">
+          <i data-lucide="bell-ring" style="width:26px;height:26px;color:#287a50;"></i>
+        </div>
+        <h3 style="margin:0 0 12px;font-family:'Manrope',sans-serif;font-size:19px;font-weight:800;color:#121412;">Mağaza Bültenleri Nasıl Çalışır?</h3>
+        <p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#444;">
+          Bir mağazayı takip ettiğinde, o mağaza <strong>yeni bir kampanya, indirim veya aktüel katalog yayınladığında</strong> seni anında haberdar ederiz — uygulama içinden, e-postayla ve WhatsApp'tan.
+        </p>
+        <p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#444;">
+          <strong>Neden sadece belirli mağazalar listede?</strong> Her mağazanın kampanya sayfasını düzenli olarak kontrol edip <em>gerçekten yeni bir şey yayınlandığında</em> haber veriyoruz — tahmin yürütmüyoruz. Listede sadece bunu güvenilir şekilde takip edebildiğimiz mağazalar var, böylece "takip ettim ama hiç haber gelmedi" diye bir durum yaşamazsın.
+        </p>
+        <p style="margin:0;font-size:13px;line-height:1.6;color:#687068;">
+          🚀 Zamanla listeye yeni mağazalar ekleyeceğiz. Görmek istediğin bir mağaza varsa <a href="/iletisim" style="color:#287a50;font-weight:600;">bize yaz</a>.
+        </p>
+      </div>
     </dialog>
 
     <!-- Search Loading Overlay -->

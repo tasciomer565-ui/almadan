@@ -1754,7 +1754,19 @@ def cron_refresh_all(
     x_cron_secret: str | None = Header(default=None),
 ) -> dict:
     require_cron_request(request)
-    return refresh_all_products()
+    result = refresh_all_products()
+
+    # Proaktif scraper sağlık kontrolü: günün kategorisi test edilir,
+    # geçmişte çalışan bir mağaza art arda 0 sonuç vermeye başlarsa
+    # admin'e Telegram/e-posta ile haber verilir (app/notifier.py).
+    try:
+        from app.scraper_healthcheck import run_daily_healthcheck
+        health_result = asyncio.run(run_daily_healthcheck())
+        result["scraper_healthcheck"] = health_result
+    except Exception as exc:
+        result["scraper_healthcheck_error"] = str(exc)
+
+    return result
 
 
 @app.get("/api/catalogs")
@@ -4549,6 +4561,49 @@ async def list_stores(request: Request):
         "health": ["bebek", "bigjoy", "toyzz", "petbis", "petlebi"],
         "market": ["arnica"],
     }
+    _extra_store_descriptions = {
+        "arnica": "Küçük ev aletlerinde yeni kampanyaları kaçırma.",
+        "arzum": "Arzum'un yeni ürün ve indirim kampanyalarından haberdar ol.",
+        "bauhaus": "Yapı market ve bahçe ürünlerinde güncel fırsatlar.",
+        "bebek": "Bebek ürünlerinde kampanya ve indirim fırsatları.",
+        "bellona": "Mobilya ve ev tekstilinde sezonluk indirimler.",
+        "bigjoy": "Oyuncak dünyasında yeni kampanya ve indirimler.",
+        "casper": "Bilgisayar ve teknoloji ürünlerinde kampanyalar.",
+        "colins": "Yeni sezon giyim kampanyalarını kaçırma.",
+        "damattween": "Erkek giyimde yeni sezon fırsatları.",
+        "defacto": "Günlük giyimde sezonluk indirim kampanyaları.",
+        "dogtas": "Mobilya ve dekorasyonda güncel kampanyalar.",
+        "dr": "Kitap ve hediyelik kampanyalarını kaçırma.",
+        "dsmart": "Paket ve kampanya fırsatlarından haberdar ol.",
+        "englishhome": "Ev tekstili ve dekorasyonda indirim kampanyaları.",
+        "evkur": "Mobilyada sezonluk kampanya ve indirimler.",
+        "fakir": "Küçük ev aletlerinde kampanya fırsatları.",
+        "farmasi": "Kozmetik ve kişisel bakımda kampanyalar.",
+        "flo": "Ayakkabı ve çantada indirim kampanyaları.",
+        "idefix": "Kitap ve teknoloji ürünlerinde kampanyalar.",
+        "istikbal": "Mobilya ve yatak odasında sezonluk indirimler.",
+        "karaca": "Mutfak ve ev ürünlerinde kampanya fırsatları.",
+        "kelebek": "Mobilyada yeni kampanya ve indirimler.",
+        "kinetix": "Spor ayakkabı ve giyimde indirim fırsatları.",
+        "kitapyurdu": "Kitap kampanyalarını ve indirimlerini kaçırma.",
+        "madamecoco": "Ev tekstili ve dekorasyonda kampanyalar.",
+        "muzikdunyasi": "Müzik aletlerinde kampanya fırsatları.",
+        "namet": "Şarküteri ürünlerinde kampanya ve indirimler.",
+        "ofissepeti": "Ofis ve kırtasiye ürünlerinde kampanyalar.",
+        "pazarama": "Binlerce üründe kampanya ve indirim fırsatları.",
+        "petbis": "Evcil hayvan ürünlerinde kampanya fırsatları.",
+        "petlebi": "Evcil hayvan bakımında indirim kampanyaları.",
+        "reebok": "Spor giyim ve ayakkabıda indirim kampanyaları.",
+        "schafer": "Mutfak gereçlerinde kampanya fırsatları.",
+        "sportive": "Spor giyim ve ekipmanda indirim kampanyaları.",
+        "tefal": "Mutfak ve ev aletlerinde kampanya fırsatları.",
+        "temu": "Binlerce üründe uygun fiyat kampanyaları.",
+        "toyzz": "Oyuncakta kampanya ve indirim fırsatları.",
+        "twist": "Kadın giyiminde sezonluk indirim kampanyaları.",
+        "ufukkirtasiye": "Kırtasiye ürünlerinde kampanya fırsatları.",
+        "vatanbilgisayar": "Bilgisayar ve teknolojide kampanya fırsatları.",
+        "yargici": "Şık giyimde sezonluk indirim kampanyaları.",
+    }
     _bulletin_capable_slugs = set(_CAMPAIGN_PAGE_STORES.keys()) | set(_WEEKLY_CATALOG_STORES.keys())
     stores = [dict(store) for store in DEFAULT_STORE_NEWSLETTERS if store["slug"] in _bulletin_capable_slugs]
     existing_slugs = {s["slug"] for s in stores}
@@ -4561,7 +4616,9 @@ async def list_stores(request: Request):
                 "name": _CAMPAIGN_PAGE_STORES[slug]["name"],
                 "category": category,
                 "publication_note": "",
-                "description": "Bu mağazanın kampanya ve indirimlerini takip et.",
+                "description": _extra_store_descriptions.get(
+                    slug, "Bu mağazanın kampanya ve indirimlerini takip et."
+                ),
             })
             existing_slugs.add(slug)
     sb_url = ""
@@ -4621,9 +4678,18 @@ async def list_stores(request: Request):
     except Exception:
         follower_counts = {}
 
+    _weekday_tr = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
     for s in stores:
         s["followed"]       = s["slug"] in followed_slugs
         s["follower_count"] = follower_counts.get(s["slug"], 0)
+        weekly = _WEEKLY_CATALOG_STORES.get(s["slug"])
+        if weekly:
+            days = ", ".join(_weekday_tr[d] for d in sorted(weekly["days"]))
+            s["notify_info"] = f"📅 Her {days} yeni katalog yayınlandığında haber veririz."
+        elif s["slug"] in _CAMPAIGN_PAGE_STORES:
+            s["notify_info"] = "🔔 Kampanya sayfasında değişiklik olur olmaz anında haberdar ederiz."
+        else:
+            s["notify_info"] = None
 
     return {"stores": stores}
 

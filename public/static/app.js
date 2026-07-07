@@ -5641,6 +5641,7 @@ function renderStoreCard(s) {
       <button class="btn-follow ${followed ? "active" : ""}" onclick="toggleFollow(${inlineJsArg(s.slug)}, ${inlineJsArg(s.name)})" id="sfbtn-${escapeHtml(s.slug)}">
         ${followed ? "✓ Takip Ediliyor" : "+ Takibe Al"}
       </button>
+      ${s.notify_info ? `<div class="store-notify-info" style="margin-top:8px;font-size:11px;line-height:1.4;color:var(--ink-2,#687068);background:rgba(40,122,80,0.06);border-radius:8px;padding:6px 8px;">${escapeHtml(s.notify_info)}</div>` : ""}
     </div>`;
 }
 
