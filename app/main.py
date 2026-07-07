@@ -1766,6 +1766,16 @@ def cron_refresh_all(
     except Exception as exc:
         result["scraper_healthcheck_error"] = str(exc)
 
+    # Sorgu tanıma kelime dağarcığını gerçek ürün başlıklarından büyüt
+    # (elle terim ekleme yerine — kapsam envanterle birlikte otomatik
+    # ölçeklenir). app/query_intelligence.py
+    try:
+        from app.query_intelligence import refresh_learned_vocabulary
+        vocab_result = asyncio.run(refresh_learned_vocabulary())
+        result["vocabulary_refresh"] = vocab_result
+    except Exception as exc:
+        result["vocabulary_refresh_error"] = str(exc)
+
     return result
 
 

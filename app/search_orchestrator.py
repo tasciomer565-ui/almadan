@@ -94,12 +94,9 @@ def _normalize_tr(text: str) -> str:
     return text.lower().translate(tr_map)
 
 
-def classify_intent(query: str) -> str:
-    q = query.lower()
-    qn = _normalize_tr(query)  # normalize edilmiş (ş→s, ğ→g, ı→i, ö→o, ü→u, ç→c)
-
-    # Her kategori için (orijinal, normalize) çiftleri
-    grocery_keywords = {
+# Kategori anahtar kelime setleri — classify_intent() ve app.query_intelligence
+# (fuzzy düzeltme / öğrenilen kelime dağarcığı) tarafından ortak kullanılır.
+GROCERY_KEYWORDS = {
         # Süt & süt ürünleri
         "süt", "sut", "süts", "suts", "sutlu", "sütlü",
         "yoğurt", "yogurt", "yoghurt", "yogurt",
@@ -145,117 +142,131 @@ def classify_intent(query: str) -> str:
         "market", "aktüel", "gıda", "gida",
     }
 
-    tech_keywords = {
-        # Cihazlar
-        "telefon", "cep telefonu", "akıllı telefon", "akilli telefon",
-        "bilgisayar", "laptop", "dizüstü", "dizustu", "masaüstü", "masaustu",
-        "tablet", "ipad", "e-kitap okuyucu",
-        "tv", "televizyon", "smart tv", "oled", "qled",
-        "monitör", "monitor", "ekran",
-        "kulaklık", "kulaklik", "headphone", "airpods", "earbuds", "hoparlör", "hoparlor",
-        "kamera", "fotoğraf makinesi", "fotograf makinesi", "lens", "drone",
-        "akıllı saat", "akilli saat", "smartwatch", "watch",
-        # Bilgisayar parçaları
-        "ram", "ssd", "hdd", "harddisk", "hard disk", "nvme", "m.2",
-        "gpu", "ekran kartı", "ekran karti", "anakart", "cpu", "işlemci", "islemci",
-        "kasa", "psu", "güç kaynağı", "guc kaynagi", "soğutucu", "sogutucu",
-        # Aksesuar & çevre birimleri
-        "mouse", "maus", "klavye", "keyboard", "mousepad",
-        "kablo", "hdmi", "usb", "adaptör", "adaptor", "şarj", "sarj", "powerbank",
-        "router", "modem", "switch", "ağ", "ag",
-        "yazıcı", "yazici", "printer", "tarayıcı", "tarayici", "scanner",
-        # Markalar
-        "samsung", "apple", "iphone", "macbook", "ipad",
-        "xiaomi", "redmi", "poco", "realme", "oppo", "vivo",
-        "huawei", "honor", "oneplus",
-        "lenovo", "asus", "hp", "dell", "acer", "msi", "toshiba",
-        "sony", "lg", "philips", "vestel", "arcelik", "arçelik",
-        "logitech", "corsair", "razer", "hyperx",
-        "itopya", "vatanbilgisayar", "teknosa", "mediamarkt",
-        # Genel
-        "elektronik", "teknoloji", "gadget",
-    }
+TECH_KEYWORDS = {
+    # Cihazlar
+    "telefon", "cep telefonu", "akıllı telefon", "akilli telefon",
+    "bilgisayar", "laptop", "dizüstü", "dizustu", "masaüstü", "masaustu",
+    "tablet", "ipad", "e-kitap okuyucu",
+    "tv", "televizyon", "smart tv", "oled", "qled",
+    "monitör", "monitor", "ekran",
+    "kulaklık", "kulaklik", "headphone", "airpods", "earbuds", "hoparlör", "hoparlor",
+    "kamera", "fotoğraf makinesi", "fotograf makinesi", "lens", "drone",
+    "akıllı saat", "akilli saat", "smartwatch", "watch",
+    # Bilgisayar parçaları
+    "ram", "ssd", "hdd", "harddisk", "hard disk", "nvme", "m.2",
+    "gpu", "ekran kartı", "ekran karti", "anakart", "cpu", "işlemci", "islemci",
+    "kasa", "psu", "güç kaynağı", "guc kaynagi", "soğutucu", "sogutucu",
+    # Aksesuar & çevre birimleri
+    "mouse", "maus", "klavye", "keyboard", "mousepad",
+    "kablo", "hdmi", "usb", "adaptör", "adaptor", "şarj", "sarj", "powerbank",
+    "router", "modem", "switch", "ağ", "ag",
+    "yazıcı", "yazici", "printer", "tarayıcı", "tarayici", "scanner",
+    # Markalar
+    "samsung", "apple", "iphone", "macbook", "ipad",
+    "xiaomi", "redmi", "poco", "realme", "oppo", "vivo",
+    "huawei", "honor", "oneplus",
+    "lenovo", "asus", "hp", "dell", "acer", "msi", "toshiba",
+    "sony", "lg", "philips", "vestel", "arcelik", "arçelik",
+    "logitech", "corsair", "razer", "hyperx",
+    "itopya", "vatanbilgisayar", "teknosa", "mediamarkt",
+    # Genel
+    "elektronik", "teknoloji", "gadget",
+}
 
-    cosmetics_keywords = {
-        "ruj", "rujum", "lipstick", "lip",
-        "rimel", "maskara", "mascara",
-        "allık", "allik", "ruj", "far", "göz farı", "goz fari", "eyeliner",
-        "fondöten", "fondoten", "foundation", "bb krem", "cc krem",
-        "makyaj", "makeup", "make-up", "kozmetik",
-        "cilt", "cilt bakım", "cilt bakim", "serum", "nemlendirici",
-        "krem", "losyon", "tonik", "yüz yıkama", "yuz yikama",
-        "güneş kremi", "gunes kremi", "spf",
-        "parfüm", "parfum", "cologne", "kolonya",
-        "deodorant", "roll-on", "antiperspirant",
-        "oje", "tırnak", "tirnak", "nail",
-        "maske", "peeling", "scrub",
-        "saç", "sac", "şampuan", "sampuan", "saç bakım", "sac bakim",
-        "saç boyası", "sac boyasi", "boya", "keratin",
-        "epilasyon", "ağda", "agda", "tıraş", "tras", "jilet",
-        "gratis", "rossmann", "watsons", "sephora",
-    }
+COSMETICS_KEYWORDS = {
+    "ruj", "rujum", "lipstick", "lip",
+    "rimel", "maskara", "mascara",
+    "allık", "allik", "ruj", "far", "göz farı", "goz fari", "eyeliner",
+    "fondöten", "fondoten", "foundation", "bb krem", "cc krem",
+    "makyaj", "makeup", "make-up", "kozmetik",
+    "cilt", "cilt bakım", "cilt bakim", "serum", "nemlendirici",
+    "krem", "losyon", "tonik", "yüz yıkama", "yuz yikama",
+    "güneş kremi", "gunes kremi", "spf",
+    "parfüm", "parfum", "cologne", "kolonya",
+    "deodorant", "roll-on", "antiperspirant",
+    "oje", "tırnak", "tirnak", "nail",
+    "maske", "peeling", "scrub",
+    "saç", "sac", "şampuan", "sampuan", "saç bakım", "sac bakim",
+    "saç boyası", "sac boyasi", "boya", "keratin",
+    "epilasyon", "ağda", "agda", "tıraş", "tras", "jilet",
+    "gratis", "rossmann", "watsons", "sephora",
+}
 
-    fashion_keywords = {
-        # Üst giyim
-        "tişört", "tisort", "tshirt", "t-shirt", "tee",
-        "gömlek", "gomlek", "shirt", "bluz", "blouse",
-        "kazak", "sweatshirt", "hoodie", "hırka", "hirka", "triko",
-        "ceket", "mont", "kaban", "parka", "yağmurluk", "yagmurluk",
-        "yelek", "vest",
-        # Alt giyim
-        "pantolon", "jean", "jeans", "denim", "tayt", "tayt",
-        "şort", "sort", "bermuda",
-        "etek", "skirt",
-        # Elbise & tulum
-        "elbise", "dress", "tulum", "overall",
-        # Ayakkabı & çanta
-        "ayakkabı", "ayakkabi", "shoe", "sneaker", "spor ayakkabı",
-        "bot", "çizme", "cizme", "boot", "sandalet", "terlik",
-        "çanta", "canta", "bag", "sırt çantası", "sirt cantasi", "cüzdan", "cuzdan",
-        # İç giyim & çorap
-        "iç çamaşır", "ic camasir", "külot", "kulot", "sütyen", "sutyen",
-        "çorap", "corap", "sock",
-        # Aksesuar
-        "kemer", "kravat", "fular", "şapka", "sapka", "bere", "eldiven",
-        "gözlük", "gozluk", "saat",
-        # Markalar & genel
-        "lcw", "lcwaikiki", "defacto", "koton", "mavi", "zara", "h&m",
-        "boyner", "vakko", "pierre cardin",
-        "giyim", "kıyafet", "kiyafet", "moda", "fashion",
-    }
+FASHION_KEYWORDS = {
+    # Üst giyim
+    "tişört", "tisort", "tshirt", "t-shirt", "tee",
+    "gömlek", "gomlek", "shirt", "bluz", "blouse",
+    "kazak", "sweatshirt", "hoodie", "hırka", "hirka", "triko",
+    "ceket", "mont", "kaban", "parka", "yağmurluk", "yagmurluk",
+    "yelek", "vest",
+    # Alt giyim
+    "pantolon", "jean", "jeans", "denim", "tayt", "tayt",
+    "şort", "sort", "bermuda",
+    "etek", "skirt",
+    # Elbise & tulum
+    "elbise", "dress", "tulum", "overall",
+    # Ayakkabı & çanta
+    "ayakkabı", "ayakkabi", "shoe", "sneaker", "spor ayakkabı",
+    "bot", "çizme", "cizme", "boot", "sandalet", "terlik",
+    "çanta", "canta", "bag", "sırt çantası", "sirt cantasi", "cüzdan", "cuzdan",
+    # İç giyim & çorap
+    "iç çamaşır", "ic camasir", "külot", "kulot", "sütyen", "sutyen",
+    "çorap", "corap", "sock",
+    # Aksesuar
+    "kemer", "kravat", "fular", "şapka", "sapka", "bere", "eldiven",
+    "gözlük", "gozluk", "saat",
+    # Markalar & genel
+    "lcw", "lcwaikiki", "defacto", "koton", "mavi", "zara", "h&m",
+    "boyner", "vakko", "pierre cardin",
+    "giyim", "kıyafet", "kiyafet", "moda", "fashion",
+}
 
-    home_keywords = {
-        # Mutfak
-        "tencere", "tava", "düdüklü", "duduklu", "wok",
-        "tabak", "kase", "bardak", "çatal", "catal", "kaşık", "kasik", "bıçak", "bicak",
-        "bıçak seti", "bicak seti", "çatal bıçak", "catal bicak",
-        "blender", "mikser", "toaster", "fırın", "firin", "microdalga", "mikrodalga",
-        "kahve makinesi", "çay makinesi", "cay makinesi", "kettle",
-        "buzdolabı", "buzdolabi", "çamaşır makinesi", "camasir makinesi",
-        "bulaşık makinesi", "bulasik makinesi", "fırın", "ocak",
-        # Yatak odası
-        "nevresim", "yorgan", "yastık", "yastik", "çarşaf", "carsaf",
-        "battaniye", "pike",
-        # Oturma odası
-        "koltuk", "kanepe", "couch", "sofa", "puf",
-        "halı", "hali", "kilim", "rug",
-        "perde", "stor perde", "tül",
-        "avize", "lamba", "abajur", "led",
-        # Mobilya & dekorasyon
-        "masa", "sandalye", "dolap", "raf", "kitaplık", "kitaplik",
-        "mobilya", "furniture", "dekorasyon", "çerçeve", "cerceve",
-        # Temizlik & ev bakım
-        "elektrikli süpürge", "elektrikli supurge", "süpürge", "supurge",
-        "robot süpürge", "robot supurge", "mop", "paspas",
-        "ütü", "utu", "iron",
-        # Banyo
-        "havlu", "bornoz", "banyo", "duş", "dus", "tuvalet",
-        # Markalar
-        "ikea", "karaca", "korkmaz", "tefal", "beko", "arçelik", "arcelik",
-        "vestel", "bosch", "siemens", "philips", "arzum",
-        "english home", "madame coco", "koçtaş", "koctas",
-        "ev", "home", "mutfak", "yatak",
-    }
+HOME_KEYWORDS = {
+    # Mutfak
+    "tencere", "tava", "düdüklü", "duduklu", "wok",
+    "tabak", "kase", "bardak", "çatal", "catal", "kaşık", "kasik", "bıçak", "bicak",
+    "bıçak seti", "bicak seti", "çatal bıçak", "catal bicak",
+    "blender", "mikser", "toaster", "fırın", "firin", "microdalga", "mikrodalga",
+    "kahve makinesi", "çay makinesi", "cay makinesi", "kettle",
+    "buzdolabı", "buzdolabi", "çamaşır makinesi", "camasir makinesi",
+    "bulaşık makinesi", "bulasik makinesi", "fırın", "ocak",
+    # Yatak odası
+    "nevresim", "yorgan", "yastık", "yastik", "çarşaf", "carsaf",
+    "battaniye", "pike",
+    # Oturma odası
+    "koltuk", "kanepe", "couch", "sofa", "puf",
+    "halı", "hali", "kilim", "rug",
+    "perde", "stor perde", "tül",
+    "avize", "lamba", "abajur", "led",
+    # Mobilya & dekorasyon
+    "masa", "sandalye", "dolap", "raf", "kitaplık", "kitaplik",
+    "mobilya", "furniture", "dekorasyon", "çerçeve", "cerceve",
+    # Temizlik & ev bakım
+    "elektrikli süpürge", "elektrikli supurge", "süpürge", "supurge",
+    "robot süpürge", "robot supurge", "mop", "paspas",
+    "ütü", "utu", "iron",
+    # Banyo
+    "havlu", "bornoz", "banyo", "duş", "dus", "tuvalet",
+    # Markalar
+    "ikea", "karaca", "korkmaz", "tefal", "beko", "arçelik", "arcelik",
+    "vestel", "bosch", "siemens", "philips", "arzum",
+    "english home", "madame coco", "koçtaş", "koctas",
+    "ev", "home", "mutfak", "yatak",
+}
+
+# Kategori adı → anahtar kelime seti (query_intelligence tarafından da kullanılır)
+CATEGORY_KEYWORD_SETS = {
+    "GIDA": GROCERY_KEYWORDS,
+    "TEKNOLOJİ": TECH_KEYWORDS,
+    "KOZMETİK": COSMETICS_KEYWORDS,
+    "MODA": FASHION_KEYWORDS,
+    "EV": HOME_KEYWORDS,
+}
+
+
+def classify_intent(query: str) -> str:
+    q = query.lower()
+    qn = _normalize_tr(query)  # normalize edilmiş (ş→s, ğ→g, ı→i, ö→o, ü→u, ç→c)
 
     words = set(re.findall(r"\w+", q))
     words_n = set(re.findall(r"\w+", qn))
@@ -272,16 +283,19 @@ def classify_intent(query: str) -> str:
                 return True
         return False
 
-    if matches(grocery_keywords):
-        return "GIDA"
-    if matches(tech_keywords):
-        return "TEKNOLOJİ"
-    if matches(cosmetics_keywords):
-        return "KOZMETİK"
-    if matches(fashion_keywords):
-        return "MODA"
-    if matches(home_keywords):
-        return "EV"
+    for category, kw_set in CATEGORY_KEYWORD_SETS.items():
+        if matches(kw_set):
+            return category
+
+    # Statik listelerde yok — cron ile günlük büyütülen (gerçek ürün
+    # başlıklarından çıkarılan) öğrenilmiş kelime dağarcığına da bak.
+    try:
+        from app.query_intelligence import classify_from_learned_vocabulary
+        learned = classify_from_learned_vocabulary(q, qn)
+        if learned:
+            return learned
+    except Exception:
+        pass
 
     return "GENEL"
 
@@ -711,6 +725,15 @@ async def master_search(
     lon: float = None,
     mode: str = "hybrid"
 ) -> list[dict]:
+    # Yazım hatası toleranslı düzeltme (rapidfuzz + statik/öğrenilmiş
+    # kelime dağarcığı) — kategori sınıflandırma ve tarama bu düzeltilmiş
+    # sorguyla yapılır, kullanıcıya gösterilen orijinal metin değişmez.
+    try:
+        from app.query_intelligence import correct_query
+        query = correct_query(query)
+    except Exception:
+        pass
+
     category = classify_intent(query)
     if category == "GENEL" and selected_category != "general":
         category_map = {
