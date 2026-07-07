@@ -4532,7 +4532,38 @@ async def list_stores(request: Request):
     Tüm aktif mağazaları döndürür.
     Giriş yapan kullanıcı için hangileri takip edildiğini de işaretler.
     """
-    stores = [dict(store) for store in DEFAULT_STORE_NEWSLETTERS]
+    # Sadece gercekten bulten gonderebilecek magazalar listelensin --
+    # digerlerini takip etmenin anlami yok, hicbir zaman bildirim gelmez.
+    # _CAMPAIGN_PAGE_STORES'daki bazi magazalar ALL_STORES_MAP'te hic
+    # kayitli degildi (scraper var ama takip listesinde yoktu) -- onlari
+    # da makul bir kategoriyle sentezleyip ekliyoruz.
+    _extra_bulletin_categories = {
+        "moda": ["colins", "defacto", "damattween", "flo", "kinetix", "twist",
+                 "reebok", "sportive", "yargici"],
+        "home": ["bauhaus", "bellona", "dogtas", "englishhome", "evkur",
+                 "karaca", "kelebek", "madamecoco", "schafer", "istikbal"],
+        "tech": ["arzum", "casper", "dsmart", "fakir", "tefal", "vatanbilgisayar"],
+        "beauty": ["farmasi"],
+        "online": ["idefix", "kitapyurdu", "muzikdunyasi", "ofissepeti",
+                   "ufukkirtasiye", "pazarama", "temu", "namet", "dr"],
+        "health": ["bebek", "bigjoy", "toyzz", "petbis", "petlebi"],
+        "market": ["arnica"],
+    }
+    _bulletin_capable_slugs = set(_CAMPAIGN_PAGE_STORES.keys()) | set(_WEEKLY_CATALOG_STORES.keys())
+    stores = [dict(store) for store in DEFAULT_STORE_NEWSLETTERS if store["slug"] in _bulletin_capable_slugs]
+    existing_slugs = {s["slug"] for s in stores}
+    for category, slugs in _extra_bulletin_categories.items():
+        for slug in slugs:
+            if slug in existing_slugs or slug not in _CAMPAIGN_PAGE_STORES:
+                continue
+            stores.append({
+                "slug": slug,
+                "name": _CAMPAIGN_PAGE_STORES[slug]["name"],
+                "category": category,
+                "publication_note": "",
+                "description": "Bu mağazanın kampanya ve indirimlerini takip et.",
+            })
+            existing_slugs.add(slug)
     sb_url = ""
     sb_hdrs: dict[str, str] = {}
     if supabase_enabled():
