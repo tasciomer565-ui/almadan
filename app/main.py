@@ -4137,13 +4137,26 @@ def _debug_wa(secret: str):
     expected = os.getenv("ADMIN_DEBUG_SECRET", "").strip()
     if not expected or not hmac.compare_digest(secret, expected):
         raise HTTPException(status_code=404, detail="Not Found")
-    from app.whatsapp import whatsapp_enabled, send_whatsapp_template
+    from app.whatsapp import whatsapp_enabled, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_API_URL
     if not whatsapp_enabled():
         return {"ok": False, "reason": "env degiskenleri eksik"}
-    ok = send_whatsapp_template(
-        "905551663380", "jaspers_market_order_confirmation_v1", lang="en_US", params=["Test"]
+    body = {
+        "messaging_product": "whatsapp",
+        "to": "905551663380",
+        "type": "template",
+        "template": {
+            "name": "jaspers_market_order_confirmation_v1",
+            "language": {"code": "en_US"},
+            "components": [{"type": "body", "parameters": [{"type": "text", "text": "Test"}]}],
+        },
+    }
+    r = requests.post(
+        f"{WHATSAPP_API_URL}/{WHATSAPP_PHONE_NUMBER_ID}/messages",
+        headers={"Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}", "Content-Type": "application/json"},
+        json=body,
+        timeout=10,
     )
-    return {"ok": ok}
+    return {"status_code": r.status_code, "body": r.text[:1000]}
 
 
 @app.get("/api/status")
