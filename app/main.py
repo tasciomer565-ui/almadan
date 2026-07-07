@@ -1790,7 +1790,18 @@ def cron_catalog_vocab_crawl(request: Request) -> dict:
     """
     require_cron_request(request)
     from app.catalog_crawler import run_catalog_batch
-    return asyncio.run(run_catalog_batch())
+    result = asyncio.run(run_catalog_batch())
+
+    # Yavaş (ScrapingBee render_js) mağazaları arka planda önceden tarayıp
+    # cache'e yaz — canlı aramanın 7s bütçesi bunlara yetmiyor.
+    # Bkz. app/slow_store_cache_warmer.py
+    try:
+        from app.slow_store_cache_warmer import warm_slow_stores
+        result["slow_store_warm"] = asyncio.run(warm_slow_stores())
+    except Exception as exc:
+        result["slow_store_warm_error"] = str(exc)
+
+    return result
 
 
 @app.get("/api/catalogs")

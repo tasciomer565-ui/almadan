@@ -565,8 +565,13 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
                    search_lescon, search_pandora):
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category == "KOZMETİK":
-        for fn in (search_gratis, search_rossmann, search_watsons, search_sephora,
-                   search_flormar, search_goldenrose, search_farmasi):
+        # search_gratis/watsons/sephora/goldenrose/farmasi canli taramadan
+        # cikarildi: render_js=True ScrapingBee istegi 10-20s surebiliyor,
+        # bu da diger hizli scraper'larla ayni 7s butceyi paylasinca
+        # tutarsiz (bazen var bazen yok) sonuca yol aciyor. Bu magazalar
+        # artik app/slow_store_cache_warmer.py'deki ayri, zaman siniri
+        # olmayan cron ile onceden taranip cache'e yaziliyor.
+        for fn in (search_rossmann, search_flormar):
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category == "GIDA":
         # search_a101 canli taramadan cikarildi: render_js=True ScrapingBee

@@ -4,6 +4,11 @@
   "regions": [
     "fra1"
   ],
+  "functions": {
+    "app/main.py": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     { "source": "/", "destination": "/static/index.html" },
     { "source": "/index.html", "destination": "/static/index.html" },
