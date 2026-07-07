@@ -558,14 +558,15 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
                    search_schafer, search_tefal, search_arzum, search_fakir):
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category in ("MODA", "SPOR"):
+        # search_boyner/hm/bershka/vakko/twist/penti/derimod/damattween/
+        # decathlon/adidas/puma/newbalance/sportive/lescon/pandora
+        # render_js=True gerektiriyor (10-20s), canli taramadan cikarildi
+        # -- bkz. app/slow_store_cache_warmer.py
         for fn in (search_yargici, search_kinetix, search_flo, search_lcwaikiki,
-                   search_mavi, search_boyner, search_zara, search_hm, search_bershka,
-                   search_colins, search_ltb, search_vakko, search_beymen, search_sarar,
-                   search_twist, search_penti, search_pierrecardin, search_altinyildiz,
-                   search_derimod, search_damattween, search_shein, search_modanisa,
-                   search_bigjoy, search_decathlon, search_nike, search_adidas,
-                   search_puma, search_reebok, search_newbalance, search_sportive,
-                   search_lescon, search_pandora):
+                   search_mavi, search_zara, search_colins, search_ltb,
+                   search_beymen, search_sarar, search_pierrecardin,
+                   search_altinyildiz, search_shein, search_modanisa,
+                   search_bigjoy, search_nike, search_reebok):
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category == "KOZMETİK":
         # search_gratis/watsons/sephora/goldenrose/farmasi canli taramadan
