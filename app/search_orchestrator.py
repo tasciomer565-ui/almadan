@@ -588,9 +588,12 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
                    search_migros_proxy, search_carrefoursa):
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category in ("GENEL", "KİTAP"):
-        for fn in (search_kitapyurdu, search_dr, search_remzi, search_idefix,
-                   search_muzikdunyasi, search_ufukkirtasiye, search_ofissepeti,
-                   search_evpet, search_petbis, search_petlebi, search_zopet,
+        # search_muzikdunyasi/ofissepeti/petbis/evpet/zopet: domainleri
+        # artik parking/satis sayfasina yonleniyor (GoDaddy/HugeDomains) --
+        # gercekten olu, kaliciya kadar dispatch listesinden cikarildi.
+        # search_idefix/petlebi render_js=True gerektiriyor, canli taramadan
+        # cikarildi -- bkz. app/slow_store_cache_warmer.py
+        for fn in (search_kitapyurdu, search_dr, search_remzi,
                    search_proteinocean, search_supplementler, search_runnutrition):
             extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     else:

@@ -39,6 +39,9 @@ _SLOW_JS_STORES: dict[str, list[str]] = {
         "search_decathlon", "search_adidas", "search_puma", "search_newbalance",
         "search_sportive", "search_lescon", "search_pandora",
     ],
+    "GENEL": [
+        "search_idefix", "search_petlebi",
+    ],
 }
 
 # Kategori başına ısıtılacak popüler sorgular (catalog_crawler.py'deki
@@ -58,6 +61,9 @@ _WARM_QUERIES: dict[str, list[str]] = {
     ],
     "MODA": [
         "tişört", "pantolon", "elbise", "ayakkabı", "ceket",
+    ],
+    "GENEL": [
+        "roman", "kedi maması", "köpek maması",
     ],
 }
 
