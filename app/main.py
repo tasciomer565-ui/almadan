@@ -1779,6 +1779,20 @@ def cron_refresh_all(
     return result
 
 
+@app.get("/cron/catalog-vocab-crawl")
+def cron_catalog_vocab_crawl(request: Request) -> dict:
+    """
+    Popüler ürün kelime dağarcığı crawler'ı — Vercel Hobby cron günde 1
+    kez ile sınırlı olduğu için (bkz. app/catalog_crawler.py), bu endpoint
+    GitHub Actions'taki zamanlanmış iş akışı tarafından günde ~48 kez
+    (her 30 dakikada bir) çağrılır. Her çağrıda küçük bir sorgu grubu
+    işlenir, kademeli ramp programına göre (bkz. _RAMP_SCHEDULE).
+    """
+    require_cron_request(request)
+    from app.catalog_crawler import run_catalog_batch
+    return asyncio.run(run_catalog_batch())
+
+
 @app.get("/api/catalogs")
 def list_catalog_status() -> list[dict]:
     db = load_db()

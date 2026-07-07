@@ -1,6 +1,6 @@
 """Veriden öğrenen sorgu tanıma katmanı.
 
-Elle terim ekleme yerine iki mekanizma:
+Elle terim ekleme yerine üç mekanizma:
 
   1. correct_query() — rapidfuzz ile yazım hatası toleranslı düzeltme.
      Sorgudaki her kelime, statik kategori kelime setleri + öğrenilmiş
@@ -8,18 +8,23 @@ Elle terim ekleme yerine iki mekanizma:
      yüksek benzerlik skorunda) değiştirilir. Zayıf eşleşmelerde kelime
      olduğu gibi bırakılır (yanlış "düzeltme" riskini önlemek için).
 
-  2. refresh_learned_vocabulary() — günlük cron'da çağrılır; Supabase
-     product_cache tablosundaki son taranan GERÇEK ürün başlıklarından
-     kelime çıkarıp db["vocabulary"] içine kategori bazlı frekans olarak
-     kaydeder. Böylece kapsam elle değil, siteye gelen gerçek envanterle
-     birlikte otomatik büyür.
+  2. learn_from_products() / refresh_learned_vocabulary() — günlük cron
+     ve katalog crawler'ında çağrılır; gerçek ürün başlıklarından kelime
+     çıkarıp app/vocabulary_store.py üzerinden AYRI bir Supabase tablosuna
+     (app_state blob'undan bağımsız, atomik sayaç artırma ile) kaydeder.
+     Böylece kapsam elle değil, siteye gelen gerçek envanterle birlikte
+     otomatik büyür.
 
   3. classify_from_learned_vocabulary() — classify_intent() statik
      setlerde eşleşme bulamazsa, öğrenilmiş kelime dağarcığına bakar.
+
+Öğrenilmiş kelime dağarcığı, arama başına Supabase'e gitmemek için
+process içi kısa süreli önbelleğe alınır (bkz. _VOCAB_CACHE_TTL).
 """
 from __future__ import annotations
 
 import re
+import time
 from collections import Counter
 
 try:
@@ -39,7 +44,10 @@ _MIN_WORD_LEN = 3
 _FUZZY_SCORE_CUTOFF = 84
 # Bir kelimenin "öğrenilmiş" sayılıp kullanılması için gereken min. gözlem sayısı
 _MIN_LEARNED_COUNT = 3
-_MAX_LEARNED_VOCAB_SIZE = 5000
+# Process içi önbellek — her arama isteğinde Supabase'e gitmemek için
+_VOCAB_CACHE_TTL = 600  # saniye
+_vocab_cache: dict[str, str] = {}
+_vocab_cache_ts: float = 0.0
 
 
 def _normalize_tr(text: str) -> str:
@@ -59,19 +67,19 @@ def _static_vocabulary() -> set[str]:
 
 
 def _learned_vocabulary() -> dict[str, str]:
-    """db['vocabulary'] içinden {kelime: kategori} — sadece yeterince
-    gözlemlenmiş kelimeler."""
+    """{kelime: kategori} — ayrı vocabulary tablosundan, process içi
+    önbellekle (10 dk TTL) okunur."""
+    global _vocab_cache, _vocab_cache_ts
+    now = time.monotonic()
+    if _vocab_cache and (now - _vocab_cache_ts) < _VOCAB_CACHE_TTL:
+        return _vocab_cache
     try:
-        from app.storage import load_db
-        db = load_db()
-        vocab = db.get("vocabulary", {})
-        return {
-            word: info.get("category", "GENEL")
-            for word, info in vocab.items()
-            if isinstance(info, dict) and info.get("count", 0) >= _MIN_LEARNED_COUNT
-        }
+        from app.vocabulary_store import fetch_learned_vocabulary
+        _vocab_cache = fetch_learned_vocabulary(min_count=_MIN_LEARNED_COUNT)
+        _vocab_cache_ts = now
     except Exception:
-        return {}
+        pass
+    return _vocab_cache
 
 
 def classify_from_learned_vocabulary(q_lower: str, q_normalized: str) -> str | None:
@@ -130,15 +138,11 @@ def correct_query(query: str) -> str:
 
 
 def learn_from_products(products: list[dict], category: str) -> int:
-    """Gerçek ürün başlıklarından kelime dağarcığını büyüt. Cache'e her
-    yeni sonuç yazıldığında ya da günlük cron'da çağrılabilir.
-    Döner: yeni/güncellenen kelime sayısı.
+    """Gerçek ürün başlıklarından kelime dağarcığını büyüt. Tek bir toplu
+    (batch) istekle app/vocabulary_store.py üzerinden ayrı tabloya yazılır.
+    Döner: gönderilen benzersiz kelime sayısı.
     """
     if not products or not category or category == "GENEL":
-        return 0
-    try:
-        from app.storage import load_db, save_db
-    except Exception:
         return 0
 
     word_counts = Counter()
@@ -154,36 +158,18 @@ def learn_from_products(products: list[dict], category: str) -> int:
     if not word_counts:
         return 0
 
-    db = load_db()
-    vocab = db.setdefault("vocabulary", {})
-    updated = 0
-    for word, cnt in word_counts.items():
-        entry = vocab.get(word)
-        if entry and isinstance(entry, dict):
-            entry["count"] = entry.get("count", 0) + cnt
-            # Kategori kararsızsa en çok görülen kategoriyi tut
-            if entry.get("category") != category and cnt > entry.get("count", 0) / 2:
-                entry["category"] = category
-        else:
-            vocab[word] = {"category": category, "count": cnt}
-        updated += 1
-
-    # Kelime dağarcığı sınırsız büyümesin — en düşük frekanslıları buda
-    if len(vocab) > _MAX_LEARNED_VOCAB_SIZE:
-        sorted_words = sorted(vocab.items(), key=lambda kv: kv[1].get("count", 0), reverse=True)
-        db["vocabulary"] = dict(sorted_words[:_MAX_LEARNED_VOCAB_SIZE])
-    else:
-        db["vocabulary"] = vocab
-
-    save_db(db)
-    return updated
+    try:
+        from app.vocabulary_store import increment_words
+        return increment_words(dict(word_counts), category)
+    except Exception:
+        return 0
 
 
 async def refresh_learned_vocabulary(sample_size: int = 200) -> dict:
     """Günlük cron: Supabase product_cache'teki en son taranan gerçek
     sonuçlardan kelime dağarcığını büyütür (elle terim eklemeye alternatif,
     envanterle birlikte kendiliğinden ölçeklenir)."""
-    from app.cache import SUPABASE_URL, SUPABASE_KEY, CACHE_TABLE, _enabled, _headers
+    from app.cache import SUPABASE_URL, CACHE_TABLE, _enabled, _headers
     import requests
 
     if not _enabled():

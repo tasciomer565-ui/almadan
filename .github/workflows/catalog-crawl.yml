@@ -1,0 +1,20 @@
+name: Katalog Kelime Dağarcığı Crawl
+
+# Vercel Hobby cron günde 1 kez ile sınırlı; bu yüzden gün içinde sık
+# tetiklemeyi GitHub Actions üzerinden yapıyoruz (ücretsiz, dakika
+# hassasiyetinde). Sadece /cron/catalog-vocab-crawl endpoint'ine
+# istek atar, gerçek işi backend yapar.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger catalog vocabulary crawl batch
+        run: |
+          curl -sS -f -X GET \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            "https://www.almadan.app/cron/catalog-vocab-crawl"
