@@ -15,9 +15,10 @@ SUPABASE_PUBLISHABLE_KEY = "".join(
 
 
 class AuthError(RuntimeError):
-    def __init__(self, message: str, status_code: int = 400):
+    def __init__(self, message: str, status_code: int = 400, error_code: str | None = None):
         super().__init__(message)
         self.status_code = status_code
+        self.error_code = error_code
 
 
 def auth_enabled() -> bool:
@@ -70,7 +71,7 @@ def auth_request(
             or body.get("error_description")
             or "Kimlik doğrulama işlemi tamamlanamadı."
         )
-        raise AuthError(message, response.status_code)
+        raise AuthError(message, response.status_code, error_code=body.get("error_code"))
 
     if not response.content:
         return {}
@@ -128,7 +129,11 @@ def sign_up(
                     # E-posta zaten onaylıysa (nadiren, örn. mevcut kullanıcı) direkt oturum aç.
                     return sign_in(email, password)
                 except AuthError as sign_in_exc:
-                    if "confirm" in str(sign_in_exc).lower():
+                    is_unconfirmed = (
+                        sign_in_exc.error_code == "email_not_confirmed"
+                        or "confirm" in str(sign_in_exc).lower()
+                    )
+                    if is_unconfirmed:
                         # Beklenen durum: hesap oluştu ama e-posta onayı bekleniyor.
                         return {"user": created_user}
                     raise

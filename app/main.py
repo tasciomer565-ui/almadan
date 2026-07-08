@@ -1154,7 +1154,10 @@ def static_page(request: Request) -> Response:
     page_file = STATIC_DIR / f"{request.url.path.strip('/')}.html"
     if page_file.is_file():
         return FileResponse(page_file, media_type="text/html; charset=utf-8")
-    return RedirectResponse("/", status_code=307)
+    target = "/"
+    if request.url.query:
+        target += f"?{request.url.query}"
+    return RedirectResponse(target, status_code=307)
 
 
 @app.get("/products")
