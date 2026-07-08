@@ -133,7 +133,7 @@ function addAffiliateTag(url, source) {
   try {
     const u = new URL(url);
     if (source === 'amazon' || u.hostname.includes('amazon.com.tr')) {
-      u.searchParams.set('tag', 'almadan-21');
+      u.searchParams.set('tag', '210214a-21');
     }
     return u.toString();
   } catch(e) { return url; }
@@ -509,7 +509,7 @@ async function loadLatestCampaigns() {
         const storeName = escapeHtml(c.store_name || c.store_slug || "Mağaza");
         const title = escapeHtml(c.title || "Yeni Kampanya");
         const desc = escapeHtml((c.description || "").slice(0, 90));
-        const url = c.catalog_url ? escapeHtml(c.catalog_url) : "";
+        const url = c.catalog_url ? escapeHtml(addAffiliateTag(c.catalog_url, c.store_slug)) : "";
         const brand = getStoreBrand(c.store_slug);
         return `
           <a href="${url || "#"}" target="_blank" rel="noopener"
