@@ -594,9 +594,18 @@ async function api(path, options = {}) {
     : { detail: await response.text() || `Sunucu hatası (${response.status})` };
 
   if (!response.ok) {
-    throw new Error(apiErrorMessage(data, response.status));
+    const err = new Error(apiErrorMessage(data, response.status));
+    err.status = response.status;
+    throw err;
   }
   return data;
+}
+
+// Bir API çağrısı "giriş gerekli" (401/403 + yetki mesajı) ile başarısız
+// olduğunda true döner -- takip/bildirim gibi hesap gerektiren işlemler
+// için ortak kontrol.
+function isLoginRequiredError(error) {
+  return error && (error.status === 401 || error.status === 403);
 }
 
 // ── Onboarding ─────────────────────────────────────────────────────────────
@@ -696,12 +705,12 @@ function renderUnauthenticatedAuth(content) {
 
         <div class="manual-fields">
           <label class="manual-field">
-            <span>Ad Soyad</span>
-            <input id="authFullName" type="text" autocomplete="name" maxlength="120" placeholder="Ad Soyad">
+            <span>Ad Soyad *</span>
+            <input id="authFullName" type="text" autocomplete="name" maxlength="120" placeholder="Ad Soyad" required>
           </label>
           <label class="manual-field">
             <span>E-posta</span>
-            <input id="authEmail" type="email" autocomplete="email" placeholder="ornek@email.com">
+            <input id="authEmail" type="email" autocomplete="email" placeholder="ornek@email.com" required>
           </label>
           <label class="manual-field">
             <span>Şifre</span>
@@ -724,8 +733,8 @@ function renderUnauthenticatedAuth(content) {
             </select>
           </label>
           <label id="phoneFieldLabel" class="manual-field">
-            <span>Telefon Numarası</span>
-            <input id="authPhone" type="tel" placeholder="05XXXXXXXXX">
+            <span>Telefon Numarası *</span>
+            <input id="authPhone" type="tel" placeholder="05XXXXXXXXX" required>
           </label>
         </div>
         <button class="auth-link-button" type="button" onclick="showForgotPassword()">
@@ -884,6 +893,11 @@ async function verifySmsCode() {
   } catch (error) {
     showAuthError(error.message);
   }
+}
+
+function promptLoginForTracking(reason) {
+  showToast(reason || "Ürün takibi için hesap açman gerekiyor.");
+  showAccount();
 }
 
 function showAccount() {
@@ -1139,10 +1153,17 @@ async function submitAuth(mode) {
   const notificationPref = document.getElementById("authNotificationPref")?.value || "both";
   const rawPhone = document.getElementById("authPhone")?.value.trim() || "";
   const phone = rawPhone ? normalizePhoneNumber(rawPhone) : "";
+  const fullName = document.getElementById("authFullName")?.value.trim() || "";
 
-  if (mode === "signup" && notificationPref !== "email" && !phone) {
-    showAuthError("SMS bildirimleri için telefon numarası gereklidir.");
-    return;
+  if (mode === "signup") {
+    if (!fullName) {
+      showAuthError("Ad Soyad gereklidir.");
+      return;
+    }
+    if (!phone) {
+      showAuthError("Telefon numarası gereklidir.");
+      return;
+    }
   }
 
   try {
@@ -1150,9 +1171,8 @@ async function submitAuth(mode) {
     if (mode === "signup") {
       payload.gender = gender;
       payload.notification_pref = notificationPref;
-      if (phone) payload.phone = phone;
-      const fullName = document.getElementById("authFullName")?.value.trim() || "";
-      if (fullName) payload.full_name = fullName;
+      payload.phone = phone;
+      payload.full_name = fullName;
     }
 
     const result = await api(`/auth/${mode}`, {
@@ -2237,7 +2257,11 @@ async function trackSearchResultProduct(button, index) {
     await loadProducts();
     switchView("tracking");
   } catch (error) {
-    showToast(`Ürün kaydedilemedi: ${error.message}`);
+    if (isLoginRequiredError(error)) {
+      promptLoginForTracking("Bir ürünü fiyat radarına eklemek için hesap açman gerekiyor.");
+    } else {
+      showToast(`Ürün kaydedilemedi: ${error.message}`);
+    }
     button.disabled = false;
     button.innerHTML = `<i data-lucide="radar" style="width:12px; height:12px; margin-right:4px;"></i> Radara Ekle`;
     lucide.createIcons();
@@ -2606,7 +2630,12 @@ async function trackParsedProduct() {
     await loadProducts();
     switchView("tracking");
   } catch (error) {
-    showDialogError(`Ürün kaydedilemedi: ${error.message}`);
+    if (isLoginRequiredError(error)) {
+      closeDialog();
+      promptLoginForTracking("Bir ürünü fiyat radarına eklemek için hesap açman gerekiyor.");
+    } else {
+      showDialogError(`Ürün kaydedilemedi: ${error.message}`);
+    }
     button.disabled = false;
     button.innerHTML = `<i data-lucide="radar"></i> Takibe al`;
     lucide.createIcons();
@@ -3489,10 +3518,11 @@ function getOrCreateDeviceId() {
 }
 
 function togglePhoneField() {
-  const pref = document.getElementById("authNotificationPref")?.value;
+  // Telefon artık her zaman zorunlu (bildirim tercihinden bağımsız) --
+  // alan her durumda görünür kalır.
   const phoneField = document.getElementById("phoneFieldLabel");
   if (phoneField) {
-    phoneField.style.display = pref === "email" ? "none" : "block";
+    phoneField.style.display = "block";
   }
 }
 

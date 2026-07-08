@@ -749,6 +749,11 @@ def auth_signup(
     response: Response,
     x_device_id: str | None = Header(default=None),
 ) -> dict:
+    if not payload.full_name or not payload.full_name.strip():
+        raise HTTPException(status_code=400, detail="Ad Soyad gereklidir.")
+    if not payload.phone or not payload.phone.strip():
+        raise HTTPException(status_code=400, detail="Telefon numarası gereklidir.")
+
     session = sign_up(
         payload.email,
         payload.password,
@@ -1173,6 +1178,7 @@ def add_product(
     background_tasks: BackgroundTasks,
     request: Request,
     x_device_id: str | None = Header(default=None),
+    user=Depends(require_login),
 ) -> dict:
     owner_id = request_owner_id(request, x_device_id)
     db = load_db()
@@ -1574,6 +1580,7 @@ def add_product_from_url(
     background_tasks: BackgroundTasks,
     request: Request,
     x_device_id: str | None = Header(default=None),
+    user=Depends(require_login),
 ) -> dict:
     owner_id = request_owner_id(request, x_device_id)
     parsed = parse_product_url(payload.url)
