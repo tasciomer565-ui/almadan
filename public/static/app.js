@@ -427,7 +427,7 @@ function persistQuantumState() {
   console.log("Kuantum Hafıza: Durum kaydedildi.", data);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   applyTheme();
   optimizeForMobile();
 
@@ -448,11 +448,49 @@ document.addEventListener("DOMContentLoaded", () => {
   const recoverySession = readRecoverySession();
   if (recoverySession) {
     showPasswordReset(recoverySession);
+    loadSession();
+  } else {
+    // Çerezlerin tarayıcıya işlenmesini bekle -- aksi halde hemen ardından
+    // gelen loadSession() henüz eski (çıkış yapılmış) durumu görüp üzerine yazabilir.
+    const confirmed = await completeEmailConfirmSession();
+    if (!confirmed) loadSession();
   }
-  loadSession();
   checkSharedListUrl();
   loadLatestCampaigns();
 });
+
+// E-posta onay linkine tıklayınca Supabase #access_token=...&type=signup
+// fragmanıyla siteye döner -- bunu yakalayıp otomatik oturum aç, kullanıcı
+// ad soyad/telefon gibi bilgileri BAŞTAN girmek zorunda kalmasın.
+async function completeEmailConfirmSession() {
+  if (!window.location.hash) return false;
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  const type = params.get("type");
+  const accessToken = params.get("access_token");
+  if (!accessToken || (type !== "signup" && type !== "email_change" && type !== "magiclink")) return false;
+
+  history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+  try {
+    const result = await api("/auth/session/exchange", {
+      method: "POST",
+      body: JSON.stringify({
+        access_token: accessToken,
+        refresh_token: params.get("refresh_token"),
+      }),
+    });
+    state.auth = { enabled: true, authenticated: true, user: result.user };
+    renderAccountButton();
+    handleCategoryChange();
+    await loadProducts();
+    await loadCartFromBackend();
+    showToast("Hesabın onaylandı, hoş geldin! Bilgilerini tamamlayalım.");
+    showAccount();
+    return true;
+  } catch (error) {
+    console.warn("E-posta onayı sonrası otomatik giriş başarısız:", error.message);
+    return false;
+  }
+}
 
 /* ── "Haftanın En Çok Düşenleri" vitrini ──────────────────────────────── */
 async function loadLatestCampaigns() {
@@ -770,69 +808,68 @@ function renderAccountButton() {
 }
 
 let activeAuthMethod = "email"; // "email" or "sms"
+let authFormMode = "login"; // "login" or "signup" -- sadece "email" sekmesi için
 let smsCodeSent = false;
+
+function switchAuthFormMode(mode) {
+  authFormMode = mode;
+  const content = document.getElementById("dialogContent");
+  if (content) renderUnauthenticatedAuth(content);
+}
 
 function renderUnauthenticatedAuth(content) {
   if (activeAuthMethod === "email") {
+    const isSignup = authFormMode === "signup";
     content.innerHTML = `
       <div class="dialog-body auth-dialog">
         <p class="eyebrow">ALMADAN HESABI</p>
-        <h2>Takiplerini kaybetme.</h2>
+        <h2>${isSignup ? "Hesap oluştur." : "Takiplerini kaybetme."}</h2>
 
         <div class="auth-tabs" style="display: flex; gap: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 10px; width: 100%;">
           <button type="button" onclick="switchAuthMethod('email')" style="background: none; border: none; font-weight: bold; cursor: pointer; color: var(--green-dark); border-bottom: 2px solid var(--green-dark); padding-bottom: 8px; font-family: inherit; font-size: 14px;">E-posta ile Giriş</button>
           <button type="button" onclick="switchAuthMethod('sms')" style="background: none; border: none; cursor: pointer; color: var(--ink-light); padding-bottom: 8px; font-family: inherit; font-size: 14px;">SMS ile Giriş</button>
         </div>
 
-        <p class="auth-copy" style="margin-bottom: 16px; font-size: 13px; color: var(--ink-light);">E-posta ile giriş yap. Bu cihazdaki ürünlerin hesabına otomatik taşınsın.</p>
+        <p class="auth-copy" style="margin-bottom: 16px; font-size: 13px; color: var(--ink-light);">
+          ${isSignup ? "Sadece e-posta ve şifre yeterli -- telefon, ad soyad gibi bilgileri girdikten sonra tamamlarsın." : "E-posta ile giriş yap. Bu cihazdaki ürünlerin hesabına otomatik taşınsın."}
+        </p>
 
         <div class="manual-fields">
-          <label class="manual-field">
-            <span>Ad Soyad *</span>
-            <input id="authFullName" type="text" autocomplete="name" maxlength="120" placeholder="Ad Soyad" required>
-          </label>
           <label class="manual-field">
             <span>E-posta</span>
             <input id="authEmail" type="email" autocomplete="email" placeholder="ornek@email.com" required>
           </label>
           <label class="manual-field">
             <span>Şifre</span>
-            <input id="authPassword" type="password" autocomplete="current-password" minlength="8" placeholder="En az 8 karakter">
+            <input id="authPassword" type="password" autocomplete="${isSignup ? "new-password" : "current-password"}" minlength="8" placeholder="En az 8 karakter">
           </label>
-          <label class="manual-field">
-            <span>Cinsiyet (Kişiselleştirilmiş Arama İçin)</span>
-            <select id="authGender" style="width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: white; font-family: inherit; font-size: 14px; color: var(--ink);">
-              <option value="belirtilmemiş">Belirtilmemiş</option>
-              <option value="erkek">Erkek</option>
-              <option value="kadın">Kadın</option>
-            </select>
-          </label>
-          <label class="manual-field">
-            <span>Bildirim Tercihi</span>
-            <select id="authNotificationPref" onchange="togglePhoneField()" style="width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: white; font-family: inherit; font-size: 14px; color: var(--ink);">
-              <option value="both">Hem SMS hem E-posta</option>
-              <option value="email">Sadece E-posta</option>
-              <option value="sms">Sadece SMS</option>
-            </select>
-          </label>
-          <label id="phoneFieldLabel" class="manual-field">
-            <span>Telefon Numarası *</span>
-            <input id="authPhone" type="tel" placeholder="05XXXXXXXXX" required>
-          </label>
+          ${isSignup ? `
+            <label class="manual-field">
+              <span>Şifre (Tekrar)</span>
+              <input id="authPasswordConfirm" type="password" autocomplete="new-password" minlength="8" placeholder="Şifreni tekrar yaz">
+            </label>
+          ` : ""}
         </div>
-        <button class="auth-link-button" type="button" onclick="showForgotPassword()">
-          Şifremi unuttum
-        </button>
+        ${isSignup ? "" : `
+          <button class="auth-link-button" type="button" onclick="showForgotPassword()">
+            Şifremi unuttum
+          </button>
+        `}
         <p class="dialog-error" id="authError" hidden></p>
         <p class="dialog-success" id="authSuccess" hidden></p>
         ${state.auth.enabled ? `
           <div class="dialog-actions">
-            <button class="secondary-button" type="button" onclick="submitAuth('signup')">Hesap oluştur</button>
-            <button class="primary-button" type="button" onclick="submitAuth('login')">
-              <i data-lucide="log-in"></i>
-              Giriş yap
+            <button class="primary-button" type="button" onclick="submitAuth('${isSignup ? "signup" : "login"}')" style="width: 100%;">
+              <i data-lucide="${isSignup ? "user-plus" : "log-in"}"></i>
+              ${isSignup ? "Hesap oluştur" : "Giriş yap"}
             </button>
           </div>
+          <p class="auth-copy" style="margin-top: 14px; font-size: 13px; text-align: center;">
+            ${isSignup ? "Zaten hesabın var mı?" : "Hesabın yok mu?"}
+            <button class="auth-link-button" type="button" onclick="switchAuthFormMode('${isSignup ? "login" : "signup"}')" style="font-weight: 700;">
+              ${isSignup ? "Giriş yap" : "Üye ol"}
+            </button>
+          </p>
         ` : `
           <p class="dialog-error">Hesap sistemi henüz sunucuda etkinleştirilmedi.</p>
         `}
@@ -1002,6 +1039,10 @@ function showAccount() {
         </div>
         <div class="manual-fields">
           <label class="manual-field">
+            <span>Ad Soyad</span>
+            <input id="profileFullName" type="text" autocomplete="name" maxlength="120" value="${escapeHtml(state.auth.user?.full_name || "")}" placeholder="Ad Soyad">
+          </label>
+          <label class="manual-field">
             <span>Cinsiyet</span>
             <select id="profileGender">
               <option value="belirtilmemiş">Belirtilmemiş</option>
@@ -1019,7 +1060,14 @@ function showAccount() {
           </label>
           <label class="manual-field" id="profilePhoneField">
             <span>Telefon Numarası</span>
-            <input id="profilePhone" type="tel" value="${escapeHtml(state.auth.user?.phone || "")}" placeholder="05XXXXXXXXX">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input id="profilePhone" type="tel" value="${escapeHtml(state.auth.user?.phone || "")}" placeholder="05XXXXXXXXX" style="flex: 1;">
+              ${state.auth.user?.phone ? (
+                state.auth.user?.phone_verified
+                  ? `<span style="font-size: 12px; color: var(--green-dark); font-weight: 700; white-space: nowrap;">✓ Doğrulandı</span>`
+                  : `<button class="secondary-button" type="button" style="white-space: nowrap; padding: 0 12px; min-height: 40px;" onclick="promptPhoneVerification(state.auth.user.phone)">Doğrula</button>`
+              ) : ""}
+            </div>
           </label>
           <label class="profile-checkbox">
             <input id="profileSilenceEnabled" type="checkbox" ${state.auth.user?.silence_hours ? "checked" : ""}>
@@ -1055,9 +1103,11 @@ function toggleProfilePhoneField() {
 }
 
 async function saveProfileSettings() {
+  const fullName = document.getElementById("profileFullName")?.value.trim() || "";
   const gender = document.getElementById("profileGender")?.value || "belirtilmemiş";
   const notificationPref = document.getElementById("profileNotificationPref")?.value || "both";
-  const phone = document.getElementById("profilePhone")?.value.trim() || "";
+  const rawPhone = document.getElementById("profilePhone")?.value.trim() || "";
+  const phone = rawPhone ? normalizePhoneNumber(rawPhone) : "";
   const silenceEnabled = Boolean(document.getElementById("profileSilenceEnabled")?.checked);
 
   if (notificationPref !== "email" && !phone) {
@@ -1069,6 +1119,7 @@ async function saveProfileSettings() {
     const result = await api("/auth/profile", {
       method: "PUT",
       body: JSON.stringify({
+        full_name: fullName,
         gender,
         phone,
         notification_pref: notificationPref,
@@ -1078,6 +1129,7 @@ async function saveProfileSettings() {
     state.auth.user = result.user;
     closeDialog();
     showToast("Profil ve bildirim ayarların kaydedildi.");
+    maybePromptPhoneVerification();
   } catch (error) {
     showAuthError(error.message);
   }
@@ -1233,31 +1285,16 @@ async function submitAuth(mode) {
     return;
   }
 
-  const gender = document.getElementById("authGender")?.value || "belirtilmemiş";
-  const notificationPref = document.getElementById("authNotificationPref")?.value || "both";
-  const rawPhone = document.getElementById("authPhone")?.value.trim() || "";
-  const phone = rawPhone ? normalizePhoneNumber(rawPhone) : "";
-  const fullName = document.getElementById("authFullName")?.value.trim() || "";
-
   if (mode === "signup") {
-    if (!fullName) {
-      showAuthError("Ad Soyad gereklidir.");
-      return;
-    }
-    if (!phone) {
-      showAuthError("Telefon numarası gereklidir.");
+    const passwordConfirm = document.getElementById("authPasswordConfirm")?.value || "";
+    if (password !== passwordConfirm) {
+      showAuthError("Yazdığın şifreler birbiriyle eşleşmiyor.");
       return;
     }
   }
 
   try {
     const payload = { email, password };
-    if (mode === "signup") {
-      payload.gender = gender;
-      payload.notification_pref = notificationPref;
-      payload.phone = phone;
-      payload.full_name = fullName;
-    }
 
     const result = await api(`/auth/${mode}`, {
       method: "POST",
@@ -1265,7 +1302,7 @@ async function submitAuth(mode) {
     });
 
     if (result.requires_email_confirmation) {
-      showAuthSuccess("Kullanıcı kaydı başarıyla oluşturuldu! E-posta adresinize bir onay bağlantısı gönderildi. Giriş yapmadan önce lütfen e-postanızı onaylayın.");
+      showAuthSuccess("Hesabın oluşturuldu! E-posta adresine bir onay bağlantısı gönderdik. Linke tıklayınca otomatik giriş yapılacak, kalan bilgilerini (ad soyad, telefon) orada birkaç adımda tamamlarsın.");
       return;
     }
 
@@ -1280,7 +1317,11 @@ async function submitAuth(mode) {
     await loadProducts();
     await loadCartFromBackend();
     showToast(mode === "signup" ? "Hesabın oluşturuldu." : "Giriş yapıldı.");
-    maybePromptPhoneVerification();
+    if (mode === "signup") {
+      showAccount();
+    } else {
+      maybePromptPhoneVerification();
+    }
   } catch (error) {
     showAuthError(error.message);
   }

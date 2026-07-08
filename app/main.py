@@ -562,6 +562,12 @@ class ProfileUpdateRequest(BaseModel):
     notification_pref: Literal["sms", "email", "both"] = "both"
     silence_enabled: bool = True
     skin_type: Literal["light", "medium", "dark"] | None = None
+    full_name: str | None = Field(default=None, max_length=120)
+
+
+class SessionExchangeRequest(BaseModel):
+    access_token: str
+    refresh_token: str | None = None
 
 
 class OtpSendRequest(BaseModel):
@@ -753,10 +759,9 @@ def auth_signup(
     response: Response,
     x_device_id: str | None = Header(default=None),
 ) -> dict:
-    if not payload.full_name or not payload.full_name.strip():
-        raise HTTPException(status_code=400, detail="Ad Soyad gereklidir.")
-    if not payload.phone or not payload.phone.strip():
-        raise HTTPException(status_code=400, detail="Telefon numarası gereklidir.")
+    # Ad Soyad/telefon artık kayıt formunda İSTENMİYOR -- kullanıcı yorulmasın
+    # diye kayıt sadece e-posta+şifre; bu bilgiler ilk girişte "Hesap
+    # Bilgilerim" adımında (profile_update) tamamlanıyor.
 
     session = sign_up(
         payload.email,
@@ -840,6 +845,62 @@ def auth_login(
             "notification_pref": user.get("user_metadata", {}).get("notification_pref") if user else None,
             "skin_type": user.get("user_metadata", {}).get("skin_type") if user else None,
             "full_name": user.get("user_metadata", {}).get("full_name") if user else None,
+            "phone_verified": bool(user.get("phone_confirmed_at")),
+        },
+    }
+
+
+@app.post("/auth/session/exchange")
+def auth_session_exchange(
+    payload: SessionExchangeRequest,
+    response: Response,
+    x_device_id: str | None = Header(default=None),
+) -> dict:
+    """
+    E-posta onay linkine tıklayınca Supabase, sayfaya #access_token=...
+    fragmanıyla döner (tarayıcı JS bunu okuyup burayı çağırır). Kullanıcı
+    onay sonrası bilgilerini yeniden girmek zorunda kalmasın diye bu token'ı
+    doğrulayıp doğrudan oturum çerezlerini kuruyoruz -- ayrı bir giriş
+    adımına gerek kalmıyor.
+    """
+    try:
+        user = get_user(payload.access_token)
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.args[0])
+
+    set_auth_cookies(response, {
+        "access_token": payload.access_token,
+        "refresh_token": payload.refresh_token,
+        "expires_in": 3600,
+    })
+
+    if user.get("id") and x_device_id:
+        claim_device_data(x_device_id, user["id"])
+
+    user_id = user.get("id")
+    if user_id:
+        user_owner = f"user:{user_id}"
+        db = load_db()
+        db.setdefault("users", {})[user_owner] = {
+            "email": user.get("email"),
+            "gender": user.get("user_metadata", {}).get("gender"),
+            "phone": user.get("user_metadata", {}).get("phone"),
+            "notification_pref": user.get("user_metadata", {}).get("notification_pref"),
+            "skin_type": user.get("user_metadata", {}).get("skin_type"),
+            "full_name": user.get("user_metadata", {}).get("full_name"),
+        }
+        save_db(db)
+
+    return {
+        "authenticated": True,
+        "user": {
+            "id": user.get("id"),
+            "email": user.get("email"),
+            "gender": user.get("user_metadata", {}).get("gender"),
+            "phone": user.get("user_metadata", {}).get("phone"),
+            "notification_pref": user.get("user_metadata", {}).get("notification_pref"),
+            "skin_type": user.get("user_metadata", {}).get("skin_type"),
+            "full_name": user.get("user_metadata", {}).get("full_name"),
             "phone_verified": bool(user.get("phone_confirmed_at")),
         },
     }
@@ -931,6 +992,11 @@ def auth_profile_update(request: Request, payload: ProfileUpdateRequest) -> dict
             {"start": 22, "end": 8} if payload.silence_enabled else None
         ),
         "skin_type": payload.skin_type,
+        "full_name": (
+            sanitize(payload.full_name, max_length=120)
+            if payload.full_name and payload.full_name.strip()
+            else (request.state.user_metadata or {}).get("full_name")
+        ),
     }
 
     access_token = request.cookies.get(ACCESS_COOKIE)
@@ -963,6 +1029,7 @@ def auth_profile_update(request: Request, payload: ProfileUpdateRequest) -> dict
         "user": {
             "id": request.state.user_id,
             "email": request.state.user_email,
+            "phone_verified": request.state.phone_verified,
             **metadata,
         },
     }
