@@ -2388,18 +2388,23 @@ def admin_user_details(request: Request) -> dict:
     rows = []
     for owner_id in all_owner_ids:
         info = users.get(owner_id, {})
+        is_registered = owner_id in users and bool(info.get("email"))
         rows.append({
             "owner_id": owner_id,
-            "email": info.get("email") or "-",
-            "full_name": info.get("full_name") or "-",
+            "is_registered": is_registered,
+            "email": info.get("email") or None,
+            "full_name": info.get("full_name") or None,
             "phone": bool(info.get("phone")),
             "notification_pref": info.get("notification_pref") or "-",
             "tracked_products": products_by_owner.get(owner_id, []),
             "followed_stores": stores_by_user.get(owner_id, []),
         })
 
-    rows.sort(key=lambda r: len(r["tracked_products"]) + len(r["followed_stores"]), reverse=True)
-    return {"users": rows}
+    # Kayıtlı kullanıcılar önce, sonra takip sayısına göre
+    rows.sort(key=lambda r: (not r["is_registered"], -(len(r["tracked_products"]) + len(r["followed_stores"]))))
+    registered_count = sum(1 for r in rows if r["is_registered"])
+    guest_count = len(rows) - registered_count
+    return {"users": rows, "registered_count": registered_count, "guest_count": guest_count}
 
 
 @app.get("/api/admin/scraper-health-report")

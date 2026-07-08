@@ -316,9 +316,12 @@
           const storesHtml = u.followed_stores.length
             ? u.followed_stores.map(esc).join(", ")
             : '<span style="color:var(--ink-light);">—</span>';
+          const userCell = u.is_registered
+            ? `${esc(u.email)}${u.full_name ? `<br><span style="color:var(--ink-light);font-size:11px;">${esc(u.full_name)}</span>` : ""}`
+            : `<span class="badge warn">Misafir</span><br><span style="color:var(--ink-light);font-size:10px;">Hesap açmadan takip eden ziyaretçi</span>`;
           return `
             <tr>
-              <td>${esc(u.email)}${u.full_name !== "-" ? `<br><span style="color:var(--ink-light);font-size:11px;">${esc(u.full_name)}</span>` : ""}</td>
+              <td>${userCell}</td>
               <td>${u.phone ? '<span class="badge ok">Var</span>' : '<span class="badge warn">Yok</span>'}</td>
               <td style="font-size:12px;">${productsHtml}</td>
               <td style="font-size:12px;">${storesHtml}</td>
@@ -327,6 +330,7 @@
         }).join("");
         el.innerHTML = `
           <h3 style="margin:24px 0 12px;font-size:15px;">Kullanıcı Bazlı Takip Detayı</h3>
+          <p class="subtitle">${d.registered_count} kayıtlı hesap, ${d.guest_count} misafir (hesap açmadan takip eden ziyaretçi).</p>
           <div style="overflow-x:auto;">
             <table><thead><tr><th>Kullanıcı</th><th>Telefon</th><th>Takip Ettiği Ürünler</th><th>Takip Ettiği Mağazalar</th></tr></thead><tbody>${rows || '<tr><td colspan="4" style="color:var(--ink-light);">Henüz kullanıcı yok.</td></tr>'}</tbody></table>
           </div>
