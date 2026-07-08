@@ -92,8 +92,11 @@ def sign_up(
         admin_payload = {
             "email": email,
             "password": password,
-            "email_confirm": True,
-            "phone_confirm": True if phone else False,
+            # Fake kullanıcıları engellemek için e-posta ve telefonu OTOMATİK
+            # onaylanmış saymıyoruz -- Supabase kendi onay mailini gönderir,
+            # telefon ise ayrı bir SMS/OTP adımıyla doğrulanır.
+            "email_confirm": False,
+            "phone_confirm": False,
             "user_metadata": {}
         }
         if gender:
@@ -120,8 +123,15 @@ def sign_up(
                 timeout=20,
             )
             if response.status_code == 201:
-                # User created and auto-confirmed! Immediately sign them in to return session tokens
-                return sign_in(email, password)
+                created_user = response.json()
+                try:
+                    # E-posta zaten onaylıysa (nadiren, örn. mevcut kullanıcı) direkt oturum aç.
+                    return sign_in(email, password)
+                except AuthError as sign_in_exc:
+                    if "confirm" in str(sign_in_exc).lower():
+                        # Beklenen durum: hesap oluştu ama e-posta onayı bekleniyor.
+                        return {"user": created_user}
+                    raise
             elif response.status_code in {400, 422}:
                 try:
                     body = response.json()

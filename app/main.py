@@ -233,6 +233,7 @@ async def resolve_auth_session(request: Request, call_next):
     request.state.user_id = None
     request.state.user_email = None
     request.state.user_metadata = {}
+    request.state.phone_verified = False
     refreshed_tokens = None
     access_token = request.cookies.get(ACCESS_COOKIE)
     refresh_token = request.cookies.get(REFRESH_COOKIE)
@@ -243,6 +244,7 @@ async def resolve_auth_session(request: Request, call_next):
             request.state.user_id = user.get("id")
             request.state.user_email = user.get("email")
             request.state.user_metadata = user.get("user_metadata") or {}
+            request.state.phone_verified = bool(user.get("phone_confirmed_at"))
         except AuthError:
             if refresh_token:
                 try:
@@ -254,6 +256,7 @@ async def resolve_auth_session(request: Request, call_next):
                     request.state.user_id = user.get("id")
                     request.state.user_email = user.get("email")
                     request.state.user_metadata = user.get("user_metadata") or {}
+                    request.state.phone_verified = bool(user.get("phone_confirmed_at"))
                 except AuthError:
                     refreshed_tokens = {}
 
@@ -735,6 +738,7 @@ def auth_session(request: Request) -> dict:
                 "notification_pref": request.state.user_metadata.get("notification_pref") if request.state.user_metadata else None,
                 "silence_hours": request.state.user_metadata.get("silence_hours") if request.state.user_metadata else None,
                 "skin_type": request.state.user_metadata.get("skin_type") if request.state.user_metadata else None,
+                "phone_verified": request.state.phone_verified,
             }
             if request.state.user_id
             else None
@@ -794,10 +798,11 @@ def auth_signup(
             "notification_pref": user.get("user_metadata", {}).get("notification_pref") if user else None,
             "skin_type": user.get("user_metadata", {}).get("skin_type") if user else None,
             "full_name": user.get("user_metadata", {}).get("full_name") if user else None,
+            "phone_verified": bool(user.get("phone_confirmed_at")),
         },
     }
- 
- 
+
+
 @app.post("/auth/login")
 def auth_login(
     payload: AuthCredentials,
@@ -835,6 +840,7 @@ def auth_login(
             "notification_pref": user.get("user_metadata", {}).get("notification_pref") if user else None,
             "skin_type": user.get("user_metadata", {}).get("skin_type") if user else None,
             "full_name": user.get("user_metadata", {}).get("full_name") if user else None,
+            "phone_verified": bool(user.get("phone_confirmed_at")),
         },
     }
 
@@ -891,6 +897,7 @@ def auth_otp_verify(
             "notification_pref": user.get("user_metadata", {}).get("notification_pref") if user else None,
             "skin_type": user.get("user_metadata", {}).get("skin_type") if user else None,
             "full_name": user.get("user_metadata", {}).get("full_name") if user else None,
+            "phone_verified": True,
         },
     }
 

@@ -669,8 +669,90 @@ async function loadSession() {
   }
   renderAccountButton();
   handleCategoryChange();
-  if (state.auth.authenticated) loadCartFromBackend();
+  if (state.auth.authenticated) {
+    loadCartFromBackend();
+    maybePromptPhoneVerification();
+  }
   setTimeout(showOnboarding, 800);
+}
+
+// Fake kullanıcıları engellemek için: telefonu doğrulanmamış hesaplara,
+// oturum başına en fazla bir kez, doğrulama dialogu göster.
+function maybePromptPhoneVerification() {
+  const user = state.auth?.user;
+  if (!user || !user.phone || user.phone_verified) return;
+  if (sessionStorage.getItem("almadan_phone_verify_dismissed") === user.phone) return;
+  promptPhoneVerification(user.phone);
+}
+
+function promptPhoneVerification(phone, codeSent = false) {
+  const dialog = document.getElementById("productDialog");
+  const content = document.getElementById("dialogContent");
+  if (!dialog || !content) return;
+
+  content.innerHTML = `
+    <div class="dialog-body auth-dialog">
+      <p class="eyebrow">TELEFON DOĞRULAMA</p>
+      <h2>Telefon numaranı doğrula.</h2>
+      <p class="auth-copy" style="margin-bottom: 16px; font-size: 13px; color: var(--ink-light);">
+        Hesabının gerçek olduğundan emin olmak için <b>${escapeHtml(phone)}</b> numarasına gönderdiğimiz kodu gir.
+      </p>
+      <div id="phoneVerifyError" class="auth-error" hidden></div>
+      ${codeSent ? `
+        <div class="manual-fields">
+          <label class="manual-field">
+            <span>Doğrulama Kodu</span>
+            <input id="phoneVerifyCode" type="text" inputmode="numeric" maxlength="6" placeholder="6 haneli kod" style="width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; font-family: inherit; font-size: 14px;">
+          </label>
+        </div>
+        <div class="dialog-actions" style="margin-top: 20px;">
+          <button class="secondary-button" type="button" onclick="dismissPhoneVerification('${phone}')">Daha Sonra</button>
+          <button class="primary-button" type="button" onclick="confirmPhoneVerification('${phone}')">Doğrula</button>
+        </div>
+      ` : `
+        <div class="dialog-actions" style="margin-top: 20px;">
+          <button class="secondary-button" type="button" onclick="dismissPhoneVerification('${phone}')">Daha Sonra</button>
+          <button class="primary-button" type="button" onclick="sendPhoneVerificationCode('${phone}')">Kod Gönder</button>
+        </div>
+      `}
+    </div>
+  `;
+  dialog.showModal();
+}
+
+function dismissPhoneVerification(phone) {
+  sessionStorage.setItem("almadan_phone_verify_dismissed", phone);
+  closeDialog();
+}
+
+async function sendPhoneVerificationCode(phone) {
+  try {
+    await api("/auth/otp/send", { method: "POST", body: JSON.stringify({ phone }) });
+    showToast("Doğrulama kodu gönderildi.");
+    promptPhoneVerification(phone, true);
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function confirmPhoneVerification(phone) {
+  const code = document.getElementById("phoneVerifyCode")?.value.trim();
+  if (!code || code.length !== 6) {
+    showToast("Lütfen 6 haneli kodu girin.");
+    return;
+  }
+  try {
+    const result = await api("/auth/otp/verify", {
+      method: "POST",
+      body: JSON.stringify({ phone, code }),
+    });
+    state.auth.user = { ...state.auth.user, ...result.user, phone_verified: true };
+    sessionStorage.removeItem("almadan_phone_verify_dismissed");
+    closeDialog();
+    showToast("Telefon doğrulandı!");
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
 function renderAccountButton() {
@@ -1198,6 +1280,7 @@ async function submitAuth(mode) {
     await loadProducts();
     await loadCartFromBackend();
     showToast(mode === "signup" ? "Hesabın oluşturuldu." : "Giriş yapıldı.");
+    maybePromptPhoneVerification();
   } catch (error) {
     showAuthError(error.message);
   }
