@@ -131,10 +131,15 @@ async def csrf_middleware(request: Request, call_next):
         # Token üretimindeki fallback ile aynı: cookie yoksa "anonymous"
         session_id = getattr(request.state, "device_id", None) or request.cookies.get("almadan_device_id", "anonymous")
         if not verify_csrf_token(token or "", session_id):
-            return JSONResponse(
+            response = JSONResponse(
                 status_code=status.HTTP_403_FORBIDDEN,
                 content={"detail": "CSRF token geçersiz veya eksik."},
             )
+            # Bayat/uyumsuz csrf_token çerezini temizle -- aksi halde cookie
+            # varlığı yeni token üretimini engelleyip kullanıcıyı kalıcı 403'e
+            # kilitliyor (elle çerez temizlemeden veya gizli pencereden başka çıkış yolu yoktu).
+            response.delete_cookie("csrf_token", path="/")
+            return response
     return await call_next(request)
 
 
