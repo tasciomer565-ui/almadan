@@ -258,6 +258,7 @@ _ADMIN_SECRET_BYPASS_PATHS = {
     "/api/admin/cron-health",
     "/api/admin/system-progress",
     "/api/admin/business-metrics",
+    "/api/admin/user-details",
 }
 
 

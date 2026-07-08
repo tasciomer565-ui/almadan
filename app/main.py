@@ -2344,6 +2344,64 @@ def admin_business_metrics(request: Request) -> dict:
     }
 
 
+@app.get("/api/admin/user-details")
+def admin_user_details(request: Request) -> dict:
+    """Hangi kullanıcı hangi ürünü/mağazayı takip ediyor — destek ve
+    kullanım analizi için detaylı döküm."""
+    require_admin_secret(request)
+    db = load_db()
+
+    users = db.get("users", {})
+    products = db.get("products", [])
+
+    products_by_owner: dict[str, list[dict]] = {}
+    for p in products:
+        owner = p.get("owner_id")
+        if not owner:
+            continue
+        products_by_owner.setdefault(owner, []).append({
+            "title": p.get("title", ""),
+            "price": p.get("price"),
+            "url": p.get("url", ""),
+        })
+
+    stores_by_user: dict[str, list[str]] = {}
+    if supabase_enabled():
+        try:
+            resp = requests.get(
+                f"{supabase_base_url()}/rest/v1/followed_stores",
+                headers=supabase_headers(),
+                params={"select": "user_id,store_slug"},
+                timeout=15,
+            )
+            rows = resp.json() if resp.ok else []
+            for row in rows:
+                uid = row.get("user_id")
+                slug = row.get("store_slug")
+                if uid and slug:
+                    stores_by_user.setdefault(f"user:{uid}", []).append(slug)
+        except Exception:
+            pass
+
+    all_owner_ids = set(users.keys()) | set(products_by_owner.keys()) | set(stores_by_user.keys())
+
+    rows = []
+    for owner_id in all_owner_ids:
+        info = users.get(owner_id, {})
+        rows.append({
+            "owner_id": owner_id,
+            "email": info.get("email") or "-",
+            "full_name": info.get("full_name") or "-",
+            "phone": bool(info.get("phone")),
+            "notification_pref": info.get("notification_pref") or "-",
+            "tracked_products": products_by_owner.get(owner_id, []),
+            "followed_stores": stores_by_user.get(owner_id, []),
+        })
+
+    rows.sort(key=lambda r: len(r["tracked_products"]) + len(r["followed_stores"]), reverse=True)
+    return {"users": rows}
+
+
 @app.get("/api/admin/scraper-health-report")
 def admin_scraper_health_report(request: Request) -> dict:
     """scraper_healthcheck.py'nin biriktirdiği sağlık verisini okunur biçimde döner."""

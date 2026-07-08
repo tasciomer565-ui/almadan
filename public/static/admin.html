@@ -296,9 +296,43 @@
             <div class="stat-card"><div class="num">${d.total_notifications_sent}</div><div class="label">Gönderilen Bildirim</div></div>
             <div class="stat-card"><div class="num">${d.total_store_follows ?? "—"}</div><div class="label">Mağaza Takibi</div></div>
           </div>
+          <div id="userDetailsBox"><div class="loading">Kullanıcı detayları yükleniyor…</div></div>
         `;
+        loadUserDetails();
       } catch (e) {
         el.innerHTML = `<div class="error-box">Yüklenemedi: ${esc(e.message)}</div>`;
+      }
+    }
+
+    async function loadUserDetails() {
+      const el = document.getElementById("userDetailsBox");
+      if (!el) return;
+      try {
+        const d = await api("/api/admin/user-details");
+        const rows = (d.users || []).map(u => {
+          const productsHtml = u.tracked_products.length
+            ? u.tracked_products.map(p => `${esc(p.title)}${p.price ? ` (${p.price} TL)` : ""}`).join("<br>")
+            : '<span style="color:var(--ink-light);">—</span>';
+          const storesHtml = u.followed_stores.length
+            ? u.followed_stores.map(esc).join(", ")
+            : '<span style="color:var(--ink-light);">—</span>';
+          return `
+            <tr>
+              <td>${esc(u.email)}${u.full_name !== "-" ? `<br><span style="color:var(--ink-light);font-size:11px;">${esc(u.full_name)}</span>` : ""}</td>
+              <td>${u.phone ? '<span class="badge ok">Var</span>' : '<span class="badge warn">Yok</span>'}</td>
+              <td style="font-size:12px;">${productsHtml}</td>
+              <td style="font-size:12px;">${storesHtml}</td>
+            </tr>
+          `;
+        }).join("");
+        el.innerHTML = `
+          <h3 style="margin:24px 0 12px;font-size:15px;">Kullanıcı Bazlı Takip Detayı</h3>
+          <div style="overflow-x:auto;">
+            <table><thead><tr><th>Kullanıcı</th><th>Telefon</th><th>Takip Ettiği Ürünler</th><th>Takip Ettiği Mağazalar</th></tr></thead><tbody>${rows || '<tr><td colspan="4" style="color:var(--ink-light);">Henüz kullanıcı yok.</td></tr>'}</tbody></table>
+          </div>
+        `;
+      } catch (e) {
+        el.innerHTML = `<div class="error-box">Kullanıcı detayları yüklenemedi: ${esc(e.message)}</div>`;
       }
     }
 
