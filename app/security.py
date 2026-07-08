@@ -109,6 +109,7 @@ CSRF_EXEMPT_PATHS = {
     "/parse-url",
     "/api/client-error",  # sendBeacon header taşıyamaz; endpoint salt-log, durum değiştirmez
     "/api/find-alternatives",  # salt-okunur arama (DB'ye yazmaz); tarayıcı uzantısı 3. taraf sayfadan çağırır, csrf_token cookie'sine erişimi yok
+    "/api/admin/products/",  # çerez değil, ayrı bir paylaşımlı sır (X-Admin-Secret) ile korunuyor -- diğer /api/admin/* endpoint'leri session-çerez tabanlı olduğu için buraya DAHIL EDİLMEDİ, sadece bu yol muaf
 }
 CSRF_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
@@ -260,6 +261,9 @@ _ADMIN_SECRET_BYPASS_PATHS = {
     "/api/admin/business-metrics",
     "/api/admin/user-details",
 }
+_ADMIN_SECRET_BYPASS_PREFIXES = (
+    "/api/admin/products/",
+)
 
 
 async def auth_wall_middleware(request: Request, call_next):
@@ -280,7 +284,7 @@ async def auth_wall_middleware(request: Request, call_next):
         if cron_secret and env_secret and hmac.compare_digest(env_secret, cron_secret):
             return await call_next(request)
 
-    if path in _ADMIN_SECRET_BYPASS_PATHS:
+    if path in _ADMIN_SECRET_BYPASS_PATHS or any(path.startswith(p) for p in _ADMIN_SECRET_BYPASS_PREFIXES):
         admin_secret = request.headers.get("x-admin-secret", "").strip()
         env_secret = os.getenv("ADMIN_DEBUG_SECRET", "").strip()
         if admin_secret and env_secret and hmac.compare_digest(env_secret, admin_secret):

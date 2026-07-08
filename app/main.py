@@ -2360,6 +2360,7 @@ def admin_user_details(request: Request) -> dict:
         if not owner:
             continue
         products_by_owner.setdefault(owner, []).append({
+            "id": p.get("id"),
             "title": p.get("title", ""),
             "price": p.get("price"),
             "url": p.get("url", ""),
@@ -2389,6 +2390,14 @@ def admin_user_details(request: Request) -> dict:
     for owner_id in all_owner_ids:
         info = users.get(owner_id, {})
         is_registered = owner_id in users and bool(info.get("email"))
+        tracked = products_by_owner.get(owner_id, [])
+        followed = stores_by_user.get(owner_id, [])
+
+        # Gercek hesabı olmayan (misafir) ve hic takibi olmayan satirlari
+        # listeden gizle -- gurultu, admin icin anlamli bir veri tasimiyor.
+        if not is_registered and not tracked and not followed:
+            continue
+
         rows.append({
             "owner_id": owner_id,
             "is_registered": is_registered,
@@ -2396,8 +2405,8 @@ def admin_user_details(request: Request) -> dict:
             "full_name": info.get("full_name") or None,
             "phone": bool(info.get("phone")),
             "notification_pref": info.get("notification_pref") or "-",
-            "tracked_products": products_by_owner.get(owner_id, []),
-            "followed_stores": stores_by_user.get(owner_id, []),
+            "tracked_products": tracked,
+            "followed_stores": followed,
         })
 
     # Kayıtlı kullanıcılar önce, sonra takip sayısına göre
@@ -2405,6 +2414,25 @@ def admin_user_details(request: Request) -> dict:
     registered_count = sum(1 for r in rows if r["is_registered"])
     guest_count = len(rows) - registered_count
     return {"users": rows, "registered_count": registered_count, "guest_count": guest_count}
+
+
+@app.delete("/api/admin/products/{product_id}")
+def admin_delete_product(product_id: str, request: Request) -> dict:
+    """Admin panelinden herhangi bir kullanıcının (misafir dahil) takip
+    ettiği tek bir ürünü kaldırır -- sahiplik kontrolü yapılmaz, sadece
+    admin anahtarı gerekir. Test verisi temizliği için."""
+    require_admin_secret(request)
+    db = load_db()
+    before = len(db.get("products", []))
+    db["products"] = [p for p in db.get("products", []) if p.get("id") != product_id]
+    after = len(db["products"])
+    if before == after:
+        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
+    db["notifications"] = [
+        n for n in db.get("notifications", []) if n.get("product_id") != product_id
+    ]
+    save_db(db)
+    return {"deleted": product_id}
 
 
 @app.get("/api/admin/scraper-health-report")

@@ -126,6 +126,27 @@
       return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     }
 
+    // onclick="..." içine güvenle gömülebilecek bir JS string literali üretir
+    function inlineJsArg(value) {
+      return JSON.stringify(String(value ?? "")).replace(/"/g, "&quot;");
+    }
+
+    async function deleteProduct(productId, btn) {
+      if (!confirm("Bu ürünü kaldırmak istediğine emin misin?")) return;
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/admin/products/" + encodeURIComponent(productId), {
+          method: "DELETE",
+          headers: { "X-Admin-Secret": secret },
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        btn.closest("div").remove();
+      } catch (e) {
+        alert("Silinemedi: " + e.message);
+        btn.disabled = false;
+      }
+    }
+
     async function loadAll() {
       loadGeneral();
       loadFailed();
@@ -311,7 +332,12 @@
         const d = await api("/api/admin/user-details");
         const rows = (d.users || []).map(u => {
           const productsHtml = u.tracked_products.length
-            ? u.tracked_products.map(p => `${esc(p.title)}${p.price ? ` (${p.price} TL)` : ""}`).join("<br>")
+            ? u.tracked_products.map(p => `
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+                  <span>${esc(p.title)}${p.price ? ` (${p.price} TL)` : ""}</span>
+                  ${p.id ? `<button onclick="deleteProduct(${inlineJsArg(p.id)}, this)" title="Bu ürünü kaldır" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 4px;">✕</button>` : ""}
+                </div>
+              `).join("")
             : '<span style="color:var(--ink-light);">—</span>';
           const storesHtml = u.followed_stores.length
             ? u.followed_stores.map(esc).join(", ")
