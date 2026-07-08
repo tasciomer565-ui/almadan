@@ -4808,10 +4808,13 @@ async function renderCart() {
     requestAnimationFrame(() => {
       setTimeout(async () => {
         const progressText = document.getElementById("quantumScanProgress");
-        var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Sepetiniz için en uygun mağazalar seçiliyor..."; }, 600);
+        var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Gerçek mağaza fiyatları taranıyor, birkaç saniye sürebilir..."; }, 600);
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 saniye kuralı
+        // Backend, offers verisi olmayan ürünler için canlı arama yapıyor
+        // (bkz. _live_offers_for_item) -- bu 45s'e kadar sürebilir, o yüzden
+        // eski 6 saniyelik sınır çok kısa kalıyordu.
+        const timeoutId = setTimeout(() => controller.abort(), 50000);
 
         try {
           const optimized = await api("/api/cart/optimize", {
