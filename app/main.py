@@ -2172,10 +2172,57 @@ def save_cart(payload: dict, user=Depends(require_login)) -> dict:
     return {"items": items}
 
 
+def _live_offers_for_item(name: str) -> dict[str, float]:
+    """Bir sepet ürünü için canlı arama yapıp mağaza başına en düşük
+    fiyatı döner (kaynak adı -> fiyat). Sepete eklenen ürünler (elle
+    yazma, barkod tarama) hiçbir zaman önceden hazır 'offers' verisi
+    taşımıyordu, bu yüzden optimizasyon her zaman 'fiyat bulunamadı'
+    dönüyordu -- bu fonksiyon gerçek scraper altyapısına bağlıyor."""
+    from app.shopping import MARKET_STORES
+    from app.comparator import search_products_by_name
+    try:
+        products = search_products_by_name(name, category="general", mode="global")
+    except Exception:
+        return {}
+    offers: dict[str, float] = {}
+    for p in products:
+        if not isinstance(p, dict):
+            continue
+        source = str(p.get("source", "")).casefold().strip()
+        price = p.get("price")
+        if source not in MARKET_STORES or not isinstance(price, (int, float)) or price <= 0:
+            continue
+        if source not in offers or price < offers[source]:
+            offers[source] = round(float(price), 2)
+    return offers
+
+
 @app.post("/api/cart/optimize")
 def optimize_cart(payload: BasketOptimizePayload) -> dict:
+    # Onceden hazir 'offers' tasimayan urunler (sepete eklemenin TUM
+    # yontemleri -- elle yazma, barkod tarama -- bunu hic doldurmuyordu)
+    # icin canli arama yaparak gercek magaza fiyatlarini cekiyoruz.
+    # Vercel'in sure butcesini asmamak icin en fazla 6 urun canli aranir,
+    # paralel calisir (ThreadPoolExecutor).
+    items = [item.model_dump() for item in payload.items]
+    needs_lookup = [item for item in items if not item.get("offers")][:6]
+
+    if needs_lookup:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            futures = {
+                executor.submit(_live_offers_for_item, item["name"]): item
+                for item in needs_lookup
+            }
+            for future in as_completed(futures, timeout=45):
+                item = futures[future]
+                try:
+                    item["offers"] = future.result()
+                except Exception:
+                    item["offers"] = {}
+
     return optimize_market_basket(
-        [item.model_dump() for item in payload.items],
+        items,
         lat=payload.lat,
         lng=payload.lng,
         location_name=payload.location_name,
