@@ -545,12 +545,13 @@ def is_logical_product(query: str, product_title: str) -> bool:
     irrelevant_terms = [
         "bezi", "spreyi", "solüsyonu", "temizleme",
         "kılıfı", "kutusu", "kabı", "kılıf", "kapak",
-        "ipi", "askısı", "zinciri", "aparatı", "standı",
+        "ipi", "askı", "askısı", "zinciri", "aparat", "aparatı", "standı",
         "cam koruyucu", "ekran koruyucu", "kırılmaz cam",
         "şarj kablosu", "yedek parça", "aksesuar",
         "tornavida", "yedek cam", "vidası", "vida",
         "temizleyici", "koruyucu", "kutusu", "çantası", "çanta",
         "kordonu", "kordon", "kılıfı", "askı aparatı", "temizleme mendili",
+        "taşıyıcı", "taşıyıcısı", "vantuz",
     ]
     
     for term in irrelevant_terms:
