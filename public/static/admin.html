@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Almadan — Admin Paneli</title>
+  <style>
+    :root {
+      --bg: #0f1210; --panel: #171b18; --line: #262b27; --ink: #eef1ef;
+      --ink-light: #9aa39c; --green: #38a169; --red: #e53e3e; --yellow: #d69e2e;
+      --blue: #3182ce;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font-family: -apple-system, "DM Sans", "Segoe UI", sans-serif;
+      padding: 24px;
+    }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .subtitle { color: var(--ink-light); font-size: 13px; margin: 0 0 24px; }
+    .gate {
+      max-width: 360px; margin: 80px auto; text-align: center;
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 14px; padding: 32px;
+    }
+    .gate input {
+      width: 100%; padding: 10px 12px; border-radius: 8px; margin: 16px 0;
+      border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-size: 14px;
+    }
+    .gate button, .tab-btn, .refresh-btn {
+      background: var(--green); color: #fff; border: none; border-radius: 8px;
+      padding: 10px 18px; font-weight: 700; cursor: pointer; font-size: 13px;
+    }
+    .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .tab-btn { background: var(--panel); color: var(--ink-light); border: 1px solid var(--line); }
+    .tab-btn.active { background: var(--green); color: #fff; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; display: none; }
+    .panel.active { display: block; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: rgba(56,161,105,0.08); border-radius: 10px; padding: 14px; text-align: center; }
+    .stat-card .num { font-size: 26px; font-weight: 800; color: var(--green); }
+    .stat-card .label { font-size: 11px; color: var(--ink-light); margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 8px; color: var(--ink-light); border-bottom: 1px solid var(--line); font-size: 11px; text-transform: uppercase; }
+    td { padding: 8px; border-bottom: 1px solid var(--line); }
+    .badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+    .badge.ok { background: rgba(56,161,105,0.15); color: var(--green); }
+    .badge.bad { background: rgba(229,62,62,0.15); color: var(--red); }
+    .badge.warn { background: rgba(214,158,46,0.15); color: var(--yellow); }
+    .loading { text-align: center; padding: 40px; color: var(--ink-light); }
+    .refresh-btn { float: right; margin-bottom: 12px; }
+    .error-box { background: rgba(229,62,62,0.1); border: 1px solid rgba(229,62,62,0.3); border-radius: 8px; padding: 12px; color: var(--red); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div id="gate" class="gate">
+    <h1>🔒 Admin Paneli</h1>
+    <p class="subtitle">Devam etmek için admin anahtarını gir.</p>
+    <input type="password" id="secretInput" placeholder="Admin anahtarı" onkeydown="if(event.key==='Enter')unlock()">
+    <button onclick="unlock()">Giriş Yap</button>
+    <div id="gateError" style="color: var(--red); font-size: 12px; margin-top: 12px;"></div>
+  </div>
+
+  <div id="app" style="display:none;">
+    <h1>Almadan — Admin Paneli</h1>
+    <p class="subtitle">Sistem sağlığı, arama kalitesi ve bildirim durumu.</p>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="general" onclick="switchTab('general')">Genel İstatistik</button>
+      <button class="tab-btn" data-tab="failed" onclick="switchTab('failed')">Başarısız Aramalar</button>
+      <button class="tab-btn" data-tab="scrapers" onclick="switchTab('scrapers')">Scraper Sağlığı</button>
+      <button class="tab-btn" data-tab="notify" onclick="switchTab('notify')">Bildirim Durumu</button>
+    </div>
+
+    <div id="panel-general" class="panel active"><div class="loading">Yükleniyor…</div></div>
+    <div id="panel-failed" class="panel"><div class="loading">Yükleniyor…</div></div>
+    <div id="panel-scrapers" class="panel"><div class="loading">Yükleniyor…</div></div>
+    <div id="panel-notify" class="panel"><div class="loading">Yükleniyor…</div></div>
+  </div>
+
+  <script>
+    const SECRET_KEY = "almadan_admin_secret";
+    let secret = sessionStorage.getItem(SECRET_KEY) || "";
+
+    function unlock() {
+      const val = document.getElementById("secretInput").value.trim();
+      if (!val) return;
+      secret = val;
+      sessionStorage.setItem(SECRET_KEY, secret);
+      tryEnter();
+    }
+
+    async function api(path) {
+      const res = await fetch(path, { headers: { "X-Admin-Secret": secret } });
+      if (res.status === 401) throw new Error("UNAUTHORIZED");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    }
+
+    async function tryEnter() {
+      try {
+        await api("/api/admin/stats?days=7");
+        document.getElementById("gate").style.display = "none";
+        document.getElementById("app").style.display = "block";
+        loadAll();
+      } catch (e) {
+        document.getElementById("gateError").textContent =
+          e.message === "UNAUTHORIZED" ? "Geçersiz anahtar." : "Bağlantı hatası: " + e.message;
+        sessionStorage.removeItem(SECRET_KEY);
+      }
+    }
+
+    function switchTab(name) {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+      document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + name));
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    async function loadAll() {
+      loadGeneral();
+      loadFailed();
+      loadScrapers();
+      loadNotify();
+    }
+
+    async function loadGeneral() {
+      const el = document.getElementById("panel-general");
+      try {
+        const s = await api("/api/admin/stats?days=7");
+        const counts = s.counts || {};
+        el.innerHTML = `
+          <button class="refresh-btn" onclick="loadGeneral()">↻ Yenile</button>
+          <div class="stat-grid">
+            <div class="stat-card"><div class="num">${s.cache_hit_rate_pct || 0}%</div><div class="label">Cache Hit Oranı</div></div>
+            <div class="stat-card"><div class="num">${s.total_searches || 0}</div><div class="label">Toplam Arama (7g)</div></div>
+            <div class="stat-card"><div class="num">${counts.proxy_used || 0}</div><div class="label">Proxy Kullanım</div></div>
+            <div class="stat-card"><div class="num">${counts.stale_fallback || 0}</div><div class="label">Eski Veri Fallback</div></div>
+          </div>
+        `;
+      } catch (e) {
+        el.innerHTML = `<div class="error-box">Yüklenemedi: ${esc(e.message)}</div>`;
+      }
+    }
+
+    async function loadFailed() {
+      const el = document.getElementById("panel-failed");
+      try {
+        const d = await api("/api/admin/failed-searches?days=7&min_count=2");
+        if (!d.enabled) {
+          el.innerHTML = `<div class="error-box">Supabase yapılandırılmamış, veri yok.</div>`;
+          return;
+        }
+        const rows = (d.queries || []).map(q => `
+          <tr>
+            <td>${esc(q.query)}</td>
+            <td>${esc(q.category || "-")}</td>
+            <td>${q.times_searched}</td>
+            <td>${q.avg_result_count}</td>
+          </tr>
+        `).join("");
+        el.innerHTML = `
+          <button class="refresh-btn" onclick="loadFailed()">↻ Yenile</button>
+          <p class="subtitle">Son ${d.days} günde ${d.total_events_scanned} arama olayı tarandı. 0-2 sonuç veren, en az 2 kez aranan sorgular:</p>
+          ${rows ? `<table><thead><tr><th>Sorgu</th><th>Kategori</th><th>Kaç Kez Arandı</th><th>Ort. Sonuç</th></tr></thead><tbody>${rows}</tbody></table>`
+                 : `<p class="subtitle">Tekrarlayan başarısız arama bulunamadı — iyi haber.</p>`}
+        `;
+      } catch (e) {
+        el.innerHTML = `<div class="error-box">Yüklenemedi: ${esc(e.message)}</div>`;
+      }
+    }
+
+    async function loadScrapers() {
+      const el = document.getElementById("panel-scrapers");
+      try {
+        const d = await api("/api/admin/scraper-health-report");
+        const rows = (d.scrapers || []).map(s => `
+          <tr>
+            <td>${esc(s.scraper)}</td>
+            <td>${s.consecutive_zero_days}</td>
+            <td>${s.best_count_seen}</td>
+            <td>${s.currently_alerted ? '<span class="badge bad">KIRIK</span>' : '<span class="badge ok">OK</span>'}</td>
+          </tr>
+        `).join("");
+        el.innerHTML = `
+          <button class="refresh-btn" onclick="loadScrapers()">↻ Yenile</button>
+          <div class="stat-grid">
+            <div class="stat-card"><div class="num">${d.total_tracked}</div><div class="label">Takip Edilen Scraper</div></div>
+            <div class="stat-card"><div class="num" style="color:${d.currently_broken ? 'var(--red)' : 'var(--green)'}">${d.currently_broken}</div><div class="label">Şu An Kırık</div></div>
+          </div>
+          ${rows ? `<table><thead><tr><th>Scraper</th><th>Art Arda Kaç Gün 0 Sonuç</th><th>En İyi Gördüğü Sonuç</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table>`
+                 : `<p class="subtitle">Henüz veri yok, günlük sağlık kontrolü birkaç gün içinde birikecek.</p>`}
+        `;
+      } catch (e) {
+        el.innerHTML = `<div class="error-box">Yüklenemedi: ${esc(e.message)}</div>`;
+      }
+    }
+
+    async function loadNotify() {
+      const el = document.getElementById("panel-notify");
+      try {
+        const d = await api("/api/admin/notification-channels");
+        const chip = (ok) => ok ? '<span class="badge ok">Yapılandırılmış</span>' : '<span class="badge warn">Yapılandırılmamış</span>';
+        el.innerHTML = `
+          <button class="refresh-btn" onclick="loadNotify()">↻ Yenile</button>
+          <table>
+            <tbody>
+              <tr><td>WhatsApp</td><td>${chip(d.whatsapp_configured)}</td></tr>
+              <tr><td>Telegram</td><td>${chip(d.telegram_configured)}</td></tr>
+              <tr><td>E-posta (SMTP)</td><td>${chip(d.email_configured)}</td></tr>
+            </tbody>
+          </table>
+        `;
+      } catch (e) {
+        el.innerHTML = `<div class="error-box">Yüklenemedi: ${esc(e.message)}</div>`;
+      }
+    }
+
+    if (secret) tryEnter();
+  </script>
+</body>
+</html>

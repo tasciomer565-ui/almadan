@@ -247,6 +247,16 @@ _CRON_BYPASS_PATHS = {
     "/api/admin/run-health-check",
 }
 
+# Giriş oturumu olmayan admin paneli (/admin, public/static/admin.html)
+# için: X-Admin-Secret header'ı ADMIN_DEBUG_SECRET ile eşleşirse gecer.
+# Gercek dogrulama (require_admin_secret) yine endpoint icinde de yapılır.
+_ADMIN_SECRET_BYPASS_PATHS = {
+    "/api/admin/stats",
+    "/api/admin/failed-searches",
+    "/api/admin/scraper-health-report",
+    "/api/admin/notification-channels",
+}
+
 
 async def auth_wall_middleware(request: Request, call_next):
     """
@@ -264,6 +274,12 @@ async def auth_wall_middleware(request: Request, call_next):
         cron_secret = request.headers.get("x-cron-secret", "").strip()
         env_secret  = os.getenv("CRON_SECRET", "").strip()
         if cron_secret and env_secret and hmac.compare_digest(env_secret, cron_secret):
+            return await call_next(request)
+
+    if path in _ADMIN_SECRET_BYPASS_PATHS:
+        admin_secret = request.headers.get("x-admin-secret", "").strip()
+        env_secret = os.getenv("ADMIN_DEBUG_SECRET", "").strip()
+        if admin_secret and env_secret and hmac.compare_digest(env_secret, admin_secret):
             return await call_next(request)
 
     if any(path.startswith(p) for p in _PROTECTED_API_PATHS):

@@ -14,7 +14,8 @@
     { "source": "/index.html", "destination": "/static/index.html" },
     { "source": "/hakkinda", "destination": "/static/hakkinda.html" },
     { "source": "/gizlilik", "destination": "/static/gizlilik.html" },
-    { "source": "/iletisim", "destination": "/static/iletisim.html" }
+    { "source": "/iletisim", "destination": "/static/iletisim.html" },
+    { "source": "/admin", "destination": "/static/admin.html" }
   ],
   "headers": [
     {

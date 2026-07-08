@@ -95,6 +95,23 @@ def require_cron_request(request: Request) -> None:
         raise HTTPException(status_code=401, detail="Geçersiz cron anahtarı")
 
 
+ADMIN_DEBUG_SECRET = os.getenv("ADMIN_DEBUG_SECRET", "")
+
+
+def require_admin_secret(request: Request) -> None:
+    """Basit paylaşımlı-sır korumalı admin paneli erişimi. RBAC (profiles.role)
+    henüz hiçbir hesapta yapılandırılmadığı için, zaten Vercel'de tanımlı
+    olan ADMIN_DEBUG_SECRET ile korunuyor."""
+    if not ADMIN_DEBUG_SECRET:
+        raise HTTPException(status_code=503, detail="Admin paneli yapılandırılmamış (ADMIN_DEBUG_SECRET eksik).")
+    candidate = (
+        request.headers.get("x-admin-secret", "").strip()
+        or request.query_params.get("secret", "").strip()
+    )
+    if not candidate or not hmac.compare_digest(candidate, ADMIN_DEBUG_SECRET):
+        raise HTTPException(status_code=401, detail="Geçersiz admin anahtarı")
+
+
 async def automatic_refresh_loop() -> None:
     while True:
         await asyncio.sleep(REFRESH_INTERVAL_SECONDS)
@@ -2127,10 +2144,111 @@ def unit_price(name: str, price: float) -> dict:
 # ── Admin Dashboard ────────────────────────────────────────────────────────
 
 @app.get("/api/admin/stats")
-def admin_stats(days: int = 7) -> dict:
+def admin_stats(request: Request, days: int = 7) -> dict:
     """Performans istatistikleri — sadece geliştirici modunda kullanılır."""
+    require_admin_secret(request)
     from app.admin_metrics import get_dashboard_stats
     return get_dashboard_stats(days=min(days, 30))
+
+
+@app.get("/api/admin/failed-searches")
+def admin_failed_searches(request: Request, days: int = 7, min_count: int = 2) -> dict:
+    """
+    Gerçek kullanıcı aramalarından sonuç bulamayan/az sonuç alan sorguları
+    gruplandırıp döner -- kör noktayı ortadan kaldırmak için: hangi gerçek
+    arama başarısız oluyor, sadece test sorgularımızla değil.
+    """
+    require_admin_secret(request)
+    if not supabase_enabled():
+        return {"enabled": False, "queries": []}
+
+    from datetime import datetime, timedelta, timezone
+    since = (datetime.now(timezone.utc) - timedelta(days=min(days, 30))).isoformat()
+
+    try:
+        resp = requests.get(
+            f"{supabase_base_url()}/rest/v1/user_events",
+            headers=supabase_headers(),
+            params={
+                "event_type": "eq.url_search",
+                "created_at": f"gte.{since}",
+                "select": "payload,created_at",
+                "order": "created_at.desc",
+                "limit": "5000",
+            },
+            timeout=15,
+        )
+        rows = resp.json() if resp.ok else []
+    except Exception as exc:
+        return {"enabled": True, "error": str(exc), "queries": []}
+
+    from collections import defaultdict
+    agg: dict[str, dict] = defaultdict(lambda: {"count": 0, "result_counts": [], "category": ""})
+    for row in rows:
+        payload = row.get("payload") or {}
+        query = (payload.get("query") or "").strip().lower()
+        if not query:
+            continue
+        result_count = payload.get("result_count")
+        if result_count is None or result_count > 2:
+            continue
+        entry = agg[query]
+        entry["count"] += 1
+        entry["result_counts"].append(result_count)
+        entry["category"] = payload.get("category") or entry["category"]
+
+    queries = [
+        {
+            "query": q,
+            "times_searched": v["count"],
+            "avg_result_count": round(sum(v["result_counts"]) / len(v["result_counts"]), 1),
+            "category": v["category"],
+        }
+        for q, v in agg.items()
+        if v["count"] >= min_count
+    ]
+    queries.sort(key=lambda x: x["times_searched"], reverse=True)
+
+    return {"enabled": True, "days": days, "queries": queries[:100], "total_events_scanned": len(rows)}
+
+
+@app.get("/api/admin/notification-channels")
+def admin_notification_channels(request: Request) -> dict:
+    """WhatsApp/Telegram/E-posta bildirim kanallarının yapılandırma durumu."""
+    require_admin_secret(request)
+    from app.notifier import notifier_status
+    from app.whatsapp import whatsapp_enabled
+
+    return {
+        "whatsapp_configured": whatsapp_enabled(),
+        **notifier_status(),
+    }
+
+
+@app.get("/api/admin/scraper-health-report")
+def admin_scraper_health_report(request: Request) -> dict:
+    """scraper_healthcheck.py'nin biriktirdiği sağlık verisini okunur biçimde döner."""
+    require_admin_secret(request)
+    db = load_db()
+    health = db.get("scraper_health", {})
+
+    rows = [
+        {
+            "scraper": name,
+            "consecutive_zero_days": info.get("consecutive_zero", 0),
+            "best_count_seen": info.get("best_count", 0),
+            "currently_alerted": info.get("alerted", False),
+        }
+        for name, info in health.items()
+        if isinstance(info, dict)
+    ]
+    rows.sort(key=lambda r: (-r["currently_alerted"], -r["consecutive_zero_days"]))
+
+    return {
+        "total_tracked": len(rows),
+        "currently_broken": sum(1 for r in rows if r["currently_alerted"]),
+        "scrapers": rows,
+    }
 
 
 @app.post("/api/admin/sync-google-sheets")
