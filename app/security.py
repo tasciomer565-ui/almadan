@@ -40,11 +40,16 @@ _IS_PROD = _ENV == "production"
 # Content-Security-Policy
 _CSP = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com "
+    "https://pagead2.googlesyndication.com https://*.googlesyndication.com "
+    "https://*.googleadservices.com https://*.doubleclick.net https://*.google.com; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net "
+    "https://*.googlesyndication.com; "
     "font-src 'self' https://fonts.gstatic.com; "
     "img-src 'self' data: https:; "
-    "connect-src 'self' https://*.supabase.co https://api.replicate.com https://app.scrapingbee.com; "
+    "frame-src https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com; "
+    "connect-src 'self' https://*.supabase.co https://api.replicate.com https://app.scrapingbee.com "
+    "https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com; "
     "frame-ancestors 'none';"
 )
 
