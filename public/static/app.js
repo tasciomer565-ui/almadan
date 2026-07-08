@@ -707,6 +707,7 @@ async function loadSession() {
   }
   renderAccountButton();
   handleCategoryChange();
+  loadProducts();
   if (state.auth.authenticated) {
     loadCartFromBackend();
     maybePromptPhoneVerification();
