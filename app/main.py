@@ -2151,6 +2151,27 @@ class ReceiptCreateRequest(BaseModel):
     raw_ocr_text: str | None = None
 
 
+@app.get("/api/cart")
+def get_cart(user=Depends(require_login)) -> dict:
+    """Hesaba bağlı sepeti döner -- cihazlar arası senkronizasyon için."""
+    owner_id = f"user:{user['id']}"
+    db = load_db()
+    return {"items": db.get("carts", {}).get(owner_id, [])}
+
+
+@app.post("/api/cart")
+def save_cart(payload: dict, user=Depends(require_login)) -> dict:
+    """Sepeti hesaba kaydeder -- frontend her değişiklikte çağırır."""
+    owner_id = f"user:{user['id']}"
+    items = payload.get("items", [])
+    if not isinstance(items, list):
+        raise HTTPException(status_code=400, detail="items bir liste olmalı.")
+    db = load_db()
+    db.setdefault("carts", {})[owner_id] = items
+    save_db(db)
+    return {"items": items}
+
+
 @app.post("/api/cart/optimize")
 def optimize_cart(payload: BasketOptimizePayload) -> dict:
     return optimize_market_basket(

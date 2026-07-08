@@ -669,6 +669,7 @@ async function loadSession() {
   }
   renderAccountButton();
   handleCategoryChange();
+  if (state.auth.authenticated) loadCartFromBackend();
   setTimeout(showOnboarding, 800);
 }
 
@@ -889,6 +890,7 @@ async function verifySmsCode() {
     handleCategoryChange();
     closeDialog();
     await loadProducts();
+    await loadCartFromBackend();
     showToast("Giriş yapıldı.");
   } catch (error) {
     showAuthError(error.message);
@@ -1194,6 +1196,7 @@ async function submitAuth(mode) {
     handleCategoryChange();
     closeDialog();
     await loadProducts();
+    await loadCartFromBackend();
     showToast(mode === "signup" ? "Hesabın oluşturuldu." : "Giriş yapıldı.");
   } catch (error) {
     showAuthError(error.message);
@@ -3411,6 +3414,11 @@ function switchView(view) {
   });
 
   if (view === "cart") {
+    if (!state.auth.authenticated) {
+      promptLoginForTracking("Sepetini kullanmak ve cihazlar arasında senkronize etmek için hesap açman gerekiyor.");
+      switchView("discover");
+      return;
+    }
     renderCart();
   }
   if (view === "savings") {
@@ -3682,8 +3690,49 @@ function updateCartQuantity(itemId, value) {
   if (state.sharedListId) syncSharedListWithServer();
 }
 
+let _cartSyncTimer = null;
+
 function saveCartToLocalStorage() {
   localStorage.setItem("almadan_cart", JSON.stringify(state.cart));
+  syncCartToBackend();
+}
+
+// Hesaba bağlı senkronizasyon -- her mutasyonda çağrılır, kısa bir
+// debounce ile (hızlı ardışık değişikliklerde tek istek atsın).
+function syncCartToBackend() {
+  if (!state.auth.authenticated) return;
+  clearTimeout(_cartSyncTimer);
+  _cartSyncTimer = setTimeout(async () => {
+    try {
+      await api("/api/cart", {
+        method: "POST",
+        body: JSON.stringify({ items: state.cart }),
+      });
+    } catch (error) {
+      console.warn("Sepet senkronize edilemedi:", error.message);
+    }
+  }, 600);
+}
+
+// Giriş/kayıt sonrası veya sayfa açılışında (oturum zaten varsa) hesaptaki
+// sepeti çeker. Cihazdaki yerel sepet boşsa doğrudan hesaptakini kullanır;
+// yerelde veri varsa (misafirken eklenmiş olabilir) hesaptakiyle birleştirir.
+async function loadCartFromBackend() {
+  if (!state.auth.authenticated) return;
+  try {
+    const res = await api("/api/cart");
+    const remoteItems = res.items || [];
+    if (state.cart.length === 0) {
+      state.cart = remoteItems;
+    } else {
+      const existingIds = new Set(state.cart.map((i) => i.id));
+      state.cart = [...state.cart, ...remoteItems.filter((i) => !existingIds.has(i.id))];
+    }
+    localStorage.setItem("almadan_cart", JSON.stringify(state.cart));
+    if (state.activeView === "cart") renderCart();
+  } catch (error) {
+    console.warn("Sepet hesaptan yüklenemedi:", error.message);
+  }
 }
 
 
