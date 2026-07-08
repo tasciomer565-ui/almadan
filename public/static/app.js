@@ -1856,6 +1856,32 @@ function showSearchResults(response) {
   const suggestion = response.suggestion;
   const originalQuery = response.query || "";
 
+  if (response.needs_clarification && response.clarification) {
+    const c = response.clarification;
+    content.innerHTML = `
+      <div class="dialog-body" style="text-align: center; padding: 32px 20px;">
+        <i data-lucide="search" style="width: 40px; height: 40px; color: var(--green); margin-bottom: 14px;"></i>
+        <h2 style="margin-bottom: 6px;">${escapeHtml(c.question)}</h2>
+        <p style="color: var(--muted); margin-bottom: 20px; font-size: 13px;">Daha isabetli sonuçlar için bir seçenek seç.</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 20px;">
+          ${c.options.map(opt => `
+            <button type="button" class="secondary-button" style="padding: 10px 18px; border-radius: 20px; font-weight: 700; height: auto;"
+              onclick="event.preventDefault(); resolveClarificationSearch(${inlineJsArg(opt.query)}, ${inlineJsArg(response.category || "general")});">
+              ${escapeHtml(opt.label)}
+            </button>
+          `).join("")}
+        </div>
+        <a href="#" style="color: var(--ink-light); font-size: 12px; text-decoration: underline;"
+          onclick="event.preventDefault(); resolveClarificationSearch(${inlineJsArg(c.term + "​")}, ${inlineJsArg(response.category || "general")});">
+          Yine de "${escapeHtml(c.term)}" olarak tüm sonuçları göster
+        </a>
+      </div>
+    `;
+    if (!dialog.open) dialog.showModal();
+    lucide.createIcons();
+    return;
+  }
+
   if (!products || products.length === 0) {
     let suggestionHtml = "";
     if (suggestion) {
@@ -3883,6 +3909,26 @@ function showBarcodeCategoryMismatch(productTitle, searchQuery, suggestedCategor
   `;
   if (!dialog.open) dialog.showModal();
   lucide.createIcons();
+}
+
+function resolveClarificationSearch(query, category) {
+  // Daraltma chip'lerinden gelen sorguyu doğrudan API'ye gönderir
+  // (triggerSuggestionSearch link-kutusu üzerinden gittiği için düz
+  // metin sorgularda çalışmıyor -- burada onu atlayıp direkt aramayı
+  // tetikliyoruz, aynı triggerCategorySearch kalıbı).
+  const overlay = document.getElementById("quantumScanOverlay");
+  if (overlay) overlay.style.display = "flex";
+
+  const searchMode = document.getElementById("globalModeCheckbox")?.checked ? "global" : "hybrid";
+  let searchUrl = `/api/search?query=${encodeURIComponent(query)}&category=${encodeURIComponent(category || "general")}&mode=${encodeURIComponent(searchMode)}`;
+  if (state.userCoords && searchMode !== "global") {
+    searchUrl += `&lat=${state.userCoords.lat}&lon=${state.userCoords.lng}`;
+  }
+
+  api(searchUrl, { signal: null })
+    .then(results => showSearchResults(results))
+    .catch(() => showToast("Arama başarısız, lütfen tekrar deneyin."))
+    .finally(() => { if (overlay) overlay.style.display = "none"; });
 }
 
 function triggerCategorySearch(query, category) {

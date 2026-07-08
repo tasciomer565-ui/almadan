@@ -1202,7 +1202,18 @@ def search_products(
 ) -> dict:
     if not query or len(query.strip()) < 2:
         raise HTTPException(status_code=400, detail="Arama sorgusu en az 2 karakter olmalıdır.")
-    
+
+    from app.search_clarification import get_clarification
+    clarification = get_clarification(query)
+    if clarification:
+        return {
+            "products": [],
+            "needs_clarification": True,
+            "clarification": clarification,
+            "query": query,
+            "category": category,
+        }
+
     user_gender = None
     if hasattr(request.state, "user_metadata") and request.state.user_metadata:
         user_gender = request.state.user_metadata.get("gender")
