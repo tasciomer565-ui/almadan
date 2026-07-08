@@ -1409,6 +1409,21 @@ body.dark-theme .supported-stores-list span:hover {
     grid-template-columns: 1fr;
   }
 
+  /* Link kutusu + iki buton mobilde yan yana sığmıyordu, taşıp
+     Barkod Tara butonunu kırpıyordu -- alt alta yığılacak şekilde sar. */
+  .url-actions-row {
+    flex-wrap: wrap;
+  }
+
+  .url-actions-row .url-field {
+    flex-basis: 100%;
+  }
+
+  .url-actions-row .primary-button,
+  .url-actions-row #mainBarcodeBtn {
+    flex: 1 1 auto;
+  }
+
   .supported-stores-container {
     display: block;
   }
