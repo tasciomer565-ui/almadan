@@ -1088,11 +1088,17 @@ def storage_health() -> dict:
 
 
 @app.get("/", include_in_schema=False)
-def home() -> Response:
+def home(request: Request) -> Response:
     index_file = STATIC_DIR / "index.html"
     if index_file.is_file():
         return FileResponse(index_file, media_type="text/html; charset=utf-8")
-    return RedirectResponse("/index.html", status_code=307)
+    # Vercel lambda paketi public/ içermediği için prod'da hep bu dala düşer --
+    # query string'i (?list=... gibi paylaşılan sepet linkleri) korumazsak
+    # ortak liste özelliği sessizce kırılır.
+    target = "/index.html"
+    if request.url.query:
+        target += f"?{request.url.query}"
+    return RedirectResponse(target, status_code=307)
 
 
 # ── İstemci hata raporları ──────────────────────────────────
