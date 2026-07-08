@@ -98,6 +98,24 @@ def require_cron_request(request: Request) -> None:
 ADMIN_DEBUG_SECRET = os.getenv("ADMIN_DEBUG_SECRET", "")
 
 
+def record_cron_run(name: str, success: bool, detail: str = "") -> None:
+    """Cron işlerinin son çalışma zamanını/başarısını admin paneli için
+    kaydeder (bkz. /api/admin/cron-health). Hata sessizce yutulur --
+    izleme, ana cron işini asla bozmamalı."""
+    try:
+        db = load_db()
+        health = db.setdefault("cron_health", {})
+        health[name] = {
+            "last_run": datetime.now(timezone.utc).isoformat(),
+            "success": success,
+            "detail": detail[:500],
+        }
+        db["cron_health"] = health
+        save_db(db)
+    except Exception:
+        pass
+
+
 def require_admin_secret(request: Request) -> None:
     """Basit paylaşımlı-sır korumalı admin paneli erişimi. RBAC (profiles.role)
     henüz hiçbir hesapta yapılandırılmadığı için, zaten Vercel'de tanımlı
@@ -1804,6 +1822,7 @@ def cron_refresh_all(
     except Exception as exc:
         result["vocabulary_refresh_error"] = str(exc)
 
+    record_cron_run("refresh-all", success=True, detail=f"checked={result.get('checked')}")
     return result
 
 
@@ -1829,6 +1848,7 @@ def cron_catalog_vocab_crawl(request: Request) -> dict:
     except Exception as exc:
         result["slow_store_warm_error"] = str(exc)
 
+    record_cron_run("catalog-vocab-crawl", success=True, detail=f"queries={result.get('queries_this_run')}")
     return result
 
 
@@ -2222,6 +2242,105 @@ def admin_notification_channels(request: Request) -> dict:
     return {
         "whatsapp_configured": whatsapp_enabled(),
         **notifier_status(),
+    }
+
+
+@app.get("/api/admin/cron-health")
+def admin_cron_health(request: Request) -> dict:
+    """Her cron işinin son çalışma zamanı/başarı durumu (bkz. record_cron_run)."""
+    require_admin_secret(request)
+    db = load_db()
+    health = db.get("cron_health", {})
+
+    expected = {
+        "refresh-all": "Günlük tazeleme + scraper sağlık kontrolü + kelime öğrenme (05:00 UTC)",
+        "catalog-vocab-crawl": "Katalog crawler + yavaş mağaza ısıtma (30 dk'da bir, GitHub Actions)",
+        "store-newsletters": "Mağaza bülteni bildirimleri (09:00 UTC)",
+    }
+    now = datetime.now(timezone.utc)
+    rows = []
+    for name, description in expected.items():
+        entry = health.get(name)
+        stale_hours = None
+        if entry and entry.get("last_run"):
+            try:
+                last = datetime.fromisoformat(entry["last_run"])
+                stale_hours = round((now - last).total_seconds() / 3600, 1)
+            except Exception:
+                pass
+        rows.append({
+            "name": name,
+            "description": description,
+            "last_run": entry.get("last_run") if entry else None,
+            "success": entry.get("success") if entry else None,
+            "detail": entry.get("detail") if entry else None,
+            "hours_since_last_run": stale_hours,
+        })
+    return {"crons": rows}
+
+
+@app.get("/api/admin/system-progress")
+def admin_system_progress(request: Request) -> dict:
+    """Kelime dağarcığı öğrenme + katalog crawler + yavaş mağaza ısıtma
+    ilerlemesi — bu sistemler tamamen arka planda çalışıyor, tek görünürlük
+    noktası burası."""
+    require_admin_secret(request)
+    db = load_db()
+
+    from app.vocabulary_store import vocabulary_stats
+    from app.catalog_crawler import _daily_query_budget, _days_since_launch, _all_queries
+
+    vocab = vocabulary_stats()
+    crawler_state = db.get("catalog_crawler_state", {})
+    warmer_state = db.get("slow_store_warmer_state", {})
+
+    total_queries = len(_all_queries())
+    cursor = crawler_state.get("cursor", 0)
+
+    return {
+        "vocabulary": vocab,
+        "catalog_crawler": {
+            "day_index": _days_since_launch(),
+            "daily_query_budget": _daily_query_budget(),
+            "cursor_position": cursor,
+            "total_query_pool": total_queries,
+            "cycle_progress_pct": round(cursor / total_queries * 100, 1) if total_queries else 0,
+        },
+        "slow_store_warmer": {
+            "cursor_position": warmer_state.get("cursor", 0),
+        },
+    }
+
+
+@app.get("/api/admin/business-metrics")
+def admin_business_metrics(request: Request) -> dict:
+    """Büyüme göstergeleri: toplam kullanıcı, takip edilen ürün, mağaza takipçisi."""
+    require_admin_secret(request)
+    db = load_db()
+
+    users = db.get("users", {})
+    products = db.get("products", [])
+    notifications = db.get("notifications", [])
+
+    followed_stores_count = None
+    if supabase_enabled():
+        try:
+            resp = requests.get(
+                f"{supabase_base_url()}/rest/v1/followed_stores",
+                headers={**supabase_headers(), "Prefer": "count=exact"},
+                params={"select": "user_id"},
+                timeout=10,
+            )
+            cr = resp.headers.get("content-range", "")
+            followed_stores_count = int(cr.split("/")[-1]) if "/" in cr else None
+        except Exception:
+            pass
+
+    return {
+        "total_users": len(users),
+        "total_tracked_products": len(products),
+        "total_notifications_sent": len(notifications),
+        "total_store_follows": followed_stores_count,
     }
 
 
@@ -6276,6 +6395,7 @@ async def cron_store_newsletters(request: Request):
                 )
             triggered.append({"slug": slug, "campaigns_notified": len(ids), "followers": follower_count})
 
+    record_cron_run("store-newsletters", success=True, detail=f"triggered={len(triggered)}")
     return {
         "date": today_str,
         "auto_generated": auto_result.get("auto_created", []),

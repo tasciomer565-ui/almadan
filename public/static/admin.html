@@ -71,12 +71,18 @@
       <button class="tab-btn" data-tab="failed" onclick="switchTab('failed')">Başarısız Aramalar</button>
       <button class="tab-btn" data-tab="scrapers" onclick="switchTab('scrapers')">Scraper Sağlığı</button>
       <button class="tab-btn" data-tab="notify" onclick="switchTab('notify')">Bildirim Durumu</button>
+      <button class="tab-btn" data-tab="cron" onclick="switchTab('cron')">Cron Sağlığı</button>
+      <button class="tab-btn" data-tab="progress" onclick="switchTab('progress')">Öğrenme İlerlemesi</button>
+      <button class="tab-btn" data-tab="business" onclick="switchTab('business')">İş Metrikleri</button>
     </div>
 
     <div id="panel-general" class="panel active"><div class="loading">Yükleniyor…</div></div>
     <div id="panel-failed" class="panel"><div class="loading">Yükleniyor…</div></div>
     <div id="panel-scrapers" class="panel"><div class="loading">Yükleniyor…</div></div>
     <div id="panel-notify" class="panel"><div class="loading">Yükleniyor…</div></div>
+    <div id="panel-cron" class="panel"><div class="loading">Yükleniyor…</div></div>
+    <div id="panel-progress" class="panel"><div class="loading">Yükleniyor…</div></div>
+    <div id="panel-business" class="panel"><div class="loading">Yükleniyor…</div></div>
   </div>
 
   <script>
@@ -125,6 +131,9 @@
       loadFailed();
       loadScrapers();
       loadNotify();
+      loadCronHealth();
+      loadProgress();
+      loadBusiness();
     }
 
     async function loadGeneral() {
@@ -213,6 +222,80 @@
               <tr><td>E-posta (SMTP)</td><td>${chip(d.email_configured)}</td></tr>
             </tbody>
           </table>
+        `;
+      } catch (e) {
+        el.innerHTML = `<div class="error-box">Yüklenemedi: ${esc(e.message)}</div>`;
+      }
+    }
+
+    function timeAgo(hours) {
+      if (hours == null) return "hiç çalışmadı";
+      if (hours < 1) return Math.round(hours * 60) + " dakika önce";
+      if (hours < 48) return Math.round(hours) + " saat önce";
+      return Math.round(hours / 24) + " gün önce";
+    }
+
+    async function loadCronHealth() {
+      const el = document.getElementById("panel-cron");
+      try {
+        const d = await api("/api/admin/cron-health");
+        const rows = (d.crons || []).map(c => {
+          let statusBadge;
+          if (c.last_run === null) statusBadge = '<span class="badge warn">Hiç Çalışmadı</span>';
+          else if (c.success === false) statusBadge = '<span class="badge bad">Son Çalışma Başarısız</span>';
+          else if (c.hours_since_last_run != null && c.hours_since_last_run > 30) statusBadge = '<span class="badge bad">Gecikmiş</span>';
+          else statusBadge = '<span class="badge ok">Sağlıklı</span>';
+          return `
+            <tr>
+              <td><strong>${esc(c.name)}</strong><br><span style="color:var(--ink-light);font-size:11px;">${esc(c.description)}</span></td>
+              <td>${timeAgo(c.hours_since_last_run)}</td>
+              <td>${esc(c.detail || "-")}</td>
+              <td>${statusBadge}</td>
+            </tr>
+          `;
+        }).join("");
+        el.innerHTML = `
+          <button class="refresh-btn" onclick="loadCronHealth()">↻ Yenile</button>
+          <table><thead><tr><th>İş</th><th>Son Çalışma</th><th>Detay</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table>
+        `;
+      } catch (e) {
+        el.innerHTML = `<div class="error-box">Yüklenemedi: ${esc(e.message)}</div>`;
+      }
+    }
+
+    async function loadProgress() {
+      const el = document.getElementById("panel-progress");
+      try {
+        const d = await api("/api/admin/system-progress");
+        const vocabTotal = d.vocabulary?.total_words ?? "—";
+        const cc = d.catalog_crawler || {};
+        el.innerHTML = `
+          <button class="refresh-btn" onclick="loadProgress()">↻ Yenile</button>
+          <div class="stat-grid">
+            <div class="stat-card"><div class="num">${vocabTotal}</div><div class="label">Öğrenilmiş Kelime</div></div>
+            <div class="stat-card"><div class="num">${cc.day_index ?? 0}</div><div class="label">Kaçıncı Gün</div></div>
+            <div class="stat-card"><div class="num">${cc.daily_query_budget ?? 0}</div><div class="label">Günlük Sorgu Bütçesi</div></div>
+            <div class="stat-card"><div class="num">${cc.cycle_progress_pct ?? 0}%</div><div class="label">Döngü İlerlemesi</div></div>
+          </div>
+          <p class="subtitle">Kelime dağarcığı her gün /cron/refresh-all ve katalog crawler ile büyür; döngü ilerlemesi, popüler sorgu havuzunun ne kadarının tarandığını gösterir (100'e ulaşınca baştan başlar, kademeli ramp'e göre günlük bütçe artar).</p>
+        `;
+      } catch (e) {
+        el.innerHTML = `<div class="error-box">Yüklenemedi: ${esc(e.message)}</div>`;
+      }
+    }
+
+    async function loadBusiness() {
+      const el = document.getElementById("panel-business");
+      try {
+        const d = await api("/api/admin/business-metrics");
+        el.innerHTML = `
+          <button class="refresh-btn" onclick="loadBusiness()">↻ Yenile</button>
+          <div class="stat-grid">
+            <div class="stat-card"><div class="num">${d.total_users}</div><div class="label">Toplam Kullanıcı</div></div>
+            <div class="stat-card"><div class="num">${d.total_tracked_products}</div><div class="label">Takip Edilen Ürün</div></div>
+            <div class="stat-card"><div class="num">${d.total_notifications_sent}</div><div class="label">Gönderilen Bildirim</div></div>
+            <div class="stat-card"><div class="num">${d.total_store_follows ?? "—"}</div><div class="label">Mağaza Takibi</div></div>
+          </div>
         `;
       } catch (e) {
         el.innerHTML = `<div class="error-box">Yüklenemedi: ${esc(e.message)}</div>`;

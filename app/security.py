@@ -255,6 +255,9 @@ _ADMIN_SECRET_BYPASS_PATHS = {
     "/api/admin/failed-searches",
     "/api/admin/scraper-health-report",
     "/api/admin/notification-channels",
+    "/api/admin/cron-health",
+    "/api/admin/system-progress",
+    "/api/admin/business-metrics",
 }
 
 
