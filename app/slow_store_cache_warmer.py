@@ -126,3 +126,61 @@ async def warm_slow_stores(max_calls: int = 2, per_call_timeout: float = 20.0) -
         })
 
     return {"processed": len(processed), "details": processed, "cursor": state["cursor"]}
+
+
+async def background_warm_query(query: str, category: str) -> None:
+    """Arka planda (FastAPI Background Task) belirtilen sorgu için 
+    yavaş çalışan mağazaları paralel tarar ve cache'e ekler."""
+    from app import comparator
+    from app.cache import make_cache_key, cache_get, cache_set
+    
+    cat_upper = category.upper()
+    if cat_upper == "GENERAL":
+        cat_upper = "GENEL"
+    elif cat_upper == "GROCERY":
+        cat_upper = "GIDA"
+    elif cat_upper == "ELECTRONICS":
+        cat_upper = "TEKNOLOJİ"
+    elif cat_upper == "COSMETICS":
+        cat_upper = "KOZMETİK"
+    elif cat_upper == "FASHION":
+        cat_upper = "MODA"
+    elif cat_upper == "HOME":
+        cat_upper = "EV"
+        
+    fn_names = _SLOW_JS_STORES.get(cat_upper)
+    if not fn_names:
+        return
+        
+    loop = asyncio.get_running_loop()
+    tasks = []
+    
+    for fn_name in fn_names:
+        fn = getattr(comparator, fn_name, None)
+        if fn:
+            tasks.append(
+                asyncio.wait_for(
+                    loop.run_in_executor(_WARM_EXECUTOR, fn, query),
+                    timeout=25.0
+                )
+            )
+            
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    new_products = []
+    for res in results:
+        if isinstance(res, list):
+            new_products.extend([p for p in res if isinstance(p, dict) and p.get("title")])
+            
+    if not new_products:
+        return
+        
+    cache_key = make_cache_key(query, cat_upper)
+    existing = cache_get(cache_key, query=query, category=cat_upper) or []
+    existing = [p for p in existing if isinstance(p, dict) and p.get("title")]
+    
+    new_sources = {p["source"] for p in new_products}
+    existing = [p for p in existing if p.get("source") not in new_sources]
+    
+    merged = existing + new_products
+    cache_set(cache_key, query, cat_upper, merged)

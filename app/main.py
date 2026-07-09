@@ -1316,6 +1316,7 @@ def add_product(
 def search_products(
     request: Request,
     query: str,
+    background_tasks: BackgroundTasks,
     category: Literal[
         "general", "grocery", "electronics", "fashion", "cosmetics", "home"
     ] = "general",
@@ -1374,6 +1375,12 @@ def search_products(
         "fallback": fallback_applied,
         "email": getattr(request.state, "user_email", None) or "Anonymous"
     })
+
+    try:
+        from app.slow_store_cache_warmer import background_warm_query
+        background_tasks.add_task(background_warm_query, gendered_query, category)
+    except Exception:
+        pass
 
     return {
         "products": products,
