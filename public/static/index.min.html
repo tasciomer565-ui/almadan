@@ -629,21 +629,46 @@
     </dialog>
 
     <!-- Search Loading Overlay -->
-    <div id="quantumScanOverlay" class="hidden" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; color: var(--ink); gap: 20px;">
-      <!-- Spinning ring -->
-      <div style="position: relative; width: 72px; height: 72px;">
-        <svg width="72" height="72" viewBox="0 0 72 72" style="animation: spin-clockwise 1.4s linear infinite;">
-          <circle cx="36" cy="36" r="30" stroke="rgba(40,122,80,0.2)" stroke-width="4" fill="none"/>
-          <circle cx="36" cy="36" r="30" stroke="#287a50" stroke-width="4" fill="none" stroke-dasharray="50 140" stroke-linecap="round"/>
-        </svg>
-        <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
-          <i data-lucide="search" style="width: 22px; height: 22px; color: #287a50;"></i>
+    <div id="quantumScanOverlay" class="hidden" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(18, 20, 18, 0.9); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; color: #fff; gap: 30px;">
+      <!-- Glowing radar matrix scanner -->
+      <div style="position: relative; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(40,122,80,0.05); box-shadow: 0 0 30px rgba(40,122,80,0.1);">
+        <!-- Rotating outer radar wave -->
+        <div style="position: absolute; inset: 0; border: 2px dashed rgba(200, 217, 74, 0.4); border-radius: 50%; animation: spin-clockwise 10s linear infinite;"></div>
+        <!-- Inner glowing scanner ring -->
+        <div style="position: absolute; inset: 15px; border: 2px solid transparent; border-top-color: #287a50; border-bottom-color: #c8d94a; border-radius: 50%; animation: spin-counter-clockwise 2.5s ease-in-out infinite;"></div>
+        
+        <!-- Rotating Radar Sweep Gradient -->
+        <div style="position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, transparent 40%, rgba(40,122,80,0.2) 100%); animation: spin-clockwise 2s linear infinite; pointer-events: none;"></div>
+        
+        <!-- Pulsing radar blips (Random positions mock) -->
+        <div style="position: absolute; top: 25px; left: 30px; width: 6px; height: 6px; background: #c8d94a; border-radius: 50%; box-shadow: 0 0 10px #c8d94a; animation: pulse 1.5s infinite alternate;"></div>
+        <div style="position: absolute; bottom: 30px; right: 25px; width: 5px; height: 5px; background: #00e676; border-radius: 50%; box-shadow: 0 0 10px #00e676; animation: pulse 1.2s infinite alternate-reverse;"></div>
+        <div style="position: absolute; top: 65px; right: 20px; width: 4px; height: 4px; background: #287a50; border-radius: 50%; box-shadow: 0 0 8px #287a50; animation: pulse 1.8s infinite alternate;"></div>
+
+        <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 0 8px rgba(40,122,80,0.6));">
+          <i data-lucide="scan-search" style="width: 32px; height: 32px; color: #c8d94a; animation: pulse 2s infinite;"></i>
         </div>
       </div>
 
-      <div style="text-align: center;">
-        <h3 style="margin: 0 0 6px 0; font-family: 'Manrope', sans-serif; font-size: 17px; font-weight: 800; color: #121412; letter-spacing: 0;">Fırsatlar Aranıyor</h3>
-        <p style="margin: 0; font-size: 13px; color: #687068; font-family: 'DM Sans', sans-serif;" id="quantumScanProgress">Sizin için en uygun fiyatlar ve diğer satıcılar inceleniyor...</p>
+      <div style="text-align: center; max-width: 400px; padding: 0 20px;">
+        <h3 style="margin: 0 0 8px 0; font-family: 'Manrope', sans-serif; font-size: 20px; font-weight: 800; color: #fff; letter-spacing: 0.5px; text-shadow: 0 2px 10px rgba(255,255,255,0.15);">Fırsatlar Aranıyor</h3>
+        <p style="margin: 0; font-size: 14px; color: #a0aaa0; font-family: 'DM Sans', sans-serif; line-height: 1.6; min-height: 44px;" id="quantumScanProgress">Sizin için en uygun fiyatlar ve diğer satıcılar inceleniyor...</p>
+      </div>
+      
+      <!-- Premium loading step indicators -->
+      <div style="display: flex; flex-direction: column; gap: 8px; width: 280px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); padding: 16px; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 12px; color: #889888;">
+        <div id="step-connect" style="display: flex; align-items: center; gap: 8px; transition: all 0.3s; color: #c8d94a;">
+          <span class="dot" style="width: 6px; height: 6px; background: #c8d94a; border-radius: 50%; box-shadow: 0 0 6px #c8d94a; transition: all 0.3s;"></span>
+          <span>Mağaza bağlantıları kuruluyor...</span>
+        </div>
+        <div id="step-compare" style="display: flex; align-items: center; gap: 8px; transition: all 0.3s; color: #556555;">
+          <span class="dot" style="width: 6px; height: 6px; background: #444; border-radius: 50%; transition: all 0.3s;"></span>
+          <span>Fiyat listeleri karşılaştırılıyor...</span>
+        </div>
+        <div id="step-select" style="display: flex; align-items: center; gap: 8px; transition: all 0.3s; color: #556555;">
+          <span class="dot" style="width: 6px; height: 6px; background: #444; border-radius: 50%; transition: all 0.3s;"></span>
+          <span>En iyi teklifler filtreleniyor...</span>
+        </div>
       </div>
     </div>
 

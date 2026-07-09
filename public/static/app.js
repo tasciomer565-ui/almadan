@@ -1935,6 +1935,26 @@ async function parseProduct(event) {
 
   const overlay = document.getElementById("quantumScanOverlay");
   const progressText = document.getElementById("quantumScanProgress");
+
+  const sConnect = document.getElementById("step-connect");
+  const sCompare = document.getElementById("step-compare");
+  const sSelect = document.getElementById("step-select");
+  if (sConnect) {
+    sConnect.style.color = "#c8d94a";
+    sConnect.querySelector(".dot").style.background = "#c8d94a";
+    sConnect.querySelector(".dot").style.boxShadow = "0 0 6px #c8d94a";
+  }
+  if (sCompare) {
+    sCompare.style.color = "#556555";
+    sCompare.querySelector(".dot").style.background = "#444";
+    sCompare.querySelector(".dot").style.boxShadow = "none";
+  }
+  if (sSelect) {
+    sSelect.style.color = "#556555";
+    sSelect.querySelector(".dot").style.background = "#444";
+    sSelect.querySelector(".dot").style.boxShadow = "none";
+  }
+
   if (overlay) overlay.style.display = "flex";
   if (progressText) {
     progressText.innerText = "Ürün bilgilerini getiriyoruz...";
@@ -1943,8 +1963,32 @@ async function parseProduct(event) {
   // 2. Arama işlemini asenkron olarak bir sonraki frame'de başlat
   requestAnimationFrame(() => {
     setTimeout(async () => {
-      var t1 = setTimeout(() => { if (progressText) progressText.innerText = "Mağaza fiyatları karşılaştırılıyor..."; }, 600);
-      var t2 = setTimeout(() => { if (progressText) progressText.innerText = "En iyi teklifler seçiliyor..."; }, 1300);
+      var t1 = setTimeout(() => {
+        if (progressText) progressText.innerText = "Mağaza fiyatları karşılaştırılıyor...";
+        if (sConnect) {
+          sConnect.style.color = "#889888";
+          sConnect.querySelector(".dot").style.background = "#287a50";
+          sConnect.querySelector(".dot").style.boxShadow = "none";
+        }
+        if (sCompare) {
+          sCompare.style.color = "#c8d94a";
+          sCompare.querySelector(".dot").style.background = "#c8d94a";
+          sCompare.querySelector(".dot").style.boxShadow = "0 0 6px #c8d94a";
+        }
+      }, 600);
+      var t2 = setTimeout(() => {
+        if (progressText) progressText.innerText = "En iyi teklifler seçiliyor...";
+        if (sCompare) {
+          sCompare.style.color = "#889888";
+          sCompare.querySelector(".dot").style.background = "#287a50";
+          sCompare.querySelector(".dot").style.boxShadow = "none";
+        }
+        if (sSelect) {
+          sSelect.style.color = "#c8d94a";
+          sSelect.querySelector(".dot").style.background = "#c8d94a";
+          sSelect.querySelector(".dot").style.boxShadow = "0 0 6px #c8d94a";
+        }
+      }, 1300);
 
       try {
         if (isUrl(val)) {
