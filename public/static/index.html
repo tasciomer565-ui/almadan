@@ -50,8 +50,9 @@
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet"></noscript>
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
+    <!-- chart.js ve html5-qrcode artık app.js'te gerçekten kullanıldıkları anda
+         (Tasarrufum grafikleri / Barkod Tara) tembel yükleniyor -- her sayfada
+         indirilip 357 KiB "kullanılmayan JS" olarak işaretlenmelerini önler. -->
     <link rel="stylesheet" href="/static/styles.css?v=20260706-dark-seller">
     <style>
       /* Sprint 12 — eksik CSS degiskenleri (cache bypass) */

@@ -1,3 +1,34 @@
+// ── Tembel kütüphane yükleme (chart.js / html5-qrcode) ──────────────────────
+// İkisi de her sayfada değil, sadece gerçekten kullanıldıkları anda (Tasarrufum
+// grafikleri, barkod tarama) gerekiyor -- eskiden <head>'de her sayfada
+// indirilip 357 KiB "kullanılmayan JS" olarak PageSpeed'e takılıyordu.
+function _loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      if (existing.dataset.loaded === "1") return resolve();
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error(`Yüklenemedi: ${src}`)));
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = () => { s.dataset.loaded = "1"; resolve(); };
+    s.onerror = () => reject(new Error(`Yüklenemedi: ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+function ensureChartJs() {
+  if (typeof Chart !== "undefined") return Promise.resolve();
+  return _loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js");
+}
+
+function ensureHtml5Qrcode() {
+  if (typeof Html5Qrcode !== "undefined") return Promise.resolve();
+  return _loadScriptOnce("https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js");
+}
+
 // ── Mağaza marka sistemi ─────────────────────────────────────────────────────
 const STORE_BRANDS = {
   trendyol:      { name: "Trendyol",      color: "#f27a1a", bg: "rgba(242,122,26,0.08)",  emoji: "🟠" },
@@ -1526,8 +1557,9 @@ function destroyChart(name) {
   delete state.charts[name];
 }
 
-function renderSavingsCharts() {
-  if (typeof Chart === "undefined") return;
+async function renderSavingsCharts() {
+  if (state.activeView !== "savings") return;
+  await ensureChartJs();
 
   const productCanvas = document.getElementById("savingsProductChart");
   const categoryCanvas = document.getElementById("spendingCategoryChart");
@@ -1709,8 +1741,9 @@ function formatReceiptDate(value) {
   }).format(new Date(value));
 }
 
-function renderReceiptCharts() {
-  if (typeof Chart === "undefined") return;
+async function renderReceiptCharts() {
+  if (state.activeView !== "savings") return;
+  await ensureChartJs();
   const summary = state.receiptSummary || {};
   const monthlyCanvas = document.getElementById("receiptMonthlyChart");
   const storeCanvas = document.getElementById("receiptStoreChart");
@@ -3105,9 +3138,10 @@ function openProduct(id) {
   loadProductReviews(product.id);
 
   // Grafik çizimi
-  setTimeout(() => {
+  setTimeout(async () => {
     const ctx = document.getElementById("priceHistoryChart");
     if (!ctx) return;
+    await ensureChartJs();
 
     const existingChart = Chart.getChart(ctx);
     if (existingChart) {
@@ -3548,6 +3582,8 @@ function switchView(view) {
   }
   if (view === "savings") {
     loadReceipts(document.getElementById("receiptMonthFilter")?.value || "");
+    renderSavingsCharts();
+    renderReceiptCharts();
   }
   if (view === "bulletins") {
     loadStores();
@@ -3894,12 +3930,15 @@ function updateBarcodeScanStatus(message) {
 async function startLiveBarcodeScanner() {
   const reader = document.getElementById("html5QrCodeReader");
   if (!reader) return;
-  if (!window.Html5Qrcode) {
+  if (liveBarcodeScannerRunning) return;
+  updateBarcodeScanStatus("Kamera tarayıcı hazırlanıyor...");
+  try {
+    await ensureHtml5Qrcode();
+  } catch {
     updateBarcodeScanStatus("Kamera tarayici kutuphanesi yuklenemedi.");
     showToast("Barkod tarayici yuklenemedi. Internet baglantisini kontrol edin.");
     return;
   }
-  if (liveBarcodeScannerRunning) return;
 
   liveBarcodeScanLocked = false;
   lastLiveBarcode = "";
@@ -6164,11 +6203,13 @@ function closeMainBarcodeScanner() {
 }
 
 async function _startMainScanner() {
-  if (!window.Html5Qrcode) {
-    showToast("Kamera kütüphanesi yükleniyor, biraz bekle...");
+  if (_mainScannerRunning) return;
+  try {
+    await ensureHtml5Qrcode();
+  } catch {
+    showToast("Kamera kütüphanesi yüklenemedi. İnternet bağlantını kontrol et.");
     return;
   }
-  if (_mainScannerRunning) return;
   try {
     _mainScanner = new Html5Qrcode("mainHtml5QrReader", { verbose: false });
     await _mainScanner.start(
