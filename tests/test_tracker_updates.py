@@ -139,8 +139,10 @@ class TestTrackerUpdates(unittest.TestCase):
     @patch("app.tracker.load_db")
     @patch("app.tracker.save_db")
     @patch("app.tracker.send_push_to_owner")
+    @patch("app.tracker._store_followers")
     def test_trigger_weekly_catalogs(
         self,
+        mock_store_followers,
         mock_send_push,
         mock_save,
         mock_load,
@@ -166,6 +168,7 @@ class TestTrackerUpdates(unittest.TestCase):
             }
         }
         mock_load.return_value = db
+        mock_store_followers.return_value = {"user:user-A"}
         mock_fetch_catalogs.return_value = [
             {
                 "store": "bim",
@@ -181,8 +184,8 @@ class TestTrackerUpdates(unittest.TestCase):
 
         trigger_weekly_catalogs()
 
-        self.assertEqual(len(db["notifications"]), 2)
-        self.assertEqual(db["notifications"][0]["title"], "Kataloğa Düştü!")
+        self.assertEqual(len(db["notifications"]), 1)
+        self.assertEqual(db["notifications"][0]["title"], "BİM Aktüel Ürünler")
         self.assertEqual(
             db["catalog_snapshots"]["bim"]["fingerprint"],
             "new-catalog",

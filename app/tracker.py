@@ -567,6 +567,24 @@ def _trigger_weekly_catalogs_legacy() -> None:
         save_db(db)
 
 
+def _store_followers(store_slug: str) -> set[str]:
+    import requests
+    from app.storage import supabase_enabled, supabase_base_url, supabase_headers
+    if not supabase_enabled():
+        return set()
+    try:
+        resp = requests.get(
+            f"{supabase_base_url()}/rest/v1/followed_stores",
+            headers=supabase_headers(),
+            params={"store_slug": f"eq.{store_slug}", "select": "user_id"},
+            timeout=10,
+        )
+        rows = resp.json() if resp.ok else []
+        return {f"user:{row['user_id']}" for row in rows if row.get("user_id")}
+    except Exception:
+        return set()
+
+
 def trigger_weekly_catalogs() -> None:
     """
     Her market (BİM, A101, ŞOK vb.) icin o haftaki aktuel/katalog verisi
@@ -607,23 +625,6 @@ def trigger_weekly_catalogs() -> None:
     # Yalnizca o magazayi GERCEKTEN takip eden kullanicilara bildirim
     # gonderilir (followed_stores tablosu) -- daha once TUM kullanicilara
     # gonderiliyordu, bu yanlisti.
-    def _store_followers(store_slug: str) -> set[str]:
-        import requests
-        from app.storage import supabase_enabled, supabase_base_url, supabase_headers
-        if not supabase_enabled():
-            return set()
-        try:
-            resp = requests.get(
-                f"{supabase_base_url()}/rest/v1/followed_stores",
-                headers=supabase_headers(),
-                params={"store_slug": f"eq.{store_slug}", "select": "user_id"},
-                timeout=10,
-            )
-            rows = resp.json() if resp.ok else []
-            return {f"user:{row['user_id']}" for row in rows if row.get("user_id")}
-        except Exception:
-            return set()
-
     notifications_added = False
     for catalog in changed_catalogs:
         followers = _store_followers(catalog["store"])

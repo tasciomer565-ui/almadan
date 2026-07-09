@@ -45,18 +45,19 @@ class CartOptimizationTests(unittest.TestCase):
         self.assertEqual(extract_volume_info("Defacto Erkek Çorap 3'lü Paket"), (3.0, "adet"))
         self.assertEqual(extract_volume_info("Koton Kadın TişörT 2'li set"), (2.0, "adet"))
 
-    @patch("app.comparator.search_n11_direct")
-    @patch("app.comparator._fetch_aol_urls")
+    @patch("app.search_orchestrator.master_search")
+    @patch("app.comparator._call_railway_scraper")
     def test_best_unit_price_supports_electronics(
         self,
-        mock_fetch_urls,
-        mock_n11,
+        mock_railway,
+        mock_master_search,
     ) -> None:
         from app.comparator import search_products_by_name
 
-        mock_fetch_urls.return_value = []
-        mock_n11.return_value = (
-            [
+        mock_railway.return_value = None
+
+        async def dummy_master_search(*args, **kwargs):
+            return [
                 {
                     "title": "Disk A 500 GB",
                     "price": 1500.0,
@@ -77,9 +78,8 @@ class CartOptimizationTests(unittest.TestCase):
                     "labels": ["Önerilen"],
                     "extra_info": {"out_of_stock": False},
                 },
-            ],
-            "disk",
-        )
+            ]
+        mock_master_search.side_effect = dummy_master_search
 
         results = search_products_by_name("disk")
         best = next(item for item in results if item["extra_info"].get("best_unit_price"))

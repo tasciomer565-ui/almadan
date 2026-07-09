@@ -2634,15 +2634,30 @@ function showParsedProduct(parsed) {
         <p class="form-hint">Otomatik bulunan bilgileri kontrol edip düzeltebilirsin.</p>
       </div>
       ${parsed.warnings.length ? `<p class="source-name">${parsed.warnings.map(escapeHtml).join(" ")}</p>` : ""}
+
+      <!-- Fiyat Geçmişi Grafiği -->
+      <div id="parsedPriceHistoryChartContainer" class="hidden" style="margin-top: 16px; margin-bottom: 16px; padding: 12px; background: #fbfcf9; border: 1px solid var(--line); border-radius: 6px;">
+        <p class="source-name" style="margin-top: 0; margin-bottom: 8px; font-weight: 600; color: var(--ink);">Fiyat Değişim Grafiği (Son 90 Gün)</p>
+        <div style="position: relative; height: 160px; width: 100%;">
+          <canvas id="parsedPriceHistoryChart"></canvas>
+        </div>
+      </div>
+
       <div id="alternativeSellersContainer" style="margin-top: 16px; margin-bottom: 16px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
         <div class="loading-row" style="margin: 0;"><span class="spinner" style="width:14px;height:14px;border-width:2px;border-color:#a0aab0;border-top-color:transparent;"></span><span style="font-size:13px;color:#a0aab0;">Alternatif satıcılar aranıyor... (Bu işlem birkaç saniye sürebilir)</span></div>
       </div>
       <p class="dialog-error" id="trackProductError" hidden></p>
-      <div class="dialog-actions">
-        <button class="secondary-button" type="button" onclick="closeDialog()">Vazgeç</button>
-        <button class="primary-button" type="button" id="trackParsedButton" onclick="trackParsedProduct()">
-          <i data-lucide="radar"></i>
-          Takibe al
+      <div class="dialog-actions" style="display:flex; flex-direction:column; gap:8px;">
+        <div style="display:flex; gap:8px; width:100%;">
+          <button class="secondary-button" style="flex:1;" type="button" onclick="closeDialog()">Vazgeç</button>
+          <button class="primary-button" style="flex:1;" type="button" id="trackParsedButton" onclick="trackParsedProduct()">
+            <i data-lucide="radar"></i>
+            Takibe al
+          </button>
+        </div>
+        <button class="secondary-button" style="width:100%; border-color:#25D366; color:#25D366; display:inline-flex; align-items:center; justify-content:center; gap:8px;" type="button" onclick="shareProductWhatsApp(state.parsedProduct)">
+          <i data-lucide="share-2" style="width:16px;height:16px;color:#25D366;"></i>
+          WhatsApp ile Paylaş
         </button>
       </div>
     </div>
@@ -2677,6 +2692,7 @@ function showParsedProduct(parsed) {
 
   updateTrackButton();
   findAlternativeSellers(parsed);
+  renderPriceHistoryChart(parsed.source + '::' + title);
   lucide.createIcons();
 }
 
@@ -2917,6 +2933,15 @@ async function trackParsedProduct() {
     showToast("Ürün fiyat radarına eklendi.");
     await loadProducts();
     switchView("tracking");
+
+    // Misafir kullanıcılar için tarayıcı bildirimi (Web Push) açma daveti
+    if (!state.auth.user && Notification.permission !== "granted" && Notification.permission !== "denied") {
+      setTimeout(() => {
+        if (confirm("Takip ettiğiniz ürünün fiyatı düştüğünde tarayıcı bildirimi almak ister misiniz?")) {
+          enablePushNotifications();
+        }
+      }, 800);
+    }
   } catch (error) {
     if (isLoginRequiredError(error)) {
       closeDialog();
@@ -3234,6 +3259,10 @@ function openProduct(id) {
       <button class="card-button" onclick="shareProduct('${product.id}')">
         <i data-lucide="share-2"></i>
         Bu fırsatı paylaş
+      </button>
+      <button class="card-button" onclick="shareProductWhatsApp(state.products.find(p => p.id === '${product.id}'))" style="border-color:#25D366; color:#25D366; display:inline-flex; align-items:center; justify-content:center; gap:8px; margin-top:8px;">
+        <i data-lucide="share-2" style="width:16px;height:16px;color:#25D366;"></i>
+        WhatsApp ile Paylaş
       </button>
 
       <!-- Topluluk İncelemeleri -->
@@ -6649,6 +6678,104 @@ async function loadRecommendations() {
     }).join("");
   } catch (err) {
     console.error("loadRecommendations hatası:", err);
+    container.classList.add("hidden");
+  }
+}
+
+function shareProductWhatsApp(parsedOrProduct) {
+  if (!parsedOrProduct) return;
+  const title = parsedOrProduct.title || parsedOrProduct.product_title || "";
+  const priceVal = parsedOrProduct.price ?? parsedOrProduct.current_price;
+  const price = priceVal ? `₺${Number(priceVal).toFixed(2)}` : "Fiyat belirtilmedi";
+  const store = parsedOrProduct.source ? parsedOrProduct.source.toUpperCase() : "MAĞAZA";
+  const url = window.location.origin + `/?q=${encodeURIComponent(title)}&auto=1`;
+  const text = `Kanka, Almadan'da aradığın ürünü buldum! 🚀\n\n📦 *${title}*\n🏪 Mağaza: ${store}\n💵 En Ucuz Fiyat: ${price}\n\nDetaylar ve karşılaştırma için tıkla:\n🔗 ${url}`;
+  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+}
+
+let productPriceHistoryChartInstance = null;
+
+async function renderPriceHistoryChart(productKey) {
+  const container = document.getElementById("parsedPriceHistoryChartContainer");
+  const canvas = document.getElementById("parsedPriceHistoryChart");
+  if (!container || !canvas) return;
+
+  try {
+    const res = await api(`/api/products/price-history?product_key=${encodeURIComponent(productKey)}`, { signal: null });
+    const history = res.history || [];
+
+    if (history.length === 0) {
+      container.classList.add("hidden");
+      return;
+    }
+
+    container.classList.remove("hidden");
+    await ensureChartJs();
+
+    // Tarihe göre sıralayalım
+    history.sort((a, b) => new Date(a.seen_at) - new Date(b.seen_at));
+
+    const labels = history.map(h => {
+      if (!h.seen_at) return "İlk Kayıt";
+      return new Intl.DateTimeFormat("tr-TR", {
+        day: "2-digit",
+        month: "short",
+      }).format(new Date(h.seen_at));
+    });
+    const prices = history.map(h => h.price);
+
+    if (productPriceHistoryChartInstance) {
+      productPriceHistoryChartInstance.destroy();
+    }
+
+    const ctx = canvas.getContext("2d");
+    productPriceHistoryChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Fiyat',
+          data: prices,
+          borderColor: '#287a50',
+          backgroundColor: 'rgba(40, 122, 80, 0.1)',
+          borderWidth: 2,
+          tension: 0.3,
+          fill: true,
+          pointBackgroundColor: '#287a50',
+          pointRadius: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return `₺${context.parsed.y.toFixed(2)}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 10 } }
+          },
+          y: {
+            ticks: {
+              font: { size: 10 },
+              callback: function(val) {
+                return `₺${val}`;
+              }
+            }
+          }
+        }
+      }
+    });
+  } catch (err) {
+    console.error("renderPriceHistoryChart hatası:", err);
     container.classList.add("hidden");
   }
 }

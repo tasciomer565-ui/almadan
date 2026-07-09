@@ -1261,7 +1261,6 @@ def add_product(
     background_tasks: BackgroundTasks,
     request: Request,
     x_device_id: str | None = Header(default=None),
-    user=Depends(require_login),
 ) -> dict:
     owner_id = request_owner_id(request, x_device_id)
     db = load_db()
@@ -1663,7 +1662,6 @@ def add_product_from_url(
     background_tasks: BackgroundTasks,
     request: Request,
     x_device_id: str | None = Header(default=None),
-    user=Depends(require_login),
 ) -> dict:
     owner_id = request_owner_id(request, x_device_id)
     parsed = parse_product_url(payload.url)
@@ -3650,6 +3648,34 @@ def get_savings(request: Request, user=Depends(require_login)):
         "streak_days": summary.streak_days,
         "monthly": summary.monthly,
         "by_store": summary.by_store,
+    }
+
+
+@app.get("/api/products/price-history", include_in_schema=False)
+def get_public_price_history(product_key: str):
+    """
+    Misafir kullanıcılar için ürün fiyat geçmişi.
+    """
+    db = load_db()
+    product_clean = sanitize(product_key, max_length=200)
+    history = []
+
+    # Yerel db'de ara
+    for p in db.get("products", []):
+        pkey = f"{p.get('source')}::{p.get('title')}"
+        if pkey == product_clean:
+            history = p.get("price_history", [])
+            break
+
+    return {
+        "product_key": product_clean,
+        "history": [
+            {
+                "price": h.get("price"),
+                "seen_at": h.get("seen_at") or h.get("date") or h.get("timestamp") or "",
+            }
+            for h in history
+        ]
     }
 
 
