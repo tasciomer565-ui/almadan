@@ -1397,6 +1397,23 @@ body.dark-theme .supported-stores-list span:hover {
     padding: 34px 18px 30px;
   }
 
+  /* Mağaza takip promo kutusu: masaüstü yan-yana düzeni mobilde metni
+     çok dar bir sütuna sıkıştırıp satır satır kırıyordu -- alt alta diz. */
+  .store-follow-promo {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    padding: 18px !important;
+  }
+
+  .store-follow-promo > div:first-child {
+    width: 100%;
+  }
+
+  .store-follow-promo button {
+    width: 100%;
+    text-align: center;
+  }
+
   h1 {
     font-size: 34px;
   }
@@ -1437,6 +1454,7 @@ body.dark-theme .supported-stores-list span:hover {
 
   .deal-grid {
     grid-template-columns: 1fr;
+    min-height: 0;
   }
 
   .deal-image {
@@ -1480,7 +1498,7 @@ body.dark-theme .supported-stores-list span:hover {
     left: 0;
     z-index: 30;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     min-height: 66px;
     padding-bottom: env(safe-area-inset-bottom);
     background: #121412;
@@ -1495,7 +1513,9 @@ body.dark-theme .supported-stores-list span:hover {
     color: #889088;
     background: transparent;
     border: 0;
-    font-size: 11px;
+    font-size: 10px;
+    padding: 6px 2px;
+    white-space: nowrap;
   }
 
   .mobile-nav-item.active {
