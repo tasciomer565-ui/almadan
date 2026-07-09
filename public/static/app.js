@@ -87,7 +87,7 @@ function scheduleAdsense() {
     window.addEventListener(eventName, trigger, { once: true, passive: true });
   });
   window.addEventListener("load", () => {
-    scheduleIdleTask(trigger, 9000);
+    window.setTimeout(() => scheduleIdleTask(trigger, 5000), 30000);
   }, { once: true });
 }
 
