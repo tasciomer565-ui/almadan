@@ -716,21 +716,23 @@
       </div>
     </dialog>
 
-    <script defer src="/static/app.min.js?v=20260709-perf4"></script>
+    <script defer src="/static/app.min.js?v=20260709-perf5"></script>
     <script>
       /* Sprint 12 — auth fix: DOMContentLoaded sonrasi state.auth guncelle */
       document.addEventListener('DOMContentLoaded', function() {
         /* app.js'in loadSession() cagrisini bekle, sonra auth/session ile patch et */
-        (window.scheduleIdleTask || window.setTimeout)(async function() {
-          try {
-            var resp = await fetch('/auth/session', {cache: 'no-store'});
-            var data = await resp.json();
-            if (typeof state !== 'undefined' && data.enabled && !state.auth.enabled) {
-              state.auth = data;
-              if (typeof renderAccountButton === 'function') renderAccountButton();
-            }
-          } catch(e) {}
-        }, 4500);
+        window.setTimeout(function() {
+          (window.scheduleIdleTask || window.setTimeout)(async function() {
+            try {
+              var resp = await fetch('/auth/session', {cache: 'no-store'});
+              var data = await resp.json();
+              if (typeof state !== 'undefined' && data.enabled && !state.auth.enabled) {
+                state.auth = data;
+                if (typeof renderAccountButton === 'function') renderAccountButton();
+              }
+            } catch(e) {}
+          }, 2500);
+        }, 9000);
       });
 
       /* Sprint 12 — demo urunleri kaldir (app.js cache bypass) */
@@ -1019,16 +1021,18 @@
         }
 
         /* Sayfa yüklenince okunmamış bildirim varsa dot göster */
-        (window.scheduleIdleTask || window.setTimeout)(function() {
-          fetch('/api/notifications', { credentials: 'same-origin' })
-            .then(function(r){ return r.ok ? r.json() : null; })
-            .then(function(data){
-              if (!data) return;
-              var unread = (data.notifications||[]).filter(function(n){ return !n.is_read; });
-              var dot = document.querySelector('.notification-dot');
-              if (dot) dot.style.display = unread.length ? '' : 'none';
-            }).catch(function(){});
-        }, 5200);
+        window.setTimeout(function() {
+          (window.scheduleIdleTask || window.setTimeout)(function() {
+            fetch('/api/notifications', { credentials: 'same-origin' })
+              .then(function(r){ return r.ok ? r.json() : null; })
+              .then(function(data){
+                if (!data) return;
+                var unread = (data.notifications||[]).filter(function(n){ return !n.is_read; });
+                var dot = document.querySelector('.notification-dot');
+                if (dot) dot.style.display = unread.length ? '' : 'none';
+              }).catch(function(){});
+          }, 2500);
+        }, 10000);
 
         /* Service worker kaydi app.js tarafinda ilk render sonrasi erteleniyor. */
 

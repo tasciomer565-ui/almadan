@@ -13,6 +13,10 @@ function scheduleIdleTask(callback, timeout = 2500) {
   return window.setTimeout(callback, Math.min(timeout, 1200));
 }
 
+function scheduleDeferredIdleTask(callback, delay = 7000, timeout = 2500) {
+  return window.setTimeout(() => scheduleIdleTask(callback, timeout), delay);
+}
+
 (() => {
   let lucidePromise = null;
   let iconRefreshQueued = false;
@@ -563,12 +567,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   const recoverySession = readRecoverySession();
   if (recoverySession) {
     showPasswordReset(recoverySession);
-    loadSession();
-  } else {
+    scheduleDeferredIdleTask(loadSession, 7000);
+  } else if (window.location.hash) {
     // Çerezlerin tarayıcıya işlenmesini bekle -- aksi halde hemen ardından
     // gelen loadSession() henüz eski (çıkış yapılmış) durumu görüp üzerine yazabilir.
     const confirmed = await completeEmailConfirmSession();
-    if (!confirmed) loadSession();
+    if (!confirmed) scheduleDeferredIdleTask(loadSession, 7000);
+  } else {
+    scheduleDeferredIdleTask(loadSession, 7000);
   }
   checkSharedListUrl();
   scheduleIdleTask(loadLatestCampaigns, 3500);
