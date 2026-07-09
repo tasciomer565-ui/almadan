@@ -1416,12 +1416,14 @@ body.dark-theme .supported-stores-list span:hover {
   }
 
   .url-actions-row .url-field {
-    flex-basis: 100%;
+    flex: 1 0 100% !important;
+    width: 100% !important;
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
   }
 
   .url-actions-row .primary-button,
   .url-actions-row #mainBarcodeBtn {
-    flex: 1 1 auto;
+    flex: 1 1 auto !important;
   }
 
   .supported-stores-container {
