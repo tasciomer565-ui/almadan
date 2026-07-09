@@ -1,7 +1,18 @@
+/* Lucide ikonları <i data-lucide> yer tutucusunu JS ile SVG'ye çeviriyor;
+   önceden hiç boyut ayrılmadığı için ikon "patlayınca" sayfa zıplıyordu
+   (yüksek CLS). Varsayılan bir kutu ayırıyoruz -- kendi inline width/height'ı
+   olan ikonlar zaten bunu geçersiz kılar, çakışma olmaz. */
+i[data-lucide] {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+}
+
 /* ALMADAN-CSS-V18-MARKER */ :root {
   --ink: #171a17;
   --ink-2: #687068;
-  --ink-light: #888;
+  --ink-light: #676f67;
   --muted: #687068;
   --paper: #f7f8f5;
   --surface: #ffffff;
@@ -450,7 +461,7 @@ body.dark-theme .supported-stores-panel.open {
   gap: 10px;
 }
 
-.supported-stores-cat h4 {
+.supported-stores-cat h2 {
   margin: 0;
   font-size: 12px;
   font-weight: 800;
@@ -461,7 +472,7 @@ body.dark-theme .supported-stores-panel.open {
   padding-left: 8px;
 }
 
-body.dark-theme .supported-stores-cat h4 {
+body.dark-theme .supported-stores-cat h2 {
   color: var(--green-dark, #10b981);
   border-left-color: var(--green-dark, #10b981);
 }
