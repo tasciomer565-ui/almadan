@@ -1,4 +1,4 @@
-const CACHE_VERSION = "almadan-v24";
+const CACHE_VERSION = "almadan-v25";
 
 // Uygulama kabuğu (shell) -- offline'da bile sayfanın açılabilmesi için
 // önceden önbelleğe alınır. Sepet/liste tik atma gibi çekirdek işlevler
@@ -6,7 +6,7 @@ const CACHE_VERSION = "almadan-v24";
 // offline'da yeniden açılabilmesiydi.
 const APP_SHELL = [
   "/",
-  "/static/index.html",
+  "/static/index.min.html",
   "/static/app.min.js",
   "/static/styles.min.css",
   "/static/manifest.json",
@@ -47,7 +47,7 @@ self.addEventListener("fetch", (event) => {
   // Sayfa navigasyonu (offline'da site açılışı) -- önbellekteki shell'e düş
   if (req.mode === "navigate") {
     event.respondWith(
-      fetch(req).catch(() => caches.match("/static/index.html")),
+      fetch(req).catch(() => caches.match("/static/index.min.html")),
     );
     return;
   }

@@ -5,6 +5,7 @@
 
 const ALMADAN_LUCIDE_SRC = "https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js";
 const ALMADAN_ADSENSE_SRC = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8816248752189045";
+window.__almadanAppScriptLoaded = true;
 
 function scheduleIdleTask(callback, timeout = 2500) {
   if ("requestIdleCallback" in window) {
@@ -551,7 +552,9 @@ function persistQuantumState() {
   console.log("Kuantum Hafıza: Durum kaydedildi.", data);
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
+async function initializeAlmadanApp() {
+  if (window.__almadanAppInitialized) return;
+  window.__almadanAppInitialized = true;
   applyTheme();
   optimizeForMobile();
   scheduleAdsense();
@@ -578,7 +581,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   checkSharedListUrl();
   scheduleIdleTask(loadLatestCampaigns, 3500);
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initializeAlmadanApp, { once: true });
+} else {
+  initializeAlmadanApp();
+}
 
 // E-posta onay linkine tıklayınca Supabase #access_token=...&type=signup
 // fragmanıyla siteye döner -- bunu yakalayıp otomatik oturum aç, kullanıcı

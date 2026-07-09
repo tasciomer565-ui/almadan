@@ -10,8 +10,8 @@
     }
   },
   "rewrites": [
-    { "source": "/", "destination": "/static/index.html" },
-    { "source": "/index.html", "destination": "/static/index.html" },
+    { "source": "/", "destination": "/static/index.min.html" },
+    { "source": "/index.html", "destination": "/static/index.min.html" },
     { "source": "/hakkinda", "destination": "/static/hakkinda.html" },
     { "source": "/gizlilik", "destination": "/static/gizlilik.html" },
     { "source": "/iletisim", "destination": "/static/iletisim.html" },
@@ -20,6 +20,13 @@
   "headers": [
     {
       "source": "/static/index.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
+        { "key": "Vary", "value": "Accept-Encoding" }
+      ]
+    },
+    {
+      "source": "/static/index.min.html",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
         { "key": "Vary", "value": "Accept-Encoding" }
