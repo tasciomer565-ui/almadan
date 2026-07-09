@@ -580,6 +580,7 @@ async function initializeAlmadanApp() {
     scheduleDeferredIdleTask(loadSession, 7000);
   }
   checkSharedListUrl();
+  checkInitialSearchQuery();
   scheduleIdleTask(loadLatestCampaigns, 3500);
 }
 
@@ -1922,7 +1923,7 @@ function isUrl(string) {
 async function parseProduct(event) {
   event.preventDefault();
   const input = document.getElementById("productUrl");
-  const submit = event.submitter;
+  const submit = event.submitter || document.querySelector("#urlForm .primary-button");
   const val = input.value.trim();
 
   if (!val) return;
@@ -1963,10 +1964,7 @@ async function parseProduct(event) {
           showSellerSelectionDialog(parsed);
         } else {
           // URL değil — rehber popup göster
-          if (overlay) overlay.style.display = "none";
-          submit.disabled = false;
-          submit.innerHTML = `<span>Kontrol et</span>`;
-          showLinkGuide(true);
+          await runTextProductSearch(val, { overlay, progressText });
         }
       } catch (error) {
         console.error("parseProduct hatası:", error);
@@ -2000,6 +1998,31 @@ async function parseProduct(event) {
 }
 
 // ── Admin Dashboard ─────────────────────────────────────────────────────────
+async function runTextProductSearch(query, options = {}) {
+  const q = String(query || "").trim();
+  if (!q) return;
+
+  const overlay = options.overlay || document.getElementById("quantumScanOverlay");
+  const progressText = options.progressText || document.getElementById("quantumScanProgress");
+  if (overlay) overlay.style.display = "flex";
+  if (progressText) progressText.innerText = "MaÄŸaza fiyatlarÄ± karÅŸÄ±laÅŸtÄ±rÄ±lÄ±yor...";
+
+  const category = document.getElementById("searchCategorySelector")?.value || "general";
+  const mode = document.getElementById("globalModeCheckbox")?.checked ? "global" : "hybrid";
+  let searchUrl = `/api/search?query=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}&mode=${encodeURIComponent(mode)}`;
+  if (state.userCoords && mode !== "global") {
+    searchUrl += `&lat=${state.userCoords.lat}&lon=${state.userCoords.lng}`;
+  }
+
+  try {
+    const results = await api(searchUrl, { signal: null });
+    switchView("discover");
+    showSearchResults(results);
+  } finally {
+    if (overlay) overlay.style.display = "none";
+  }
+}
+
 async function showAdminDashboard() {
   const dialog = document.getElementById("productDialog");
   const content = document.getElementById("dialogContent");
@@ -5514,6 +5537,23 @@ async function checkSharedListUrl() {
     } catch (error) {
       showToast("Paylaşılan liste yüklenemedi: " + error.message);
     }
+  }
+}
+
+async function checkInitialSearchQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const query = (params.get("q") || "").trim();
+  if (!query) return;
+
+  const input = document.getElementById("productUrl");
+  if (input) input.value = query;
+
+  if (params.get("auto") === "1") {
+    window.setTimeout(() => {
+      runTextProductSearch(query).catch((error) => {
+        console.warn("Ä°lk SEO aramasÄ± baÅŸlatÄ±lamadÄ±:", error.message);
+      });
+    }, 250);
   }
 }
 

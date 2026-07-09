@@ -6044,6 +6044,285 @@ async def price_landing_page(slug: str):
     return HTMLResponse(page)
 
 
+_GSC_TOPIC_PAGES = {
+    "elektronik": {
+        "title": "Hoparlör, AirPods ve Powerbank Fiyat Karşılaştırma",
+        "eyebrow": "ELEKTRONIK",
+        "description": "Razer hoparlör, Apple hoparlör, LG hoparlör, AirPods ve powerbank aramalarında mağazalar arası fiyat farkını hızlı kontrol et.",
+        "terms": [
+            "razer hoparlör", "apple hoparlör", "lg hoparlör", "iphone hoparlör",
+            "airpods fiyatları", "airpods fiyat", "apple airpods fiyat",
+            "apple powerbank", "apple powerbank fiyat", "apple uyumlu powerbank",
+            "apple powerbank kablosuz", "iphone powerbank", "huawei powerbank",
+            "xiaomi redmi", "monster monitör", "monster a27",
+        ],
+        "tips": [
+            "Kulaklik ve hoparlor aramalarinda resmi distribitor, garanti ve satici puani fiyat kadar onemlidir.",
+            "Powerbank ararken kapasite (mAh), cikis gucu ve kablosuz sarj destegi ayni model karsilastirmasinda kontrol edilmeli.",
+            "AirPods ve Apple aksesuarlarinda benzer gorunen yan sanayi urunler fiyat listesini bozabilir; model adini net yazmak daha temiz sonuc verir.",
+        ],
+    },
+    "elektrikli-ev-aletleri": {
+        "title": "Kettle, Süpürge ve Blender Seti En Ucuz Fiyatlar",
+        "eyebrow": "EV ALETLERI",
+        "description": "Tefal kettle, Philips kettle, Bosch kettle, Beko süpürge ve Vestel blender gibi aramalarda en ucuz mağazayı bulmaya odaklanan rehber.",
+        "terms": [
+            "tefal kettle fiyatları", "kettle tefal", "tefal su ısıtıcı", "tefal kettle",
+            "philips kettle en ucuz", "philips kettle", "bosch kettle fiyatlari",
+            "beko süpürge makinesi fiyatları", "beko elektrik süpürgesi",
+            "beko elektrikli süpürge fiyatları", "beko elektrikli süpürge",
+            "beko torbasız süpürge", "beko süpürge modelleri", "beko toster",
+            "vestel blender seti en ucuz", "blender seti vestel", "vestel blender seti",
+            "vestel blender fiyatları", "vestel blender", "vestel el blender",
+            "vestel el blenderı", "vestel çubuk blender", "vestel mikser seti",
+            "vestel mikser fiyatı", "vestel mutfak robotu fiyatları",
+            "vestel mutfak robotu", "vestel elektrik süpürgesi fiyatları",
+            "vestel elektrikli süpürge fiyatları", "vestel torbasız süpürge",
+            "vestel sessiz süpürge", "tefal süpürge", "tefal kablosuz süpürge",
+        ],
+        "tips": [
+            "Supurge aramalarinda torbali/torbasiz, kablolu/kablosuz ve emiş gucu ayni sepette karsilastirilmali.",
+            "Kettle ve su isiticida litre hacmi, celik/cam govde ve otomatik kapanma ozellikleri fiyat farkini aciklar.",
+            "Blender setlerinde parca sayisi ve motor gucu ayni degilse en ucuz gorunen teklif gercekte daha zayif paket olabilir.",
+        ],
+    },
+    "moda-renk": {
+        "title": "Renk ve Kategoriye Göre Moda Fiyat Karşılaştırma",
+        "eyebrow": "MODA",
+        "description": "Lacivert kaban, sari tisort, bordo etek, bej hirka ve benzeri renkli moda aramalarini tek yerde karsilastir.",
+        "terms": [
+            "lacivert kaban", "kırmızı kaban", "mor kravat", "lacivert kravat",
+            "sarı tişört", "sarı tişört erkek", "turkuaz tişört erkek",
+            "bordo etek", "bej hırka", "kahverengi elbise", "puma elbise",
+            "zara ceket", "erkek denim", "koyu lacivert jean",
+            "lacivert ayakkabı boyası",
+        ],
+        "tips": [
+            "Renkli moda aramalarinda beden, sezon ve kumas bilgisi fiyati ciddi etkiler.",
+            "Ayni urun farkli pazaryerlerinde farkli satici adiyla listelenebilir; model ve marka bilgisini birlikte aramak daha iyi sonuc verir.",
+            "Kaban, ceket ve denim gibi urunlerde kargo/iade kosullari toplam maliyetin parcasi olarak dusunulmeli.",
+        ],
+    },
+    "ev-yasam": {
+        "title": "Mobilya, Raf, Avize ve Ev Tekstili Fiyatları",
+        "eyebrow": "EV VE YASAM",
+        "description": "Yatak, kitaplik, raf, avize, perde, kanepe ve buzdolabi gibi ev alisverisi aramalarinda fiyat farklarini yakala.",
+        "terms": [
+            "mor yatak", "pembe çocuk yatağı", "pembe kitaplık", "bordo kitaplık",
+            "mavi raf", "gold raf", "mavi avize", "pembe avize", "yesil kanepe",
+            "gri perde", "siyah bornoz", "gri buzdolabı", "buzdolabı gri",
+            "ikea teşhir ürünleri fiyatları",
+        ],
+        "tips": [
+            "Mobilya ve beyaz esyada teslimat, kurulum ve garanti bedelleri urun fiyatina eklenebilir.",
+            "Renk odakli aramalarda ayni urun farkli adlarla listelenebilir; ana kategoriyle birlikte aramak daha iyi eslesme saglar.",
+            "Teşhir urunlerinde stok ve kondisyon bilgisi hizli degistigi icin fiyat takibi faydalidir.",
+        ],
+    },
+    "kozmetik": {
+        "title": "Gratis, Flormar ve Golden Rose Kozmetik Fiyatları",
+        "eyebrow": "KOZMETIK",
+        "description": "Gratis ruj, Flormar parfum, kalici ruj ve Golden Rose parfum gibi kozmetik aramalarinda kampanya ve fiyat farklarini takip et.",
+        "terms": [
+            "flormar parfüm", "flormar parfüm kadın", "gratis ruj seti",
+            "gratis ruj", "gratis kalıcı ruj", "golden rose parfüm",
+        ],
+        "tips": [
+            "Kozmetikte renk kodu, seri adi ve ml/gr bilgisi ayni urunu bulmak icin kritik.",
+            "Set urunlerde adet ve gramaj farki oldugu icin sadece toplam fiyata bakmak yaniltabilir.",
+            "Kampanya donemlerinde ayni urun market, kozmetik zinciri ve pazaryerinde farkli fiyatla gorunebilir.",
+        ],
+    },
+    "market": {
+        "title": "Market Ürünleri, ŞOK Katalog ve Gıda Fiyatları",
+        "eyebrow": "MARKET",
+        "description": "Nohut, kefir, semolina, Hakmar ve Sok katalog aramalarinda market fiyatlarini ve aktuel firsatlari takip et.",
+        "terms": [
+            "nohut fiyatları", "kefir fiyat", "kefir kaç tl", "kefir al",
+            "semola", "semolina", "semolina unu", "hakmar",
+            "şok indirimleri", "şok katalog",
+        ],
+        "tips": [
+            "Gida aramalarinda gramaj ve paket adedi fiyat karsilastirmasinin en onemli parcasidir.",
+            "Aktuel katalog urunleri kisa sureli oldugu icin stok ve tarih bilgisini kontrol etmek gerekir.",
+            "Market urunlerinde en yakin magaza, teslimat ucreti ve minimum sepet tutari toplam fiyati degistirebilir.",
+        ],
+    },
+}
+
+
+def _seo_topic_cards() -> str:
+    import html as _html
+    cards = []
+    for slug, data in _GSC_TOPIC_PAGES.items():
+        title = _html.escape(data["title"])
+        desc = _html.escape(data["description"])
+        cards.append(
+            f'<a class="bp-feature" href="/fiyat-rehberi/{slug}">'
+            f'<h3>{title}</h3><p>{desc}</p></a>'
+        )
+    return "".join(cards)
+
+
+def _seo_query_chips(terms: list[str]) -> str:
+    import html as _html
+    from urllib.parse import quote_plus
+
+    slug_map = _seo_price_slug_map()
+    reverse_slug = {v.translate(_SEO_TR_TO_ASCII).casefold(): k for k, v in slug_map.items()}
+    chips = []
+    for term in terms:
+        label = _html.escape(term)
+        q = quote_plus(term)
+        normalized = term.translate(_SEO_TR_TO_ASCII).casefold()
+        price_slug = reverse_slug.get(normalized)
+        price_link = (
+            f'<a class="bp-chip bp-chip-secondary" href="/fiyat/{price_slug}">Fiyat sayfasi</a>'
+            if price_slug else ""
+        )
+        chips.append(
+            '<div class="bp-chip-row">'
+            f'<a class="bp-chip" href="/?q={q}&auto=1">{label}</a>'
+            f'{price_link}'
+            '</div>'
+        )
+    return "".join(chips)
+
+
+@app.get("/fiyat-rehberi", response_class=HTMLResponse)
+async def price_guide_index():
+    cards = _seo_topic_cards()
+    page = f"""<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#121412">
+    <title>Fiyat Karsilastirma Rehberi - Almadan</title>
+    <meta name="description" content="Search Console verilerinden gelen elektronik, ev aletleri, moda, kozmetik, market ve ev yasam aramalari icin fiyat karsilastirma rehberleri.">
+    <link rel="canonical" href="https://www.almadan.app/fiyat-rehberi">
+    <meta name="robots" content="index, follow">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Almadan">
+    <meta property="og:title" content="Fiyat Karsilastirma Rehberi - Almadan">
+    <meta property="og:description" content="Populer urun ve kategori aramalarinda en ucuz fiyati bulmak icin rehberler.">
+    <meta property="og:url" content="https://www.almadan.app/fiyat-rehberi">
+    <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
+    <meta property="og:locale" content="tr_TR">
+    <link rel="stylesheet" href="/static/brand-pages.css?v=2">
+  </head>
+  <body>
+    <header class="bp-header">
+      <a href="/" class="bp-logo"><span class="bp-logo-mark">A</span>almadan</a>
+      <nav class="bp-nav">
+        <a href="/fiyat-rehberi" class="active">Fiyat Rehberi</a>
+        <a href="/hakkinda">Hakkinda</a>
+        <a href="/iletisim">Iletisim</a>
+      </nav>
+    </header>
+    <section class="bp-hero">
+      <div class="bp-hero-inner">
+        <p class="bp-eyebrow">DOGAL TRAFIK REHBERI</p>
+        <h1>En cok aranan urunlerde fiyat karsilastirma</h1>
+        <p class="bp-hero-copy">Google'da gorunum almaya baslayan urun ve kategori aramalarini tek tek fiyat karsilastirma akisine bagladik.</p>
+        <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> Urun Ara</a>
+      </div>
+    </section>
+    <main class="bp-main">
+      <h2><i data-lucide="layout-grid"></i> Rehber Basliklari</h2>
+      <div class="bp-feature-grid">{cards}</div>
+    </main>
+    <footer class="bp-footer">
+      <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkinda</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">Iletisim</a>
+      <p>© 2026 Almadan</p>
+    </footer>
+  </body>
+</html>"""
+    return HTMLResponse(page)
+
+
+@app.get("/fiyat-rehberi/{topic}", response_class=HTMLResponse)
+async def price_guide_topic(topic: str):
+    import html as _html
+
+    data = _GSC_TOPIC_PAGES.get(topic)
+    if not data:
+        return HTMLResponse(
+            "<h1>Sayfa bulunamadi</h1><p><a href=\"/fiyat-rehberi\">Fiyat rehberine don</a></p>",
+            status_code=404,
+        )
+
+    title = _html.escape(data["title"])
+    eyebrow = _html.escape(data["eyebrow"])
+    description = _html.escape(data["description"])
+    chips = _seo_query_chips(data["terms"])
+    tips = "".join(
+        f'<div class="bp-card"><p>{_html.escape(tip)}</p></div>'
+        for tip in data["tips"]
+    )
+    page = f"""<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#121412">
+    <title>{title} - Almadan</title>
+    <meta name="description" content="{description}">
+    <link rel="canonical" href="https://www.almadan.app/fiyat-rehberi/{topic}">
+    <meta name="robots" content="index, follow">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Almadan">
+    <meta property="og:title" content="{title} - Almadan">
+    <meta property="og:description" content="{description}">
+    <meta property="og:url" content="https://www.almadan.app/fiyat-rehberi/{topic}">
+    <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
+    <meta property="og:locale" content="tr_TR">
+    <script type="application/ld+json">
+    {{
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "url": "https://www.almadan.app/fiyat-rehberi/{topic}",
+      "name": "{title}",
+      "description": "{description}",
+      "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app" }}
+    }}
+    </script>
+    <link rel="stylesheet" href="/static/brand-pages.css?v=2">
+  </head>
+  <body>
+    <header class="bp-header">
+      <a href="/" class="bp-logo"><span class="bp-logo-mark">A</span>almadan</a>
+      <nav class="bp-nav">
+        <a href="/fiyat-rehberi" class="active">Fiyat Rehberi</a>
+        <a href="/hakkinda">Hakkinda</a>
+        <a href="/iletisim">Iletisim</a>
+      </nav>
+    </header>
+    <section class="bp-hero">
+      <div class="bp-hero-inner">
+        <p class="bp-eyebrow">{eyebrow}</p>
+        <h1>{title}</h1>
+        <p class="bp-hero-copy">{description}</p>
+        <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> Hemen Karsilastir</a>
+      </div>
+    </section>
+    <main class="bp-main">
+      <h2><i data-lucide="search"></i> Bu sayfadaki aramalar</h2>
+      <p class="bp-body muted">Bir sorguya dokununca Almadan ana arama ekrani acilir ve fiyat karsilastirmasi otomatik baslar.</p>
+      <div class="bp-chip-grid">{chips}</div>
+      <h2><i data-lucide="check-circle"></i> Karsilastirirken dikkat et</h2>
+      {tips}
+      <a class="bp-cta bp-cta-block" href="/fiyat-rehberi"><i data-lucide="arrow-left"></i> Tum Rehberler</a>
+    </main>
+    <footer class="bp-footer">
+      <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkinda</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">Iletisim</a>
+      <p>© 2026 Almadan</p>
+    </footer>
+  </body>
+</html>"""
+    return HTMLResponse(page)
+
+
 @app.get("/api/campaigns/latest")
 async def latest_campaigns(limit: int = 12):
     """
