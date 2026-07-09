@@ -128,12 +128,16 @@ async def warm_slow_stores(max_calls: int = 2, per_call_timeout: float = 20.0) -
     return {"processed": len(processed), "details": processed, "cursor": state["cursor"]}
 
 
-async def background_warm_query(query: str, category: str) -> None:
-    """Arka planda (FastAPI Background Task) belirtilen sorgu için 
-    yavaş çalışan mağazaları paralel tarar ve cache'e ekler."""
+async def background_warm_query(query: str, category: str) -> dict:
+    """Belirtilen sorgu için yavaş (render_js) mağazaları paralel tarar ve
+    cache'e ekler. Frontend, arama sonuçları ekrana geldikten sonra
+    /api/warm-slow-stores üzerinden senkron çağırır — Vercel serverless
+    yanıt döner dönmez lambdayı dondurduğu için BackgroundTasks ile
+    çalıştırmak canlıda yarıda kalıyordu; ayrı bir istek içinde await
+    edilince 60s maxDuration bütçesinde tamamlanabiliyor."""
     from app import comparator
     from app.cache import make_cache_key, cache_get, cache_set
-    
+
     cat_upper = category.upper()
     if cat_upper == "GENERAL":
         cat_upper = "GENEL"
@@ -150,8 +154,16 @@ async def background_warm_query(query: str, category: str) -> None:
         
     fn_names = _SLOW_JS_STORES.get(cat_upper)
     if not fn_names:
-        return
-        
+        return {"added": 0, "skipped": "no_slow_stores"}
+
+    # Zaten ısıtılmışsa (cache'de bu yavaş mağazalardan en az biri varsa)
+    # tekrar tarama — her tarama ScrapingBee kredisi harcıyor.
+    cache_key = make_cache_key(query, cat_upper)
+    cached = cache_get(cache_key, query=query, category=cat_upper) or []
+    slow_sources = {fn.replace("search_", "") for fn in fn_names}
+    if any(p.get("source") in slow_sources for p in cached if isinstance(p, dict)):
+        return {"added": 0, "skipped": "already_warm"}
+
     loop = asyncio.get_running_loop()
     tasks = []
     
@@ -173,9 +185,8 @@ async def background_warm_query(query: str, category: str) -> None:
             new_products.extend([p for p in res if isinstance(p, dict) and p.get("title")])
             
     if not new_products:
-        return
-        
-    cache_key = make_cache_key(query, cat_upper)
+        return {"added": 0}
+
     existing = cache_get(cache_key, query=query, category=cat_upper) or []
     existing = [p for p in existing if isinstance(p, dict) and p.get("title")]
     
@@ -184,3 +195,4 @@ async def background_warm_query(query: str, category: str) -> None:
     
     merged = existing + new_products
     cache_set(cache_key, query, cat_upper, merged)
+    return {"added": len(new_products), "sources": sorted(new_sources)}

@@ -2200,11 +2200,50 @@ async function forceRefreshSearch(query, cacheKey) {
   }
 }
 
+// ── Yavaş mağaza ısıtması (Gratis, Watsons, Boyner...) ──────────────────────
+// Vercel serverless, arama yanıtı döner dönmez sunucuyu dondurduğu için
+// backend'in kendi background task'i canlıda yarıda kalıyordu. Çözüm:
+// sonuçlar ekrana geldikten sonra frontend ayrı bir istekle /api/warm-slow-stores
+// çağırır (o istek bitene kadar lambda canlı kalır), yeni mağaza sonucu
+// geldiyse aynı arama sessizce tazelenir.
+let _warmToken = 0;
+async function warmSlowStoresAfterSearch(response) {
+  if (!response || response._warmed || response.needs_clarification) return;
+  const query = response.effective_query || response.query;
+  if (!query || !response.cache_key) return;
+  const category = response.category || "general";
+  const token = ++_warmToken;
+  try {
+    const warm = await api("/api/warm-slow-stores", {
+      method: "POST",
+      body: JSON.stringify({ query, category }),
+    });
+    if (!warm || !warm.added || token !== _warmToken) return;
+
+    // Yeni mağazalar cache'e yazıldı — kullanıcı hâlâ aynı sonuçlara
+    // bakıyorsa listeyi sessizce tazele.
+    const dialog = document.getElementById("productDialog");
+    if (!dialog || !dialog.open) return;
+    const url = `/api/search?query=${encodeURIComponent(query)}&category=${encodeURIComponent(category)}&mode=hybrid`;
+    const fresh = await api(url);
+    if (token !== _warmToken || !dialog.open) return;
+    const oldCount = (response.products || []).length;
+    if ((fresh.products || []).length > oldCount) {
+      fresh._warmed = true;
+      showSearchResults(fresh);
+      showToast(`${warm.added} yeni mağaza sonucu eklendi`);
+    }
+  } catch {
+    /* ısıtma başarısız olursa sessizce geç — mevcut sonuçlar etkilenmez */
+  }
+}
+
 function showSearchResults(response) {
   const dialog = document.getElementById("productDialog");
   const content = document.getElementById("dialogContent");
 
   const products = response.products || [];
+  warmSlowStoresAfterSearch(response);
   const suggestion = response.suggestion;
   const originalQuery = response.query || "";
 

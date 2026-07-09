@@ -514,6 +514,11 @@ class UrlParseRequest(BaseModel):
     url: str = Field(min_length=5)
 
 
+class WarmSlowStoresRequest(BaseModel):
+    query: str = Field(min_length=2, max_length=80)
+    category: str = "general"
+
+
 class ProductFromUrlRequest(BaseModel):
     url: str = Field(min_length=5)
     fallback_title: str | None = None
@@ -1376,11 +1381,10 @@ def search_products(
         "email": getattr(request.state, "user_email", None) or "Anonymous"
     })
 
-    try:
-        from app.slow_store_cache_warmer import background_warm_query
-        background_tasks.add_task(background_warm_query, gendered_query, category)
-    except Exception:
-        pass
+    # Not: Yavaş mağaza ısıtması artık BackgroundTasks ile DEĞİL, frontend'in
+    # sonuçlar ekrana geldikten sonra çağırdığı /api/warm-slow-stores ile
+    # yapılıyor — Vercel serverless, yanıt döner dönmez lambdayı dondurduğu
+    # için background task canlıda hiç tamamlanmıyordu.
 
     return {
         "products": products,
@@ -1393,6 +1397,20 @@ def search_products(
         "stale_age": stale_age,
         "cache_key": cache_key,
     }
+
+
+@app.post("/api/warm-slow-stores")
+async def api_warm_slow_stores(payload: WarmSlowStoresRequest) -> dict:
+    """Yavaş (render_js) mağazaları bu sorgu için tarayıp cache'e yazar.
+
+    Frontend, arama sonuçları ekrana geldikten sonra bunu ayrı bir istek
+    olarak çağırır; istek senkron await edildiği için Vercel lambda'sı
+    tarama bitene kadar (maxDuration=60s) canlı kalır. Sorgu zaten
+    ısıtılmışsa hiçbir scraper çağrılmadan hemen döner."""
+    from app.slow_store_cache_warmer import background_warm_query
+
+    result = await background_warm_query(payload.query.strip(), payload.category)
+    return result or {"added": 0}
 
 
 @app.post("/parse-url")
