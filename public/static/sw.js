@@ -1,4 +1,4 @@
-const CACHE_VERSION = "almadan-v28";
+const CACHE_VERSION = "almadan-v29";
 
 // Uygulama kabuğu (shell) -- offline'da bile sayfanın açılabilmesi için
 // önceden önbelleğe alınır. Sepet/liste tik atma gibi çekirdek işlevler

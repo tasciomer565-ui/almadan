@@ -1546,6 +1546,7 @@ function renderAll() {
   renderDeals();
   renderTracking();
   renderSavings();
+  loadRecommendations();
   lucide.createIcons();
 }
 
@@ -1961,6 +1962,9 @@ async function parseProduct(event) {
             return;
           }
           if (overlay) overlay.style.display = "none";
+          if (parsed.title) {
+            saveToSearchHistory(parsed.title);
+          }
           showSellerSelectionDialog(parsed);
         } else {
           // URL değil — rehber popup göster
@@ -2001,11 +2005,12 @@ async function parseProduct(event) {
 async function runTextProductSearch(query, options = {}) {
   const q = String(query || "").trim();
   if (!q) return;
+  saveToSearchHistory(q);
 
   const overlay = options.overlay || document.getElementById("quantumScanOverlay");
   const progressText = options.progressText || document.getElementById("quantumScanProgress");
   if (overlay) overlay.style.display = "flex";
-  if (progressText) progressText.innerText = "MaÄŸaza fiyatlarÄ± karÅŸÄ±laÅŸtÄ±rÄ±lÄ±yor...";
+  if (progressText) progressText.innerText = "Mağaza fiyatları karşılaştırılıyor...";
 
   const category = document.getElementById("searchCategorySelector")?.value || "general";
   const mode = document.getElementById("globalModeCheckbox")?.checked ? "global" : "hybrid";
@@ -5551,7 +5556,7 @@ async function checkInitialSearchQuery() {
   if (params.get("auto") === "1") {
     window.setTimeout(() => {
       runTextProductSearch(query).catch((error) => {
-        console.warn("Ä°lk SEO aramasÄ± baÅŸlatÄ±lamadÄ±:", error.message);
+        console.warn("İlk SEO araması başlatılamadı:", error.message);
       });
     }, 250);
   }
@@ -6574,4 +6579,76 @@ function selectSellerAndProceed(element) {
   };
 
   showParsedProduct(newParsed);
+}
+
+function saveToSearchHistory(query) {
+  if (!query) return;
+  const q = String(query).trim();
+  if (q.length < 2 || isUrl(q)) return; // Linkleri veya çok kısa kelimeleri kaydetmeyelim
+
+  try {
+    let history = JSON.parse(localStorage.getItem("almadan_search_history") || "[]");
+    history = history.filter(item => item.toLowerCase() !== q.toLowerCase());
+    history.push(q);
+    if (history.length > 5) {
+      history.shift(); // En eskiyi çıkar
+    }
+    localStorage.setItem("almadan_search_history", JSON.stringify(history));
+    loadRecommendations();
+  } catch (e) {
+    console.error("saveToSearchHistory hatası:", e);
+  }
+}
+
+async function loadRecommendations() {
+  const container = document.getElementById("recommendationsSection");
+  const grid = document.getElementById("recommendationsGrid");
+  if (!container || !grid) return;
+
+  let history = [];
+  try {
+    history = JSON.parse(localStorage.getItem("almadan_search_history") || "[]");
+  } catch (e) {
+    history = [];
+  }
+
+  if (!history || history.length === 0) {
+    container.classList.add("hidden");
+    return;
+  }
+
+  container.classList.remove("hidden");
+  grid.innerHTML = `<div class="loading-state" style="grid-column:1/-1;"><span class="spinner"></span>Öneriler hazırlanıyor...</div>`;
+
+  try {
+    const res = await api("/api/recommendations", {
+      method: "POST",
+      body: JSON.stringify({ queries: history, limit: 6 }),
+      signal: null
+    });
+
+    const items = res.recommendations || [];
+    if (items.length === 0) {
+      container.classList.add("hidden");
+      return;
+    }
+
+    grid.innerHTML = items.map(p => {
+      const priceStr = p.price ? `₺${p.price.toFixed(2)}` : "Fiyat bulunamadı";
+      const escapedTitle = (p.product_title || "").replace(/'/g, "&#39;");
+      const storeLabel = p.store ? p.store.toUpperCase() : "MAĞAZA";
+      const q = encodeURIComponent(p.product_title);
+      return `
+        <div class="store-card" style="padding:16px; display:flex; flex-direction:column; gap:8px;">
+          <div style="font-size:11px; font-weight:700; color:var(--green); letter-spacing:.05em;">${storeLabel}</div>
+          <div style="font-size:14px; font-weight:700; color:var(--ink); line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; height:40px;">${escapedTitle}</div>
+          <div style="font-size:16px; font-weight:800; color:var(--green-dark); margin-top:4px;">${priceStr}</div>
+          <a href="/?q=${q}&auto=1" class="btn-follow" style="text-align:center; text-decoration:none; margin-top:8px; display:block;">Fiyat Karşılaştır</a>
+        </div>
+      `;
+    }).join("");
+  } catch (err) {
+    console.error("loadRecommendations hatası:", err);
+    container.classList.add("hidden");
+  }
 }

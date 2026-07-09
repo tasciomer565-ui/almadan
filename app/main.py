@@ -3923,6 +3923,74 @@ async def semantic_search(
     }
 
 
+class RecommendationRequest(BaseModel):
+    queries: list[str] = Field(..., min_length=1)
+    limit: int = Field(default=6, ge=1, le=20)
+
+
+@app.post("/api/recommendations", include_in_schema=False)
+async def get_recommendations(body: RecommendationRequest):
+    """
+    Kullanıcının arama geçmişine göre anlamsal katalog önerileri döner.
+    Üye girişi gerektirmez, localStorage tabanlı geçmişle çalışır.
+    """
+    import logging
+    from app.semantic_search import semantic_search as ss
+
+    log = logging.getLogger("almadan.recommendations")
+    recommended = []
+    seen_keys = set()
+
+    # Son sorgulardan başlayarak arayalım
+    for q in reversed(body.queries):
+        if len(recommended) >= body.limit:
+            break
+        clean_q = sanitize(q.strip(), max_length=100)
+        if not clean_q:
+            continue
+        try:
+            results = await asyncio.to_thread(
+                ss.search,
+                clean_q,
+                limit=3,
+                threshold=0.65,
+            )
+            for r in results:
+                if r.product_key not in seen_keys:
+                    seen_keys.add(r.product_key)
+                    recommended.append({
+                        "product_key": r.product_key,
+                        "product_title": r.product_title,
+                        "store": r.store,
+                        "category": r.category,
+                        "price": r.price,
+                    })
+        except Exception as e:
+            log.warning("Rec query failed for '%s': %s", clean_q, e)
+
+    # Fallback: Eğer arama geçmişinden hiç ürün bulunamadıysa veya limitin altındaysa,
+    # sistemdeki genel fırsatlardan ekleyelim ki ekran boş görünmesin.
+    if len(recommended) < body.limit:
+        db = load_db()
+        for p in db.get("products", []):
+            if len(recommended) >= body.limit:
+                break
+            pkey = f"{p.get('source')}::{p.get('title')}"
+            if pkey not in seen_keys:
+                seen_keys.add(pkey)
+                recommended.append({
+                    "product_key": pkey,
+                    "product_title": p.get("title"),
+                    "store": p.get("source"),
+                    "category": p.get("category", ""),
+                    "price": p.get("price"),
+                })
+
+    return {
+        "recommendations": recommended[:body.limit]
+    }
+
+
 @app.post("/api/admin/search/index")
 async def index_catalog_for_search(
     store: str | None = None,
