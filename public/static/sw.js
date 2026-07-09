@@ -1,4 +1,4 @@
-const CACHE_VERSION = "almadan-v21";
+const CACHE_VERSION = "almadan-v22";
 
 // Uygulama kabuğu (shell) -- offline'da bile sayfanın açılabilmesi için
 // önceden önbelleğe alınır. Sepet/liste tik atma gibi çekirdek işlevler
@@ -52,8 +52,23 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Statik dosyalar (JS/CSS/ikon): önce ağ dene, olmazsa önbellekten ver,
-  // başarılı olursa önbelleği güncel tut.
+  if (url.pathname.startsWith("/static/")) {
+    event.respondWith(
+      caches.match(req).then((cached) => {
+        const update = fetch(req).then((res) => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE_VERSION).then((cache) => cache.put(req, clone));
+          }
+          return res;
+        }).catch(() => cached);
+        return cached || update;
+      }),
+    );
+    return;
+  }
+
+  // Diğer GET istekleri: ağ öncelikli, offline'da önbellek.
   event.respondWith(
     fetch(req)
       .then((res) => {

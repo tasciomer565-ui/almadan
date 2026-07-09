@@ -3,8 +3,6 @@
   <head>
     <meta charset="utf-8">
     <meta name="google-site-verification" content="pxvMaq3UfZon9kMc5Re5jKd3DHYb60UmIMzOL3_plUA" />
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8816248752189045"
-     crossorigin="anonymous"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#121412">
     <meta name="mobile-web-app-capable" content="yes">
@@ -47,13 +45,12 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" media="print" onload="this.onload=null;this.media='all';this.rel='stylesheet'">
     <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet"></noscript>
-    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
     <!-- chart.js ve html5-qrcode artık app.js'te gerçekten kullanıldıkları anda
          (Tasarrufum grafikleri / Barkod Tara) tembel yükleniyor -- her sayfada
          indirilip 357 KiB "kullanılmayan JS" olarak işaretlenmelerini önler. -->
-    <link rel="stylesheet" href="/static/styles.css?v=20260709-perf1">
+    <link rel="stylesheet" href="/static/styles.css?v=20260709-perf2">
     <style>
       /* Sprint 12 — eksik CSS degiskenleri (cache bypass) */
       :root {
@@ -718,12 +715,12 @@
       </div>
     </dialog>
 
-    <script defer src="/static/app.js?v=20260709-perf1"></script>
+    <script defer src="/static/app.js?v=20260709-perf2"></script>
     <script>
       /* Sprint 12 — auth fix: DOMContentLoaded sonrasi state.auth guncelle */
       document.addEventListener('DOMContentLoaded', function() {
         /* app.js'in loadSession() cagrisini bekle, sonra auth/session ile patch et */
-        setTimeout(async function() {
+        (window.scheduleIdleTask || window.setTimeout)(async function() {
           try {
             var resp = await fetch('/auth/session', {cache: 'no-store'});
             var data = await resp.json();
@@ -732,7 +729,7 @@
               if (typeof renderAccountButton === 'function') renderAccountButton();
             }
           } catch(e) {}
-        }, 200);
+        }, 4500);
       });
 
       /* Sprint 12 — demo urunleri kaldir (app.js cache bypass) */
@@ -1021,28 +1018,18 @@
         }
 
         /* Sayfa yüklenince okunmamış bildirim varsa dot göster */
-        fetch('/api/notifications', { credentials: 'same-origin' })
-          .then(function(r){ return r.ok ? r.json() : null; })
-          .then(function(data){
-            if (!data) return;
-            var unread = (data.notifications||[]).filter(function(n){ return !n.is_read; });
-            var dot = document.querySelector('.notification-dot');
-            if (dot) dot.style.display = unread.length ? '' : 'none';
-          }).catch(function(){});
+        (window.scheduleIdleTask || window.setTimeout)(function() {
+          fetch('/api/notifications', { credentials: 'same-origin' })
+            .then(function(r){ return r.ok ? r.json() : null; })
+            .then(function(data){
+              if (!data) return;
+              var unread = (data.notifications||[]).filter(function(n){ return !n.is_read; });
+              var dot = document.querySelector('.notification-dot');
+              if (dot) dot.style.display = unread.length ? '' : 'none';
+            }).catch(function(){});
+        }, 5200);
 
-        /* PWA Service Worker & Push Kaydı */
-        if ('serviceWorker' in navigator) {
-          window.addEventListener('load', function() {
-            navigator.serviceWorker.register('/static/sw.js').then(function(reg) {
-              console.log('SW Kayıt Başarılı:', reg.scope);
-              if (Notification.permission === 'default') {
-                setTimeout(() => Notification.requestPermission(), 3000);
-              }
-            }).catch(function(err) {
-              console.log('SW Kayıt Hatası:', err);
-            });
-          });
-        }
+        /* Service worker kaydi app.js tarafinda ilk render sonrasi erteleniyor. */
 
         /* ── GOOGLE SHEETS SYNC BUTONU ──────────────────────────────────────
            Admin paneline "Google Sheets'e Gönder" butonu enjekte eder.

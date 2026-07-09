@@ -2,6 +2,95 @@
 // İkisi de her sayfada değil, sadece gerçekten kullanıldıkları anda (Tasarrufum
 // grafikleri, barkod tarama) gerekiyor -- eskiden <head>'de her sayfada
 // indirilip 357 KiB "kullanılmayan JS" olarak PageSpeed'e takılıyordu.
+
+const ALMADAN_LUCIDE_SRC = "https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js";
+const ALMADAN_ADSENSE_SRC = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8816248752189045";
+
+function scheduleIdleTask(callback, timeout = 2500) {
+  if ("requestIdleCallback" in window) {
+    return window.requestIdleCallback(callback, { timeout });
+  }
+  return window.setTimeout(callback, Math.min(timeout, 1200));
+}
+
+(() => {
+  let lucidePromise = null;
+  let iconRefreshQueued = false;
+
+  function refreshIconsWhenReady() {
+    if (window.lucide?.__almadanStub) {
+      iconRefreshQueued = true;
+      window.__almadanLoadLucide();
+      return;
+    }
+    if (window.lucide?.createIcons) {
+      window.requestAnimationFrame(() => window.lucide.createIcons());
+    }
+  }
+
+  window.__almadanLoadLucide = function __almadanLoadLucide(immediate = false) {
+    if (window.lucide?.createIcons && !window.lucide.__almadanStub) {
+      refreshIconsWhenReady();
+      return Promise.resolve();
+    }
+    if (lucidePromise) return lucidePromise;
+
+    lucidePromise = new Promise((resolve, reject) => {
+      const load = () => {
+        const existing = document.querySelector(`script[src="${ALMADAN_LUCIDE_SRC}"]`);
+        const script = existing || document.createElement("script");
+        if (!existing) {
+          script.src = ALMADAN_LUCIDE_SRC;
+          script.async = true;
+          script.defer = true;
+          document.head.appendChild(script);
+        }
+        script.addEventListener("load", () => {
+          if (iconRefreshQueued && window.lucide?.createIcons) {
+            iconRefreshQueued = false;
+            window.requestAnimationFrame(() => window.lucide.createIcons());
+          }
+          resolve();
+        }, { once: true });
+        script.addEventListener("error", reject, { once: true });
+      };
+      if (immediate) load();
+      else scheduleIdleTask(load, 1800);
+    });
+    return lucidePromise;
+  };
+
+  if (!window.lucide) {
+    window.lucide = {
+      __almadanStub: true,
+      createIcons() {
+        iconRefreshQueued = true;
+        window.__almadanLoadLucide();
+      },
+    };
+  }
+})();
+
+function loadAdsenseAfterFirstPaint() {
+  if (window.__almadanAdsenseLoaded) return;
+  window.__almadanAdsenseLoaded = true;
+  const script = document.createElement("script");
+  script.async = true;
+  script.crossOrigin = "anonymous";
+  script.src = ALMADAN_ADSENSE_SRC;
+  document.head.appendChild(script);
+}
+
+function scheduleAdsense() {
+  const trigger = () => loadAdsenseAfterFirstPaint();
+  ["pointerdown", "keydown", "touchstart", "scroll"].forEach((eventName) => {
+    window.addEventListener(eventName, trigger, { once: true, passive: true });
+  });
+  window.addEventListener("load", () => {
+    scheduleIdleTask(trigger, 9000);
+  }, { once: true });
+}
+
 function _loadScriptOnce(src) {
   return new Promise((resolve, reject) => {
     const existing = document.querySelector(`script[src="${src}"]`);
@@ -461,19 +550,14 @@ function persistQuantumState() {
 document.addEventListener("DOMContentLoaded", async () => {
   applyTheme();
   optimizeForMobile();
+  scheduleAdsense();
 
-  if (window.requestIdleCallback) {
-    requestIdleCallback(() => {
-      lucide.createIcons();
-    });
-  } else {
-    requestAnimationFrame(() => {
-      lucide.createIcons();
-    });
-  }
+  scheduleIdleTask(() => window.__almadanLoadLucide(), 1600);
 
   bindEvents();
-  registerServiceWorker();
+  window.addEventListener("load", () => {
+    scheduleIdleTask(registerServiceWorker, 3000);
+  }, { once: true });
   updateNetworkStatus();
   updateGpsStatusUI();
   const recoverySession = readRecoverySession();
@@ -487,7 +571,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!confirmed) loadSession();
   }
   checkSharedListUrl();
-  loadLatestCampaigns();
+  scheduleIdleTask(loadLatestCampaigns, 3500);
 });
 
 // E-posta onay linkine tıklayınca Supabase #access_token=...&type=signup
@@ -738,10 +822,10 @@ async function loadSession() {
   }
   renderAccountButton();
   handleCategoryChange();
-  loadProducts();
+  scheduleIdleTask(loadProducts, 1600);
   if (state.auth.authenticated) {
-    loadCartFromBackend();
-    maybePromptPhoneVerification();
+    scheduleIdleTask(loadCartFromBackend, 2400);
+    scheduleIdleTask(maybePromptPhoneVerification, 3200);
   }
   setTimeout(showOnboarding, 800);
 }
@@ -3435,7 +3519,7 @@ async function showNotifications() {
 async function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    return await navigator.serviceWorker.register("/sw.js");
+    return await navigator.serviceWorker.register("/static/sw.js");
   } catch {
     return null;
   }
