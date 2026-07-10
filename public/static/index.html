@@ -1149,7 +1149,7 @@
               method: 'POST',
               credentials: 'same-origin',
               headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-              body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url })
+              body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url, source: parsed.source || null, price: parsed.price || null })
             }).then(function(r){ return r.json(); });
 
             var alts = (faResp.alternatives || []);
