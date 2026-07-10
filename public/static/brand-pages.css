@@ -1,13 +1,18 @@
-/* Almadan marka sayfaları — Hakkında / Gizlilik / İletişim ortak stili */
+/* Almadan marka sayfaları — Hakkında / Gizlilik / İletişim ortak stili.
+   Varsayılan tema KOYU -- ana site (index.html) varsayılan olarak koyu
+   temayla açılıyor, bu sayfalar önceden varsayılan AÇIK'tı ve kullanıcı
+   hiç tema değiştirmediğinde (localStorage'da almadan_theme yoksa) veya
+   OS light modundaysa ana siteyle uyumsuz/parlak görünüyordu. Açık tema
+   artık .light-theme sınıfıyla devreye giren bir tercih. */
 :root {
-  --ink: #171a17;
-  --ink-2: #687068;
-  --paper: #f7f8f5;
-  --surface: #ffffff;
-  --border: #dfe3dc;
+  --ink: #eceeed;
+  --ink-2: #93998f;
+  --paper: #111411;
+  --surface: #1a1e1a;
+  --border: #2a2e2a;
   --green: #287a50;
   --green-dark: #1e5e3e;
-  --green-bg: rgba(40, 122, 80, 0.07);
+  --green-bg: rgba(142, 215, 170, 0.08);
   --lime: #d9ef57;
   --dark: #121412;
   --radius: 14px;
@@ -268,24 +273,14 @@ i[data-lucide] { width: 18px; height: 18px; stroke-width: 2.2; flex-shrink: 0; }
   .bp-nav a { font-size: 12.5px; }
 }
 
-/* ── Dark mode desteği ──────────────────────────────── */
-html.dark-theme, body.dark-theme {
-  --paper: #111411;
-  --surface: #1a1e1a;
-  --border: #2a2e2a;
-  --ink: #eceeed;
-  --ink-2: #93998f;
-  --green-bg: rgba(142, 215, 170, 0.08);
-}
-
-@media (prefers-color-scheme: dark) {
-  html:not(.light-theme) body:not(.force-light),
-  body:not(.light-theme):not(.force-light) {
-    --paper: #111411;
-    --surface: #1a1e1a;
-    --border: #2a2e2a;
-    --ink: #eceeed;
-    --ink-2: #93998f;
-    --green-bg: rgba(142, 215, 170, 0.08);
-  }
+/* ── Açık tema (opsiyonel tercih) ──────────────────────
+   Varsayılan koyu; kullanıcı ana sitede açık temayı seçtiyse
+   (localStorage almadan_theme=light) bu sınıf devreye girer. */
+html.light-theme, body.light-theme {
+  --ink: #171a17;
+  --ink-2: #687068;
+  --paper: #f7f8f5;
+  --surface: #ffffff;
+  --border: #dfe3dc;
+  --green-bg: rgba(40, 122, 80, 0.07);
 }
