@@ -252,25 +252,149 @@
           <span>Ürün linkini yapıştır veya barkod tara — sistem fiyatları otomatik karşılaştırır.</span>
         </div>
 
-        <!-- Yakında Eklenecek Mağazalar Duyuru Afişi -->
-        <div style="background: linear-gradient(135deg, rgba(40,122,80,0.05) 0%, rgba(217,239,87,0.03) 100%); border: 1.5px solid rgba(40,122,80,0.15); border-radius: 14px; padding: 18px 20px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 14px; min-width: 280px; flex: 1;">
-            <div style="width: 42px; height: 42px; background: rgba(40,122,80,0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--green);">
-              <i data-lucide="rocket" style="width: 20px; height: 20px; stroke-width: 2.2;"></i>
+        <!-- Yakında Eklenecek Mağazalar Duyuru Afişi (Açılır Liste) -->
+        <div class="coming-soon-stores-box" style="margin-bottom: 24px;">
+          <button type="button" class="coming-soon-toggle" onclick="toggleComingSoonStores()" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: linear-gradient(135deg, rgba(40,122,80,0.05) 0%, rgba(217,239,87,0.03) 100%); border: 1.5px solid rgba(40,122,80,0.15); border-radius: 12px; font-size: 14px; font-weight: 800; color: var(--ink); cursor: pointer; transition: all 0.2s;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <i data-lucide="rocket" style="width: 18px; height: 18px; color: var(--green); stroke-width: 2.5; flex-shrink:0;"></i>
+              <span style="text-align: left;">🚀 Yakında Eklenecek Yeni Mağazalar (50+ Entegrasyon)</span>
+              <span style="background: var(--lime); color: #121412; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink:0;">Yolda</span>
             </div>
-            <div>
-              <h3 style="margin: 0 0 3px; font-size: 14px; font-weight: 800; color: var(--ink); display: flex; align-items: center; gap: 6px;">Yeni Mağazalar Yolda! <span style="background: var(--lime); color: #121412; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block;">Çok Yakında</span></h3>
-              <p style="margin: 0; font-size: 12.5px; color: var(--ink-2); line-height: 1.4;">A101, IKEA, Samsung, DeFacto, Koton ve 50+ yeni mağaza entegrasyonu arka planda test ediliyor.</p>
+            <i data-lucide="chevron-down" id="comingSoonChevron" style="width: 18px; height: 18px; transition: transform 0.2s; flex-shrink:0;"></i>
+          </button>
+          
+          <div id="comingSoonStoresContainer" style="display: none; background: var(--surface,#fff); border: 1.5px solid var(--border); border-top: none; border-radius: 0 0 12px 12px; padding: 20px; margin-top: -2px;">
+            <p style="font-size: 12.5px; color: var(--ink-2); margin-top: 0; margin-bottom: 16px; line-height: 1.5; border-bottom: 1px dashed var(--border); padding-bottom: 10px;">
+              Aşağıdaki mağazaların fiyat tarama entegrasyonları arka planda test ediliyor. Çok yakında karşılaştırma sonuçlarında aktif olacaklardır:
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+              
+              <div>
+                <h4 style="font-size: 12px; color: var(--green); font-weight: 800; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="shopping-basket" style="width: 13px; height: 13px;"></i> Gıda & Süpermarket
+                </h4>
+                <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">A101 <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">FİLE <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Macrocenter <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Happy Center <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Onur Market <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Mopaş <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Hakmar <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Çağrı Market <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                </div>
+              </div>
+
+              <div>
+                <h4 style="font-size: 12px; color: var(--green); font-weight: 800; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="smartphone" style="width: 13px; height: 13px;"></i> Teknoloji & Elektronik
+                </h4>
+                <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Troy <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Gürgençler <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Pozitif Teknoloji <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Samsung <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Evkur <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Çetmen <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Yiğit AVM <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Özşanal <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                </div>
+              </div>
+
+              <div>
+                <h4 style="font-size: 12px; color: var(--green); font-weight: 800; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="sparkles" style="width: 13px; height: 13px;"></i> Kozmetik & Kişisel Bakım
+                </h4>
+                <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Eve Shop <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Sevil <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Yves Rocher <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">MAC <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Kiko Milano <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                </div>
+              </div>
+
+              <div>
+                <h4 style="font-size: 12px; color: var(--green); font-weight: 800; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="shirt" style="width: 13px; height: 13px;"></i> Giyim, Ayakkabı & Moda
+                </h4>
+                <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">DeFacto <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Koton <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">LTB <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Colin's <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Özdilek <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Beymen <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Kiğılı <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Süvari <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Hatemoğlu <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Tudors <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">İpekyol <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Machka <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Pull&Bear <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Stradivarius <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Massimo Dutti <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">In Street <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Deichmann <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Ayakkabı Dünyası <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">SuperStep <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                </div>
+              </div>
+
+              <div>
+                <h4 style="font-size: 12px; color: var(--green); font-weight: 800; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="baby" style="width: 13px; height: 13px;"></i> Sağlık & Anne-Bebek
+                </h4>
+                <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Atasun Optik <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Opmar Optik <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Elegance Optik <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Mert Optik <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Babymall <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Joker <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">GNC <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                </div>
+              </div>
+
+              <div>
+                <h4 style="font-size: 12px; color: var(--green); font-weight: 800; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="home" style="width: 13px; height: 13px;"></i> Ev & Yapı Market
+                </h4>
+                <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Paşabahçe <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Bernardo <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Jumbo <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Porland <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Hisar <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Linens <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Bella Maison <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Karaca Home <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">IKEA <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Koçtaş Fix <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                  <span style="background: rgba(0,0,0,0.02); border: 1px dashed var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--ink-2);">Tekzen <span style="font-size:8px; color:var(--green); font-weight:700;">(Yakında)</span></span>
+                </div>
+              </div>
+
             </div>
-          </div>
-          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <span style="background: var(--surface,#fff); border: 1px solid var(--border); padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; color: var(--ink-2);">A101</span>
-            <span style="background: var(--surface,#fff); border: 1px solid var(--border); padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; color: var(--ink-2);">IKEA</span>
-            <span style="background: var(--surface,#fff); border: 1px solid var(--border); padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; color: var(--ink-2);">Samsung</span>
-            <span style="background: var(--surface,#fff); border: 1px solid var(--border); padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; color: var(--ink-2);">DeFacto</span>
-            <span style="background: var(--surface,#fff); border: 1px solid var(--border); padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; color: var(--ink-2);">Koton</span>
           </div>
         </div>
+        
+        <script>
+          function toggleComingSoonStores() {
+            const container = document.getElementById('comingSoonStoresContainer');
+            const chevron = document.getElementById('comingSoonChevron');
+            const btn = document.querySelector('.coming-soon-toggle');
+            if (container.style.display === 'none') {
+              container.style.display = 'block';
+              chevron.style.transform = 'rotate(180deg)';
+              btn.style.borderRadius = '12px 12px 0 0';
+            } else {
+              container.style.display = 'none';
+              chevron.style.transform = 'none';
+              btn.style.borderRadius = '12px';
+            }
+          }
+        </script>
         <div id="latestCampaignsSection" class="hidden" style="margin-bottom:22px;">
           <div class="section-heading" style="margin-bottom:10px;">
             <div>
