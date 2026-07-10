@@ -5608,6 +5608,8 @@ async def store_page(slug: str):
     name = _html.escape(store["name"])
     description = _html.escape(store.get("description") or f"{name} kampanya ve fiyat karşılaştırması.")
     category = _html.escape(store.get("category") or "")
+    category_display_name, _ = _CATEGORY_DISPLAY.get(store.get("category", ""), (store.get("category", "").capitalize(), ""))
+    category_display_name_escaped = _html.escape(category_display_name)
 
     campaigns = []
     if supabase_enabled():
@@ -5644,20 +5646,94 @@ async def store_page(slug: str):
     else:
         campaigns_html = '<p class="bp-body">Şu anda listelenen aktif bir kampanya yok. Ana sayfadan arama yaparak güncel fiyatları karşılaştırabilirsin.</p>'
 
+    seo_title = f"{name} Kampanyaları, İndirimleri ve Fiyatları — Almadan"
+    if campaigns:
+        seo_desc = f"Güncel {len(campaigns)} adet {name} kampanyası, indirim kataloğu ve fiyat karşılaştırmaları. Satın almadan önce en ucuz {name} fiyatlarını görün."
+    else:
+        seo_desc = f"En güncel {name} indirim kampanyaları, fiyat karşılaştırmaları ve katalog fırsatları. Aradığınız {name} ürününü en ucuza Almadan ile bulun."
+
+    seo_title_escaped = _html.escape(seo_title)
+    seo_desc_escaped = _html.escape(seo_desc)
+
+    schema_json = f"""{{
+      "@context": "https://schema.org",
+      "@graph": [
+        {{
+          "@type": "WebPage",
+          "url": "https://www.almadan.app/magaza/{slug}",
+          "name": "{seo_title_escaped}",
+          "description": "{seo_desc_escaped}",
+          "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app/index.html" }},
+          "about": {{ "@type": "Organization", "name": "{name}" }}
+        }},
+        {{
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {{
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Ana Sayfa",
+              "item": "https://www.almadan.app/index.html"
+            }},
+            {{
+              "@type": "ListItem",
+              "position": 2,
+              "name": "{category_display_name_escaped}",
+              "item": "https://www.almadan.app/kategori/{category}"
+            }},
+            {{
+              "@type": "ListItem",
+              "position": 3,
+              "name": "{name}",
+              "item": "https://www.almadan.app/magaza/{slug}"
+            }}
+          ]
+        }}
+      ]
+    }}"""
+
+    # Find up to 4 other stores in the same category
+    other_stores = [
+        s for s in DEFAULT_STORE_NEWSLETTERS
+        if s["category"] == store.get("category") and s["slug"] != slug
+    ][:4]
+    
+    related_stores_html = ""
+    if other_stores:
+        related_items = []
+        for s in other_stores:
+            s_name = _html.escape(s["name"])
+            s_slug = _html.escape(s["slug"])
+            s_desc = _html.escape(s.get("description") or f"{s_name} indirim ve kampanyaları.")
+            related_items.append(
+                f'<a class="bp-feature" href="/magaza/{s_slug}" style="text-decoration:none; display:flex; flex-direction:column; justify-content:space-between; padding:18px;">'
+                f'<div>'
+                f'<h3 style="margin-bottom:6px; font-size:15px; font-weight:700;">{s_name}</h3>'
+                f'<p style="font-size:12.5px; line-height:1.45; color:var(--ink-2); margin:0;">{s_desc}</p>'
+                f'</div>'
+                f'<span style="color:var(--green); font-size:12.5px; font-weight:700; margin-top:12px; display:inline-flex; align-items:center; gap:4px;">İndirimleri Gör <i data-lucide="arrow-right" style="width:14px; height:14px;"></i></span>'
+                f'</a>'
+            )
+        related_stores_html = f"""
+      <h2 style="margin-top:40px; font-size:20px; font-weight:700; display:flex; align-items:center; gap:9px;"><i data-lucide="store" style="color:var(--green);"></i> Benzer Mağazalar</h2>
+      <div class="bp-feature-grid" style="margin-bottom:24px;">
+        {"".join(related_items)}
+      </div>"""
+
     page = f"""<!doctype html>
 <html lang="tr">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#121412">
-    <title>{name} Kampanyaları ve Fiyat Karşılaştırma — Almadan</title>
-    <meta name="description" content="{description}">
+    <title>{seo_title_escaped}</title>
+    <meta name="description" content="{seo_desc_escaped}">
     <link rel="canonical" href="https://www.almadan.app/magaza/{slug}">
     <meta name="robots" content="index, follow">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Almadan">
-    <meta property="og:title" content="{name} Kampanyaları — Almadan">
-    <meta property="og:description" content="{description}">
+    <meta property="og:title" content="{seo_title_escaped}">
+    <meta property="og:description" content="{seo_desc_escaped}">
     <meta property="og:url" content="https://www.almadan.app/magaza/{slug}">
     <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
     <meta property="og:locale" content="tr_TR">
@@ -5666,14 +5742,7 @@ async def store_page(slug: str):
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
     <script type="application/ld+json">
-    {{
-      "@context": "https://schema.org",
-      "@type": "WebPage",
-      "url": "https://www.almadan.app/magaza/{slug}",
-      "name": "{name} Kampanyaları — Almadan",
-      "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app" }},
-      "about": {{ "@type": "Organization", "name": "{name}" }}
-    }}
+    {schema_json}
     </script>
     <link rel="stylesheet" href="/static/brand-pages.css?v=1">
   </head>
@@ -5686,6 +5755,14 @@ async def store_page(slug: str):
         <a href="/iletisim">İletişim</a>
       </nav>
     </header>
+
+    <div class="bp-breadcrumbs" style="padding: 16px 5vw 0; max-width: 820px; margin: 0 auto; font-size: 13.5px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+      <a href="/index.html" style="text-decoration: none; color: var(--green); font-weight: 600;">Ana Sayfa</a>
+      <span style="color: var(--border);">/</span>
+      <a href="/kategori/{category}" style="text-decoration: none; color: var(--green); font-weight: 600;">{category_display_name_escaped}</a>
+      <span style="color: var(--border);">/</span>
+      <span style="color: var(--ink-2); font-weight: 500;">{name}</span>
+    </div>
 
     <section class="bp-hero">
       <div class="bp-hero-inner">
@@ -5701,8 +5778,8 @@ async def store_page(slug: str):
       <div class="bp-feature-grid">
         {campaigns_html}
       </div>
-      <p class="bp-body"><a href="/kategori/{store.get("category", "")}">{category} kategorisindeki diğer mağazalar</a></p>
-      <a class="bp-cta bp-cta-block" href="/"><i data-lucide="arrow-right"></i> Tüm Mağazalarda Karşılaştır</a>
+      {related_stores_html}
+      <a class="bp-cta bp-cta-block" style="margin-top: 24px;" href="/"><i data-lucide="arrow-right"></i> Tüm Mağazalarda Karşılaştır</a>
     </main>
 
     <footer class="bp-footer">
@@ -5748,20 +5825,77 @@ async def catalog_page(store: str):
     else:
         items_html = '<p class="bp-body">Bu haftaki katalog henüz taranamadı, kısa süre sonra tekrar kontrol et.</p>'
 
+    store_entry = next((s for s in DEFAULT_STORE_NEWSLETTERS if s["slug"] == store), None)
+    if store_entry:
+        category_slug = store_entry.get("category") or ""
+        category_display_name, _ = _CATEGORY_DISPLAY.get(category_slug, (category_slug.capitalize(), ""))
+        store_name = store_entry["name"]
+    else:
+        category_slug = "market"
+        category_display_name = "Market / Gıda"
+        store_name = _format_store_name(store)
+
+    seo_title = f"{title} Aktüel Ürünler Kataloğu & İndirimleri — Almadan"
+    seo_desc = f"{store_name} bu haftaki aktüel ürünler listesi, güncel indirim kataloğu ve haftalık market fırsatları. En ucuz fiyatları Almadan ile kaçırmayın!"
+
+    seo_title_escaped = _html.escape(seo_title)
+    seo_desc_escaped = _html.escape(seo_desc)
+    category_display_name_escaped = _html.escape(category_display_name)
+    store_name_escaped = _html.escape(store_name)
+
+    schema_json = f"""{{
+      "@context": "https://schema.org",
+      "@graph": [
+        {{
+          "@type": "WebPage",
+          "url": "https://www.almadan.app/aktuel/{store}",
+          "name": "{seo_title_escaped}",
+          "description": "{seo_desc_escaped}",
+          "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app/index.html" }}
+        }},
+        {{
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {{
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Ana Sayfa",
+              "item": "https://www.almadan.app/index.html"
+            }},
+            {{
+              "@type": "ListItem",
+              "position": 2,
+              "name": "{category_display_name_escaped}",
+              "item": "https://www.almadan.app/kategori/{category_slug}"
+            }},
+            {{
+              "@type": "ListItem",
+              "position": 3,
+              "name": "{store_name_escaped} Aktüel",
+              "item": "https://www.almadan.app/aktuel/{store}"
+            }}
+          ]
+        }}
+      ]
+    }}"""
+
     page = f"""<!doctype html>
 <html lang="tr">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#121412">
-    <title>{title} — Bu Haftaki Aktüel — Almadan</title>
-    <meta name="description" content="{title} bu hafta neler var? Güncel aktüel ürün listesi.">
+    <title>{seo_title_escaped}</title>
+    <meta name="description" content="{seo_desc_escaped}">
     <link rel="canonical" href="https://www.almadan.app/aktuel/{store}">
     <meta name="robots" content="index, follow">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+    <script type="application/ld+json">
+    {schema_json}
+    </script>
     <link rel="stylesheet" href="/static/brand-pages.css?v=1">
   </head>
   <body>
@@ -5773,6 +5907,16 @@ async def catalog_page(store: str):
         <a href="/iletisim">İletişim</a>
       </nav>
     </header>
+
+    <div class="bp-breadcrumbs" style="padding: 16px 5vw 0; max-width: 820px; margin: 0 auto; font-size: 13.5px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+      <a href="/index.html" style="text-decoration: none; color: var(--green); font-weight: 600;">Ana Sayfa</a>
+      <span style="color: var(--border);">/</span>
+      <a href="/kategori/{category_slug}" style="text-decoration: none; color: var(--green); font-weight: 600;">{category_display_name_escaped}</a>
+      <span style="color: var(--border);">/</span>
+      <a href="/magaza/{store}" style="text-decoration: none; color: var(--green); font-weight: 600;">{store_name_escaped}</a>
+      <span style="color: var(--border);">/</span>
+      <span style="color: var(--ink-2); font-weight: 500;">Aktüel</span>
+    </div>
 
     <section class="bp-hero">
       <div class="bp-hero-inner">
@@ -5823,9 +5967,14 @@ async def category_page(category: str):
             status_code=404,
         )
 
-    display_name, description = _CATEGORY_DISPLAY.get(category, (category.capitalize(), ""))
+    display_name, raw_desc = _CATEGORY_DISPLAY.get(category, (category.capitalize(), ""))
     display_name = _html.escape(display_name)
-    description = _html.escape(description)
+    description = _html.escape(raw_desc)
+
+    seo_title = f"{display_name} Fiyatları & İndirim Kampanyaları — Almadan"
+    seo_desc = f"{display_name} kategorisindeki en ucuz fiyatları ve güncel kampanyaları karşılaştırın. {display_name} mağazalarının fırsatlarını Almadan ile hemen bulun."
+    seo_title_escaped = _html.escape(seo_title)
+    seo_desc_escaped = _html.escape(seo_desc)
 
     store_links = []
     for slug in ALL_STORES_MAP[category]:
@@ -5835,20 +5984,50 @@ async def category_page(category: str):
         )
     stores_html = "".join(store_links)
 
+    schema_json = f"""{{
+      "@context": "https://schema.org",
+      "@graph": [
+        {{
+          "@type": "CollectionPage",
+          "url": "https://www.almadan.app/kategori/{category}",
+          "name": "{seo_title_escaped}",
+          "description": "{seo_desc_escaped}",
+          "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app/index.html" }}
+        }},
+        {{
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {{
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Ana Sayfa",
+              "item": "https://www.almadan.app/index.html"
+            }},
+            {{
+              "@type": "ListItem",
+              "position": 2,
+              "name": "{display_name}",
+              "item": "https://www.almadan.app/kategori/{category}"
+            }}
+          ]
+        }}
+      ]
+    }}"""
+
     page = f"""<!doctype html>
 <html lang="tr">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#121412">
-    <title>{display_name} Fiyat Karşılaştırma — Almadan</title>
-    <meta name="description" content="{description}">
+    <title>{seo_title_escaped}</title>
+    <meta name="description" content="{seo_desc_escaped}">
     <link rel="canonical" href="https://www.almadan.app/kategori/{category}">
     <meta name="robots" content="index, follow">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Almadan">
-    <meta property="og:title" content="{display_name} Fiyat Karşılaştırma — Almadan">
-    <meta property="og:description" content="{description}">
+    <meta property="og:title" content="{seo_title_escaped}">
+    <meta property="og:description" content="{seo_desc_escaped}">
     <meta property="og:url" content="https://www.almadan.app/kategori/{category}">
     <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
     <meta property="og:locale" content="tr_TR">
@@ -5857,13 +6036,7 @@ async def category_page(category: str):
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
     <script type="application/ld+json">
-    {{
-      "@context": "https://schema.org",
-      "@type": "CollectionPage",
-      "url": "https://www.almadan.app/kategori/{category}",
-      "name": "{display_name} Fiyat Karşılaştırma — Almadan",
-      "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app" }}
-    }}
+    {schema_json}
     </script>
     <link rel="stylesheet" href="/static/brand-pages.css?v=1">
   </head>
@@ -5876,6 +6049,12 @@ async def category_page(category: str):
         <a href="/iletisim">İletişim</a>
       </nav>
     </header>
+
+    <div class="bp-breadcrumbs" style="padding: 16px 5vw 0; max-width: 820px; margin: 0 auto; font-size: 13.5px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+      <a href="/index.html" style="text-decoration: none; color: var(--green); font-weight: 600;">Ana Sayfa</a>
+      <span style="color: var(--border);">/</span>
+      <span style="color: var(--ink-2); font-weight: 500;">{display_name}</span>
+    </div>
 
     <section class="bp-hero">
       <div class="bp-hero-inner">
@@ -5891,7 +6070,7 @@ async def category_page(category: str):
       <div class="bp-feature-grid">
         {stores_html}
       </div>
-      <a class="bp-cta bp-cta-block" href="/"><i data-lucide="arrow-right"></i> Tüm Mağazalarda Karşılaştır</a>
+      <a class="bp-cta bp-cta-block" style="margin-top: 24px;" href="/"><i data-lucide="arrow-right"></i> Tüm Mağazalarda Karşılaştır</a>
     </main>
 
     <footer class="bp-footer">
