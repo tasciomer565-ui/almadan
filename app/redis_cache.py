@@ -52,11 +52,16 @@ def rset(key: str, data: list[dict]) -> None:
     try:
         k = _safe_key(key)
         payload = json.dumps(data, ensure_ascii=False)
-        # Upstash REST: POST /set/<key>/<value>?EX=<ttl>
+        # Upstash REST SET: deger request body'de RAW olarak gonderilmeli.
+        # `json=payload` kullanmak payload'i (zaten bir JSON string) BIR KEZ
+        # DAHA JSON-encode eder (disariya fazladan tirnak ekler) -- rget()
+        # bunu json.loads() ile tek katman coz(er) ama sonuc yine string
+        # kalir (liste degil), boylece "cache HIT" hicbir zaman gerceklesmez
+        # ve her istek Supabase/scraper'a dusup gereksiz kredi harcar.
         _req.post(
             f"{_URL}/set/{urllib.parse.quote(k, safe='')}",
-            headers={**_headers(), "Content-Type": "application/json"},
-            json=payload,
+            headers={**_headers(), "Content-Type": "text/plain"},
+            data=payload.encode("utf-8"),
             params={"EX": _TTL},
             timeout=2
         )
@@ -68,6 +73,7 @@ def rdel(key: str) -> None:
     if not _enabled():
         return
     try:
-        _req.get(f"{_URL}/del/{key}", headers=_headers(), timeout=2)
+        k = _safe_key(key)
+        _req.get(f"{_URL}/del/{urllib.parse.quote(k, safe='')}", headers=_headers(), timeout=2)
     except Exception:
         pass
