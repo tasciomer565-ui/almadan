@@ -17,6 +17,15 @@ _STD_HEADERS = {
 
 _PRICE_RE = re.compile(r"(\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})?)\s*(?:TL|₺)")
 
+# "100TL üzeri alışverişe özel", "150 TL üzeri kargo bedava" gibi kargo/kampanya
+# esik metinleri de _PRICE_RE ile eslesiyor -- gercek urun fiyati sanilip yanlis
+# fiyat gosterilmesine yol aciyordu (orn. Rossmann'da gercek fiyat 329 TL iken
+# sayfadaki "100TL uzeri..." rozeti urun fiyati sanilip 100 TL gosterilmisti).
+_PRICE_THRESHOLD_CONTEXT_RE = re.compile(
+    r"üzeri|üzerinde|ve üzeri|kargo\s*bedava|ücretsiz\s*kargo|indirim\s*kod",
+    re.IGNORECASE,
+)
+
 
 def _heuristic_price_card_scan(soup: "BeautifulSoup", source: str, base_url: str) -> list[dict]:
     """JSON-LD bulunamadığında son çare: fiyat deseni (₺/TL) içeren ve içinde
@@ -32,6 +41,8 @@ def _heuristic_price_card_scan(soup: "BeautifulSoup", source: str, base_url: str
     for text_node in price_nodes[:40]:
         price_match = _PRICE_RE.search(text_node)
         if not price_match:
+            continue
+        if _PRICE_THRESHOLD_CONTEXT_RE.search(text_node):
             continue
         try:
             price = float(price_match.group(1).replace(".", "").replace(" ", "").replace(",", "."))
@@ -88,6 +99,8 @@ def _heuristic_price_card_scan(soup: "BeautifulSoup", source: str, base_url: str
         text = el.get_text(" ", strip=True)
         price_match = _PRICE_RE.search(text)
         if not price_match:
+            continue
+        if _PRICE_THRESHOLD_CONTEXT_RE.search(text):
             continue
         try:
             price = float(price_match.group(1).replace(".", "").replace(" ", "").replace(",", "."))
