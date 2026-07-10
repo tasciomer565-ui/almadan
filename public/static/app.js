@@ -78,6 +78,11 @@ function scheduleDeferredIdleTask(callback, delay = 7000, timeout = 2500) {
 
 function loadAdsenseAfterFirstPaint() {
   if (window.__almadanAdsenseLoaded) return;
+  const existing = document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
+  if (existing) {
+    window.__almadanAdsenseLoaded = true;
+    return;
+  }
   window.__almadanAdsenseLoaded = true;
   const script = document.createElement("script");
   script.async = true;
