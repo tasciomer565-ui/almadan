@@ -5633,14 +5633,38 @@ async def store_page(slug: str):
             campaigns = []
 
     if campaigns:
+        from datetime import date as _date
+        today_d = _date.today()
         items = []
         for c in campaigns:
             title = _html.escape(c.get("title") or "Kampanya")
             desc = _html.escape(c.get("description") or "")
             catalog_url = _html.escape(c.get("catalog_url") or "")
             link_html = f'<a href="{catalog_url}" rel="nofollow noopener" target="_blank">Kataloğu Gör</a>' if catalog_url else ""
+
+            valid_until_html = ""
+            raw_until = c.get("valid_until")
+            if raw_until:
+                try:
+                    until_d = _date.fromisoformat(str(raw_until)[:10])
+                    days_left = (until_d - today_d).days
+                    until_display = until_d.strftime("%d.%m.%Y")
+                    if days_left <= 0:
+                        continue  # tedbiren -- sorgu zaten filtreliyor ama sunuculararasi saat farkina karsi
+                    elif days_left <= 2:
+                        urgency = f'<span style="color:#dc2626; font-weight:700;">Son {days_left} gün!</span>'
+                    else:
+                        urgency = f"{until_display} tarihine kadar geçerli"
+                    valid_until_html = (
+                        f'<p style="font-size:11.5px; color:var(--ink-2); margin:6px 0 0; '
+                        f'display:flex; align-items:center; gap:4px;">'
+                        f'<i data-lucide="clock" style="width:12px; height:12px; flex-shrink:0;"></i> {urgency}</p>'
+                    )
+                except (ValueError, TypeError):
+                    pass
+
             items.append(
-                f'<div class="bp-feature"><h3>{title}</h3><p>{desc}</p>{link_html}</div>'
+                f'<div class="bp-feature"><h3>{title}</h3><p>{desc}</p>{valid_until_html}{link_html}</div>'
             )
         campaigns_html = "".join(items)
     else:
@@ -5655,6 +5679,30 @@ async def store_page(slug: str):
     seo_title_escaped = _html.escape(seo_title)
     seo_desc_escaped = _html.escape(seo_desc)
 
+    # Kampanyalari gecerli schema.org Offer olarak isaretle -- uydurma fiyat
+    # KOYMUYORUZ (Google Search Console'da yapisal veri hatasi/manuel islem
+    # riski), sadece elimizde gercekten olan alanlari: ad, url, gecerlilik
+    # tarihleri.
+    offers_json = ""
+    if campaigns:
+        offer_items = []
+        for c in campaigns:
+            offer_name = _html.escape(c.get("title") or "Kampanya")
+            offer_url = _html.escape(c.get("catalog_url") or f"https://www.almadan.app/magaza/{slug}")
+            valid_from = _html.escape(str(c.get("valid_from") or "")[:10])
+            valid_through = _html.escape(str(c.get("valid_until") or "")[:10])
+            fields = [
+                '"@type": "Offer"',
+                f'"name": "{offer_name}"',
+                f'"url": "{offer_url}"',
+            ]
+            if valid_from:
+                fields.append(f'"validFrom": "{valid_from}"')
+            if valid_through:
+                fields.append(f'"priceValidUntil": "{valid_through}"')
+            offer_items.append("{ " + ", ".join(fields) + " }")
+        offers_json = ',\n          "makesOffer": [' + ", ".join(offer_items) + "]"
+
     schema_json = f"""{{
       "@context": "https://schema.org",
       "@graph": [
@@ -5664,7 +5712,7 @@ async def store_page(slug: str):
           "name": "{seo_title_escaped}",
           "description": "{seo_desc_escaped}",
           "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app/index.html" }},
-          "about": {{ "@type": "Organization", "name": "{name}" }}
+          "about": {{ "@type": "Organization", "name": "{name}"{offers_json} }}
         }},
         {{
           "@type": "BreadcrumbList",

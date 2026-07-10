@@ -1,0 +1,38 @@
+name: Sitemap Yeniden Üretimi
+
+# public/sitemap.xml, app/main.py'deki gercek magaza/kategori/fiyat-terimi
+# verisinden uretiliyor (bkz. scripts/generate_sitemap.py). Statik dosya
+# oldugu icin elle senkron kalmasi gerekiyordu -- bu is akisi haftada bir
+# yeniden uretip degisiklik varsa otomatik commitler.
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Regenerate sitemap.xml
+        run: python scripts/generate_sitemap.py
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet public/sitemap.xml; then
+            echo "Degisiklik yok."
+            exit 0
+          fi
+          git config user.name "almadan-bot"
+          git config user.email "bot@almadan.app"
+          git add public/sitemap.xml
+          git commit -m "chore: sitemap.xml otomatik yeniden uretildi"
+          git push
