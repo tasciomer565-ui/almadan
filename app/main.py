@@ -1955,6 +1955,23 @@ def cron_refresh_all(
     return result
 
 
+@app.get("/cron/scraper-healthcheck-secondary")
+def cron_scraper_healthcheck_secondary(
+    request: Request,
+    x_cron_secret: str | None = Header(default=None),
+) -> dict:
+    """Günün ikinci scraper sağlık kontrolü -- Vercel Hobby cron günde 1
+    kez ile sınırlı olduğu için (bkz. catalog-vocab-crawl), bu ikinci
+    çalıştırma GitHub Actions üzerinden günde 1 kez ayrıca tetiklenir.
+    /cron/refresh-all içindeki slot=0 çalıştırmasıyla birlikte günde 2
+    kategori test edilmiş olur, haftalık tam tur süresi ~3.5 güne iner."""
+    require_cron_request(request)
+    from app.scraper_healthcheck import run_daily_healthcheck
+    result = asyncio.run(run_daily_healthcheck(slot=1))
+    record_cron_run("scraper-healthcheck-secondary", success=True, detail=f"tested={result.get('tested')}")
+    return result
+
+
 @app.get("/cron/catalog-vocab-crawl")
 def cron_catalog_vocab_crawl(request: Request) -> dict:
     """

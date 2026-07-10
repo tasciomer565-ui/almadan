@@ -1,0 +1,20 @@
+name: Scraper Sağlık Kontrolü (İkinci Tur)
+
+# Vercel Hobby cron günde 1 kez ile sınırlı; /cron/refresh-all zaten
+# günde bir kategori test ediyor (Vercel'in kendi zamanlaması). Bu iş
+# akışı günün İKİNCİ turunu GitHub Actions üzerinden tetikler, böylece
+# 122+ scraper'ın haftalık tam kontrol turu ~7 günden ~3.5 güne iner.
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  healthcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger secondary scraper healthcheck
+        run: |
+          curl -sS -f -X GET \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            "https://www.almadan.app/cron/scraper-healthcheck-secondary"

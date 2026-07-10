@@ -74,7 +74,11 @@ _DAILY_PLAN: dict[int, tuple[str, str, list[str]]] = {
 }
 
 
-async def run_daily_healthcheck(weekday: int | None = None) -> dict:
+async def run_daily_healthcheck(weekday: int | None = None, slot: int = 0) -> dict:
+    """slot=0: günün normal kategorisi (Vercel'in tek günlük cron'u).
+    slot=1: GitHub Actions'tan günde ikinci kez tetiklenen çalıştırma --
+    aynı kategoriyi tekrar test etmek yerine BİR SONRAKİ günün kategorisini
+    test eder, böylece haftalık tam tur süresi 7 günden ~3.5 güne iner."""
     from app import comparator
     from app import search_orchestrator
     from app.storage import load_db, save_db
@@ -83,7 +87,8 @@ async def run_daily_healthcheck(weekday: int | None = None) -> dict:
     if weekday is None:
         weekday = datetime.datetime.utcnow().weekday()
 
-    category, test_query, fn_names = _DAILY_PLAN[weekday]
+    plan_day = (weekday + slot) % 7
+    category, test_query, fn_names = _DAILY_PLAN[plan_day]
 
     loop = asyncio.get_running_loop()
     valid_names = []
