@@ -175,7 +175,16 @@ def cache_set(cache_key: str, query: str, category: str, products: list[dict]) -
 
 
 def cache_invalidate(cache_key: str) -> None:
-    """Belirli bir cache kaydını sil."""
+    """Belirli bir cache kaydını sil (Redis + Supabase). cache_get Redis'i
+    ONCE kontrol ettiği icin sadece Supabase'i silmek yetersizdi -- Redis'te
+    duran (6 saate kadar) eski deger "Fiyati Guncelle" sonrasi bile geri
+    donmeye devam ediyordu."""
+    try:
+        from app.redis_cache import rdel
+        rdel(cache_key)
+    except Exception as exc:
+        logger.warning("Redis cache_invalidate hata: %s", exc)
+
     if not _enabled():
         return
     try:

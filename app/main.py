@@ -2670,13 +2670,36 @@ async def sync_google_sheets(request: Request, user=Depends(require_login)):
 
 @app.delete("/api/cache")
 def clear_search_cache(query: str | None = None, category: str | None = None) -> dict:
-    """Cache'i temizle — query+category verilirse sadece o key'i sil, verilmezse etkisiz."""
+    """Cache'i temizle — query+category verilirse sadece o key'i sil, verilmezse etkisiz.
+
+    Onemli: gercek arama akisi (master_search) cache key'ini classify_intent()
+    ile hesaplanan TURKCE kategoriyle (orn. "KOZMETİK") kuruyor -- burada
+    onceden dogrudan frontend'in gonderdigi INGILIZCE literal (orn.
+    "cosmetics") kullaniliyordu, bu da farkli bir anahtari siliyordu ve
+    "Fiyati Guncelle" butonu gercek cache kaydini hicbir zaman temizlemiyordu.
+    """
     from app.cache import make_cache_key, cache_invalidate
-    if query:
-        key = make_cache_key(query, category or "GENEL")
-        cache_invalidate(key)
-        return {"deleted": key}
-    return {"deleted": None, "message": "Tüm cache silmek için Supabase'den manuel temizleyin."}
+    if not query:
+        return {"deleted": None, "message": "Tüm cache silmek için Supabase'den manuel temizleyin."}
+
+    from app.search_orchestrator import classify_intent
+    try:
+        from app.query_intelligence import correct_query
+        corrected_query = correct_query(query)
+    except Exception:
+        corrected_query = query
+
+    resolved_category = classify_intent(corrected_query)
+    if resolved_category == "GENEL" and category and category != "general":
+        category_map = {
+            "grocery": "GIDA", "electronics": "TEKNOLOJİ", "cosmetics": "KOZMETİK",
+            "fashion": "MODA", "home": "EV",
+        }
+        resolved_category = category_map.get(category, "GENEL")
+
+    key = make_cache_key(corrected_query, resolved_category)
+    cache_invalidate(key)
+    return {"deleted": key}
 
 
 def _barcode_from_sources(barcode: str) -> dict | None:
