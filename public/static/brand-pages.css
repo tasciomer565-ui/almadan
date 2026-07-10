@@ -269,8 +269,18 @@ i[data-lucide] { width: 18px; height: 18px; stroke-width: 2.2; flex-shrink: 0; }
 }
 
 /* ── Dark mode desteği ──────────────────────────────── */
+html.dark-theme, body.dark-theme {
+  --paper: #111411;
+  --surface: #1a1e1a;
+  --border: #2a2e2a;
+  --ink: #eceeed;
+  --ink-2: #93998f;
+  --green-bg: rgba(142, 215, 170, 0.08);
+}
+
 @media (prefers-color-scheme: dark) {
-  body:not(.force-light) {
+  html:not(.light-theme) body:not(.force-light),
+  body:not(.light-theme):not(.force-light) {
     --paper: #111411;
     --surface: #1a1e1a;
     --border: #2a2e2a;

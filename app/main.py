@@ -5724,6 +5724,16 @@ async def store_page(slug: str):
 <html lang="tr">
   <head>
     <meta charset="utf-8">
+    <script>
+      (function() {{
+        const theme = localStorage.getItem("almadan_theme");
+        if (theme === "dark") {{
+          document.documentElement.classList.add("dark-theme");
+        }} else if (theme === "light") {{
+          document.documentElement.classList.add("light-theme");
+        }}
+      }})();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#121412">
     <title>{seo_title_escaped}</title>
@@ -5883,6 +5893,16 @@ async def catalog_page(store: str):
 <html lang="tr">
   <head>
     <meta charset="utf-8">
+    <script>
+      (function() {{
+        const theme = localStorage.getItem("almadan_theme");
+        if (theme === "dark") {{
+          document.documentElement.classList.add("dark-theme");
+        }} else if (theme === "light") {{
+          document.documentElement.classList.add("light-theme");
+        }}
+      }})();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#121412">
     <title>{seo_title_escaped}</title>
@@ -6018,6 +6038,16 @@ async def category_page(category: str):
 <html lang="tr">
   <head>
     <meta charset="utf-8">
+    <script>
+      (function() {{
+        const theme = localStorage.getItem("almadan_theme");
+        if (theme === "dark") {{
+          document.documentElement.classList.add("dark-theme");
+        }} else if (theme === "light") {{
+          document.documentElement.classList.add("light-theme");
+        }}
+      }})();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#121412">
     <title>{seo_title_escaped}</title>
@@ -6338,6 +6368,16 @@ async def price_landing_page(slug: str):
 <html lang="tr">
   <head>
     <meta charset="utf-8">
+    <script>
+      (function() {{
+        const theme = localStorage.getItem("almadan_theme");
+        if (theme === "dark") {{
+          document.documentElement.classList.add("dark-theme");
+        }} else if (theme === "light") {{
+          document.documentElement.classList.add("light-theme");
+        }}
+      }})();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#121412">
     <title>{title_term} Fiyatları — Almadan</title>
@@ -6554,6 +6594,16 @@ async def price_guide_index():
 <html lang="tr">
   <head>
     <meta charset="utf-8">
+    <script>
+      (function() {{
+        const theme = localStorage.getItem("almadan_theme");
+        if (theme === "dark") {{
+          document.documentElement.classList.add("dark-theme");
+        }} else if (theme === "light") {{
+          document.documentElement.classList.add("light-theme");
+        }}
+      }})();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#121412">
     <title>Fiyat Karsilastirma Rehberi - Almadan</title>
@@ -6622,6 +6672,16 @@ async def price_guide_topic(topic: str):
 <html lang="tr">
   <head>
     <meta charset="utf-8">
+    <script>
+      (function() {{
+        const theme = localStorage.getItem("almadan_theme");
+        if (theme === "dark") {{
+          document.documentElement.classList.add("dark-theme");
+        }} else if (theme === "light") {{
+          document.documentElement.classList.add("light-theme");
+        }}
+      }})();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#121412">
     <title>{title} - Almadan</title>
