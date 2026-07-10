@@ -2011,8 +2011,13 @@ async function parseProduct(event) {
           }
           showSellerSelectionDialog(parsed);
         } else {
-          // URL değil — rehber popup göster
-          await runTextProductSearch(val, { overlay, progressText });
+          // URL değil — isimle arama KAPALI (yanlış/yanıltıcı eşleşme riski
+          // yüzünden bilinçli karar, 2026-07-10). Sistem yalnızca ürün linki
+          // ile kesin sonuç verir; kullanıcıya rehberi göster.
+          if (overlay) overlay.style.display = "none";
+          showToast("Lütfen bir ürün linki yapıştır — isimle arama desteklenmiyor.");
+          showLinkGuide(true);
+          return;
         }
       } catch (error) {
         console.error("parseProduct hatası:", error);
@@ -2797,7 +2802,7 @@ async function findAlternativeSellers(parsed) {
   try {
     const data = await api("/api/find-alternatives", {
       method: "POST",
-      body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url, source: parsed.source, image_url: parsed.image_url })
+      body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url, source: parsed.source, image_url: parsed.image_url, price: parsed.price || null })
     });
     const alts = data.alternatives || [];
 
@@ -6568,7 +6573,7 @@ async function showSellerSelectionDialog(parsed) {
   try {
     const data = await api("/api/find-alternatives", {
       method: "POST",
-      body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url, source: parsed.source, image_url: parsed.image_url })
+      body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url, source: parsed.source, image_url: parsed.image_url, price: parsed.price || null })
     });
     let alts = data.alternatives || [];
     // alts aynı diziye referans — mutasyonlardan ÖNCE backend sonuç sayısını sakla

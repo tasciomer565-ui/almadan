@@ -504,6 +504,7 @@ class AlternativesRequest(BaseModel):
     original_url: str | None = None
     source: str | None = None
     image_url: str | None = None
+    price: float | None = None  # kaynak mağazadaki fiyat — mantık dışı eşleşme filtresi için
 
 class ReviewCreateRequest(BaseModel):
     user_name: str | None = "Anonim Kullanıcı"
@@ -1605,6 +1606,16 @@ async def find_alternatives(payload: AlternativesRequest):
 
     # Her zaman filtrele (model_codes boş olsa bile variant filtresi çalışsın)
     products = [p for p in products if is_same_model(p)]
+
+    # Fiyat mantık filtresi: kaynak mağazadaki fiyat belliyken, onun çok
+    # altındaki (1/4'ünden az) "alternatifler" neredeyse her zaman yanlış
+    # eşleşmedir (farklı ürün, tekli yerine numune boy, aksesuar vb.) --
+    # kullanıcıya "900 TL'lik ruj başka yerde 200 TL" gibi yanıltıcı ve
+    # güven zedeleyici bir tablo çıkarıyordu. Gerçek indirimler bile nadiren
+    # %75'i geçer; geçen varsa da güvenilir şekilde doğrulayamayız, göstermeyiz.
+    if payload.price and payload.price > 0:
+        floor = payload.price * 0.25
+        products = [p for p in products if (p.get("price") or 0) >= floor]
 
     def relevance(p: dict) -> float:
         title_lower = (p.get("title") or "").lower()

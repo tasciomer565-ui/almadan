@@ -131,7 +131,7 @@
             <div class="url-actions-row" style="display:flex;gap:10px;width:min(800px,100%);">
               <div class="url-field" style="flex:1;grid-template-columns:auto minmax(0,1fr) auto;">
                 <i data-lucide="link"></i>
-                <input id="productUrl" type="text" placeholder="Ürün linkini yapıştır veya ürün adı yaz…" autocomplete="off" required>
+                <input id="productUrl" type="text" placeholder="Ürün linkini buraya yapıştır…" autocomplete="off" required>
                 <button type="button" class="paste-button" id="pasteButton" aria-label="Yapıştır" title="Panodan yapıştır">
                   <i data-lucide="clipboard"></i>
                 </button>
@@ -693,7 +693,7 @@
               </div>
               <div>
                 <strong style="font-size: 15px; display: block; margin-bottom: 4px;">Fiyat Karşılaştırma</strong>
-                <span style="font-size: 13px; color: var(--ink-light, #666);">Ürün adı yazın (örn: "süt", "Samsung S24") — sistem tüm online mağazaları tarayıp en ucuzu bulur.</span>
+                <span style="font-size: 13px; color: var(--ink-light, #666);">Beğendiğin ürünün linkini yapıştır — sistem diğer mağazalardaki fiyatları bulup karşılaştırır.</span>
               </div>
             </div>
           </div>
@@ -748,7 +748,7 @@
     </dialog>
 
     <script>
-      (()=>{let p;const src="/static/app.min.js?v=20260710-storelink";function load(){if(window.__almadanAppScriptLoaded)return Promise.resolve();if(p)return p;p=new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.defer=true;s.onload=()=>res();s.onerror=rej;document.head.appendChild(s)});return p}window.__almadanLoadApp=load;["openMainBarcodeScanner","closeMainBarcodeScanner","showLinkGuide","toggleSupportedStores","updateUserLocation","updateMaxDistance","closeSizeSelectorDialog","goOnboardingStep","onboardingNav","toggleFollow","showParsedProduct"].forEach(n=>{if(!window[n]){const stub=function(...a){load().then(()=>{window[n]!==stub&&typeof window[n]=="function"&&window[n](...a)})};window[n]=stub}});function view(v){document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));document.querySelectorAll(".content-section").forEach(s=>s.classList.toggle("hidden",s.id!==v+"View"));const i=document.querySelector(".intro-band");if(i)i.style.display=v==="discover"?"":"none"}if(/[?&](q|auto|list)=/.test(location.search))load();document.addEventListener("click",e=>{const b=e.target.closest("[data-view]");if(b&&!window.__almadanAppScriptLoaded){view(b.dataset.view);load()}},{capture:true,passive:true});document.addEventListener("submit",e=>{if(e.target&&e.target.id==="urlForm"&&!window.__almadanAppScriptLoaded){e.preventDefault();load().then(()=>window.parseProduct&&window.parseProduct({preventDefault(){},target:e.target}))}},{capture:true});["pointerdown","keydown","touchstart","scroll"].forEach(e=>addEventListener(e,load,{once:true,passive:true}));addEventListener("load",()=>{setTimeout(()=>{const m=document.createElement("link");m.rel="manifest";m.href="/static/manifest.json";document.head.appendChild(m)},3500);setTimeout(load,14000)},{once:true})})();
+      (()=>{let p;const src="/static/app.min.js?v=20260710-linkonly";function load(){if(window.__almadanAppScriptLoaded)return Promise.resolve();if(p)return p;p=new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.defer=true;s.onload=()=>res();s.onerror=rej;document.head.appendChild(s)});return p}window.__almadanLoadApp=load;["openMainBarcodeScanner","closeMainBarcodeScanner","showLinkGuide","toggleSupportedStores","updateUserLocation","updateMaxDistance","closeSizeSelectorDialog","goOnboardingStep","onboardingNav","toggleFollow","showParsedProduct"].forEach(n=>{if(!window[n]){const stub=function(...a){load().then(()=>{window[n]!==stub&&typeof window[n]=="function"&&window[n](...a)})};window[n]=stub}});function view(v){document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));document.querySelectorAll(".content-section").forEach(s=>s.classList.toggle("hidden",s.id!==v+"View"));const i=document.querySelector(".intro-band");if(i)i.style.display=v==="discover"?"":"none"}if(/[?&](q|auto|list)=/.test(location.search))load();document.addEventListener("click",e=>{const b=e.target.closest("[data-view]");if(b&&!window.__almadanAppScriptLoaded){view(b.dataset.view);load()}},{capture:true,passive:true});document.addEventListener("submit",e=>{if(e.target&&e.target.id==="urlForm"&&!window.__almadanAppScriptLoaded){e.preventDefault();load().then(()=>window.parseProduct&&window.parseProduct({preventDefault(){},target:e.target}))}},{capture:true});["pointerdown","keydown","touchstart","scroll"].forEach(e=>addEventListener(e,load,{once:true,passive:true}));addEventListener("load",()=>{setTimeout(()=>{const m=document.createElement("link");m.rel="manifest";m.href="/static/manifest.json";document.head.appendChild(m)},3500);setTimeout(load,14000)},{once:true})})();
     </script>
     <script>
       /* Sprint 12 — auth fix: DOMContentLoaded sonrasi state.auth guncelle */
