@@ -1178,7 +1178,11 @@ def home(request: Request) -> Response:
     target = "/index.html"
     if request.url.query:
         target += f"?{request.url.query}"
-    return RedirectResponse(target, status_code=307)
+    # Prod'da bu yonlendirme HER ZAMAN gerceklesiyor (yapisal, gecici degil)
+    # -- 301 (kalici) kullanmak Google'a ve tarayiciya dogru sinyali verir,
+    # 307 "gecici" oldugu icin arama motoru sinyal degerini / yi tutmaya
+    # calisip kafasi karisabiliyordu.
+    return RedirectResponse(target, status_code=301)
 
 
 # ── İstemci hata raporları ──────────────────────────────────
