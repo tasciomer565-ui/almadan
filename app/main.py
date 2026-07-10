@@ -1564,6 +1564,11 @@ async def find_alternatives(payload: AlternativesRequest):
     # Defensive: filter out non-dict entries (corrupt cache data)
     products = [p for p in products if isinstance(p, dict)]
 
+    # Güven filtresi: JSON-LD bulunamayınca devreye giren sezgisel fiyat
+    # tarayıcı (verified=False) yanlış eşleşme riski taşıyor -- kullanıcıya
+    # kesin sonuç vaat ettiğimiz için şimdilik gösterilmiyor.
+    products = [p for p in products if p.get("verified", True)]
+
     # Fiyatı olmayan/0 olan sonuçlar karşılaştırmada işe yaramaz
     products = [p for p in products if (p.get("price") or 0) > 0]
 

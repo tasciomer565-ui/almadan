@@ -82,6 +82,7 @@ def _heuristic_price_card_scan(soup: "BeautifulSoup", source: str, base_url: str
             "title": title, "price": price, "original_price": None,
             "image_url": img, "source": source, "url": prod_url,
             "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            "verified": False,  # sezgisel (heuristik) fiyat tahmini -- JSON-LD yok
         })
         if len(results) >= 10:
             break
@@ -144,6 +145,7 @@ def _heuristic_price_card_scan(soup: "BeautifulSoup", source: str, base_url: str
             "title": title, "price": price, "original_price": None,
             "image_url": img, "source": source, "url": prod_url,
             "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            "verified": False,  # sezgisel (heuristik) fiyat tahmini -- JSON-LD yok
         })
         if len(results) >= 10:
             break
@@ -194,6 +196,7 @@ def _scrape_jsonld_itemlist(url: str, source: str, render_js: bool = False, time
                     "title": name, "price": price, "original_price": None,
                     "image_url": img, "source": source, "url": prod_url,
                     "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                    "verified": True,  # JSON-LD -- mağazanın kendi yapılandırılmış verisi
                 })
             if results:
                 return results
@@ -3128,6 +3131,14 @@ def search_products_by_name(
     # Bazi scraper'lar dict olmayan ogeler de sizdirabiliyor (orn. N11'in
     # tuple donusu) -- once bunlari ele.
     all_products = [p for p in all_products if isinstance(p, dict)]
+
+    # Güven filtresi: JSON-LD/yapılandırılmış veri olmayan sayfalarda son
+    # çare olarak devreye giren sezgisel fiyat tarayıcı (verified=False)
+    # yanlış eşleşme riski taşıyor (bkz. Rossmann "100TL üzeri kargo"
+    # olayı). Kullanıcıya kesin sonuç vaadi verdiğimiz için bu sonuçlar
+    # şimdilik gösterilmiyor; mağaza özelinde doğrulanınca kaldırılabilir.
+    all_products = [p for p in all_products if p.get("verified", True)]
+
     for p in all_products:
         if not isinstance(p.get("extra_info"), dict):
             p["extra_info"] = {}
