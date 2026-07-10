@@ -2456,6 +2456,14 @@ function showSearchResults(response) {
             ? `<strong style="font-size: 14px; color: var(--muted); font-style: italic;">Stokta Yok</strong>`
             : `<strong style="font-size: 14px; color: var(--ink);" class="price-display-strong">${currency.format(item.price)}</strong>`;
 
+          const storeLinkHtml = !isOutOfStock && item.url
+            ? `<a href="${escapeHtml(addAffiliateTag(item.url, item.source))}" target="_blank" rel="noopener noreferrer sponsored"
+                 class="secondary-button" style="padding: 6px 12px; font-size: 11px; height: auto; width: auto; display: inline-flex; align-items: center; text-decoration: none;"
+                 onclick="event.stopPropagation();">
+                 <i data-lucide="external-link" style="width:12px; height:12px; margin-right:4px;"></i> Mağazaya Git
+               </a>`
+            : "";
+
           const buttonHtml = isOutOfStock
             ? `<button class="primary-button" style="padding: 6px 12px; font-size: 11px; height: auto; width: auto; background-color: #687068; border-color: #687068;" onclick="trackSearchResultProduct(this, ${index})">
                  <i data-lucide="bell" style="width:12px; height:12px; margin-right:4px;"></i> Stok Takibi Ekle
@@ -2531,7 +2539,10 @@ function showSearchResults(response) {
                     return `<div class="price-trend-flat"><i data-lucide="minus" style="width:11px;height:11px;flex-shrink:0;"></i>Sabit (7g)</div>`;
                   })()}
                 </div>
-                ${buttonHtml}
+                <div style="display: flex; gap: 6px;">
+                  ${storeLinkHtml}
+                  ${buttonHtml}
+                </div>
               </div>
             </div>
           `;
