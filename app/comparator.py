@@ -3170,12 +3170,38 @@ def search_products_by_name(
             
     # 7. Generic vs Specific Query details limit
     has_details = brand is not None or any(x in corrected_query.lower() for x in [" l", "gr", "kg", "gb", "tb", "ml"])
-    limit = 5 if has_details else 15
-    
+    limit = 5 if has_details else 20
+
     # 8. Sort in-stock by price (cheapest first) if generic query
     if not brand:
         in_stock.sort(key=lambda x: x["price"])
-        
+
+        # Magaza cesitliligi: tek bir magazanin ucuz varyantlari (ayni urunun
+        # farkli renk/beden secenekleri gibi) tum listeyi doldurup diger
+        # magazalari (Gratis, Watsons, Boyner...) ekrandan tamamen disarida
+        # birakmasin. Magaza basina en fazla 2 urun alacak sekilde en
+        # ucuzdan baslayip round-robin dagitiyoruz -- boylece hem ucuzluk
+        # onceligi korunuyor hem de kullaniciya birden fazla magaza gosteriliyor.
+        max_per_source = 2
+        by_source: dict[str, list[dict]] = {}
+        for p in in_stock:
+            by_source.setdefault(p.get("source", ""), []).append(p)
+
+        diversified: list[dict] = []
+        while len(diversified) < limit and any(by_source.values()):
+            progressed = False
+            for items in by_source.values():
+                if len(diversified) >= limit:
+                    break
+                taken = sum(1 for d in diversified if d.get("source") == items[0].get("source")) if items else 0
+                if items and taken < max_per_source:
+                    diversified.append(items.pop(0))
+                    progressed = True
+            if not progressed:
+                break
+        diversified.sort(key=lambda x: x["price"])
+        in_stock = diversified
+
     output_in_stock = in_stock[:limit]
     output_out_of_stock = out_of_stock[:2] if limit == 15 else out_of_stock[:1]
     
