@@ -6450,13 +6450,25 @@ async def price_landing_page(slug: str):
                 },
             },
         })
-    item_list_schema = _json.dumps({
+    combined_schema = _json.dumps({
         "@context": "https://schema.org",
-        "@type": "ItemList",
-        "name": f"{title_term} Fiyatları",
-        "url": f"https://www.almadan.app/fiyat/{slug}",
-        "numberOfItems": len(item_list_elements),
-        "itemListElement": item_list_elements,
+        "@graph": [
+            {
+                "@type": "ItemList",
+                "name": f"{title_term} Fiyatları",
+                "url": f"https://www.almadan.app/fiyat/{slug}",
+                "numberOfItems": len(item_list_elements),
+                "itemListElement": item_list_elements,
+            },
+            {
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    {"@type": "ListItem", "position": 1, "name": "Ana Sayfa", "item": "https://www.almadan.app/index.html"},
+                    {"@type": "ListItem", "position": 2, "name": "Fiyat Rehberi", "item": "https://www.almadan.app/fiyat-rehberi"},
+                    {"@type": "ListItem", "position": 3, "name": f"{title_term} Fiyatları", "item": f"https://www.almadan.app/fiyat/{slug}"},
+                ],
+            },
+        ],
     }, ensure_ascii=False)
     page = f"""<!doctype html>
 <html lang="tr">
@@ -6490,7 +6502,7 @@ async def price_landing_page(slug: str):
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
     <script type="application/ld+json">
-    {item_list_schema}
+    {combined_schema}
     </script>
     <link rel="stylesheet" href="/static/brand-pages.css?v=1">
   </head>
@@ -6503,6 +6515,14 @@ async def price_landing_page(slug: str):
         <a href="/iletisim">İletişim</a>
       </nav>
     </header>
+
+    <div class="bp-breadcrumbs" style="padding: 16px 5vw 0; max-width: 820px; margin: 0 auto; font-size: 13.5px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+      <a href="/index.html" style="text-decoration: none; color: var(--green); font-weight: 600;">Ana Sayfa</a>
+      <span style="color: var(--border);">/</span>
+      <a href="/fiyat-rehberi" style="text-decoration: none; color: var(--green); font-weight: 600;">Fiyat Rehberi</a>
+      <span style="color: var(--border);">/</span>
+      <span style="color: var(--ink-2); font-weight: 500;">{title_term} Fiyatları</span>
+    </div>
 
     <section class="bp-hero">
       <div class="bp-hero-inner">
