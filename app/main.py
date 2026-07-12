@@ -6412,6 +6412,52 @@ async def price_landing_page(slug: str):
     intro = f"{title_term} için {len(products)} mağazadan güncel fiyat karşılaştırması. En ucuz: {cheapest:.2f} ₺." if cheapest else f"{title_term} için güncel fiyat karşılaştırması."
 
     intro_escaped = _html.escape(intro)
+
+    # Baslikta fiyati dogrudan gostermek CTR'yi artiriyor (SERP'te rakip
+    # sonuclarin cogu bunu yapiyor) -- "X Fiyatlari - Almadan" yerine
+    # "X Fiyatlari: En Ucuz 2.990 TL'den | Almadan".
+    if cheapest:
+        price_display = f"{cheapest:,.0f}".replace(",", ".")
+        seo_title = f"{title_term} Fiyatları: En Ucuz {price_display} TL'den — Almadan"
+    else:
+        seo_title = f"{title_term} Fiyatları — Almadan"
+    seo_title_escaped = _html.escape(seo_title)
+
+    # Google'in fiyat/urun zengin sonucu (rich snippet) gosterebilmesi icin
+    # ItemList'i gercek Product/Offer verisiyle dolduruyoruz -- onceden
+    # sadece isim/url iceren bos bir ItemList'ti, zenginlestirme sansi yoktu.
+    import json as _json
+    item_list_elements = []
+    for i, p in enumerate(products[:15], start=1):
+        p_title = p.get("title", "") or term
+        price = p.get("price") or 0
+        url = p.get("url", "")
+        if not url or not price:
+            continue
+        item_list_elements.append({
+            "@type": "ListItem",
+            "position": i,
+            "item": {
+                "@type": "Product",
+                "name": p_title,
+                "url": url,
+                "offers": {
+                    "@type": "Offer",
+                    "price": round(float(price), 2),
+                    "priceCurrency": "TRY",
+                    "availability": "https://schema.org/InStock",
+                    "url": url,
+                },
+            },
+        })
+    item_list_schema = _json.dumps({
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": f"{title_term} Fiyatları",
+        "url": f"https://www.almadan.app/fiyat/{slug}",
+        "numberOfItems": len(item_list_elements),
+        "itemListElement": item_list_elements,
+    }, ensure_ascii=False)
     page = f"""<!doctype html>
 <html lang="tr">
   <head>
@@ -6428,13 +6474,13 @@ async def price_landing_page(slug: str):
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#121412">
-    <title>{title_term} Fiyatları — Almadan</title>
+    <title>{seo_title_escaped}</title>
     <meta name="description" content="{intro_escaped}">
     <link rel="canonical" href="https://www.almadan.app/fiyat/{slug}">
     <meta name="robots" content="index, follow">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Almadan">
-    <meta property="og:title" content="{title_term} Fiyatları — Almadan">
+    <meta property="og:title" content="{seo_title_escaped}">
     <meta property="og:description" content="{intro_escaped}">
     <meta property="og:url" content="https://www.almadan.app/fiyat/{slug}">
     <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
@@ -6444,12 +6490,7 @@ async def price_landing_page(slug: str):
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
     <script type="application/ld+json">
-    {{
-      "@context": "https://schema.org",
-      "@type": "ItemList",
-      "name": "{title_term} Fiyatları",
-      "url": "https://www.almadan.app/fiyat/{slug}"
-    }}
+    {item_list_schema}
     </script>
     <link rel="stylesheet" href="/static/brand-pages.css?v=1">
   </head>
