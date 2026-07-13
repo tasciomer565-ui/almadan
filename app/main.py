@@ -5800,6 +5800,9 @@ async def store_page(slug: str):
     <meta property="og:url" content="https://www.almadan.app/magaza/{slug}">
     <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
     <meta property="og:locale" content="tr_TR">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{seo_title_escaped}">
+    <meta name="twitter:description" content="{seo_desc_escaped}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
@@ -5967,6 +5970,16 @@ async def catalog_page(store: str):
     <meta name="description" content="{seo_desc_escaped}">
     <link rel="canonical" href="https://www.almadan.app/aktuel/{store}">
     <meta name="robots" content="index, follow">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Almadan">
+    <meta property="og:title" content="{seo_title_escaped}">
+    <meta property="og:description" content="{seo_desc_escaped}">
+    <meta property="og:url" content="https://www.almadan.app/aktuel/{store}">
+    <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
+    <meta property="og:locale" content="tr_TR">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{seo_title_escaped}">
+    <meta name="twitter:description" content="{seo_desc_escaped}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
@@ -6125,6 +6138,9 @@ async def category_page(category: str):
     <meta property="og:url" content="https://www.almadan.app/kategori/{category}">
     <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
     <meta property="og:locale" content="tr_TR">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{seo_title_escaped}">
+    <meta name="twitter:description" content="{seo_desc_escaped}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
@@ -6513,6 +6529,9 @@ async def price_landing_page(slug: str):
     <meta property="og:url" content="https://www.almadan.app/fiyat/{slug}">
     <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
     <meta property="og:locale" content="tr_TR">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{seo_title_escaped}">
+    <meta name="twitter:description" content="{intro_escaped}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
@@ -6731,17 +6750,20 @@ async def price_guide_index():
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#121412">
-    <title>Fiyat Karsilastirma Rehberi - Almadan</title>
-    <meta name="description" content="Search Console verilerinden gelen elektronik, ev aletleri, moda, kozmetik, market ve ev yasam aramalari icin fiyat karsilastirma rehberleri.">
+    <title>Fiyat Karşılaştırma Rehberi: {len(_GSC_TOPIC_PAGES)} Kategori — Almadan</title>
+    <meta name="description" content="Elektronik, ev aletleri, moda, kozmetik ve market aramaları için hazırlanmış {len(_GSC_TOPIC_PAGES)} fiyat karşılaştırma rehberi. En ucuz fiyatı bulmak artık çok kolay.">
     <link rel="canonical" href="https://www.almadan.app/fiyat-rehberi">
     <meta name="robots" content="index, follow">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Almadan">
-    <meta property="og:title" content="Fiyat Karsilastirma Rehberi - Almadan">
-    <meta property="og:description" content="Populer urun ve kategori aramalarinda en ucuz fiyati bulmak icin rehberler.">
+    <meta property="og:title" content="Fiyat Karşılaştırma Rehberi: {len(_GSC_TOPIC_PAGES)} Kategori — Almadan">
+    <meta property="og:description" content="Popüler ürün ve kategori aramalarında en ucuz fiyatı bulmak için {len(_GSC_TOPIC_PAGES)} rehber.">
     <meta property="og:url" content="https://www.almadan.app/fiyat-rehberi">
     <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
     <meta property="og:locale" content="tr_TR">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Fiyat Karşılaştırma Rehberi: {len(_GSC_TOPIC_PAGES)} Kategori — Almadan">
+    <meta name="twitter:description" content="Popüler ürün ve kategori aramalarında en ucuz fiyatı bulmak için {len(_GSC_TOPIC_PAGES)} rehber.">
     <link rel="stylesheet" href="/static/brand-pages.css?v=2">
   </head>
   <body>
@@ -6793,6 +6815,8 @@ async def price_guide_topic(topic: str):
         f'<div class="bp-card"><p>{_html.escape(tip)}</p></div>'
         for tip in data["tips"]
     )
+    term_count = len(data["terms"])
+    seo_title = f"{title}: {term_count} Arama Terimi Karşılaştırması — Almadan"
     page = f"""<!doctype html>
 <html lang="tr">
   <head>
@@ -6809,17 +6833,20 @@ async def price_guide_topic(topic: str):
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#121412">
-    <title>{title} - Almadan</title>
+    <title>{seo_title}</title>
     <meta name="description" content="{description}">
     <link rel="canonical" href="https://www.almadan.app/fiyat-rehberi/{topic}">
     <meta name="robots" content="index, follow">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Almadan">
-    <meta property="og:title" content="{title} - Almadan">
+    <meta property="og:title" content="{seo_title}">
     <meta property="og:description" content="{description}">
     <meta property="og:url" content="https://www.almadan.app/fiyat-rehberi/{topic}">
     <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
     <meta property="og:locale" content="tr_TR">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{seo_title}">
+    <meta name="twitter:description" content="{description}">
     <script type="application/ld+json">
     {{
       "@context": "https://schema.org",
