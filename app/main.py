@@ -5670,10 +5670,15 @@ async def store_page(slug: str):
     else:
         campaigns_html = '<p class="bp-body">Şu anda listelenen aktif bir kampanya yok. Ana sayfadan arama yaparak güncel fiyatları karşılaştırabilirsin.</p>'
 
-    seo_title = f"{name} Kampanyaları, İndirimleri ve Fiyatları — Almadan"
+    # CTR icin: aktif kampanya varsa somut sayiyi ve aciliyeti baslikta
+    # goster (orn. "3 Aktif Kampanya") -- "Kampanyalar" gibi jenerik
+    # kelimeden cok daha ikna edici, kullaniciya "burada gercekten guncel
+    # bir sey var" sinyali verir.
     if campaigns:
+        seo_title = f"{name}: {len(campaigns)} Aktif Kampanya ve Fiyat Karşılaştırması — Almadan"
         seo_desc = f"Güncel {len(campaigns)} adet {name} kampanyası, indirim kataloğu ve fiyat karşılaştırmaları. Satın almadan önce en ucuz {name} fiyatlarını görün."
     else:
+        seo_title = f"{name} Kampanyaları, İndirimleri ve Fiyatları — Almadan"
         seo_desc = f"En güncel {name} indirim kampanyaları, fiyat karşılaştırmaları ve katalog fırsatları. Aradığınız {name} ürününü en ucuza Almadan ile bulun."
 
     seo_title_escaped = _html.escape(seo_title)
@@ -5893,7 +5898,12 @@ async def catalog_page(store: str):
         category_display_name = "Market / Gıda"
         store_name = _format_store_name(store)
 
-    seo_title = f"{title} Aktüel Ürünler Kataloğu & İndirimleri — Almadan"
+    # CTR icin: kac urun taranmis somut sayiyla baslikta -- "Aktuel Urunler
+    # Katalogu" gibi jenerik ifadeden daha ikna edici.
+    if items:
+        seo_title = f"{title}: {len(items)} Aktüel Ürün Bu Hafta — Almadan"
+    else:
+        seo_title = f"{title} Aktüel Ürünler Kataloğu & İndirimleri — Almadan"
     seo_desc = f"{store_name} bu haftaki aktüel ürünler listesi, güncel indirim kataloğu ve haftalık market fırsatları. En ucuz fiyatları Almadan ile kaçırmayın!"
 
     seo_title_escaped = _html.escape(seo_title)
@@ -6039,8 +6049,14 @@ async def category_page(category: str):
     display_name = _html.escape(display_name)
     description = _html.escape(raw_desc)
 
-    seo_title = f"{display_name} Fiyatları & İndirim Kampanyaları — Almadan"
-    seo_desc = f"{display_name} kategorisindeki en ucuz fiyatları ve güncel kampanyaları karşılaştırın. {display_name} mağazalarının fırsatlarını Almadan ile hemen bulun."
+    # CTR icin baslikta somut magaza sayisini goster -- jenerik "Fiyat
+    # Karsilastirma" yerine "23 Magaza Karsilastirmasi" gibi somut bir
+    # rakam, kullaniciya "burada gercekten kapsamli bir liste var" sinyali
+    # verir (bkz. /fiyat/{terim} sayfalarindaki fiyat-baslikta deneyimiyle
+    # ayni mantik).
+    store_count = len(ALL_STORES_MAP.get(category, []))
+    seo_title = f"{display_name} Fiyatları: {store_count} Mağaza Karşılaştırması — Almadan"
+    seo_desc = f"{display_name} kategorisinde {store_count} mağazanın fiyatlarını tek ekranda karşılaştır, en ucuzu anında bul. Güncel kampanyalar, ücretsiz — Almadan."
     seo_title_escaped = _html.escape(seo_title)
     seo_desc_escaped = _html.escape(seo_desc)
 
