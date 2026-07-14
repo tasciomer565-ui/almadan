@@ -212,14 +212,16 @@
             <td>${esc(s.scraper)}</td>
             <td>${s.consecutive_zero_days}</td>
             <td>${s.best_count_seen}</td>
-            <td>${s.currently_alerted ? '<span class="badge bad">KIRIK</span>' : '<span class="badge ok">OK</span>'}</td>
+            <td>${s.currently_alerted ? '<span class="badge bad">KIRIK</span>' : (s.ready_to_promote ? '<span class="badge ok">✓ HAZIR</span>' : '<span class="badge">İzleniyor</span>')}</td>
           </tr>
         `).join("");
         el.innerHTML = `
           <button class="refresh-btn" onclick="loadScrapers()">↻ Yenile</button>
+          <p class="subtitle">"HAZIR" = son günlerde art arda gerçek sonuç bulmuş, şu an sorunsuz — "yakında" listesinden çıkarıp aktif etmeyi düşünebilirsin.</p>
           <div class="stat-grid">
             <div class="stat-card"><div class="num">${d.total_tracked}</div><div class="label">Takip Edilen Scraper</div></div>
             <div class="stat-card"><div class="num" style="color:${d.currently_broken ? 'var(--red)' : 'var(--green)'}">${d.currently_broken}</div><div class="label">Şu An Kırık</div></div>
+            <div class="stat-card"><div class="num" style="color:var(--green)">${d.ready_to_promote_count || 0}</div><div class="label">Aktif Etmeye Hazır</div></div>
           </div>
           ${rows ? `<table><thead><tr><th>Scraper</th><th>Art Arda Kaç Gün 0 Sonuç</th><th>En İyi Gördüğü Sonuç</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table>`
                  : `<p class="subtitle">Henüz veri yok, günlük sağlık kontrolü birkaç gün içinde birikecek.</p>`}

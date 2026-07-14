@@ -2660,21 +2660,32 @@ def admin_scraper_health_report(request: Request) -> dict:
     db = load_db()
     health = db.get("scraper_health", {})
 
+    # "Aktif etmeye hazir" -- gunluk saglik kontrolunde en az 3 kez gercek
+    # sonuc bulmus (rastlanti degil), su an art arda 0 sonuc vermiyor ve
+    # alarm durumunda degil. Bu, "yakinda" listesindeki bir magazayi elle
+    # tek tek test etmek yerine, zaman icinde biriken gercek veriyle
+    # otomatik olarak "hazir" diye isaretliyor.
     rows = [
         {
             "scraper": name,
             "consecutive_zero_days": info.get("consecutive_zero", 0),
             "best_count_seen": info.get("best_count", 0),
             "currently_alerted": info.get("alerted", False),
+            "ready_to_promote": (
+                info.get("best_count", 0) >= 3
+                and info.get("consecutive_zero", 0) == 0
+                and not info.get("alerted", False)
+            ),
         }
         for name, info in health.items()
         if isinstance(info, dict)
     ]
-    rows.sort(key=lambda r: (-r["currently_alerted"], -r["consecutive_zero_days"]))
+    rows.sort(key=lambda r: (-r["currently_alerted"], -r["ready_to_promote"], -r["consecutive_zero_days"]))
 
     return {
         "total_tracked": len(rows),
         "currently_broken": sum(1 for r in rows if r["currently_alerted"]),
+        "ready_to_promote_count": sum(1 for r in rows if r["ready_to_promote"]),
         "scrapers": rows,
     }
 
