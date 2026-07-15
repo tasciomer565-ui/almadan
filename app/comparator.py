@@ -4131,13 +4131,76 @@ def search_tudors(query: str) -> list[dict]:
     )
 
 def search_ipekyol(query: str) -> list[dict]:
-    """İpekyol — JSON-LD ItemList var ama fiyatsiz (sadece ad/url), sezgisel
-    tarayiciya dusecek -- verified=False olarak isaretlenip filtrelenecek,
-    guvenilir hale gelmesi icin ozel DOM parser gerekebilir."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.ipekyol.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "ipekyol", render_js=True, timeout=15
-    )
+    """İpekyol — arama sayfasi Next.js SSR; sayfadaki __NEXT_DATA__ script'i
+    icinde props.pageProps.data.response.products altinda gercek urun listesi
+    (basePrice/discountPrice/salesPrice, routePath, documents[].filePath) hazir
+    JSON olarak geliyor. JSON-LD'deki ItemList sadece isim/url iceriyordu (fiyatsiz);
+    __NEXT_DATA__ ise dogrudan fiyat verisi tasidigi icin render_js/ScrapingBee
+    gerekmeden, duz requests.get ile guvenilir sonuc alinabiliyor."""
+    try:
+        url = f"https://www.ipekyol.com.tr/arama?q={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": USER_AGENT,
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=12)
+        if not r.ok:
+            return []
+        m = re.search(
+            r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
+            r.text, re.S
+        )
+        if not m:
+            return []
+        try:
+            data = json.loads(m.group(1))
+        except Exception:
+            return []
+        products = (
+            data.get("props", {})
+            .get("pageProps", {})
+            .get("data", {})
+            .get("response", {})
+            .get("products", [])
+        )
+        results = []
+        for p in products[:12]:
+            route_path = p.get("routePath")
+            if not route_path:
+                continue
+            sales_price = p.get("salesPrice") or p.get("discountPrice") or p.get("basePrice")
+            base_price = p.get("basePrice")
+            try:
+                price = float(sales_price)
+            except (TypeError, ValueError):
+                continue
+            if price <= 0:
+                continue
+            try:
+                original_price = float(base_price) if base_price and float(base_price) > price else None
+            except (TypeError, ValueError):
+                original_price = None
+            name_parts = [p.get("name", ""), p.get("shortName", "")]
+            title = " ".join(part for part in name_parts if part).strip() or p.get("name", "")
+            if not title:
+                continue
+            docs = p.get("documents") or []
+            image = ""
+            if docs:
+                file_path = docs[0].get("filePath", "")
+                if file_path:
+                    image = f"https://ipekyol.sm.mncdn.com/mnresize/750/-{file_path}"
+            results.append({
+                "title": title, "price": price, "original_price": original_price,
+                "image_url": image, "source": "ipekyol",
+                "url": f"https://www.ipekyol.com.tr/urun/{route_path}",
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                "verified": True,
+            })
+        return results
+    except Exception:
+        return []
 
 def search_deichmann(query: str) -> list[dict]:
     """Deichmann Türkiye — dogru yol /tr-tr altinda."""
@@ -4278,6 +4341,177 @@ def search_superstep(query: str) -> list[dict]:
         f"https://www.superstep.com.tr/arama?q={urllib.parse.quote_plus(query)}",
         "superstep", render_js=True, timeout=15
     )
+
+
+# ── 2026-07-16: bolgesel/kucuk magazalar (Turkpatent arastirmasindan) ──
+# Domain'ler curl ile 200 + title/ld+json eslesmesiyle daha once dogrulanmisti.
+# Bu blokta arama sayfasi format+veri yapisi teker teker curl edilerek kontrol
+# edildi; sadece gercek fiyat verisi bulunanlar icin kod yazildi.
+
+def search_gurgencler(query: str) -> list[dict]:
+    """Gürgençler (Apple Premium Partner) — Magento tabanli, arama sonuc sayfasinda
+    JSON-LD ItemList yok ama sayfa icine gomulu `window.insider_object.listing.items`
+    JS objesi (Insider pazarlama entegrasyonu) name/unit_sale_price/url/image alanlariyla
+    dogrudan urun listesini iceriyor -- render gerekmeden duz requests ile okunuyor."""
+    try:
+        url = f"https://www.gurgencler.com.tr/catalogsearch/result/?q={urllib.parse.quote_plus(query)}"
+        r = requests.get(url, headers=_STD_HEADERS, timeout=12)
+        if not r.ok:
+            return []
+        m = re.search(r'window\.insider_object\.listing\s*=\s*(\{.*?\});', r.text, re.S)
+        if not m:
+            return []
+        try:
+            data = json.loads(m.group(1))
+        except Exception:
+            return []
+        results = []
+        for item in data.get("items", [])[:10]:
+            name = (item.get("name") or "").replace("\xa0", " ").strip()
+            if not name:
+                continue
+            price = item.get("unit_sale_price") or item.get("unit_price")
+            try:
+                price = float(price)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": item.get("product_image_url", ""), "source": "gurgencler",
+                "url": item.get("url", ""), "labels": ["Önerilen"],
+                "extra_info": {"out_of_stock": item.get("stock", 1) == 0},
+                "verified": True,
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_cetmen(query: str) -> list[dict]:
+    """Çetmen Mobilya — Drupal tabanli site, arama /tr/arama?search_api_fulltext=
+    JSON-LD yok, urunler `.views-row` icinde `.tc-title span` (baslik) ve
+    `.p-price` (indirimli fiyat, `.p-list-price` orijinal fiyat) siniflariyla
+    DOM'da duz metin olarak geliyor -- custom BeautifulSoup parser gerekiyor."""
+    try:
+        url = f"https://www.cetmen.com.tr/tr/arama?search_api_fulltext={urllib.parse.quote_plus(query)}"
+        r = requests.get(url, headers=_STD_HEADERS, timeout=12)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for row in soup.select(".views-row")[:10]:
+            title_el = row.select_one(".tc-title span")
+            price_el = row.select_one(".p-price")
+            link_el = row.select_one("a[href]")
+            if not title_el or not price_el or not link_el:
+                continue
+            name = title_el.get_text(strip=True)
+            price_text = price_el.get_text(strip=True)
+            price_num = re.sub(r"[^\d,\.]", "", price_text).replace(".", "").replace(",", ".")
+            try:
+                price = float(price_num)
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            href = link_el.get("href", "")
+            if href.startswith("/"):
+                href = "https://www.cetmen.com.tr" + href
+            orig_el = row.select_one(".p-list-price")
+            orig_price = None
+            if orig_el:
+                orig_num = re.sub(r"[^\d,\.]", "", orig_el.get_text(strip=True)).replace(".", "").replace(",", ".")
+                try:
+                    orig_price = float(orig_num)
+                except Exception:
+                    orig_price = None
+            img_el = row.select_one("img")
+            img = img_el.get("src", "") if img_el else ""
+            if img.startswith("/"):
+                img = "https://www.cetmen.com.tr" + img
+            results.append({
+                "title": name, "price": price, "original_price": orig_price,
+                "image_url": img, "source": "cetmen", "url": href,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                "verified": True,
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_sevil(query: str) -> list[dict]:
+    """Sevil Parfümeri — Magento tabanli, /catalogsearch/result/?q= adresinde
+    JSON-LD ItemList yok (sadece Breadcrumb/Website turu var), urunler
+    `li.item.product.product-item` kartlarinda `a.product-item-link` (baslik)
+    ve `span.price-wrapper[data-price-amount]` (fiyat, kurus/virgul yok, dogrudan
+    sayisal) ile DOM'da geliyor -- custom BeautifulSoup parser."""
+    try:
+        url = f"https://www.sevil.com.tr/catalogsearch/result/?q={urllib.parse.quote_plus(query)}"
+        r = requests.get(url, headers=_STD_HEADERS, timeout=12)
+        if not r.ok:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for item in soup.select("li.item.product.product-item")[:10]:
+            link_el = item.select_one("a.product-item-link")
+            price_el = item.select_one("span.price-wrapper[data-price-amount]")
+            if not link_el or not price_el:
+                continue
+            name = link_el.get_text(strip=True)
+            try:
+                price = float(price_el.get("data-price-amount", "0"))
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            href = link_el.get("href", "")
+            img_el = item.select_one("img.product-image-photo")
+            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
+            results.append({
+                "title": name, "price": price, "original_price": None,
+                "image_url": img, "source": "sevil", "url": href,
+                "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                "verified": True,
+            })
+        return results
+    except Exception:
+        return []
+
+
+def search_ozsanal(query: str) -> list[dict]:
+    """Özşanal (taksitli AVM) — /arama?q= adresinde JSON-LD ItemList/Product/Offer
+    dogrulandi, duz requests.get ile 200 donuyor, render gerekmiyor."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.ozsanal.com/arama?q={urllib.parse.quote_plus(query)}",
+        "ozsanal", render_js=False, timeout=12
+    )
+
+
+def search_joker(query: str) -> list[dict]:
+    """Joker Baby — T-Soft altyapili, /arama?q= adresinde JSON-LD ItemList/Product/Offer
+    dogrulandi, duz requests.get ile 200 donuyor, render gerekmiyor."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.joker.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "joker", render_js=False, timeout=12
+    )
+
+# ATLANANLAR (kod yazilmadi, sebep):
+# - Yiğit AVM (yigitalisveris.com.tr): Ticimax altyapili, arama sayfasi
+#   (/Arama?q=) Handlebars template'leri iceriyor, urun listesi JS/AJAX ile
+#   sonradan doluyor; statik HTML'de ne ld+json ne fiyat var. Emin olunamadi.
+# - Elegance Optik (eleganceos.com.tr) / Opmar Optik (opmar.com.tr): Ayni
+#   Ticimax altyapisi, anasayfada ld+json var ama arama sonuc sayfasinda YOK
+#   (JS-SPA render sonrasi olusuyor) -- "JS-SPA + ld+json yok" kurali geregi atlandi.
+# - Çağrı Market (cagri.com): React SPA, statik HTML'de arama formu/ld+json yok,
+#   API endpoint'i tespit edilemedi.
+# - FİLE (file.com.tr): ASP.NET WebForms postback tabanli (form1/__doPostBack),
+#   GET ile calisan bir arama URL'si bulunamadi, yapi belirsiz.
+# - Hisar (hisar.com.tr): /arama?q= sayfasi statik urun karti veriyor ama fiyat
+#   alani (`.product-bottom-line`) bos -- fiyat JS/AJAX ile sonradan yukleniyor,
+#   ld+json de yok.
 
 
 def lookup_barcode(barcode: str) -> dict | None:

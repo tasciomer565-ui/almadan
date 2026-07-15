@@ -33,6 +33,7 @@ _DAILY_PLAN: dict[int, tuple[str, str, list[str]]] = {
         "search_lenovo", "search_asusrog", "search_lg", "search_sony",
         "search_hp", "search_canon", "search_epson", "search_turkcell",
         "search_dsmart", "search_evkur",
+        "search_gurgencler",
     ]),
     1: ("MODA", "tişört", [
         "search_yargici", "search_kinetix", "search_flo", "search_lcwaikiki",
@@ -54,6 +55,7 @@ _DAILY_PLAN: dict[int, tuple[str, str, list[str]]] = {
         "search_flormar", "search_goldenrose", "search_farmasi",
         "search_mac", "search_yvesrocher", "search_eveshop",
         "search_atasunoptik", "search_mertoptik",
+        "search_sevil",
     ]),
     3: ("EV", "tencere", [
         "search_vivense", "search_evidea", "search_karaca", "search_englishhome",
@@ -63,6 +65,7 @@ _DAILY_PLAN: dict[int, tuple[str, str, list[str]]] = {
         "search_fakir", "search_philips",
         "search_bernardo", "search_linens", "search_pasabahce", "search_porland",
         "search_tekzen",
+        "search_cetmen",
     ]),
     4: ("GIDA", "süt", [
         "search_bim", "search_sokmarket", "search_tarimkredi",
@@ -74,6 +77,7 @@ _DAILY_PLAN: dict[int, tuple[str, str, list[str]]] = {
     5: ("BEBEK", "bebek bezi", [
         "search_ebebek", "search_toyzz", "search_bebek", "search_lego", "search_frigg",
         "search_babymall", "search_gnc",
+        "search_joker",
     ]),
     6: ("GENEL", "roman", [
         "search_kitapyurdu", "search_dr", "search_remzi", "search_idefix",
@@ -82,6 +86,7 @@ _DAILY_PLAN: dict[int, tuple[str, str, list[str]]] = {
         "search_proteinocean", "search_supplementler", "search_runnutrition",
         "search_n11_direct", "search_amazon_tr", "search_trendyol_direct",
         "search_hepsiburada_direct", "search_pazarama", "search_aliexpress", "search_temu",
+        "search_ozsanal",
     ]),
 }
 
