@@ -43,10 +43,17 @@ _DAILY_PLAN: dict[int, tuple[str, str, list[str]]] = {
         "search_bigjoy", "search_decathlon", "search_nike", "search_adidas",
         "search_puma", "search_reebok", "search_newbalance", "search_sportive",
         "search_lescon", "search_pandora", "search_defacto",
+        # 2026-07-13: "yakinda" listesinden aday yeni scraper'lar
+        "search_koton", "search_kigili", "search_instreet", "search_pullandbear",
+        "search_stradivarius", "search_massimodutti", "search_hatemoglu",
+        "search_machka", "search_suvari", "search_tudors", "search_ipekyol",
+        "search_deichmann", "search_troy", "search_ozdilek", "search_superstep",
     ]),
     2: ("KOZMETİK", "şampuan", [
         "search_gratis", "search_rossmann", "search_watsons", "search_sephora",
         "search_flormar", "search_goldenrose", "search_farmasi",
+        "search_mac", "search_yvesrocher", "search_eveshop",
+        "search_atasunoptik", "search_mertoptik",
     ]),
     3: ("EV", "tencere", [
         "search_vivense", "search_evidea", "search_karaca", "search_englishhome",
@@ -54,14 +61,19 @@ _DAILY_PLAN: dict[int, tuple[str, str, list[str]]] = {
         "search_bellona", "search_dogtas", "search_kelebek", "search_schafer",
         "search_korkmaz", "search_bosch", "search_tefal", "search_arzum",
         "search_fakir", "search_philips",
+        "search_bernardo", "search_linens", "search_pasabahce", "search_porland",
+        "search_tekzen",
     ]),
     4: ("GIDA", "süt", [
         "search_bim", "search_sokmarket", "search_tarimkredi",
         "search_metro", "search_bizimtoptan", "search_tazedirekt",
         "search_migros_proxy", "search_carrefoursa", "search_a101",
+        "search_hakmar", "search_happycenter", "search_jumbo", "search_mopas",
+        "search_onurmarket",
     ]),
     5: ("BEBEK", "bebek bezi", [
         "search_ebebek", "search_toyzz", "search_bebek", "search_lego", "search_frigg",
+        "search_babymall", "search_gnc",
     ]),
     6: ("GENEL", "roman", [
         "search_kitapyurdu", "search_dr", "search_remzi", "search_idefix",
@@ -127,7 +139,7 @@ async def run_daily_healthcheck(weekday: int | None = None, slot: int = 0) -> di
         if isinstance(res, Exception) or res is None or not isinstance(res, list):
             count = 0
         else:
-            count = len(res)
+            count = len([p for p in res if p.get("verified", True)])
         report[name] = count
 
         entry = health.setdefault(name, {"consecutive_zero": 0, "best_count": 0, "alerted": False})

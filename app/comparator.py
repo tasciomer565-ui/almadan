@@ -4046,6 +4046,240 @@ def search_kinetix(query: str) -> list[dict]:
         return []
 
 
+# ── 2026-07-13: "yakında" listesinden aktif edilmeye aday yeni scraper'lar ──
+# Hepsi paylasilan _scrape_jsonld_itemlist uzerinden calisiyor (render_js=True
+# -- domain kontrolu curl ile yapildi ama cogu site JS-SPA oldugu icin
+# gercek fiyat verisi ancak ScrapingBee render sonrasi test edilebilir).
+# Canliya cikinca gunluk scraper_healthcheck.py otomatik dogruluyor --
+# "HAZIR" rozeti cikana kadar admin panelden takip edilmeli.
+
+def search_koton(query: str) -> list[dict]:
+    """Koton — React SPA, render_js=True gerekiyor."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.koton.com/arama?q={urllib.parse.quote_plus(query)}",
+        "koton", render_js=True, timeout=15
+    )
+
+def search_kigili(query: str) -> list[dict]:
+    """Kiğılı — SPA, render_js=True gerekiyor."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.kigili.com/arama?q={urllib.parse.quote_plus(query)}",
+        "kigili", render_js=True, timeout=15
+    )
+
+def search_mac(query: str) -> list[dict]:
+    """MAC Cosmetics — SPA, render_js=True gerekiyor."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.maccosmetics.com.tr/search?q={urllib.parse.quote_plus(query)}",
+        "mac", render_js=True, timeout=15
+    )
+
+def search_instreet(query: str) -> list[dict]:
+    """In Street — SPA, render_js=True gerekiyor."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.instreet.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "instreet", render_js=True, timeout=15
+    )
+
+def search_pullandbear(query: str) -> list[dict]:
+    """Pull&Bear — Inditex grubu SPA, render_js=True gerekiyor."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.pullandbear.com/tr/search?q={urllib.parse.quote_plus(query)}",
+        "pullandbear", render_js=True, timeout=15
+    )
+
+def search_stradivarius(query: str) -> list[dict]:
+    """Stradivarius — Inditex grubu SPA, render_js=True gerekiyor."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.stradivarius.com/tr/search?q={urllib.parse.quote_plus(query)}",
+        "stradivarius", render_js=True, timeout=15
+    )
+
+def search_massimodutti(query: str) -> list[dict]:
+    """Massimo Dutti — Inditex grubu SPA, render_js=True gerekiyor."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.massimodutti.com/tr/search?q={urllib.parse.quote_plus(query)}",
+        "massimodutti", render_js=True, timeout=15
+    )
+
+def search_hatemoglu(query: str) -> list[dict]:
+    """Hatemoğlu — domain hatemoglu.com (hatemoglu.com.tr yönleniyor)."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.hatemoglu.com/arama?q={urllib.parse.quote_plus(query)}",
+        "hatemoglu", render_js=True, timeout=15
+    )
+
+def search_machka(query: str) -> list[dict]:
+    """Machka — statik HTML'de JSON-LD dogrulandi (curl ile 200 + ld+json)."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.machka.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "machka", render_js=False, timeout=12
+    )
+
+def search_suvari(query: str) -> list[dict]:
+    """Süvari — render_js=True gerekiyor (ilk denemede yönlendirme cikti)."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.suvari.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "suvari", render_js=True, timeout=15
+    )
+
+def search_tudors(query: str) -> list[dict]:
+    """Tudors — domain tudors.com (tudors.com.tr calismiyordu)."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.tudors.com/arama?q={urllib.parse.quote_plus(query)}",
+        "tudors", render_js=True, timeout=15
+    )
+
+def search_ipekyol(query: str) -> list[dict]:
+    """İpekyol — JSON-LD ItemList var ama fiyatsiz (sadece ad/url), sezgisel
+    tarayiciya dusecek -- verified=False olarak isaretlenip filtrelenecek,
+    guvenilir hale gelmesi icin ozel DOM parser gerekebilir."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.ipekyol.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "ipekyol", render_js=True, timeout=15
+    )
+
+def search_deichmann(query: str) -> list[dict]:
+    """Deichmann Türkiye — dogru yol /tr-tr altinda."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.deichmann.com/tr-tr/search?q={urllib.parse.quote_plus(query)}",
+        "deichmann", render_js=True, timeout=15
+    )
+
+def search_troy(query: str) -> list[dict]:
+    """Troy (ayakkabi) — domain troy.com.tr."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.troy.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "troy", render_js=True, timeout=15
+    )
+
+def search_bernardo(query: str) -> list[dict]:
+    """Bernardo — ayakkabi/deri, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.bernardo.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "bernardo", render_js=True, timeout=15
+    )
+
+def search_linens(query: str) -> list[dict]:
+    """Linens — ev tekstili, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.linens.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "linens", render_js=True, timeout=15
+    )
+
+def search_pasabahce(query: str) -> list[dict]:
+    """Paşabahçe — cam/kristal ev urunleri, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.pasabahce.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "pasabahce", render_js=True, timeout=15
+    )
+
+def search_porland(query: str) -> list[dict]:
+    """Porland — porselen/servis takimlari, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.porland.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "porland", render_js=True, timeout=15
+    )
+
+def search_tekzen(query: str) -> list[dict]:
+    """Tekzen — yapi/bahce market, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.tekzen.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "tekzen", render_js=True, timeout=15
+    )
+
+def search_hakmar(query: str) -> list[dict]:
+    """Hakmar — market zinciri, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.hakmar.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "hakmar", render_js=True, timeout=15
+    )
+
+def search_happycenter(query: str) -> list[dict]:
+    """Happy Center — market zinciri, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.happycenter.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "happycenter", render_js=True, timeout=15
+    )
+
+def search_jumbo(query: str) -> list[dict]:
+    """Jumbo — market zinciri, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.jumbo.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "jumbo", render_js=True, timeout=15
+    )
+
+def search_mopas(query: str) -> list[dict]:
+    """Mopaş — market zinciri, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.mopas.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "mopas", render_js=True, timeout=15
+    )
+
+def search_onurmarket(query: str) -> list[dict]:
+    """Onur Market — market zinciri, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.onurmarket.com/arama?q={urllib.parse.quote_plus(query)}",
+        "onurmarket", render_js=True, timeout=15
+    )
+
+def search_yvesrocher(query: str) -> list[dict]:
+    """Yves Rocher — dogrudan istekte bot korumasi (403), render_js=True sart."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.yvesrocher.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "yvesrocher", render_js=True, timeout=15
+    )
+
+def search_eveshop(query: str) -> list[dict]:
+    """Eve Shop — kozmetik, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.eveshop.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "eveshop", render_js=True, timeout=15
+    )
+
+def search_atasunoptik(query: str) -> list[dict]:
+    """Atasun Optik — render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.atasunoptik.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "atasunoptik", render_js=True, timeout=15
+    )
+
+def search_mertoptik(query: str) -> list[dict]:
+    """Mert Optik — domain mertoptik.com, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.mertoptik.com/arama?q={urllib.parse.quote_plus(query)}",
+        "mertoptik", render_js=True, timeout=15
+    )
+
+def search_babymall(query: str) -> list[dict]:
+    """BabyMall — anne/bebek urunleri, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.babymall.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "babymall", render_js=True, timeout=15
+    )
+
+def search_gnc(query: str) -> list[dict]:
+    """GNC Türkiye — takviye/vitamin, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.gnc.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "gnc", render_js=True, timeout=15
+    )
+
+def search_ozdilek(query: str) -> list[dict]:
+    """Özdilek — AVM/tekstil, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.ozdilek.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "ozdilek", render_js=True, timeout=15
+    )
+
+def search_superstep(query: str) -> list[dict]:
+    """SuperStep — spor ayakkabi, render_js=True."""
+    return _scrape_jsonld_itemlist(
+        f"https://www.superstep.com.tr/arama?q={urllib.parse.quote_plus(query)}",
+        "superstep", render_js=True, timeout=15
+    )
+
+
 def lookup_barcode(barcode: str) -> dict | None:
     barcode_clean = barcode.strip()
     return BARCODE_DATABASE.get(barcode_clean)
