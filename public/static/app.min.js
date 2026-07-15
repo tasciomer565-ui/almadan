@@ -2995,9 +2995,6 @@ async function trackParsedProduct() {
   if (targetPrice) {
     extraInfo.target_price = targetPrice;
   }
-  if (Number.isFinite(alertThreshold) && alertThreshold >= 1 && alertThreshold <= 100) {
-    extraInfo.alert_threshold = alertThreshold;
-  }
   if (lastPurchasedDate && Number.isFinite(restockPeriod) && restockPeriod > 0) {
     extraInfo.last_purchased_date = lastPurchasedDate;
     extraInfo.restock_period_days = restockPeriod;
