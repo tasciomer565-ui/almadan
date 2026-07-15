@@ -310,6 +310,56 @@ async def auth_wall_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+# ── Basit IP-bazlı Rate Limiting (in-memory, best-effort) ──────
+# Vercel serverless ortamında process bellek arasında kalıcı DEĞİL —
+# her invocation ayrı bir süreç olabileceğinden bu KESİN bir garanti
+# değildir. Ama sıcak (warm) lambda'larda ve tek-worker/uzun-ömürlü
+# çalıştırmalarda (ör. Render/local) makul bir güvenlik ağı sağlar.
+# Amaç: ScrapingBee kredisi tüketen public scraper endpoint'lerini
+# tek bir IP'nin kısa sürede aşırı yormasını engellemek.
+_RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
+_RATE_LIMIT_MAX_KEYS = 5000  # bellek şişmesin diye üst sınır
+
+
+def get_client_ip(request: Request) -> str:
+    return (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "unknown")
+    )
+
+
+def check_rate_limit(request: Request, bucket: str, limit: int, window_seconds: int) -> None:
+    """IP başına sliding-window rate limit. Aşılırsa 429 fırlatır.
+
+    Kesin/dağıtık bir garanti değildir (bkz. yukarıdaki not) — amaç ScrapingBee
+    kredisini tüketen uçlara karşı düşük riskli, basit bir güvenlik ağı eklemek.
+    """
+    ip = get_client_ip(request)
+    key = f"{bucket}:{ip}"
+    now = time.time()
+
+    if len(_RATE_LIMIT_BUCKETS) > _RATE_LIMIT_MAX_KEYS:
+        # Basit temizlik: pencere dışı kalan tüm kayıtları at
+        for k in list(_RATE_LIMIT_BUCKETS.keys()):
+            _RATE_LIMIT_BUCKETS[k] = [t for t in _RATE_LIMIT_BUCKETS[k] if now - t < window_seconds]
+            if not _RATE_LIMIT_BUCKETS[k]:
+                del _RATE_LIMIT_BUCKETS[k]
+
+    timestamps = [t for t in _RATE_LIMIT_BUCKETS.get(key, []) if now - t < window_seconds]
+
+    if len(timestamps) >= limit:
+        retry_after = max(1, int(window_seconds - (now - timestamps[0])) + 1)
+        _RATE_LIMIT_BUCKETS[key] = timestamps
+        raise HTTPException(
+            status_code=429,
+            detail="Çok fazla istek gönderdin, biraz sonra tekrar dene.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    timestamps.append(now)
+    _RATE_LIMIT_BUCKETS[key] = timestamps
+
+
 # ── Audit Log ────────────────────────────────────────────────
 
 def log_activity(

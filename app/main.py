@@ -1337,6 +1337,9 @@ def search_products(
     if not query or len(query.strip()) < 2:
         raise HTTPException(status_code=400, detail="Arama sorgusu en az 2 karakter olmalıdır.")
 
+    from app.security import check_rate_limit
+    check_rate_limit(request, "api_search", limit=30, window_seconds=60)
+
     from app.search_clarification import get_clarification
     clarification = get_clarification(query)
     if clarification:
@@ -1405,13 +1408,16 @@ def search_products(
 
 
 @app.post("/api/warm-slow-stores")
-async def api_warm_slow_stores(payload: WarmSlowStoresRequest) -> dict:
+async def api_warm_slow_stores(payload: WarmSlowStoresRequest, request: Request) -> dict:
     """Yavaş (render_js) mağazaları bu sorgu için tarayıp cache'e yazar.
 
     Frontend, arama sonuçları ekrana geldikten sonra bunu ayrı bir istek
     olarak çağırır; istek senkron await edildiği için Vercel lambda'sı
     tarama bitene kadar (maxDuration=60s) canlı kalır. Sorgu zaten
     ısıtılmışsa hiçbir scraper çağrılmadan hemen döner."""
+    from app.security import check_rate_limit
+    check_rate_limit(request, "warm_slow_stores", limit=20, window_seconds=60)
+
     from app.slow_store_cache_warmer import background_warm_query
 
     result = await background_warm_query(payload.query.strip(), payload.category)
@@ -1460,7 +1466,10 @@ def parse_url(payload: UrlParseRequest) -> dict:
 
 
 @app.post("/api/find-alternatives")
-async def find_alternatives(payload: AlternativesRequest):
+async def find_alternatives(payload: AlternativesRequest, request: Request):
+    from app.security import check_rate_limit
+    check_rate_limit(request, "find_alternatives", limit=20, window_seconds=60)
+
     from app.search_orchestrator import master_search, marketplace_scan
     import re
 
