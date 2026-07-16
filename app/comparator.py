@@ -171,7 +171,10 @@ def _scrape_jsonld_itemlist(url: str, source: str, render_js: bool = False, time
     results = []
     for script in soup.find_all("script", type="application/ld+json"):
         try:
-            data = json.loads(script.string or "{}")
+            # strict=False: bazi magazalar (orn. madamecoco) JSON-LD icine
+            # kacissiz kontrol karakteri (ham newline/tab) gomuyor -- spec
+            # disi ama Python'un strict modu bu yuzden tum bloğu reddediyor.
+            data = json.loads(script.string or "{}", strict=False)
             if data.get("@type") != "ItemList":
                 continue
             for item in data.get("itemListElement", [])[:10]:
@@ -1942,6 +1945,10 @@ def search_goldenrose(query: str) -> list[dict]:
 
 
 def search_istikbal(query: str) -> list[dict]:
+    """İstikbal — CSS class'ları (.product-item vb.) sitenin güncel yapısıyla
+    artık eşleşmiyordu (0 sonuç). Ürün verisi ld+json'da değil, her ürün
+    kartındaki data-prd-ga4-config attribute'unda JSON olarak duruyor
+    (name/price/slug) — buradan okunacak şekilde güncellendi."""
     try:
         url = f"https://www.istikbal.com.tr/ara?q={urllib.parse.quote_plus(query)}"
         headers = {
@@ -1954,31 +1961,29 @@ def search_istikbal(query: str) -> list[dict]:
             return []
         soup = BeautifulSoup(r.text, "html.parser")
         results = []
-        for item in soup.select(".product-item, [class*='product-card'], .product")[:10]:
-            name_el = item.select_one("[class*='name'], [class*='title'], h3")
-            name = name_el.get_text(strip=True) if name_el else ""
+        for item in soup.select("[data-prd-ga4-config]")[:10]:
+            try:
+                cfg = json.loads(item.get("data-prd-ga4-config") or "{}")
+            except Exception:
+                continue
+            name = cfg.get("name", "")
             if not name:
                 continue
-            price_el = item.select_one("[class*='price']")
-            if not price_el:
-                continue
-            raw = price_el.get_text(strip=True).replace("TL","").replace("₺","").replace(".","").replace(",",".").strip()
-            raw = re.sub(r"[^\d.]","", raw)
             try:
-                price = float(raw)
+                price = float(cfg.get("price", 0))
             except Exception:
                 continue
             if price <= 0:
                 continue
-            link_el = item.select_one("a[href]")
-            href = link_el.get("href","") if link_el else ""
-            prod_url = f"https://www.istikbal.com.tr{href}" if href.startswith("/") else href
+            slug = cfg.get("slug", "")
+            prod_url = f"https://www.istikbal.com.tr/urun/{slug}" if slug else ""
             img_el = item.select_one("img")
-            img = (img_el.get("data-src") or img_el.get("src","")) if img_el else ""
+            img = (img_el.get("data-src") or img_el.get("src", "")) if img_el else ""
             results.append({
                 "title": name, "price": price, "original_price": None,
                 "image_url": img, "source": "istikbal", "url": prod_url,
                 "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+                "verified": True,  # data-prd-ga4-config -- magazanin kendi yapilandirilmis verisi
             })
         return results
     except Exception:
@@ -3381,7 +3386,7 @@ def search_products_by_name(
     query_is_refurb = is_refurbished_title(corrected_query)
     for p in output:
         if is_refurbished_title(p.get("title", "")):
-            p["extra_info"]["refurbished"] = True
+            p.setdefault("extra_info", {})["refurbished"] = True
             p["condition"] = "refurbished"
     if output_in_stock:
         non_suspicious_in_stock = [p for p in output_in_stock if not p["extra_info"].get("suspicious")]
