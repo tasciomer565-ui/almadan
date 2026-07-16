@@ -2235,10 +2235,11 @@ def search_arnica(query: str) -> list[dict]:
 
 
 def search_arzum(query: str) -> list[dict]:
-    """arzum — URL doğru, eski selector'lar sitenin güncel
-    yapısıyla eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
+    """arzum — eski URL (/?s=) genel WordPress arama sayfasina dusuyordu,
+    ld+json yok. Gercek arama sayfasi /arama?q= duzgun Product/Offer
+    JSON-LD donduruyor (2026-07-16'da dogrulandi)."""
     return _scrape_jsonld_itemlist(
-        f"https://www.arzum.com.tr/?s={urllib.parse.quote_plus(query)}",
+        f"https://www.arzum.com.tr/arama?q={urllib.parse.quote_plus(query)}",
         "arzum", render_js=False, timeout=12
     )
 
