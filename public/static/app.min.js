@@ -7,6 +7,13 @@ const ALMADAN_LUCIDE_SRC = "https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min
 const ALMADAN_ADSENSE_SRC = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8816248752189045";
 window.__almadanAppScriptLoaded = true;
 
+// initializeAlmadanApp() en basta applyTheme() cagiriyor -- bu iki sabit
+// script'in daha asagisinda tanimliysa TDZ (temporal dead zone) hatasi
+// veriyordu ("Cannot access '_MOON_SVG' before initialization"), tum
+// karsilastirma formunu kirmisti. En basa tasindi.
+const _SUN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
+const _MOON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+
 function scheduleIdleTask(callback, timeout = 2500) {
   if ("requestIdleCallback" in window) {
     return window.requestIdleCallback(callback, { timeout });
@@ -4036,8 +4043,6 @@ window.deleteReceipt = deleteReceipt;
 
 
 /* PREMIUM KOYU TEMA */
-const _SUN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
-const _MOON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
 function applyTheme() {
   const isDark = state.theme === "dark";
   document.documentElement.classList.toggle("dark-theme", isDark);
