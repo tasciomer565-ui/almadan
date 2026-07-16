@@ -1625,6 +1625,25 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
     # Her zaman filtrele (model_codes boş olsa bile variant filtresi çalışsın)
     products = [p for p in products if is_same_model(p)]
 
+    # Model numarası çakışması: kaynak "iPhone 15 128 GB" iken adayda "16"
+    # veya "16e" gibi FARKLI bir bağımsız model numarası varsa ele.
+    # has_model_conflict muhafazakârdır: iki tarafta da model adayı yokken
+    # veya en az biri örtüşüyorken ürünü tutar.
+    from app.comparator import has_model_conflict, is_refurbished_title
+    products = [p for p in products if not has_model_conflict(payload.title, p.get("title", ""))]
+
+    # Yenilenmiş/teşhir/outlet/2.el tespiti: ürün listeden SİLİNMEZ ama
+    # işaretlenir (frontend rozet gösterebilsin) ve kaynak ürün sıfırken
+    # "En Ucuz" / "En Yüksek İndirim" gibi etiketleri taşıyamaz.
+    source_is_refurb = is_refurbished_title(payload.title)
+    for p in products:
+        if is_refurbished_title(p.get("title", "")):
+            p.setdefault("extra_info", {})["refurbished"] = True
+            p["condition"] = "refurbished"
+            if not source_is_refurb and p.get("labels"):
+                p["labels"] = [l for l in p["labels"]
+                               if l not in ("En Ucuz", "En Yüksek İndirim")]
+
     # Fiyat mantık filtresi: kaynak mağazadaki fiyat belliyken, onun çok
     # altındaki (1/4'ünden az) "alternatifler" neredeyse her zaman yanlış
     # eşleşmedir (farklı ürün, tekli yerine numune boy, aksesuar vb.) --
@@ -5160,6 +5179,38 @@ async def cron_check_reminders(request: Request):
     return {"checked": len(rows), "notified": sent, "date": today}
 
 
+def _branded_404_page(title: str, message: str = "") -> str:
+    """SEO/dinamik sayfalarin 404 dallari icin ortak, marka tasarimina uygun
+    HTML -- daha once ciplak <h1> donduruyorlardi (canli UX testinde bulundu)."""
+    import html as _html
+    title_esc = _html.escape(title)
+    message_esc = _html.escape(message) if message else ""
+    return f"""<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, follow">
+    <title>{title_esc} — Almadan</title>
+    <style>
+      body {{ margin:0; background:#121412; color:#f2f4f0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }}
+      .wrap {{ max-width:520px; margin:0 auto; padding:80px 24px; text-align:center; }}
+      h1 {{ font-size:22px; font-weight:800; margin:0 0 12px; }}
+      p {{ color:#a8afa8; font-size:14px; line-height:1.6; margin:0 0 28px; }}
+      a.cta {{ display:inline-block; background:#287a50; color:#fff; text-decoration:none; font-weight:700; font-size:14px; padding:12px 24px; border-radius:10px; }}
+      a.cta:hover {{ background:#1f6340; }}
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>{title_esc}</h1>
+      {f'<p>{message_esc}</p>' if message_esc else ''}
+      <a class="cta" href="/index.html">Ana Sayfaya Dön</a>
+    </div>
+  </body>
+</html>"""
+
+
 # ── Mağaza Bülten & Takip Modülü ─────────────────────────────────────────────
 
 # Türkçe gün adı → İngilizce slug eşlemesi (publication_day DB'de İngilizce saklanıyor)
@@ -5621,7 +5672,7 @@ async def store_page(slug: str):
     store = next((s for s in DEFAULT_STORE_NEWSLETTERS if s["slug"] == slug), None)
     if not store:
         return HTMLResponse(
-            "<h1>Mağaza bulunamadı</h1><p><a href=\"/\">Ana sayfaya dön</a></p>",
+            _branded_404_page("Mağaza bulunamadı", "Aradığın mağaza listemizde yok."),
             status_code=404,
         )
 
@@ -5894,8 +5945,7 @@ async def catalog_page(store: str):
 
     if not snapshot:
         return HTMLResponse(
-            "<h1>Bu mağaza için henüz katalog verisi yok</h1>"
-            "<p><a href=\"/\">Ana sayfaya dön</a></p>",
+            _branded_404_page("Bu mağaza için henüz katalog verisi yok", "Yakında eklenecek."),
             status_code=404,
         )
 
@@ -6067,14 +6117,30 @@ _CATEGORY_DISPLAY = {
 }
 
 
+# Türkçe kategori isimlerini gecerli (Ingilizce) slug'lara yonlendirir --
+# kullanicilar Turkce sitede dogal olarak Turkce slug tahmin ediyor
+# (canli UX testinde bulundu: /kategori/teknoloji cascade 404 veriyordu).
+_CATEGORY_TR_ALIASES = {
+    "teknoloji": "tech", "kozmetik": "beauty", "guzellik": "beauty", "güzellik": "beauty",
+    "moda": "fashion", "giyim": "fashion", "saglik": "health", "sağlık": "health",
+    "bebek": "health", "ev": "home", "ev-yasam": "home", "ev-yaşam": "home",
+    "yasam": "home", "yaşam": "home", "gida": "market", "gıda": "market",
+    "market": "market", "pazaryeri": "online", "online": "online",
+}
+
+
 @app.get("/kategori/{category}", response_class=HTMLResponse)
 async def category_page(category: str):
     """Kategori bazli SEO sayfasi -- ilgili tum magazalara link verir."""
     import html as _html
 
+    alias_target = _CATEGORY_TR_ALIASES.get(category.lower())
+    if alias_target and alias_target != category:
+        return RedirectResponse(f"/kategori/{alias_target}", status_code=301)
+
     if category not in ALL_STORES_MAP:
         return HTMLResponse(
-            "<h1>Kategori bulunamadı</h1><p><a href=\"/\">Ana sayfaya dön</a></p>",
+            _branded_404_page("Kategori bulunamadı", "Aradığın kategori listemizde yok."),
             status_code=404,
         )
 

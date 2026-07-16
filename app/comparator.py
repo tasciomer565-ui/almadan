@@ -505,6 +505,84 @@ def detect_query_category(query: str) -> str:
         return "supplement"
     return "general"
 
+_REFURB_TR_MAP = str.maketrans("şğıöüçâîŞĞİÖÜÇ", "sgioucaisgiouc")
+
+# "2. el" / "2.el" / "ikinci el" gibi varyantlar dahil; kelime sınırına
+# dikkat ("outlet" bir mağaza adında geçebilir ama başlıkta geçiyorsa
+# genelde teşhir/outlet ürünüdür, kabul edilebilir sinyal).
+_REFURB_PATTERNS = (
+    "yenilenmis", "refurbished", "refurbish", "teshir", "outlet",
+    "2. el", "2.el", "ikinci el", "2 el",
+)
+
+
+def is_refurbished_title(title: str) -> bool:
+    """Baslik yenilenmis/teshir/outlet/ikinci el urun sinyali iceriyor mu?
+
+    Turkce karakter varyantlarina (yenilenmiş/YENILENMIS...) ve buyuk/kucuk
+    harfe duyarsizdir.
+    """
+    if not title:
+        return False
+    norm = title.lower().translate(_REFURB_TR_MAP)
+    return any(pat in norm for pat in _REFURB_PATTERNS)
+
+
+# Sayi token'i bir olcu birimiyle takip ediliyorsa model numarasi degildir
+# ("128 GB", "12 Ay Garantili", "6.1 inç" vb.).
+_MODEL_UNIT_WORDS = {
+    "gb", "tb", "mb", "ml", "lt", "l", "kg", "gr", "g", "mg", "cm", "mm", "m",
+    "w", "kw", "hz", "mah", "inc", "inch", "ay", "yil", "adet", "li", "lu",
+    "lü", "kisi", "watt", "volt", "v", "amper", "mp", "hp", "fps", "gun",
+    "parca", "cift", "renk", "beden", "numara", "no", "yas", "kat",
+}
+
+
+def extract_model_numbers(title: str) -> set[str]:
+    """Basliktan bagimsiz model-numarasi adaylarini cikarir.
+
+    Muhafazakar kurallar (yanlis pozitif eleme riskini dusuk tutmak icin):
+    - Sadece 2 haneli sayi + opsiyonel tek harf token'lari ("15", "16e",
+      "24"); tek haneliler ("3 lu paket") ve 3+ haneliler (128, 256 gibi
+      kapasiteler) model sayilmaz.
+    - Token'dan sonra bir olcu/birim kelimesi geliyorsa elenir
+      ("12 Ay Garantili" -> 12 model degildir).
+    """
+    import re as _re
+    if not title:
+        return set()
+    norm = title.lower().translate(_REFURB_TR_MAP)
+    tokens = _re.findall(r"\w+", norm)
+    models: set[str] = set()
+    for i, tok in enumerate(tokens):
+        if not _re.fullmatch(r"\d{2}[a-z]?", tok):
+            continue
+        nxt = tokens[i + 1] if i + 1 < len(tokens) else ""
+        if nxt in _MODEL_UNIT_WORDS:
+            continue
+        models.add(tok)
+        # "16e" hem kendisi hem cekirdek sayisiyla ("16") eslesebilsin
+        if tok[-1].isalpha():
+            models.add(tok[:-1])
+    return models
+
+
+def has_model_conflict(source_title: str, candidate_title: str) -> bool:
+    """Aday baslikta kaynaktan FARKLI bir model numarasi var mi?
+
+    Muhafazakar: sadece her iki baslikta da model numarasi adayi varken ve
+    hicbiri ortusmuyorken True doner (orn. kaynak "iPhone 15 128 GB",
+    aday "iPhone 16e" -> True). Suphede kalirsa urun tutulur (False).
+    """
+    src = extract_model_numbers(source_title)
+    if not src:
+        return False
+    cand = extract_model_numbers(candidate_title)
+    if not cand:
+        return False
+    return not (src & cand)
+
+
 def is_logical_product(query: str, product_title: str) -> bool:
     query_lower = query.lower()
     title_lower = product_title.lower()
@@ -3251,8 +3329,20 @@ def search_products_by_name(
                         p["labels"].append("Şüpheli Fiyat")
                         
     # 10. Enrich labels (En Ucuz, En Yüksek İndirim)
+    # Yenilenmis/teshir/outlet urunleri isaretle -- frontend rozet gosterebilsin.
+    # Sorgunun kendisi yenilenmis urun aramiyorsa bu urunler "En Ucuz" /
+    # "En Yuksek Indirim" etiketi ALAMAZ (sifir vs yenilenmis adil kiyas degil).
+    query_is_refurb = is_refurbished_title(corrected_query)
+    for p in output:
+        if is_refurbished_title(p.get("title", "")):
+            p["extra_info"]["refurbished"] = True
+            p["condition"] = "refurbished"
     if output_in_stock:
         non_suspicious_in_stock = [p for p in output_in_stock if not p["extra_info"].get("suspicious")]
+        if not query_is_refurb:
+            non_refurb = [p for p in non_suspicious_in_stock if not p["extra_info"].get("refurbished")]
+            if non_refurb:
+                non_suspicious_in_stock = non_refurb
         cheapest_pool = non_suspicious_in_stock if non_suspicious_in_stock else output_in_stock
         cheapest = min(cheapest_pool, key=lambda x: x["price"])
         for r in output:
@@ -3267,7 +3357,12 @@ def search_products_by_name(
                 return (r["original_price"] - r["price"]) / r["original_price"]
             return 0
             
-        most_discounted = max(output_in_stock, key=get_discount_pct)
+        discount_pool = output_in_stock
+        if not query_is_refurb:
+            _non_refurb_pool = [p for p in output_in_stock if not p["extra_info"].get("refurbished")]
+            if _non_refurb_pool:
+                discount_pool = _non_refurb_pool
+        most_discounted = max(discount_pool, key=get_discount_pct)
         if get_discount_pct(most_discounted) > 0.05:
             for r in output:
                 if r["url"] == most_discounted["url"] and not r["extra_info"].get("out_of_stock"):
