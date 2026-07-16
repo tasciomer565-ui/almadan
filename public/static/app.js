@@ -269,6 +269,16 @@ function addAffiliateTag(url, source) {
   } catch(e) { return url; }
 }
 
+// "Mağazaya Git" tıklaması -- şimdilik sadece arama geçmişine ekliyor
+// (ürün tekrar önerilebilsin diye); ileride affiliate tıklama analitiği
+// için bu hook noktası genişletilecek.
+function trackStoreVisit(parsedOrProduct) {
+  try {
+    const title = parsedOrProduct && (parsedOrProduct.title || parsedOrProduct.product_title);
+    if (title) saveToSearchHistory(title);
+  } catch (e) { /* sessizce yut -- linki asla engellemesin */ }
+}
+
 function getStoreBrand(source) {
   const key = String(source || "").toLowerCase().replace(/\s+.*$/, "").replace(/[^a-z0-9]/g, "");
   return STORE_BRANDS[key] || { name: source || "Mağaza", color: "#287a50", bg: "rgba(40,122,80,0.08)", emoji: "🛒" };
@@ -2752,9 +2762,15 @@ function showParsedProduct(parsed) {
       </div>
       <p class="dialog-error" id="trackProductError" hidden></p>
       <div class="dialog-actions" style="display:flex; flex-direction:column; gap:8px;">
+        ${parsed.canonical_url ? `
+        <a class="primary-button" style="width:100%; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:8px;" href="${escapeHtml(parsed.canonical_url)}" target="_blank" rel="noopener sponsored" onclick="trackStoreVisit(state.parsedProduct)">
+          <i data-lucide="external-link" style="width:16px;height:16px;"></i>
+          Mağazaya Git
+        </a>
+        ` : ""}
         <div style="display:flex; gap:8px; width:100%;">
           <button class="secondary-button" style="flex:1;" type="button" onclick="closeDialog()">Vazgeç</button>
-          <button class="primary-button" style="flex:1;" type="button" id="trackParsedButton" onclick="trackParsedProduct()">
+          <button class="${parsed.canonical_url ? 'secondary-button' : 'primary-button'}" style="flex:1;" type="button" id="trackParsedButton" onclick="trackParsedProduct()">
             <i data-lucide="radar"></i>
             Takibe al
           </button>
