@@ -805,6 +805,16 @@ const _ONBOARDING_KEY = "almadan_onboarded_v1";
 
 function showOnboarding() {
   if (localStorage.getItem(_ONBOARDING_KEY)) return;
+  // Uygulama tembel yüklendiği için (ilk tıklamada) loadSession() -> 800ms
+  // sonra bu fonksiyon tetikleniyor. Kullanıcının ilk tıklaması genelde
+  // "Fiyatları Karşılaştır" oluyor -- tam o an onboarding'i acarsak
+  // kullanıcının kendi başlattığı işlemin üstüne biniyor (canlı UX testinde
+  // bulundu). Bir işlem/pencere zaten sürüyorsa hiç açma; sonraki idle anda
+  // (dialog kapandığında) tekrar denenmeyecek olsa da rahatsız etmemiş oluruz.
+  const busy = document.getElementById("quantumScanOverlay")?.style.display === "flex"
+    || document.getElementById("productDialog")?.open
+    || document.getElementById("sellerSelectionDialog")?.open;
+  if (busy) return;
   const modal = document.getElementById("onboardingModal");
   if (!modal) return;
   if (!modal.open) modal.showModal();
@@ -1659,6 +1669,13 @@ function renderTracking() {
 }
 
 function renderSavings() {
+  const emptyState = document.getElementById("savingsEmptyState");
+  const dashboardContent = document.getElementById("savingsDashboardContent");
+  const isEmpty = state.products.length === 0;
+  if (emptyState) emptyState.classList.toggle("hidden", !isEmpty);
+  if (dashboardContent) dashboardContent.classList.toggle("hidden", isEmpty);
+  if (isEmpty) return;
+
   const totalSavings = state.products.reduce((total, product) => {
     const firstPrice = product.price_history[0]?.price || product.current_price;
     return total + Math.max(0, firstPrice - product.current_price);
@@ -2727,14 +2744,17 @@ function showParsedProduct(parsed) {
           </div>
           <input id="parsedTargetPrice" type="text" inputmode="decimal" placeholder="Bu fiyata düşünce haber ver (İsteğe bağlı)">
         </label>
-        <label class="manual-field">
-          <span>Son Satın Alma Tarihi</span>
-          <input id="parsedLastPurchasedDate" type="date">
-        </label>
-        <label class="manual-field">
-          <span>Tekrar Alma Periyodu (Gün)</span>
-          <input id="parsedRestockPeriod" type="number" min="1" max="730" placeholder="Örn. 30">
-        </label>
+        <details style="margin: 4px 0;">
+          <summary style="cursor:pointer; font-size:12.5px; font-weight:700; color:var(--ink-2); padding:4px 0;">Gelişmiş seçenekler (stok hatırlatıcı)</summary>
+          <label class="manual-field">
+            <span>Son Satın Alma Tarihi</span>
+            <input id="parsedLastPurchasedDate" type="date">
+          </label>
+          <label class="manual-field">
+            <span>Tekrar Alma Periyodu (Gün)</span>
+            <input id="parsedRestockPeriod" type="number" min="1" max="730" placeholder="Örn. 30">
+          </label>
+        </details>
         ${isSupplement ? `
         <label class="manual-field">
           <span>Toplam Servis Sayısı</span>
