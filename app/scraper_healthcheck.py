@@ -26,6 +26,25 @@ _MIN_CONSECUTIVE_ZERO_TO_ALERT = 2
 # en düşük en-iyi sonuç sayısı
 _MIN_HISTORY_TO_CARE = 3
 
+# Bazi kategoriler (ozellikle EV) hem farkli alt-turleri (mobilya vs
+# mutfak esyasi) barindiriyor -- tek bir kategori sorgusu ("tencere")
+# custom-DOM-parser'li magazalarda (JSON-LD'ye bagimli olmayan, gercek
+# veri ureten) hicbir gercek eslesme bulamayabiliyordu. Bu sozluk,
+# belirli bir scraper icin kategori sorgusunu ezer.
+#
+# ONEMLI: sadece custom DOM parser kullanan (JSON-LD'ye bagimli olmayan)
+# magazalar icin anlamli -- _scrape_jsonld_itemlist kullanan magazalarda
+# "0 sonuc" cogunlukla sorgu uyumsuzlugu degil, sitenin /ara sayfasinin
+# hic server-side render edilmemesi (JS-SPA, ScrapingBee gerektirir)
+# -- boyle magazalar icin sorgu degistirmek sorunu cozmez (bellona/dogtas
+# ile denendi, 2026-07-16'da dogrulandi: hangi sorgu verilirse verilsin
+# ayni ana sayfa/varsayilan urunler donuyor, ItemList/gercek arama sonucu
+# hicbir zaman yok -- bu magazalar icin custom parser veya render_js=True
+# gerekir, sadece sorgu override etmek yanlis "duzeltme" olurdu).
+_STORE_TEST_QUERY_OVERRIDES: dict[str, str] = {
+    "search_vivense": "koltuk",  # custom DOM parser (data-product-name/price), tencere'de gercek eslesme yok
+}
+
 _DAILY_PLAN: dict[int, tuple[str, str, list[str]]] = {
     0: ("TEKNOLOJİ", "telefon", [
         "search_mediamarkt", "search_teknosa", "search_vatanbilgisayar",
@@ -115,7 +134,8 @@ async def run_daily_healthcheck(weekday: int | None = None, slot: int = 0) -> di
         if fn is None:
             continue
         valid_names.append(name)
-        tasks.append(loop.run_in_executor(_HC_EXECUTOR, fn, test_query))
+        store_query = _STORE_TEST_QUERY_OVERRIDES.get(name, test_query)
+        tasks.append(loop.run_in_executor(_HC_EXECUTOR, fn, store_query))
 
     try:
         results_raw = await asyncio.wait_for(
