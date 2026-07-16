@@ -3999,14 +3999,15 @@ window.deleteReceipt = deleteReceipt;
 
 
 /* PREMIUM KOYU TEMA */
+const _SUN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
+const _MOON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
 function applyTheme() {
   const isDark = state.theme === "dark";
   document.documentElement.classList.toggle("dark-theme", isDark);
   document.body.classList.toggle("dark-theme", isDark);
   const themeBtn = document.getElementById("themeToggleButton");
   if (themeBtn) {
-    themeBtn.innerHTML = isDark ? `<i data-lucide="sun"></i>` : `<i data-lucide="moon"></i>`;
-    lucide.createIcons();
+    themeBtn.innerHTML = isDark ? _SUN_SVG : _MOON_SVG;
   }
 }
 
@@ -6250,7 +6251,11 @@ async function toggleFollow(slug, name) {
       const c = storeFollowerCounts[slug];
       countEl.textContent = c > 0 ? `👥 ${c} kişi takipte` : "İlk takipçi ol!";
     }
-    showToast(escapeHtml(error?.message || "Bağlantı hatası, tekrar dene."));
+    if (isLoginRequiredError(error)) {
+      promptLoginForTracking("Bir mağazayı takibe almak için hesap açman gerekiyor.");
+    } else {
+      showToast(escapeHtml(error?.message || "Bağlantı hatası, tekrar dene."));
+    }
   }
 }
 
@@ -6628,10 +6633,14 @@ async function showSellerSelectionDialog(parsed) {
     const minPrice = Math.min(...alts.filter(a => a.price > 0).map(a => a.price));
     const maxPrice = Math.max(...alts.filter(a => a.price > 0).map(a => a.price));
     const savings = maxPrice - minPrice;
+    const storeCount = new Set(alts.map(a => a.source)).size;
+    const headerLabel = storeCount === alts.length
+      ? `${alts.length} Mağazada Karşılaştırma`
+      : `${alts.length} Sonuç, ${storeCount} Mağazada Karşılaştırma`;
 
     let listHtml = `
       <div style="margin-bottom:16px;">
-        <h3 style="margin:0 0 4px 0; font-size:20px; font-weight:800; color:var(--ink);">🛒 ${alts.length} Mağazada Karşılaştırma</h3>
+        <h3 style="margin:0 0 4px 0; font-size:20px; font-weight:800; color:var(--ink);">🛒 ${headerLabel}</h3>
         ${savings > 1 ? `<p style="margin:0; font-size:13px; color:#287a50; font-weight:600;">💰 En pahalı satıcıya göre <b>₺${savings.toFixed(2)}</b> tasarruf edebilirsin!</p>` : `<p style="margin:0; font-size:13px; color:var(--ink-2);">Bir mağaza seçip takibe alarak fiyat düşüşlerini takip et.</p>`}
       </div>
       <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; max-height:60vh; overflow-y:auto; padding-right:4px;" class="custom-scrollbar">
@@ -6750,6 +6759,14 @@ async function loadRecommendations() {
   container.classList.remove("hidden");
   grid.innerHTML = `<div class="loading-state" style="grid-column:1/-1;"><span class="spinner"></span>Öneriler hazırlanıyor...</div>`;
 
+  // csrf_token çerezi yeni sekme/oturumda henüz yazılmamış olabilir (ilk
+  // sayfa yanıtıyla aynı anda ayarlanıyor, nadir bir yarış durumu) -- POST
+  // öncesi kısa bir kez bekleyip tekrar dene, gereksiz konsol hatasını önle.
+  const hasCsrfCookie = () => document.cookie.split("; ").some(row => row.startsWith("csrf_token="));
+  if (!hasCsrfCookie()) {
+    await new Promise(resolve => setTimeout(resolve, 400));
+  }
+
   try {
     const res = await api("/api/recommendations", {
       method: "POST",
@@ -6778,7 +6795,7 @@ async function loadRecommendations() {
       `;
     }).join("");
   } catch (err) {
-    console.error("loadRecommendations hatası:", err);
+    // Öneriler tali bir özellik -- sessizce gizle, konsolu kirletme.
     container.classList.add("hidden");
   }
 }
