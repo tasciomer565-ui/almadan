@@ -1670,7 +1670,16 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
             model_penalty = 0
         return base + model_bonus - model_penalty
 
-    products.sort(key=lambda p: (-relevance(p), p.get("price") or 0))
+    # Yenilenmis urunler genelde daha ucuz oldugu icin sirf fiyata gore
+    # siralarsak "labels" alanindan cikardigimiz "En Ucuz" etiketine
+    # ragmen sifir listesindeki EN UCUZ rozeti (frontend bunu backend
+    # etiketi degil dizideki 0. sira uzerinden hesapliyor) yine de
+    # yenilenmis urune duserdi. Kaynak sifirken yenilenmisleri ayni
+    # relevance grubunda SONRA sirala (kaldirmadan, sadece geriye it).
+    def refurb_penalty(p: dict) -> int:
+        return 1 if (not source_is_refurb and p.get("condition") == "refurbished") else 0
+
+    products.sort(key=lambda p: (-relevance(p), refurb_penalty(p), p.get("price") or 0))
 
     # Her kaynaktan en fazla 3 ürün al (tekrarlayan mağazaları sınırla)
     from collections import defaultdict
@@ -1705,7 +1714,14 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
                                   if isinstance(p, dict) and (p.get("price") or 0) > 0]
                 retry_products = [p for p in retry_products
                                   if is_logical_product(query, p.get("title", "")) and is_same_model(p)]
-                retry_products.sort(key=lambda p: (-relevance(p), p.get("price") or 0))
+                retry_products = [p for p in retry_products if not has_model_conflict(payload.title, p.get("title", ""))]
+                for p in retry_products:
+                    if is_refurbished_title(p.get("title", "")):
+                        p.setdefault("extra_info", {})["refurbished"] = True
+                        p["condition"] = "refurbished"
+                        if not source_is_refurb and p.get("labels"):
+                            p["labels"] = [l for l in p["labels"] if l not in ("En Ucuz", "En Yüksek İndirim")]
+                retry_products.sort(key=lambda p: (-relevance(p), refurb_penalty(p), p.get("price") or 0))
                 deduped = _dedup(retry_products)
             except Exception:
                 pass
