@@ -5567,7 +5567,52 @@ async def follow_store(slug: str, request: Request, user=Depends(require_login))
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Mağaza takibi şu anda kaydedilemedi.") from exc
     _log_event(uid, "store_follow", {"store_slug": slug, "action": "follow", "email": user_email})
+
+    store_name = next(
+        (s["name"] for s in DEFAULT_STORE_NEWSLETTERS if s["slug"] == slug), slug
+    )
+    _notify_follow_confirmation(uid, slug, store_name)
     return {"followed": slug}
+
+
+def _notify_follow_confirmation(uid: str, slug: str, store_name: str) -> None:
+    """Takip onayi -- uygulama ici bildirim zili (garantili) + telefon
+    numarasi varsa WhatsApp (Meta onayli sablon gerektirir, yoksa sessizce
+    atlar). Kullanici "takip ettim ama hicbir tepki almadim" hissine
+    kapilmasin diye eklendi."""
+    import logging
+    log = logging.getLogger(__name__)
+    sb_url = supabase_base_url()
+    sb_hdrs = supabase_headers()
+    try:
+        requests.post(
+            f"{sb_url}/rest/v1/user_notifications",
+            headers=sb_hdrs,
+            json={
+                "user_id": uid, "store_slug": slug,
+                "title": f"{store_name} takibe alındı",
+                "body": "Bu mağazada kampanya veya önemli fiyat düşüşü olduğunda anında haber vereceğiz.",
+                "url": f"/magaza/{slug}", "is_read": False,
+            },
+            timeout=10,
+        )
+    except Exception:
+        log.warning("Takip onay bildirimi kaydedilemedi user=%s slug=%s", uid, slug)
+
+    try:
+        from app.whatsapp import whatsapp_enabled, send_whatsapp_template
+        from app.tracker import _whatsapp_display_name
+        if whatsapp_enabled():
+            local_db = load_db()
+            user_info = local_db.get("users", {}).get(f"user:{uid}", {})
+            phone = user_info.get("phone")
+            pref = user_info.get("notification_pref", "both")
+            if phone and pref in ("sms", "both"):
+                display_name = _whatsapp_display_name(user_info)
+                follow_template = os.getenv("WHATSAPP_FOLLOW_TEMPLATE_NAME", "store_follow_confirm").strip()
+                send_whatsapp_template(phone, follow_template, params=[display_name, store_name])
+    except Exception as wa_err:
+        log.warning("Takip onay WhatsApp gönderilemedi user=%s: %s", uid, wa_err)
 
 
 # ── Bildirimler ──────────────────────────────────────────────────────────────

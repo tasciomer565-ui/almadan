@@ -3644,13 +3644,29 @@ async function refreshAllPrices() {
 
 async function showNotifications() {
   try {
-    const [notifications, pushConfig] = await Promise.all([
+    // İki ayrı bildirim kaynağı var: /notifications = cihaz bazlı fiyat
+    // alarmı/katalog eşleşmesi, /api/notifications = hesap bazlı mağaza
+    // takibi/kampanya bildirimi (girişsizken 403 döner, sorun değil).
+    // Zil ikonu ikisini de tek listede göstermeli -- aksi halde mağaza
+    // takip onayı hiçbir yerde görünmez.
+    const [notifications, pushConfig, storeNotifResult] = await Promise.all([
       api("/notifications"),
       api("/push/config"),
+      api("/api/notifications").catch(() => ({ notifications: [] })),
     ]);
     const dialog = document.getElementById("productDialog");
     const content = document.getElementById("dialogContent");
     const pushState = await currentPushState(pushConfig);
+
+    const storeNotifications = (storeNotifResult.notifications || []).map(item => ({
+      type: "store_follow",
+      title: item.title,
+      message: item.body,
+      created_at: item.created_at,
+      url: item.url,
+    }));
+    const merged = [...notifications, ...storeNotifications]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     content.innerHTML = `
       <div class="dialog-body">
@@ -3668,8 +3684,8 @@ async function showNotifications() {
               : ""}
         </div>
         <div class="notification-list">
-          ${notifications.length
-            ? notifications.map((item) => {
+          ${merged.length
+            ? merged.map((item) => {
                 let badgeHtml = "";
                 if (item.type === "catalog_bim") {
                   badgeHtml = `<span class="analysis-status-badge bg-blue" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; margin-right: 6px;">BİM AKTÜEL</span>`;
@@ -3681,6 +3697,8 @@ async function showNotifications() {
                   badgeHtml = `<span class="analysis-status-badge bg-green" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; margin-right: 6px;">STOK GELDİ</span>`;
                 } else if (item.type === "catalog_match") {
                   badgeHtml = `<span class="analysis-status-badge bg-green" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; margin-right: 6px;">KATALOĞA DÜŞTÜ!</span>`;
+                } else if (item.type === "store_follow") {
+                  badgeHtml = `<span class="analysis-status-badge bg-blue" style="font-size: 9px; padding: 2px 4px; border-radius: 3px; font-weight: 700; margin-right: 6px;">MAĞAZA</span>`;
                 }
 
                 return `
@@ -3700,6 +3718,9 @@ async function showNotifications() {
     `;
     dialog.showModal();
     await api("/notifications/read-all", { method: "POST" });
+    if (storeNotifications.length) {
+      api("/api/notifications/read-all", { method: "POST" }).catch(() => {});
+    }
   } catch (error) {
     showToast(error.message);
   }
