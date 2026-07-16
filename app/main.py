@@ -5599,20 +5599,44 @@ def _notify_follow_confirmation(uid: str, slug: str, store_name: str) -> None:
     except Exception:
         log.warning("Takip onay bildirimi kaydedilemedi user=%s slug=%s", uid, slug)
 
+    phone: str | None = None
+    pref = "both"
+    display_name = ""
+    try:
+        from app.tracker import _whatsapp_display_name
+        local_db = load_db()
+        user_info = local_db.get("users", {}).get(f"user:{uid}", {})
+        phone = user_info.get("phone")
+        pref = user_info.get("notification_pref", "both")
+        display_name = _whatsapp_display_name(user_info)
+    except Exception:
+        log.warning("Takip onay için kullanıcı telefon bilgisi okunamadı user=%s", uid)
+
+    if not phone or pref not in ("sms", "both"):
+        return
+
+    sent = False
     try:
         from app.whatsapp import whatsapp_enabled, send_whatsapp_template
-        from app.tracker import _whatsapp_display_name
         if whatsapp_enabled():
-            local_db = load_db()
-            user_info = local_db.get("users", {}).get(f"user:{uid}", {})
-            phone = user_info.get("phone")
-            pref = user_info.get("notification_pref", "both")
-            if phone and pref in ("sms", "both"):
-                display_name = _whatsapp_display_name(user_info)
-                follow_template = os.getenv("WHATSAPP_FOLLOW_TEMPLATE_NAME", "store_follow_confirm").strip()
-                send_whatsapp_template(phone, follow_template, params=[display_name, store_name])
+            follow_template = os.getenv("WHATSAPP_FOLLOW_TEMPLATE_NAME", "store_follow_confirm").strip()
+            sent = send_whatsapp_template(phone, follow_template, params=[display_name, store_name])
     except Exception as wa_err:
         log.warning("Takip onay WhatsApp gönderilemedi user=%s: %s", uid, wa_err)
+
+    # WhatsApp yoksa/başarısızsa Netgsm SMS'e düş -- şablon onayı gerektirmez,
+    # NETGSM_USERCODE/PASSWORD/MSGHEADER ayarlanana kadar sessizce atlanır.
+    if not sent:
+        try:
+            from app.netgsm import netgsm_enabled, send_netgsm_sms
+            if netgsm_enabled():
+                send_netgsm_sms(
+                    phone,
+                    f"Almadan: {store_name} magazasini takibe aldin. "
+                    f"Kampanya veya onemli fiyat dususunde sana haber verecegiz.",
+                )
+        except Exception as sms_err:
+            log.warning("Takip onay SMS gönderilemedi user=%s: %s", uid, sms_err)
 
 
 # ── Bildirimler ──────────────────────────────────────────────────────────────
