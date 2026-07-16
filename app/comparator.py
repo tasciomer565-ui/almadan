@@ -583,6 +583,51 @@ def has_model_conflict(source_title: str, candidate_title: str) -> bool:
     return not (src & cand)
 
 
+_STORAGE_UNIT_TO_GB = {"tb": 1024, "gb": 1, "mb": 1 / 1024}
+
+
+def extract_storage_capacity(title: str) -> float | None:
+    """Basliktan depolama kapasitesini (GB cinsinden) cikarir -- "128 GB",
+    "1 TB", "256GB" gibi. Birden fazla farkli deger varsa (orn. hem RAM hem
+    depolama yaziyorsa, "8 GB RAM 128 GB Depolama" gibi) muhafazakar davranip
+    None doner -- yanlis pozitif eleme riskini almamak icin.
+    """
+    import re as _re
+    if not title:
+        return None
+    norm = title.lower().translate(_REFURB_TR_MAP)
+    matches = _re.findall(r"(\d+(?:[.,]\d+)?)\s*(tb|gb|mb)\b", norm)
+    if not matches:
+        return None
+    values = set()
+    for num, unit in matches:
+        try:
+            val = float(num.replace(",", ".")) * _STORAGE_UNIT_TO_GB[unit]
+        except ValueError:
+            continue
+        values.add(round(val, 3))
+    if len(values) != 1:
+        return None
+    return values.pop()
+
+
+def has_capacity_conflict(source_title: str, candidate_title: str) -> bool:
+    """Aday baslikta kaynaktan FARKLI bir depolama kapasitesi var mi?
+
+    Muhafazakar: sadece ikisinden de TEK VE NET bir kapasite degeri
+    cikarilabiliyorsa ve degerler farkliysa True doner (orn. kaynak
+    "iPhone 15 128 GB", aday "iPhone 15 512 GB" -> True). Herhangi bir
+    tarafta kapasite belirsizse/yoksa urun tutulur (False).
+    """
+    src = extract_storage_capacity(source_title)
+    if src is None:
+        return False
+    cand = extract_storage_capacity(candidate_title)
+    if cand is None:
+        return False
+    return src != cand
+
+
 def is_logical_product(query: str, product_title: str) -> bool:
     query_lower = query.lower()
     title_lower = product_title.lower()
