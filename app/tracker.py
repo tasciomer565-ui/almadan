@@ -192,7 +192,16 @@ def log_email_notification(owner_id: str | None, title: str, message: str) -> No
     
     if pref not in ("email", "both") or not email:
         return
-        
+
+    # Gercek SMTP e-posta gonderimi -- credential yoksa (SMTP_HOST/USER/
+    # PASSWORD eksikse) smtp_enabled() False doner ve sessizce atlanir.
+    try:
+        from app.email_notify import smtp_enabled, send_smtp_email
+        if smtp_enabled():
+            send_smtp_email(email, title, message)
+    except Exception:
+        pass
+
     from app.storage import DATA_DIR, utc_now
     email_file = DATA_DIR / "email_logs.json"
     

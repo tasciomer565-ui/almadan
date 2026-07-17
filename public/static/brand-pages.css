@@ -163,6 +163,9 @@ i[data-lucide] { width: 18px; height: 18px; stroke-width: 2.2; flex-shrink: 0; }
   transition: border-color .15s, box-shadow .15s;
 }
 .bp-feature:hover { border-color: var(--green); box-shadow: 0 8px 24px rgba(40,122,80,.08); }
+.bp-price-history { margin: 10px 0; }
+.bp-price-history svg { display: block; width: 100%; height: auto; }
+.bp-price-history-caption { font-size: 12px; color: var(--ink-2); margin: 4px 0 0; }
 .bp-feature i {
   color: var(--green);
   background: var(--green-bg);

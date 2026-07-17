@@ -73,6 +73,30 @@ def apply_security_headers(response) -> None:
             response.headers[key] = value
 
 
+# ── Embed CSP (yalnızca /embed/* rotası) ────────────────────
+# Karşılaştırma widget'ının başka sitelere iframe içinde gömülebilmesi için
+# frame-ancestors'ı gevşetiyoruz. Bu SADECE /embed/* rotasına uygulanır --
+# genel SECURITY_HEADERS'taki frame-ancestors 'none' değişmez.
+_EMBED_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com; "
+    "img-src 'self' data: https:; "
+    "connect-src 'self'; "
+    "frame-ancestors *;"
+)
+
+
+def apply_embed_security_headers(response) -> None:
+    """/embed/* rotası için gevşetilmiş CSP -- diğer sitelerde iframe ile gömülebilsin."""
+    for key, value in SECURITY_HEADERS.items():
+        if value and key not in ("X-Frame-Options", "Content-Security-Policy"):
+            response.headers[key] = value
+    response.headers["Content-Security-Policy"] = _EMBED_CSP
+    # X-Frame-Options kasıtlı olarak set edilmiyor -- frame-ancestors CSP ile kontrol ediliyor.
+
+
 # ── CSRF Koruması ────────────────────────────────────────────
 
 def generate_csrf_token(session_id: str) -> str:
@@ -113,6 +137,7 @@ CSRF_EXEMPT_PATHS = {
     "/cron/",
     "/parse-url",
     "/api/client-error",  # sendBeacon header taşıyamaz; endpoint salt-log, durum değiştirmez
+    "/api/track-share",  # sendBeacon header taşıyamaz; endpoint salt-log, durum değiştirmez
     "/api/find-alternatives",  # salt-okunur arama (DB'ye yazmaz); tarayıcı uzantısı 3. taraf sayfadan çağırır, csrf_token cookie'sine erişimi yok
     "/api/admin/products/",  # çerez değil, ayrı bir paylaşımlı sır (X-Admin-Secret) ile korunuyor -- diğer /api/admin/* endpoint'leri session-çerez tabanlı olduğu için buraya DAHIL EDİLMEDİ, sadece bu yol muaf
 }
@@ -358,6 +383,53 @@ def check_rate_limit(request: Request, bucket: str, limit: int, window_seconds: 
 
     timestamps.append(now)
     _RATE_LIMIT_BUCKETS[key] = timestamps
+
+
+# ── Genel Geliştirici API Anahtarı ──────────────────────────
+# Basit, ücretsiz, rate-limited salt-okunur API için X-API-Key doğrulaması.
+# Anahtarlar Supabase'deki api_keys tablosunda tutulur (key_hash, label, active).
+
+def hash_api_key(raw_key: str) -> str:
+    return hashlib.sha256(raw_key.encode()).hexdigest()
+
+
+async def require_api_key(request: Request) -> dict:
+    """X-API-Key header'ını api_keys tablosuna karşı doğrular.
+
+    Ham anahtar hiçbir yerde saklanmaz -- yalnızca sha256 hash'i tutulur.
+    Geçersiz/eksik anahtar veya pasif kayıt 401 döner.
+    """
+    import requests as _req
+
+    raw_key = request.headers.get("x-api-key", "").strip()
+    if not raw_key:
+        raise HTTPException(status_code=401, detail="X-API-Key başlığı eksik.")
+
+    if not supabase_enabled():
+        raise HTTPException(status_code=503, detail="API şu anda kullanılamıyor.")
+
+    key_hash = hash_api_key(raw_key)
+    try:
+        url = f"{supabase_base_url()}/rest/v1/api_keys"
+        resp = _req.get(
+            url,
+            headers=supabase_headers(),
+            params={"key_hash": f"eq.{key_hash}", "active": "eq.true", "select": "*"},
+            timeout=5,
+        )
+        rows = resp.json() if resp.ok else []
+    except Exception:
+        rows = []
+
+    if not rows:
+        raise HTTPException(status_code=401, detail="Geçersiz veya pasif API anahtarı.")
+
+    key_row = rows[0]
+
+    # Anahtar başına rate limit -- IP değil, api key bazlı (paylaşılan IP'lerde adil olsun diye).
+    check_rate_limit(request, f"public_api:{key_hash}", limit=60, window_seconds=60)
+
+    return key_row
 
 
 # ── Audit Log ────────────────────────────────────────────────
