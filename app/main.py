@@ -53,15 +53,12 @@ from app.storage import (
 )
 from app.tracker import refresh_all_products, refresh_owner_products, refresh_product
 from app.security import (
-    apply_embed_security_headers,
     apply_security_headers,
     auth_wall_middleware,
     csrf_middleware,
     generate_csrf_token,
-    hash_api_key,
     log_activity,
     require_admin,
-    require_api_key,
     require_login,
     require_premium,
     sanitize,
@@ -283,10 +280,7 @@ async def resolve_auth_session(request: Request, call_next):
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path.startswith("/embed/"):
-        apply_embed_security_headers(response)
-    else:
-        apply_security_headers(response)
+    apply_security_headers(response)
     # CSRF token'ı cookie olarak sun (JS okumaz, header'dan gönderir)
     if not request.cookies.get("csrf_token"):
         device_id = getattr(request.state, "device_id", None) or request.cookies.get("almadan_device_id", "anonymous")
@@ -561,7 +555,6 @@ class AuthCredentials(BaseModel):
     phone: str | None = None
     notification_pref: str | None = None
     full_name: str | None = Field(default=None, max_length=120)
-    ref: str | None = Field(default=None, max_length=32)
 
 
 class PasswordResetRequest(BaseModel):
@@ -582,7 +575,6 @@ class ProfileUpdateRequest(BaseModel):
     gender: Literal["belirtilmemiş", "erkek", "kadın"] = "belirtilmemiş"
     phone: str | None = Field(default=None, max_length=30)
     notification_pref: Literal["sms", "email", "both"] = "both"
-    notification_hour: int | None = Field(default=None, ge=0, le=23)
     silence_enabled: bool = True
     skin_type: Literal["light", "medium", "dark"] | None = None
     full_name: str | None = Field(default=None, max_length=120)
@@ -813,10 +805,6 @@ def auth_signup(
             "skin_type": user.get("user_metadata", {}).get("skin_type") if user else None,
             "full_name": user.get("user_metadata", {}).get("full_name") if user else None,
         }
-        if payload.ref:
-            ref_code = sanitize(payload.ref.strip().upper(), max_length=32)
-            referrer_uid = db.get("referral_codes", {}).get(ref_code)
-            db["users"][user_owner]["referred_by"] = referrer_uid or ref_code
         save_db(db)
 
     return {
@@ -1015,7 +1003,6 @@ def auth_profile_update(request: Request, payload: ProfileUpdateRequest) -> dict
         "gender": payload.gender,
         "phone": phone or None,
         "notification_pref": payload.notification_pref,
-        "notification_hour": payload.notification_hour,
         "silence_hours": (
             {"start": 22, "end": 8} if payload.silence_enabled else None
         ),
@@ -1179,84 +1166,6 @@ async def get_activity_log(request: Request, limit: int = 50) -> dict:
     return {"events": rows}
 
 
-@app.get("/api/admin/viewed-not-tracked")
-def admin_viewed_not_tracked(request: Request, hours: int = 24, days: int = 7, user=Depends(require_admin)) -> dict:
-    """Ürünü görüntüleyip belirtilen süre (varsayılan 24 saat) içinde
-    takibe almayan kullanıcıları tespit eder. Sadece tespit -- bildirim/e-posta
-    göndermez, salt okunur bir sorgu endpoint'idir."""
-    from app.storage import supabase_base_url, supabase_headers, supabase_enabled
-
-    if not supabase_enabled():
-        return {"enabled": False, "candidates": []}
-
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-
-    try:
-        views_resp = requests.get(
-            f"{supabase_base_url()}/rest/v1/user_events",
-            headers=supabase_headers(),
-            params={
-                "event_type": "eq.product_view",
-                "created_at": f"gt.{since}",
-                "select": "user_id,payload,created_at",
-                "order": "created_at.asc",
-                "limit": "2000",
-            },
-            timeout=10,
-        )
-        views = views_resp.json() if views_resp.ok else []
-
-        tracks_resp = requests.get(
-            f"{supabase_base_url()}/rest/v1/user_events",
-            headers=supabase_headers(),
-            params={
-                "event_type": "eq.product_track",
-                "created_at": f"gt.{since}",
-                "select": "user_id,payload,created_at",
-                "limit": "2000",
-            },
-            timeout=10,
-        )
-        tracks = tracks_resp.json() if tracks_resp.ok else []
-    except Exception:
-        return {"enabled": True, "candidates": [], "error": "sorgu başarısız"}
-
-    tracked_keys = set()
-    for t in tracks:
-        payload = t.get("payload") or {}
-        title = (payload.get("title") or "").strip().lower()
-        if t.get("user_id") and title:
-            tracked_keys.add((t["user_id"], title))
-
-    candidates = []
-    seen = set()
-    for v in views:
-        uid = v.get("user_id")
-        payload = v.get("payload") or {}
-        title = (payload.get("title") or "").strip().lower()
-        viewed_at = v.get("created_at") or ""
-        if not uid or not title or not viewed_at:
-            continue
-        if viewed_at > cutoff:
-            continue  # henüz 24 saat dolmamış
-        if (uid, title) in tracked_keys:
-            continue  # takibe almış
-        key = (uid, title)
-        if key in seen:
-            continue
-        seen.add(key)
-        candidates.append({
-            "user_id": uid,
-            "email": payload.get("email") or "Anonymous",
-            "title": payload.get("title"),
-            "source": payload.get("source"),
-            "viewed_at": viewed_at,
-        })
-
-    return {"enabled": True, "hours": hours, "days": days, "candidates": candidates[:200]}
-
-
 @app.get("/storage-health")
 def storage_health() -> dict:
     db = load_db()
@@ -1319,208 +1228,11 @@ async def client_error_report(request: Request) -> dict:
     return {"ok": True}
 
 
-@app.post("/api/track-share", include_in_schema=False)
-async def track_share(request: Request) -> dict:
-    """
-    Paylaşım linklerindeki UTM parametrelerini (utm_source, utm_medium,
-    utm_campaign) loglar. Frontend paylaşım fonksiyonları (shareProductWhatsApp,
-    shareProduct) linke UTM ekledikten sonra bu uca sendBeacon/fetch ile
-    fire-and-forget bildirir -- _log_event ile mevcut event altyapısı kullanılır.
-    """
-    from app.security import check_rate_limit
-    check_rate_limit(request, "track_share", limit=60, window_seconds=60)
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-
-    device_id = request.cookies.get("almadan_device_id")
-    _log_event(None, "share_utm", {
-        "utm_source":   str(body.get("utm_source", ""))[:60],
-        "utm_medium":   str(body.get("utm_medium", ""))[:60],
-        "utm_campaign": str(body.get("utm_campaign", ""))[:60],
-        "channel":      str(body.get("channel", ""))[:40],
-    }, session_id=device_id)
-    return {"ok": True}
-
-
 @app.get("/api/client-errors", include_in_schema=False)
 async def client_error_list(request: Request) -> list[dict]:
     """Son istemci hatalarını listele (yalnızca admin)."""
     await require_admin(request)
     return list(_client_errors or [])
-
-
-@app.post("/api/log-activity", include_in_schema=False)
-async def log_activity(request: Request) -> dict:
-    """Genel amaçlı, düşük hacimli istemci aktivite loglayıcı (örn. A/B test
-    variant atamaları). Kimlik doğrulama gerektirmez, kısıtlı alanlarla
-    _log_event'e (Supabase + yerel JSONL) yazar."""
-    from app.security import check_rate_limit
-    check_rate_limit(request, "log_activity", limit=30, window_seconds=60)
-    try:
-        body = await request.json()
-    except Exception:
-        return {"ok": False}
-
-    action = sanitize(str(body.get("action", "")), max_length=64) or "activity"
-    payload = {
-        "action": action,
-        "ab_test": sanitize(str(body.get("ab_test", "")), max_length=64),
-        "ab_variant": sanitize(str(body.get("ab_variant", "")), max_length=8),
-        "path": sanitize(str(body.get("path", "")), max_length=200),
-    }
-    _log_event(None, "client_activity", payload)
-    return {"ok": True}
-
-
-def _store_suggestions_file() -> "Path":
-    from pathlib import Path
-    data_dir = Path(__file__).resolve().parent.parent / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    return data_dir / "store_suggestions.jsonl"
-
-
-@app.get("/oneri", include_in_schema=False)
-def store_suggestion_form() -> HTMLResponse:
-    """'Hangi mağazayı ekleyelim' topluluk oylama/öneri formu."""
-    page = """<!doctype html>
-<html lang="tr">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#121412">
-    <title>Mağaza Öner — Almadan</title>
-    <meta name="description" content="Almadan'a hangi mağazanın eklenmesini istersin? Mağaza adı ve linkini paylaş, topluluğun önerilerini oylayalım.">
-    <link rel="canonical" href="https://www.almadan.app/oneri">
-    <meta name="robots" content="index, follow">
-    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
-  </head>
-  <body>
-    <header class="bp-header">
-      <a href="/" class="bp-logo"><span class="bp-logo-mark">A</span>almadan</a>
-      <nav class="bp-nav">
-        <a href="/hakkinda">Hakkında</a>
-        <a href="/iletisim">İletişim</a>
-      </nav>
-    </header>
-    <section class="bp-hero">
-      <div class="bp-hero-inner">
-        <p class="bp-eyebrow">TOPLULUK</p>
-        <h1>Hangi mağazayı ekleyelim?</h1>
-        <p class="bp-hero-copy">Almadan'da görmek istediğin bir mağaza mı var? Adını ve (varsa) linkini bırak, ekip değerlendirsin.</p>
-      </div>
-    </section>
-    <main class="bp-main" style="max-width:480px;">
-      <form id="storeSuggestForm" style="display:flex; flex-direction:column; gap:12px;">
-        <label style="font-weight:700; font-size:13px;">Mağaza adı
-          <input id="ssName" name="store_name" required maxlength="120" style="width:100%; margin-top:4px; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:14px;">
-        </label>
-        <label style="font-weight:700; font-size:13px;">Mağaza linki (opsiyonel)
-          <input id="ssUrl" name="store_url" type="url" maxlength="300" style="width:100%; margin-top:4px; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:14px;">
-        </label>
-        <label style="font-weight:700; font-size:13px;">Not (opsiyonel)
-          <textarea id="ssNote" name="note" maxlength="500" rows="3" style="width:100%; margin-top:4px; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; font-family:inherit;"></textarea>
-        </label>
-        <button type="submit" class="bp-cta" style="justify-content:center; border:none; cursor:pointer;">Öneriyi Gönder</button>
-        <p id="ssMsg" style="font-size:13px; margin:0;"></p>
-      </form>
-    </main>
-    <footer class="bp-footer">
-      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
-      <p>© 2026 Almadan</p>
-    </footer>
-    <script>
-      document.getElementById('storeSuggestForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const msg = document.getElementById('ssMsg');
-        const btn = e.target.querySelector('button[type="submit"]');
-        btn.disabled = true;
-        msg.style.color = 'var(--ink-2)';
-        msg.textContent = 'Gönderiliyor...';
-        try {
-          const res = await fetch('/api/store-suggestions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              store_name: document.getElementById('ssName').value,
-              store_url: document.getElementById('ssUrl').value,
-              note: document.getElementById('ssNote').value,
-            }),
-          });
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          msg.style.color = '#287a50';
-          msg.textContent = 'Teşekkürler! Önerin bize ulaştı.';
-          e.target.reset();
-        } catch (err) {
-          msg.style.color = '#b3261e';
-          msg.textContent = 'Gönderilemedi, lütfen tekrar dene.';
-        } finally {
-          btn.disabled = false;
-        }
-      });
-    </script>
-  </body>
-</html>"""
-    return HTMLResponse(page)
-
-
-@app.post("/api/store-suggestions", include_in_schema=False)
-async def create_store_suggestion(request: Request) -> dict:
-    """Topluluk mağaza önerilerini kaydeder (basit dosya tabanlı depolama)."""
-    from app.security import check_rate_limit
-    check_rate_limit(request, "store_suggestion", limit=10, window_seconds=60)
-    try:
-        body = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Geçersiz istek gövdesi")
-
-    store_name = sanitize(str(body.get("store_name", "")), max_length=120).strip()
-    if not store_name:
-        raise HTTPException(status_code=400, detail="Mağaza adı zorunlu")
-    store_url = sanitize(str(body.get("store_url", "")), max_length=300).strip()
-    note = sanitize(str(body.get("note", "")), max_length=500).strip()
-
-    import json as _json
-    import uuid as _uuid
-    entry = {
-        "id": str(_uuid.uuid4()),
-        "store_name": store_name,
-        "store_url": store_url,
-        "note": note,
-        "created_at": utc_now(),
-        "status": "pending",
-    }
-    try:
-        with open(_store_suggestions_file(), "a", encoding="utf-8") as f:
-            f.write(_json.dumps(entry, ensure_ascii=False) + "\n")
-    except Exception:
-        raise HTTPException(status_code=500, detail="Kaydedilemedi")
-
-    _log_event(None, "store_suggestion", {"store_name": store_name, "store_url": store_url})
-    return {"ok": True}
-
-
-@app.get("/api/admin/store-suggestions", include_in_schema=False)
-def admin_list_store_suggestions(request: Request) -> dict:
-    """Topluluk mağaza önerilerini admin panelinde listelemek için döner."""
-    require_admin_secret(request)
-    import json as _json
-    path = _store_suggestions_file()
-    if not path.exists():
-        return {"suggestions": []}
-    items = []
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                items.append(_json.loads(line))
-            except Exception:
-                continue
-    items.reverse()
-    return {"suggestions": items[:200]}
 
 
 @app.get("/hakkinda", include_in_schema=False)
@@ -1724,7 +1436,7 @@ async def api_warm_slow_stores(payload: WarmSlowStoresRequest, request: Request)
 
 
 @app.post("/parse-url")
-def parse_url(payload: UrlParseRequest, request: Request) -> dict:
+def parse_url(payload: UrlParseRequest) -> dict:
     import hashlib, time
     from functools import lru_cache
 
@@ -1751,45 +1463,7 @@ def parse_url(payload: UrlParseRequest, request: Request) -> dict:
         "original_price": parsed.original_price,
         "extra_info": parsed.extra_info,
     }
-
-    # "Bu fiyata değer mi?" -- gerçek fiyat geçmişinden deal_score/verdict
-    # hesapla ve tek cümlelik mesaj üret (bkz. app/scoring.py). Yeterli
-    # geçmiş yoksa mesaj eklenmez -- uydurma yorum gösterilmez.
-    if parsed.price and parsed.title and parsed.source:
-        try:
-            from app.price_history import get_price_list
-            hist = get_price_list(parsed.title, parsed.source)
-            if hist:
-                decision = calculate_deal_score(parsed.price, hist)
-                result["deal_score"] = decision.score
-                result["deal_verdict"] = decision.verdict
-                if decision.verdict == "al" and parsed.price <= min(hist) * 1.03:
-                    message = "Bu ürün son dönemin en düşük fiyatlarından birinde."
-                elif decision.verdict == "al":
-                    message = "Bu ürün fiyat geçmişine göre güçlü bir fırsat."
-                elif decision.verdict == "düşünülebilir":
-                    message = "Bu ürünün fiyatı ortalamadan iyi durumda."
-                elif decision.verdict == "takip et":
-                    message = "Fiyat şu an normal seviyede, biraz daha bekleyebilirsin."
-                else:
-                    message = "Bu ürün fiyat geçmişine göre şu an pahalı görünüyor."
-                result["deal_message"] = message
-        except Exception:
-            pass
-
-    # Kullanıcı ürün önizlemesi görüntüledi -- takip edilmediği tespit
-    # edilebilsin diye kaydediliyor (bkz. /api/admin/viewed-not-tracked).
-    try:
-        uid = getattr(request.state, "user_id", None)
-        if parsed.title and parsed.source:
-            _log_event(uid, "product_view", {
-                "title": parsed.title[:200],
-                "source": parsed.source,
-                "email": getattr(request.state, "user_email", None) or "Anonymous",
-            })
-    except Exception:
-        pass
-
+    
     # Sadece başarılı sonuçları önbellekle
     if parsed.price and parsed.title:
         _url_cache[cache_key] = (now, result)
@@ -1798,135 +1472,8 @@ def parse_url(payload: UrlParseRequest, request: Request) -> dict:
             oldest = sorted(_url_cache.items(), key=lambda x: x[1][0])[:100]
             for k, _ in oldest:
                 del _url_cache[k]
-
+    
     return result
-
-
-# ── Basit Geliştirici API (ücretsiz, rate-limited, X-API-Key) ──
-
-@app.get("/api/public/v1/compare")
-def public_api_compare(url: str, request: Request, key_row: dict = Depends(require_api_key)):
-    """
-    Ücretsiz, salt-okunur geliştirici API'si. /parse-url ile aynı mantığı
-    kullanır ama X-API-Key header'ı ile korunur ve anahtar başına
-    dakikada 60 istekle sınırlıdır. Fiyatlandırma/ödeme yok -- anahtar
-    admin panelinden manuel olarak verilir.
-    """
-    if not url or not url.strip():
-        raise HTTPException(status_code=400, detail="url parametresi zorunlu.")
-    parsed = parse_product_url(url.strip())
-    return {
-        "title": parsed.title,
-        "price": parsed.price,
-        "image_url": parsed.image_url,
-        "source": parsed.source,
-        "canonical_url": parsed.canonical_url,
-        "confidence": parsed.confidence,
-        "original_price": parsed.original_price,
-    }
-
-
-class CreateApiKeyPayload(BaseModel):
-    label: str = Field(..., max_length=120)
-
-
-@app.post("/api/admin/api-keys/create")
-def admin_create_api_key(body: CreateApiKeyPayload, user=Depends(require_admin)):
-    """Admin: yeni geliştirici API anahtarı üretir. Ham anahtar sadece bu
-    yanıtta bir kez gösterilir -- DB'de yalnızca sha256 hash'i saklanır."""
-    import secrets as _secrets
-
-    raw_key = f"alm_{_secrets.token_hex(24)}"
-    key_hash = hash_api_key(raw_key)
-
-    if supabase_enabled():
-        try:
-            requests.post(
-                f"{supabase_base_url()}/rest/v1/api_keys",
-                headers=supabase_headers(),
-                json={
-                    "key_hash": key_hash,
-                    "label": sanitize(body.label, max_length=120),
-                    "active": True,
-                },
-                timeout=5,
-            )
-        except Exception as exc:
-            raise HTTPException(status_code=502, detail=f"Anahtar kaydedilemedi: {exc}")
-    else:
-        raise HTTPException(status_code=503, detail="Supabase yapılandırılmamış.")
-
-    return {"api_key": raw_key, "label": body.label, "note": "Bu anahtar sadece bir kez gösterilir, kaydet."}
-
-
-@app.post("/api/admin/api-keys/{key_hash}/revoke")
-def admin_revoke_api_key(key_hash: str, user=Depends(require_admin)):
-    """Admin: bir API anahtarını pasif hale getirir."""
-    if not supabase_enabled():
-        raise HTTPException(status_code=503, detail="Supabase yapılandırılmamış.")
-    try:
-        requests.patch(
-            f"{supabase_base_url()}/rest/v1/api_keys",
-            headers=supabase_headers(),
-            params={"key_hash": f"eq.{key_hash}"},
-            json={"active": False},
-            timeout=5,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Anahtar iptal edilemedi: {exc}")
-    return {"revoked": True}
-
-
-# ── Mağaza Doğrulama Rozeti ──────────────────────────────────
-
-@app.post("/api/admin/stores/{slug}/verify")
-def admin_verify_store(slug: str, request: Request, user=Depends(require_admin)):
-    """Admin: bir mağazayı 'Resmi Mağaza' olarak işaretler (verified_stores tablosu)."""
-    if not supabase_enabled():
-        raise HTTPException(status_code=503, detail="Supabase yapılandırılmamış.")
-    try:
-        requests.post(
-            f"{supabase_base_url()}/rest/v1/verified_stores",
-            headers={**supabase_headers(), "Prefer": "resolution=merge-duplicates"},
-            json={"slug": sanitize(slug, max_length=60), "verified": True},
-            timeout=5,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Doğrulama kaydedilemedi: {exc}")
-    return {"slug": slug, "verified": True}
-
-
-@app.post("/api/admin/stores/{slug}/unverify")
-def admin_unverify_store(slug: str, user=Depends(require_admin)):
-    """Admin: bir mağazanın 'Resmi Mağaza' rozetini kaldırır."""
-    if not supabase_enabled():
-        raise HTTPException(status_code=503, detail="Supabase yapılandırılmamış.")
-    try:
-        requests.patch(
-            f"{supabase_base_url()}/rest/v1/verified_stores",
-            headers=supabase_headers(),
-            params={"slug": f"eq.{slug}"},
-            json={"verified": False},
-            timeout=5,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Kayıt güncellenemedi: {exc}")
-    return {"slug": slug, "verified": False}
-
-
-def _is_store_verified(slug: str) -> bool:
-    if not supabase_enabled():
-        return False
-    try:
-        r = requests.get(
-            f"{supabase_base_url()}/rest/v1/verified_stores",
-            headers=supabase_headers(),
-            params={"slug": f"eq.{slug}", "verified": "eq.true", "select": "slug"},
-            timeout=5,
-        )
-        return bool(r.ok and r.json())
-    except Exception:
-        return False
 
 
 @app.post("/api/find-alternatives")
@@ -2787,14 +2334,6 @@ class SharedListItem(BaseModel):
 class SharedListPayload(BaseModel):
     items: list[SharedListItem]
     base_version: int | None = None
-
-
-class WrongMatchFeedback(BaseModel):
-    query: str | None = None
-    product_title: str | None = None
-    product_source: str | None = None
-    product_url: str | None = None
-    note: str | None = None
 
 
 class BasketItemPayload(BaseModel):
@@ -4254,26 +3793,6 @@ def update_shared_list(id: str, payload: SharedListPayload) -> dict:
     }
 
 
-@app.post("/api/feedback/wrong-match")
-def report_wrong_match(payload: WrongMatchFeedback) -> dict:
-    db = load_db()
-    entries = db.setdefault("wrong_match_feedback", [])
-    entries.append({
-        "id": str(uuid4())[:8],
-        "query": (payload.query or "")[:300],
-        "product_title": (payload.product_title or "")[:300],
-        "product_source": (payload.product_source or "")[:100],
-        "product_url": (payload.product_url or "")[:500],
-        "note": (payload.note or "")[:500],
-        "created_at": utc_now(),
-    })
-    # Keep the feedback log bounded to avoid unbounded db growth.
-    if len(entries) > 5000:
-        db["wrong_match_feedback"] = entries[-5000:]
-    save_db(db)
-    return {"status": "ok"}
-
-
 # ══════════════════════════════════════════════════════════════
 # Sprint 5 — İşletme Analitiği & Kullanıcı Tutundurma
 # ══════════════════════════════════════════════════════════════
@@ -4523,40 +4042,6 @@ def admin_deploy_info(user=Depends(require_admin)):
     }
 
 
-@app.get("/api/git-info")
-def public_git_info():
-    """Public git metadata for display in the footer."""
-    commit_sha = os.getenv("VERCEL_GIT_COMMIT_SHA")
-    branch = os.getenv("VERCEL_GIT_COMMIT_REF")
-    if not commit_sha:
-        import subprocess
-        try:
-            commit_sha = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("utf-8").strip()
-            branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode("utf-8").strip()
-        except Exception:
-            commit_sha = "a0a1553"
-            branch = "main"
-
-    return {
-        "commit_sha": commit_sha[:7] if commit_sha else "unknown",
-        "branch": branch or "main"
-    }
-
-
-@app.get("/api/admin/logs")
-def admin_logs(user=Depends(require_admin)):
-    """Reads and returns the last 200 lines of failure.log."""
-    log_path = Path("app_logs/failure.log")
-    if not log_path.is_file():
-        return {"logs": "Log dosyası bulunamadı."}
-    try:
-        with open(log_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-        return {"logs": "".join(lines[-200:])}
-    except Exception as e:
-        return {"logs": f"Hata: {str(e)}"}
-
-
 # ── Puan Sistemi ──────────────────────────────────────────────
 
 @app.get("/api/points")
@@ -4606,107 +4091,6 @@ async def send_digest_now(
         return {"ok": ok}
     result = await asyncio.to_thread(retention_service.run_weekly_digest, dry_run=False)
     return {"ok": True, **result}
-
-
-# ── RSS Feed (kategori bazlı fiyat düşüşleri) ────────────────
-
-def _rss_escape(text: str) -> str:
-    import html as _html
-    return _html.escape(text or "", quote=True)
-
-
-@app.get("/rss/{category}.xml", include_in_schema=False)
-async def rss_category_feed(category: str) -> Response:
-    """Kategori bazlı son fiyat düşüşlerini RSS 2.0 formatında döner.
-    Harici kütüphane gerektirmez, basit XML üretimi."""
-    from email.utils import format_datetime
-    from datetime import datetime, timezone
-
-    db = load_db()
-    items = []
-    for p in db.get("products", []):
-        if (p.get("category") or "").lower() != category.lower():
-            continue
-        history = p.get("price_history", [])
-        if len(history) < 2:
-            continue
-        try:
-            new_price = float(history[-1]["price"])
-            old_price = float(history[-2]["price"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        if old_price <= new_price:
-            continue
-        items.append((p, old_price, new_price))
-
-    # En büyük düşüşten en küçüğe sırala, ilk 50 ile sınırla.
-    items.sort(key=lambda t: (t[1] - t[2]), reverse=True)
-    items = items[:50]
-
-    rss_items = []
-    for p, old_price, new_price in items:
-        title = _rss_escape(p.get("title") or "Ürün")
-        link = _rss_escape(p.get("url") or "https://www.almadan.app/")
-        drop_pct = round(((old_price - new_price) / old_price) * 100) if old_price else 0
-        description = _rss_escape(
-            f"{p.get('title', 'Ürün')}: {old_price:.2f} TL'den {new_price:.2f} TL'ye düştü (%{drop_pct} indirim)."
-        )
-        checked_at = p.get("last_checked_at")
-        try:
-            pub_dt = datetime.fromisoformat((checked_at or "").replace("Z", "+00:00"))
-        except Exception:
-            pub_dt = datetime.now(timezone.utc)
-        if pub_dt.tzinfo is None:
-            pub_dt = pub_dt.replace(tzinfo=timezone.utc)
-        pub_date = format_datetime(pub_dt)
-        guid = _rss_escape(p.get("id") or link)
-        rss_items.append(
-            f"<item><title>{title}</title><link>{link}</link>"
-            f"<description>{description}</description>"
-            f"<pubDate>{pub_date}</pubDate>"
-            f"<guid isPermaLink=\"false\">{guid}</guid></item>"
-        )
-
-    display_name, _ = _CATEGORY_DISPLAY.get(category, (category.capitalize(), ""))
-    channel_title = _rss_escape(f"Almadan — {display_name} Fiyat Düşüşleri")
-    xml = (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        '<rss version="2.0"><channel>'
-        f"<title>{channel_title}</title>"
-        f"<link>https://www.almadan.app/kategori/{_rss_escape(category)}</link>"
-        f"<description>{channel_title} — en güncel fiyat düşüşleri</description>"
-        "<language>tr-TR</language>"
-        f"{''.join(rss_items)}"
-        "</channel></rss>"
-    )
-    return Response(content=xml, media_type="application/rss+xml; charset=utf-8")
-
-
-# ── Referans (Arkadaşını Davet Et) ───────────────────────────
-
-def _referral_code_for_user(user_id: str) -> str:
-    """Kullanıcı ID'sinden türetilmiş, kısa ve deterministik bir referans
-    kodu üretir -- ekstra bir sayaç/DB alanı gerektirmez."""
-    digest = hashlib.sha256(user_id.encode("utf-8")).hexdigest().upper()
-    return digest[:8]
-
-
-@app.get("/api/referral/my-code")
-async def referral_my_code(user=Depends(require_login)) -> dict:
-    uid = user["user_id"]
-    code = _referral_code_for_user(uid)
-    # Kod -> kullanıcı eşlemesini lazy olarak kaydet ki yeni kayıtlarda
-    # ?ref=CODE ile gelenlerin gerçek referred_by kullanıcı ID'sini
-    # çözebilelim (kod tek yönlü hash'ten türediği için tersine çevrilemez).
-    db = load_db()
-    referral_codes = db.setdefault("referral_codes", {})
-    if referral_codes.get(code) != uid:
-        referral_codes[code] = uid
-        save_db(db)
-    return {
-        "code": code,
-        "share_url": f"https://www.almadan.app/?ref={code}",
-    }
 
 
 # ══════════════════════════════════════════════════════════════
@@ -6301,19 +5685,6 @@ def _notify_follow_confirmation(uid: str, slug: str, store_name: str) -> None:
     except Exception:
         log.warning("Takip onay için kullanıcı telefon bilgisi okunamadı user=%s", uid)
 
-    # Tarayıcı push bildirimi -- VAPID varsa best-effort, telefon/SMS
-    # tercihinden bağımsız, uygulama içi zil bildirimine ek olarak gönderilir.
-    try:
-        from app.push import send_push_to_owner
-        send_push_to_owner(uid, {
-            "title": f"{store_name} takibe alındı",
-            "body": "Bu mağazada kampanya veya önemli fiyat düşüşü olduğunda anında haber vereceğiz.",
-            "url": f"/magaza/{slug}",
-            "tag": f"follow-{slug}",
-        })
-    except Exception as push_err:
-        log.warning("Takip onay push bildirimi gönderilemedi user=%s: %s", uid, push_err)
-
     if not phone or pref not in ("sms", "both"):
         return
 
@@ -6451,16 +5822,6 @@ async def store_page(slug: str):
     description = _html.escape(store.get("description") or f"{name} kampanya ve fiyat karşılaştırması.")
     category = _html.escape(store.get("category") or "")
     category_display_name, _ = _CATEGORY_DISPLAY.get(store.get("category", ""), (store.get("category", "").capitalize(), ""))
-
-    verified_badge_html = ""
-    if _is_store_verified(slug):
-        verified_badge_html = (
-            '<span title="Bu mağaza Almadan tarafından doğrulanmıştır" '
-            'style="display:inline-flex; align-items:center; gap:4px; background:#ecfdf5; '
-            'color:#059669; border:1px solid #a7f3d0; border-radius:999px; padding:3px 10px; '
-            'font-size:12px; font-weight:700; margin-left:8px; vertical-align:middle;">'
-            '✓ Resmi Mağaza</span>'
-        )
     category_display_name_escaped = _html.escape(category_display_name)
 
     campaigns = []
@@ -6685,7 +6046,7 @@ async def store_page(slug: str):
     <section class="bp-hero">
       <div class="bp-hero-inner">
         <p class="bp-eyebrow">{category.upper()}</p>
-        <h1>{name} Kampanyaları ve Fiyat Karşılaştırma{verified_badge_html}</h1>
+        <h1>{name} Kampanyaları ve Fiyat Karşılaştırma</h1>
         <p class="bp-hero-copy">{description}</p>
         <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> {name} Fiyatlarını Karşılaştır</a>
       </div>
@@ -6705,184 +6066,6 @@ async def store_page(slug: str):
       <p>© 2026 Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
-  </body>
-</html>"""
-    return HTMLResponse(page)
-
-
-@app.get("/kuponlar", response_class=HTMLResponse)
-async def coupons_page():
-    """
-    Kupon/promosyon kodu toplayıcı SEO sayfası. Elimizde gerçek, doğrulanmış
-    kupon kodu verisi yok (bu dış API/scraping gerektirir) -- bu yüzden
-    UYDURMA kod göstermek yerine sayfa yapısını hazırlıyoruz ve gerçek
-    aktif kampanyaları (store_campaigns) "Yakında: kupon kodu" notuyla
-    listeliyoruz. Kod alanı ileride gerçek veri geldiğinde doldurulabilir.
-    """
-    import html as _html
-
-    campaigns = []
-    if supabase_enabled():
-        try:
-            from datetime import date
-            today = date.today().isoformat()
-            r = requests.get(
-                f"{supabase_base_url()}/rest/v1/store_campaigns",
-                headers=supabase_headers(),
-                params={
-                    "select": "*",
-                    "or": f"(valid_until.is.null,valid_until.gte.{today})",
-                    "order": "created_at.desc",
-                    "limit": "40",
-                },
-                timeout=10,
-            )
-            campaigns = r.json() if r.ok else []
-        except Exception:
-            campaigns = []
-
-    if campaigns:
-        items = []
-        for c in campaigns:
-            title = _html.escape(c.get("title") or "Kampanya")
-            store_slug = _html.escape(c.get("store_slug") or "")
-            desc = _html.escape(c.get("description") or "")
-            code = c.get("code") or c.get("coupon_code") or c.get("discount_code")
-            code_html = (
-                f'<div class="bp-coupon-code">{_html.escape(str(code))}</div>'
-                if code else
-                '<div class="bp-coupon-code bp-coupon-soon">Kupon kodu: Yakında</div>'
-            )
-            store_link = f'<a href="/magaza/{store_slug}">{store_slug}</a>' if store_slug else ""
-            items.append(
-                f'<div class="bp-feature"><h3>{title}</h3><p>{desc}</p>{code_html}{store_link}</div>'
-            )
-        campaigns_html = "".join(items)
-    else:
-        campaigns_html = (
-            '<p class="bp-body">Şu anda listelenen bir kampanya yok. Gerçek, doğrulanmış '
-            'kupon kodları eklendikçe burada yayınlanacak -- uydurma kod göstermiyoruz.</p>'
-        )
-
-    seo_title = "Kupon Kodları ve Kampanyalar — Almadan"
-    seo_desc = "Türkiye'deki mağazaların güncel kampanyaları burada. Doğrulanmış kupon kodları yakında."
-
-    page = f"""<!DOCTYPE html>
-<html lang="tr">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{_html.escape(seo_title)}</title>
-    <meta name="description" content="{_html.escape(seo_desc)}" />
-    <link rel="canonical" href="https://www.almadan.app/kuponlar" />
-    <link rel="stylesheet" href="/static/bp.css" />
-  </head>
-  <body class="bp-body-page">
-    <header class="bp-header">
-      <a href="/index.html" class="bp-logo">Almadan</a>
-      <nav>
-        <a href="/hakkinda">Hakkında</a>
-        <a href="/iletisim">İletişim</a>
-      </nav>
-    </header>
-    <section class="bp-hero">
-      <div class="bp-hero-inner">
-        <p class="bp-eyebrow">KUPONLAR</p>
-        <h1>Kupon Kodları ve Kampanyalar</h1>
-        <p class="bp-hero-copy">Doğrulanmış kupon kodu toplama özelliği yakında burada olacak. Şimdilik gerçek mağaza kampanyalarını listeliyoruz -- uydurma kod yok.</p>
-        <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> Fiyat Karşılaştır</a>
-      </div>
-    </section>
-    <main class="bp-main">
-      <h2><i data-lucide="ticket"></i> Kampanyalar</h2>
-      <div class="bp-feature-grid">
-        {campaigns_html}
-      </div>
-    </main>
-    <footer class="bp-footer">
-      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
-      <p>© 2026 Almadan</p>
-    </footer>
-    <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
-  </body>
-</html>"""
-    return HTMLResponse(page)
-
-
-@app.get("/embed/{terim}", response_class=HTMLResponse)
-async def embed_compare_page(terim: str, request: Request):
-    """
-    Başka sitelere iframe içinde gömülebilen minimal karşılaştırma sonucu
-    sayfası. Bu rota için CSP frame-ancestors '*' olarak gevşetilir
-    (bkz. security_headers_middleware) -- diğer tüm rotalarda 'none' kalır.
-    """
-    from app.security import check_rate_limit
-    check_rate_limit(request, "embed_compare", limit=30, window_seconds=60)
-
-    import html as _html
-    from app.search_orchestrator import master_search
-
-    query = terim.replace("-", " ").strip()
-    products = []
-    if query:
-        try:
-            products = await master_search(query)
-        except Exception:
-            products = []
-
-    products = sorted(products, key=lambda p: p.get("current_price") or float("inf"))[:5]
-
-    if products:
-        rows = []
-        for p in products:
-            title = _html.escape(str(p.get("title") or ""))[:80]
-            store = _html.escape(str(p.get("source") or ""))
-            price = p.get("current_price")
-            price_str = f"₺{price:,.2f}".replace(",", ".") if price else "—"
-            url = _html.escape(str(p.get("url") or "#"))
-            rows.append(
-                f'<a class="em-row" href="{url}" target="_blank" rel="nofollow noopener sponsored">'
-                f'<span class="em-title">{title}</span>'
-                f'<span class="em-store">{store}</span>'
-                f'<span class="em-price">{price_str}</span></a>'
-            )
-        rows_html = "".join(rows)
-    else:
-        rows_html = '<p class="em-empty">Sonuç bulunamadı.</p>'
-
-    query_escaped = _html.escape(query)
-    page = f"""<!DOCTYPE html>
-<html lang="tr">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{query_escaped} Fiyat Karşılaştırma — Almadan</title>
-    <meta name="robots" content="noindex, nofollow" />
-    <style>
-      * {{ box-sizing: border-box; }}
-      body {{ margin:0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background:#fff; color:#1a1a1a; }}
-      .em-wrap {{ padding: 12px; }}
-      .em-head {{ font-size: 13px; font-weight: 700; color:#059669; margin-bottom: 8px; display:flex; align-items:center; justify-content:space-between; }}
-      .em-head a {{ color:#059669; text-decoration:none; font-size:11px; }}
-      .em-row {{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 6px; border-bottom:1px solid #eee; text-decoration:none; color:inherit; }}
-      .em-row:last-child {{ border-bottom:none; }}
-      .em-title {{ flex:1; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
-      .em-store {{ font-size:11px; color:#888; text-transform:uppercase; }}
-      .em-price {{ font-size:13px; font-weight:700; color:#059669; }}
-      .em-empty {{ font-size:13px; color:#888; }}
-      .em-footer {{ text-align:center; padding-top:8px; font-size:11px; color:#aaa; }}
-      .em-footer a {{ color:#059669; text-decoration:none; }}
-    </style>
-  </head>
-  <body>
-    <div class="em-wrap">
-      <div class="em-head">
-        <span>{query_escaped}</span>
-        <a href="https://www.almadan.app/?q={query_escaped}&auto=1" target="_blank" rel="noopener">Tümünü Gör</a>
-      </div>
-      {rows_html}
-      <div class="em-footer">Powered by <a href="https://www.almadan.app" target="_blank" rel="noopener">Almadan</a></div>
-    </div>
   </body>
 </html>"""
     return HTMLResponse(page)
@@ -7113,28 +6296,6 @@ async def category_page(category: str):
     # verir (bkz. /fiyat/{terim} sayfalarindaki fiyat-baslikta deneyimiyle
     # ayni mantik).
     store_count = len(ALL_STORES_MAP.get(category, []))
-
-    # Kategori fiyat endeksi: son 30 gündeki ortalama fiyat değişimi.
-    # Gerçek price_history verisinden hesaplanır; veri yoksa/Supabase
-    # kapalıysa uydurma sayı göstermek yerine "yakında" yerleşimi kullanılır.
-    from app.price_history import get_category_price_change
-    price_index = get_category_price_change(ALL_STORES_MAP.get(category, []), days=30)
-    if price_index:
-        pct = price_index["avg_change_pct"]
-        direction_word = "arttı" if pct > 0 else ("azaldı" if pct < 0 else "değişmedi")
-        price_index_html = (
-            f'<div class="bp-feature" style="grid-column: 1 / -1;">'
-            f'<h3><i data-lucide="trending-{"up" if pct > 0 else "down"}"></i> Son 30 Günlük Fiyat Endeksi</h3>'
-            f'<p>Bu kategorideki ürünlerin ortalama fiyatı son 30 günde %{abs(pct)} {direction_word} '
-            f'({price_index["sample_size"]} ürün örneklemi üzerinden).</p></div>'
-        )
-    else:
-        price_index_html = (
-            '<div class="bp-feature" style="grid-column: 1 / -1;">'
-            '<h3><i data-lucide="trending-up"></i> Fiyat Endeksi</h3>'
-            '<p>Bu kategori için fiyat değişim endeksi yakında — yeterli geçmiş veri biriktiğinde burada görünecek.</p></div>'
-        )
-
     seo_title = f"{display_name} Fiyatları: {store_count} Mağaza Karşılaştırması — Almadan"
     seo_desc = f"{display_name} kategorisinde {store_count} mağazanın fiyatlarını tek ekranda karşılaştır, en ucuzu anında bul. Güncel kampanyalar, ücretsiz — Almadan."
     seo_title_escaped = _html.escape(seo_title)
@@ -7245,203 +6406,11 @@ async def category_page(category: str):
     <main class="bp-main">
       <h2><i data-lucide="store"></i> Bu Kategorideki Mağazalar</h2>
       <div class="bp-feature-grid">
-        {price_index_html}
         {stores_html}
       </div>
       <a class="bp-cta bp-cta-block" style="margin-top: 24px;" href="/"><i data-lucide="arrow-right"></i> Tüm Mağazalarda Karşılaştır</a>
     </main>
 
-    <footer class="bp-footer">
-      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
-      <p>© 2026 Almadan</p>
-    </footer>
-    <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
-  </body>
-</html>"""
-    return HTMLResponse(page)
-
-
-# TODO(scope): "Marka sayfaları" (madde 11) bilinçli olarak atlandı --
-# kategori/mağaza modelinin üstüne ayrı bir marka veri modeli (marka<->ürün
-# eşleştirmesi, marka meta verisi) gerektiriyor; kapsam MVP için büyük.
-# TODO(scope): "Aynı ürün farklı isimle eşleştirme" (madde 12) bilinçli
-# olarak atlandı -- güvenilir fuzzy/semantik ürün eşleştirme ayrı bir
-# veri modeli ve doğrulama katmanı gerektiriyor; kapsam MVP için büyük.
-
-
-def _read_search_terms(max_lines: int = 20000) -> list[tuple[str, int]]:
-    """data/user_activity_logs.jsonl içinden gerçek arama terimlerini sayar.
-
-    event_type == "url_search" olaylarının payload.query alanını kullanır
-    (bkz. _log_event çağrısı, arama endpoint'inde). Uydurma veri yok --
-    log dosyası boşsa/okunamazsa boş liste döner.
-    """
-    import json as _json
-    from collections import Counter
-
-    log_file = Path(__file__).resolve().parent.parent / "data" / "user_activity_logs.jsonl"
-    if not log_file.exists():
-        return []
-
-    counter: Counter[str] = Counter()
-    try:
-        with log_file.open("r", encoding="utf-8") as f:
-            lines = f.readlines()[-max_lines:]
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = _json.loads(line)
-            except ValueError:
-                continue
-            if entry.get("event_type") != "url_search":
-                continue
-            query = (entry.get("payload") or {}).get("query")
-            if query and isinstance(query, str):
-                clean = query.strip()
-                if 1 < len(clean) <= 80:
-                    counter[clean] += 1
-    except OSError:
-        return []
-
-    return counter.most_common(50)
-
-
-@app.get("/api/search-suggestions", include_in_schema=False)
-def api_search_suggestions(limit: int = 10) -> dict:
-    """Ürün linki kutusu için otomatik tamamlama önerileri (gerçek arama geçmişinden)."""
-    terms = _read_search_terms()
-    return {"suggestions": [t for t, _ in terms[: max(1, min(limit, 30))]]}
-
-
-@app.get("/trend", response_class=HTMLResponse)
-async def trend_page():
-    """En çok aranan terimler -- SEO sayfası. Gerçek arama logundan üretilir."""
-    import html as _html
-
-    terms = _read_search_terms()
-
-    if terms:
-        rows_html = "".join(
-            f'<div class="bp-feature"><h3>{i + 1}. {_html.escape(term)}</h3>'
-            f'<p>{count} arama</p></div>'
-            for i, (term, count) in enumerate(terms[:30])
-        )
-    else:
-        rows_html = '<p class="bp-body">Henüz yeterli arama verisi birikmedi. Yakında burada en popüler aramalar listelenecek.</p>'
-
-    seo_title = "Popüler Aramalar — En Çok Aranan Ürünler — Almadan"
-    seo_desc = "Almadan kullanıcılarının en çok fiyat karşılaştırdığı ürünler ve aramalar."
-
-    page = f"""<!doctype html>
-<html lang="tr">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#121412">
-    <title>{_html.escape(seo_title)}</title>
-    <meta name="description" content="{_html.escape(seo_desc)}">
-    <link rel="canonical" href="https://www.almadan.app/trend">
-    <meta name="robots" content="index, follow">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
-  </head>
-  <body>
-    <header class="bp-header">
-      <a href="/" class="bp-logo"><span class="bp-logo-mark">A</span>almadan</a>
-      <nav class="bp-nav">
-        <a href="/hakkinda">Hakkında</a>
-        <a href="/gizlilik">Gizlilik</a>
-        <a href="/iletisim">İletişim</a>
-      </nav>
-    </header>
-    <section class="bp-hero">
-      <div class="bp-hero-inner">
-        <p class="bp-eyebrow">TREND</p>
-        <h1>Popüler Aramalar</h1>
-        <p class="bp-hero-copy">Almadan kullanıcılarının en çok fiyat karşılaştırdığı ürünler.</p>
-        <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> Sen de Karşılaştır</a>
-      </div>
-    </section>
-    <main class="bp-main">
-      <h2><i data-lucide="trending-up"></i> En Çok Aranan Terimler</h2>
-      <div class="bp-feature-grid">
-        {rows_html}
-      </div>
-    </main>
-    <footer class="bp-footer">
-      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
-      <p>© 2026 Almadan</p>
-    </footer>
-    <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
-  </body>
-</html>"""
-    return HTMLResponse(page)
-
-
-@app.get("/rekortmenler", response_class=HTMLResponse)
-async def price_records_page():
-    """Fiyat geçmişi rekortmenleri -- en büyük düşüşler. Gerçek price_history verisinden."""
-    import html as _html
-    from app.price_history import get_biggest_movers
-
-    movers = get_biggest_movers(limit=24)
-
-    if movers:
-        cards_html = "".join(
-            f'<div class="bp-feature"><h3>{_html.escape(m["title"][:70] or "Ürün")}</h3>'
-            f'<p>{_html.escape(m["source"])} · %{m["change_pct"]} düşüş · '
-            f'En düşük ₺{m["min_price"]:.2f} · Şimdi ₺{m["last_price"]:.2f}</p></div>'
-            for m in movers if m["change_pct"] > 0
-        )
-    else:
-        cards_html = ""
-
-    if not cards_html:
-        cards_html = '<p class="bp-body">Henüz yeterli fiyat geçmişi verisi birikmedi. Fiyatlar izlendikçe rekortmenler burada listelenecek.</p>'
-
-    seo_title = "Fiyat Geçmişi Rekortmenleri — En Büyük Fiyat Düşüşleri — Almadan"
-    seo_desc = "Gerçek fiyat geçmişi verisine göre en çok fiyatı düşen ve en stabil ürünler."
-
-    page = f"""<!doctype html>
-<html lang="tr">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#121412">
-    <title>{_html.escape(seo_title)}</title>
-    <meta name="description" content="{_html.escape(seo_desc)}">
-    <link rel="canonical" href="https://www.almadan.app/rekortmenler">
-    <meta name="robots" content="index, follow">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
-  </head>
-  <body>
-    <header class="bp-header">
-      <a href="/" class="bp-logo"><span class="bp-logo-mark">A</span>almadan</a>
-      <nav class="bp-nav">
-        <a href="/hakkinda">Hakkında</a>
-        <a href="/gizlilik">Gizlilik</a>
-        <a href="/iletisim">İletişim</a>
-      </nav>
-    </header>
-    <section class="bp-hero">
-      <div class="bp-hero-inner">
-        <p class="bp-eyebrow">REKORTMENLER</p>
-        <h1>Fiyat Geçmişi Rekortmenleri</h1>
-        <p class="bp-hero-copy">Gerçek fiyat geçmişi verisine göre en büyük düşüşler.</p>
-        <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> Sen de Karşılaştır</a>
-      </div>
-    </section>
-    <main class="bp-main">
-      <h2><i data-lucide="trending-down"></i> En Çok Düşen Ürünler</h2>
-      <div class="bp-feature-grid">
-        {cards_html}
-      </div>
-    </main>
     <footer class="bp-footer">
       <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
       <p>© 2026 Almadan</p>
@@ -7646,51 +6615,6 @@ def _seo_price_slug_map() -> dict[str, str]:
     return mapping
 
 
-def _render_price_history_svg(history: list[dict]) -> str:
-    """Girissiz/JS'siz de calisan basit bir SVG fiyat gecmisi cizgisi uretir.
-
-    Chart.js gibi istemci tarafi kutuphane gerektirmez -- sunucu tarafinda
-    duz bir polyline SVG'si olusturulur, boylece crawler'lar ve JS kapali
-    tarayicilar da fiyat gecmisini gorebilir.
-    """
-    points = [
-        (h.get("price"), h.get("seen_at") or h.get("date") or h.get("timestamp") or "")
-        for h in history
-        if isinstance(h.get("price"), (int, float)) and h.get("price") > 0
-    ]
-    if len(points) < 2:
-        return ""
-
-    prices = [p[0] for p in points]
-    lo, hi = min(prices), max(prices)
-    span = hi - lo or 1.0
-
-    width, height, pad = 320, 80, 8
-    n = len(points)
-    step = (width - 2 * pad) / (n - 1)
-    coords = []
-    for i, price in enumerate(prices):
-        x = pad + i * step
-        y = height - pad - ((price - lo) / span) * (height - 2 * pad)
-        coords.append((round(x, 1), round(y, 1)))
-    polyline_points = " ".join(f"{x},{y}" for x, y in coords)
-    last_x, last_y = coords[-1]
-
-    import html as _html_esc
-    lo_s = _html_esc.escape(f"{lo:,.2f} ₺".replace(",", "."))
-    hi_s = _html_esc.escape(f"{hi:,.2f} ₺".replace(",", "."))
-
-    return f'''<div class="bp-price-history" aria-label="Fiyat gecmisi grafigi">
-      <svg viewBox="0 0 {width} {height}" width="100%" height="{height}" role="img"
-           aria-label="Son {n} fiyat kaydina gore fiyat degisim grafigi, en dusuk {lo_s}, en yuksek {hi_s}">
-        <polyline points="{polyline_points}" fill="none" stroke="#2e7d32" stroke-width="2"
-                  stroke-linejoin="round" stroke-linecap="round" />
-        <circle cx="{last_x}" cy="{last_y}" r="3" fill="#2e7d32" />
-      </svg>
-      <p class="bp-price-history-caption">Fiyat geçmişi: en düşük {lo_s}, en yüksek {hi_s} ({n} kayıt)</p>
-    </div>'''
-
-
 @app.get("/fiyat/{slug}", response_class=HTMLResponse)
 async def price_landing_page(slug: str):
     """
@@ -7732,30 +6656,15 @@ async def price_landing_page(slug: str):
         )
 
     title_term = _html.escape(term.capitalize())
-
-    # Fiyat gecmisi (varsa) icin yerel db'den once tek seferde bak --
-    # her urun icin ayri sorgu yerine source::title -> history sozlugu.
-    try:
-        _hist_db = load_db()
-        _hist_map = {
-            f"{hp.get('source')}::{hp.get('title')}": hp.get("price_history") or []
-            for hp in _hist_db.get("products", [])
-        }
-    except Exception:
-        _hist_map = {}
-
     rows = []
     for p in products[:15]:
         p_title = _html.escape(p.get("title", ""))
         price = p.get("price") or 0
         source = _html.escape(p.get("source", ""))
         url = _html.escape(p.get("url", ""))
-        hist_key = f"{p.get('source')}::{p.get('title')}"
-        history_svg = _render_price_history_svg(_hist_map.get(hist_key, []))
         rows.append(
             f'<div class="bp-feature"><h3>{p_title}</h3>'
             f'<p>{price:.2f} ₺ — {source}</p>'
-            f'{history_svg}'
             f'<a href="{url}" rel="nofollow noopener" target="_blank">Ürüne Git</a></div>'
         )
     products_html = "".join(rows)
@@ -7801,38 +6710,16 @@ async def price_landing_page(slug: str):
                 },
             },
         })
-    # Birden fazla magaza fiyati varsa tek bir Product'in offers alanini
-    # AggregateOffer (lowPrice/highPrice/offerCount) olarak da yayinla --
-    # schema.org standardina uygun, Google'in fiyat araligi zengin sonucu
-    # gosterebilmesi icin ItemList'e ek olarak eklenir (yerine gecmez).
-    graph_nodes = [
-        {
-            "@type": "ItemList",
-            "name": f"{title_term} Fiyatları",
-            "url": f"https://www.almadan.app/fiyat/{slug}",
-            "numberOfItems": len(item_list_elements),
-            "itemListElement": item_list_elements,
-        },
-    ]
-    priced = [p for p in products[:15] if p.get("price")]
-    if len(priced) >= 2:
-        agg_low = round(float(min(p["price"] for p in priced)), 2)
-        agg_high = round(float(max(p["price"] for p in priced)), 2)
-        graph_nodes.append({
-            "@type": "Product",
-            "name": f"{title_term} Fiyatları",
-            "url": f"https://www.almadan.app/fiyat/{slug}",
-            "offers": {
-                "@type": "AggregateOffer",
-                "priceCurrency": "TRY",
-                "lowPrice": agg_low,
-                "highPrice": agg_high,
-                "offerCount": len(priced),
-            },
-        })
     combined_schema = _json.dumps({
         "@context": "https://schema.org",
-        "@graph": graph_nodes + [
+        "@graph": [
+            {
+                "@type": "ItemList",
+                "name": f"{title_term} Fiyatları",
+                "url": f"https://www.almadan.app/fiyat/{slug}",
+                "numberOfItems": len(item_list_elements),
+                "itemListElement": item_list_elements,
+            },
             {
                 "@type": "BreadcrumbList",
                 "itemListElement": [
@@ -8274,34 +7161,6 @@ async def latest_campaigns(limit: int = 12):
         for row in rows
     ]
     return {"campaigns": campaigns}
-
-
-@app.get("/api/editorial-picks")
-async def editorial_picks(limit: int = 8):
-    """
-    "Almadan Seçti" -- editoryal öne çıkan ürün listesi. Sadece doğrudan
-    veritabanından (Supabase 'editorial_picks' tablosu) yönetilir, admin
-    panelinde henüz UI'ı yok (MVP). Liste boşsa boş döner -- frontend
-    bölümü otomatik gizler, sahte veri gösterilmez.
-    """
-    if not supabase_enabled():
-        return {"picks": []}
-    limit = max(1, min(limit, 20))
-    try:
-        r = requests.get(
-            f"{supabase_base_url()}/rest/v1/editorial_picks",
-            headers=supabase_headers(),
-            params={
-                "select": "title,source,url,image_url,price,note,created_at",
-                "order": "created_at.desc",
-                "limit": str(limit),
-            },
-            timeout=10,
-        )
-        rows = r.json() if r.ok else []
-    except Exception:
-        rows = []
-    return {"picks": rows}
 
 
 @app.post("/api/admin/stores/{slug}/campaign")

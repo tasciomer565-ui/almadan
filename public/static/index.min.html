@@ -190,8 +190,7 @@
             <div class="url-actions-row" style="display:flex;gap:10px;width:min(800px,100%);">
               <div class="url-field" style="flex:1;grid-template-columns:auto minmax(0,1fr) auto;">
                 <i data-lucide="link"></i>
-                <input id="productUrl" type="text" list="productUrlHistory" placeholder="Ürün linkini buraya yapıştır…" autocomplete="off" required>
-                <datalist id="productUrlHistory"></datalist>
+                <input id="productUrl" type="text" placeholder="Ürün linkini buraya yapıştır…" autocomplete="off" required>
                 <button type="button" class="paste-button" id="pasteButton" aria-label="Yapıştır" title="Panodan yapıştır">
                   <i data-lucide="clipboard"></i>
                 </button>
@@ -212,7 +211,7 @@
           <div id="mainBarcodeScanArea" class="main-barcode-scan-area hidden">
             <div class="main-barcode-header">
               <span>📷 Barkodu kameraya göster</span>
-              <button type="button" onclick="closeMainBarcodeScanner()" class="guide-close" aria-label="Barkod tarayıcıyı kapat">✕</button>
+              <button type="button" onclick="closeMainBarcodeScanner()" class="guide-close">✕</button>
             </div>
             <div id="mainHtml5QrReader" style="width:100%;max-width:420px;margin:0 auto;border-radius:10px;overflow:hidden;"></div>
             <p style="font-size:11px;color:var(--ink-2);text-align:center;margin-top:8px;">EAN-8 · EAN-13 · UPC-A desteklenir</p>
@@ -437,16 +436,6 @@
           <div id="latestCampaignsGrid" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;"></div>
         </div>
 
-        <div id="editorialPicksSection" class="hidden" style="margin-bottom:22px;">
-          <div class="section-heading" style="margin-bottom:10px;">
-            <div>
-              <p class="eyebrow">EDİTÖR ÖNERİLERİ</p>
-              <h2 style="font-size:18px;">Almadan Seçti</h2>
-            </div>
-          </div>
-          <div id="editorialPicksGrid" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;"></div>
-        </div>
-
         <div class="section-heading">
           <div>
             <p class="eyebrow">TAKİP LİSTEN</p>
@@ -473,19 +462,6 @@
             </div>
           </div>
           <div class="deal-grid" id="recommendationsGrid">
-            <!-- Dinamik doldurulacak -->
-          </div>
-        </div>
-
-        <div id="recentlyViewedSection" class="hidden" style="margin-top:24px;margin-bottom:12px;">
-          <div class="section-heading" style="margin-bottom:12px;">
-            <div>
-              <p class="eyebrow" style="color:var(--ink-2);">GEÇMİŞ</p>
-              <h2>Son Görüntülenenler</h2>
-            </div>
-            <button class="text-button" type="button" onclick="clearRecentlyViewed()" aria-label="Son görüntülenenler geçmişini temizle">Temizle</button>
-          </div>
-          <div class="deal-grid" id="recentlyViewedGrid" aria-live="polite">
             <!-- Dinamik doldurulacak -->
           </div>
         </div>
@@ -542,7 +518,6 @@
             <span>Yakalanan fiyat farkı</span>
             <strong id="totalSavings">0 TL</strong>
             <p>Takip ettiğin ürünlerin ilk görülen fiyatına göre hesaplandı.</p>
-            <div id="savingsBadge" class="savings-badge hidden" aria-live="polite"></div>
           </div>
           <div class="savings-stats">
             <div><span>Takip edilen</span><strong id="trackedStat">0</strong></div>

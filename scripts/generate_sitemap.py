@@ -32,7 +32,6 @@ STATIC_PAGES = [
     ("gizlilik", "monthly", "0.3"),
     ("iletisim", "monthly", "0.4"),
     ("fiyat-rehberi", "weekly", "0.5"),
-    ("oneri", "monthly", "0.3"),
 ]
 
 

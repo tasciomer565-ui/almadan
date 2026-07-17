@@ -13,7 +13,6 @@ window.__almadanAppScriptLoaded = true;
 // karsilastirma formunu kirmisti. En basa tasindi.
 const _SUN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
 const _MOON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
-const _AMOLED_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 0 0 20z" fill="currentColor" stroke="none"/></svg>';
 
 function scheduleIdleTask(callback, timeout = 2500) {
   if ("requestIdleCallback" in window) {
@@ -605,8 +604,6 @@ async function initializeAlmadanApp() {
   checkSharedListUrl();
   checkInitialSearchQuery();
   scheduleIdleTask(loadLatestCampaigns, 3500);
-  scheduleIdleTask(loadEditorialPicks, 3800);
-  scheduleIdleTask(loadProductUrlSuggestions, 2500);
 }
 
 if (document.readyState === "loading") {
@@ -683,59 +680,6 @@ async function loadLatestCampaigns() {
     section.classList.remove("hidden");
   } catch (e) {
     // Sessizce geç — ana sayfa deneyimini bozmasın
-  }
-}
-
-/* ── "Almadan Seçti" editoryal öne çıkanlar ────────────────────────────── */
-async function loadEditorialPicks() {
-  const section = document.getElementById("editorialPicksSection");
-  const grid = document.getElementById("editorialPicksGrid");
-  if (!section || !grid) return;
-  try {
-    const res = await fetch("/api/editorial-picks?limit=8");
-    if (!res.ok) return;
-    const data = await res.json();
-    const picks = data.picks || [];
-    if (!picks.length) return; // Gerçek veri yoksa bölüm gizli kalır -- sahte veri gösterilmez
-
-    grid.innerHTML = picks
-      .map((p) => {
-        const title = escapeHtml(p.title || "Ürün");
-        const note = escapeHtml((p.note || "").slice(0, 90));
-        const priceStr = p.price ? `₺${Number(p.price).toFixed(2)}` : "";
-        const url = p.url ? escapeHtml(p.url) : "#";
-        const brand = getStoreBrand(p.source);
-        return `
-          <a href="${url}" target="_blank" rel="noopener sponsored"
-             style="flex:0 0 220px;background:var(--bg-card,#181b20);border:1.5px solid var(--border,#2e3240);border-radius:12px;padding:14px;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:6px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <div style="width:28px;height:28px;border-radius:7px;background:${brand.bg};color:${brand.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;">${(p.source || "?").charAt(0).toUpperCase()}</div>
-              <span style="font-size:12.5px;font-weight:700;color:var(--ink,#e2e4e9);">${escapeHtml(brand.name || p.source || "")}</span>
-            </div>
-            <div style="font-size:13px;font-weight:700;color:var(--ink,#e2e4e9);">⭐ ${title}</div>
-            ${priceStr ? `<div style="font-size:14px;font-weight:800;color:#287a50;">${priceStr}</div>` : ""}
-            ${note ? `<div style="font-size:11.5px;color:var(--ink-2,#848c96);line-height:1.4;">${note}</div>` : ""}
-          </a>`;
-      })
-      .join("");
-    section.classList.remove("hidden");
-  } catch (e) {
-    // Sessizce geç -- ana sayfa deneyimini bozmasın
-  }
-}
-
-/* ── Ürün linki kutusu için gerçek arama geçmişinden autocomplete ─────── */
-async function loadProductUrlSuggestions() {
-  const datalist = document.getElementById("productUrlHistory");
-  if (!datalist) return;
-  try {
-    const res = await fetch("/api/search-suggestions?limit=10");
-    if (!res.ok) return;
-    const data = await res.json();
-    const suggestions = data.suggestions || [];
-    datalist.innerHTML = suggestions.map(s => `<option value="${escapeHtml(s)}"></option>`).join("");
-  } catch (e) {
-    // Sessizce geç
   }
 }
 
@@ -1612,41 +1556,11 @@ async function loadProducts(signal = null) {
 
   try {
     state.products = await api("/api/opportunities", { signal: null });
-    try {
-      localStorage.setItem("almadan_products_cache", JSON.stringify(state.products));
-    } catch (e) { /* depolama dolu olabilir, sessiz geç */ }
     renderAll();
   } catch (error) {
     console.error("loadProducts hatası:", error);
-    if (!navigator.onLine && renderOfflineCachedProducts()) return;
     renderFallbackOpportunities();
   }
-}
-
-// Çevrimdışıyken sunucudan taze veri alınamazsa, en son başarılı yüklemede
-// localStorage'a kaydedilen fiyatları gösteren basit bir fallback.
-function renderOfflineCachedProducts() {
-  let cached = [];
-  try {
-    cached = JSON.parse(localStorage.getItem("almadan_products_cache") || "[]");
-  } catch (e) {
-    cached = [];
-  }
-  if (!cached || cached.length === 0) return false;
-
-  state.products = cached;
-  renderAll();
-
-  const grid = document.getElementById("dealGrid");
-  if (grid) {
-    const banner = document.createElement("div");
-    banner.className = "offline-cache-banner";
-    banner.setAttribute("role", "status");
-    banner.innerHTML = `<i data-lucide="wifi-off" style="width:14px;height:14px;"></i> Çevrimdışısın — son bilinen fiyatlar gösteriliyor, güncel olmayabilir.`;
-    grid.parentNode.insertBefore(banner, grid);
-    lucide.createIcons();
-  }
-  return true;
 }
 
 function renderFallbackOpportunities() {
@@ -1665,7 +1579,6 @@ function renderAll() {
   renderTracking();
   renderSavings();
   loadRecommendations();
-  renderRecentlyViewed();
   lucide.createIcons();
 }
 
@@ -1775,29 +1688,7 @@ function renderSavings() {
   document.getElementById("trackedStat").textContent = state.products.length;
   document.getElementById("buyStat").textContent = buySignals;
   document.getElementById("bestScoreStat").textContent = bestScore;
-  renderSavingsBadge(totalSavings);
   renderSavingsCharts();
-}
-
-const SAVINGS_BADGE_TIERS = [
-  { min: 500, label: "Tasarruf Ustası", icon: "🏆" },
-  { min: 250, label: "Fiyat Avcısı", icon: "🥈" },
-  { min: 100, label: "Akıllı Alıcı", icon: "🥉" },
-  { min: 1,   label: "Yeni Başlangıç", icon: "🌱" },
-];
-
-function renderSavingsBadge(totalSavings) {
-  const el = document.getElementById("savingsBadge");
-  if (!el) return;
-  const tier = SAVINGS_BADGE_TIERS.find((t) => totalSavings >= t.min);
-  if (!tier) {
-    el.classList.add("hidden");
-    el.textContent = "";
-    return;
-  }
-  el.classList.remove("hidden");
-  el.textContent = `${tier.icon} ${tier.label}`;
-  el.setAttribute("aria-label", `Tasarruf rozeti: ${tier.label}`);
 }
 
 function destroyChart(name) {
@@ -1838,8 +1729,8 @@ async function renderSavingsCharts() {
     cosmetics: "Kozmetik",
     supplement: "Takviye",
   };
-  const chartText = state.theme !== "light" ? "#c8cec8" : "#687068";
-  const chartGrid = state.theme !== "light" ? "#2b3036" : "#e2e6df";
+  const chartText = state.theme === "dark" ? "#c8cec8" : "#687068";
+  const chartGrid = state.theme === "dark" ? "#2b3036" : "#e2e6df";
 
   destroyChart("products");
   destroyChart("categories");
@@ -2000,8 +1891,8 @@ async function renderReceiptCharts() {
 
   const monthlyEntries = Object.entries(summary.monthly_totals || {});
   const storeEntries = Object.entries(summary.store_totals || {}).slice(0, 7);
-  const chartText = state.theme !== "light" ? "#c8cec8" : "#687068";
-  const chartGrid = state.theme !== "light" ? "#2b3036" : "#e2e6df";
+  const chartText = state.theme === "dark" ? "#c8cec8" : "#687068";
+  const chartGrid = state.theme === "dark" ? "#2b3036" : "#e2e6df";
 
   destroyChart("receiptMonthly");
   destroyChart("receiptStores");
@@ -2614,19 +2505,10 @@ function showSearchResults(response) {
           const storeLinkHtml = !isOutOfStock && item.url
             ? `<a href="${escapeHtml(addAffiliateTag(item.url, item.source))}" target="_blank" rel="noopener noreferrer sponsored"
                  class="secondary-button" style="padding: 6px 12px; font-size: 11px; height: auto; width: auto; display: inline-flex; align-items: center; text-decoration: none;"
-                 onclick="event.stopPropagation(); addToRecentlyViewed(state.searchResults[${index}]);">
+                 onclick="event.stopPropagation();">
                  <i data-lucide="external-link" style="width:12px; height:12px; margin-right:4px;"></i> Mağazaya Git
                </a>`
             : "";
-
-          const whyMatchedText = `Bu ürün ${item.source} mağazasındaki sonuçlar arasından "${originalQuery}" araması ile eşleştirildi.`;
-          const whyMatchedHtml = `<span class="why-matched-icon" tabindex="0" role="img" title="${escapeHtml(whyMatchedText)}" aria-label="${escapeHtml(whyMatchedText)}">
-              <i data-lucide="info" style="width:12px; height:12px;"></i>
-            </span>`;
-
-          const wrongMatchHtml = `<button type="button" class="wrong-match-link" onclick="event.stopPropagation(); reportWrongMatch(${index});">
-              Bu eşleşme yanlış
-            </button>`;
 
           const buttonHtml = isOutOfStock
             ? `<button class="primary-button" style="padding: 6px 12px; font-size: 11px; height: auto; width: auto; background-color: #687068; border-color: #687068;" onclick="trackSearchResultProduct(this, ${index})">
@@ -2676,7 +2558,7 @@ function showSearchResults(response) {
                   : `<span class="product-placeholder" style="width:100%; height:100%; display:grid; place-items:center;"><i data-lucide="${getStoreIcon(item.source, item.title)}" style="width:18px; height:18px;"></i></span>`}
               </div>
               <div style="flex: 1; min-width: 0;">
-                <p class="source-name" style="margin: 0 0 2px 0; font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--muted);">${escapeHtml(item.source)} ${whyMatchedHtml}</p>
+                <p class="source-name" style="margin: 0 0 2px 0; font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--muted);">${escapeHtml(item.source)}</p>
                 <h4 style="margin: 0 0 6px 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</h4>
                 <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px;">
                   ${badgesHtml}
@@ -2690,11 +2572,9 @@ function showSearchResults(response) {
                 </div>
                 ${suspiciousWarningHtml}
                 ${unitPriceHtml}
-                ${wrongMatchHtml}
               </div>
               <div style="text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
-                <div style="display:flex; align-items:center; justify-content:flex-end; gap:4px;">
-                  ${favoriteButtonHtml(item)}
+                <div>
                   ${originalPriceHtml}
                   ${priceDisplayHtml}
                   ${(() => {
@@ -2749,30 +2629,9 @@ window.triggerSuggestionSearch = function(query) {
 };
 
 
-async function reportWrongMatch(index) {
-  const item = state.searchResults ? state.searchResults[index] : null;
-  if (!item) return;
-  try {
-    await api("/api/feedback/wrong-match", {
-      method: "POST",
-      body: JSON.stringify({
-        query: window._lastSearchQuery || "",
-        product_title: item.title || "",
-        product_source: item.source || "",
-        product_url: item.url || "",
-      }),
-    });
-    showToast("Bildirdiğin için teşekkürler, eşleşmeyi inceleyeceğiz.");
-  } catch (e) {
-    showToast("Geri bildirim gönderilemedi, lütfen tekrar dene.");
-  }
-}
-window.reportWrongMatch = reportWrongMatch;
-
 async function trackSearchResultProduct(button, index) {
   const item = state.searchResults ? state.searchResults[index] : null;
   if (!item) return;
-  addToRecentlyViewed(item);
 
   button.disabled = true;
   button.innerHTML = `<span class="spinner"></span> Ekleniyor`;
@@ -2868,14 +2727,6 @@ function showParsedProduct(parsed) {
           <p>${parsed.price ? "Ürün ve fiyat bilgisi bulundu." : "Fiyat bulunamadı. Aşağıdan elle tamamlayabilirsin."}</p>
         </div>
       </div>
-      ${parsed.deal_message ? `
-      <div class="decision-panel" style="background:${parsed.deal_verdict === 'al' ? 'rgba(40,122,80,.08)' : 'rgba(255,152,0,.08)'}; border:1px solid ${parsed.deal_verdict === 'al' ? 'rgba(40,122,80,.25)' : 'rgba(255,152,0,.25)'};">
-        <span style="font-size:22px;">${parsed.deal_verdict === 'al' ? '✅' : parsed.deal_verdict === 'bekle' ? '⏳' : '📊'}</span>
-        <div>
-          <strong>Bu fiyata değer mi?</strong>
-          <p>${escapeHtml(parsed.deal_message)}</p>
-        </div>
-      </div>` : ""}
       <div class="manual-fields">
         <label class="manual-field">
           <span>Ürün adı</span>
@@ -2932,7 +2783,6 @@ function showParsedProduct(parsed) {
         <p id="parsedPriceHistoryEmptyState" class="hidden" style="font-size: 12px; color: var(--muted); margin: 0; padding: 8px 0; text-align: center;">Bu ürün için henüz fiyat geçmişi kaydı yok. Fiyat değişimleri izlendikçe burada görünecek.</p>
         <div id="parsedPriceHistoryChartInner">
           <p class="source-name" style="margin-top: 0; margin-bottom: 8px; font-weight: 600; color: var(--ink);">Fiyat Değişim Grafiği (Son 90 Gün)</p>
-          <p id="priceHistoryLowestInfo" style="font-size:12px; color:var(--green); font-weight:700; margin:0 0 8px;"></p>
           <div style="position: relative; height: 160px; width: 100%;">
             <canvas id="parsedPriceHistoryChart"></canvas>
           </div>
@@ -3771,13 +3621,10 @@ async function shareProduct(productId) {
   const price = currency.format(product.current_price);
   const storeName = escapeHtml(product.source || "mağaza");
   const text = `${product.title} — ${storeName}'da ${price}! Almadan ile karşılaştır:`;
-  const baseUrl = product.url || window.location.href;
-  const sep = baseUrl.includes("?") ? "&" : "?";
+  const url = product.url || window.location.href;
 
   if (navigator.share) {
     try {
-      const url = `${baseUrl}${sep}utm_source=native_share&utm_medium=share`;
-      trackShareUtm("native_share", "share", "web_share_api");
       await navigator.share({ title: product.title, text, url });
       return;
     } catch (e) {
@@ -3786,9 +3633,7 @@ async function shareProduct(productId) {
     }
   }
 
-  const url = `${baseUrl}${sep}utm_source=whatsapp&utm_medium=share`;
   const waText = encodeURIComponent(`${text} ${url}`);
-  trackShareUtm("whatsapp", "share", "whatsapp");
   window.open(`https://wa.me/?text=${waText}`, "_blank", "noopener,noreferrer");
 }
 
@@ -4229,23 +4074,19 @@ window.goToReceiptHistory = goToReceiptHistory;
 window.deleteReceipt = deleteReceipt;
 
 
-/* PREMIUM KOYU TEMA (light -> dark -> amoled -> light) */
+/* PREMIUM KOYU TEMA */
 function applyTheme() {
-  const isDark = state.theme === "dark" || state.theme === "amoled";
-  const isAmoled = state.theme === "amoled";
+  const isDark = state.theme === "dark";
   document.documentElement.classList.toggle("dark-theme", isDark);
   document.body.classList.toggle("dark-theme", isDark);
-  document.documentElement.classList.toggle("amoled-theme", isAmoled);
-  document.body.classList.toggle("amoled-theme", isAmoled);
   const themeBtn = document.getElementById("themeToggleButton");
   if (themeBtn) {
-    themeBtn.innerHTML = state.theme === "light" ? _MOON_SVG : (state.theme === "dark" ? _AMOLED_SVG : _SUN_SVG);
-    themeBtn.setAttribute("aria-label", state.theme === "light" ? "Koyu temaya geç" : (state.theme === "dark" ? "AMOLED temaya geç" : "Açık temaya geç"));
+    themeBtn.innerHTML = isDark ? _SUN_SVG : _MOON_SVG;
   }
 }
 
 function toggleTheme() {
-  state.theme = state.theme === "light" ? "dark" : (state.theme === "dark" ? "amoled" : "light");
+  state.theme = state.theme === "light" ? "dark" : "light";
   localStorage.setItem("almadan_theme", state.theme);
   applyTheme();
   renderSavingsCharts();
@@ -6797,22 +6638,6 @@ async function searchByBarcode(code) {
 
 /* ── Yeni: Satıcı Seçim Akışı ─────────────────────────────────────────────── */
 
-function formatFreshnessLabel(a) {
-  // Cache/scrape zaman damgasi varsa gercek "X dakika once" metni uret;
-  // yoksa uydurma kesin zaman GOSTERME, genel bir ifadeyle yetin.
-  const ts = a && a.extra_info && (a.extra_info.checked_at || a.extra_info.seen_at || a.extra_info.scraped_at);
-  if (!ts) return "az önce kontrol edildi";
-  const t = new Date(ts).getTime();
-  if (!t || isNaN(t)) return "az önce kontrol edildi";
-  const diffMin = Math.max(0, Math.round((Date.now() - t) / 60000));
-  if (diffMin < 1) return "az önce kontrol edildi";
-  if (diffMin < 60) return `${diffMin} dakika önce kontrol edildi`;
-  const diffHour = Math.round(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} saat önce kontrol edildi`;
-  const diffDay = Math.round(diffHour / 24);
-  return `${diffDay} gün önce kontrol edildi`;
-}
-
 async function showSellerSelectionDialog(parsed) {
   const dialog = document.getElementById("sellerSelectionDialog");
   const content = document.getElementById("sellerSelectionContent");
@@ -6879,44 +6704,58 @@ async function showSellerSelectionDialog(parsed) {
       return;
     }
 
+    const minPrice = Math.min(...alts.filter(a => a.price > 0).map(a => a.price));
+    const maxPrice = Math.max(...alts.filter(a => a.price > 0).map(a => a.price));
+    const savings = maxPrice - minPrice;
     const storeCount = new Set(alts.map(a => a.source)).size;
     const headerLabel = storeCount === alts.length
       ? `${alts.length} Mağazada Karşılaştırma`
       : `${alts.length} Sonuç, ${storeCount} Mağazada Karşılaştırma`;
 
-    // Filtre/tablo görünümü için ham veriyi sakla — re-render bundan yapılır.
-    state.sellerAlts = alts;
-    state.sellerViewMode = state.sellerViewMode || "list";
-    state.sellerFilters = { inStockOnly: false, fastDeliveryOnly: false };
-
     let listHtml = `
-      <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
-        <div>
-          <h3 style="margin:0 0 4px 0; font-size:20px; font-weight:800; color:var(--ink);">🛒 ${headerLabel}</h3>
-          <p id="sellerSavingsHint" style="margin:0; font-size:13px; color:var(--ink-2);"></p>
-        </div>
-        <button type="button" class="ab-no-print" onclick="window.print()" title="Karşılaştırmayı yazdır / PDF olarak kaydet"
-          style="flex-shrink:0; border:1.5px solid var(--border); background:var(--surface); color:var(--ink); border-radius:8px; padding:7px 10px; font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap;">
-          🖨️ Yazdır / PDF
-        </button>
+      <div style="margin-bottom:16px;">
+        <h3 style="margin:0 0 4px 0; font-size:20px; font-weight:800; color:var(--ink);">🛒 ${headerLabel}</h3>
+        ${savings > 1 ? `<p style="margin:0; font-size:13px; color:#287a50; font-weight:600;">💰 En pahalı satıcıya göre <b>₺${savings.toFixed(2)}</b> tasarruf edebilirsin!</p>` : `<p style="margin:0; font-size:13px; color:var(--ink-2);">Bir mağaza seçip takibe alarak fiyat düşüşlerini takip et.</p>`}
       </div>
-      <div class="ab-no-print" style="display:flex; flex-wrap:wrap; align-items:center; gap:14px; margin-bottom:12px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--surface);">
-        <div style="display:flex; gap:6px;">
-          <button type="button" id="sellerViewListBtn" onclick="setSellerViewMode('list')"
-            style="border:1.5px solid var(--line); background:var(--surface); color:var(--ink); border-radius:6px; padding:5px 10px; font-size:11.5px; font-weight:700; cursor:pointer;">☰ Liste</button>
-          <button type="button" id="sellerViewTableBtn" onclick="setSellerViewMode('table')"
-            style="border:1.5px solid var(--line); background:var(--surface); color:var(--ink); border-radius:6px; padding:5px 10px; font-size:11.5px; font-weight:700; cursor:pointer;">▦ Tablo</button>
-        </div>
-        <label style="display:flex; align-items:center; gap:5px; font-size:12px; color:var(--ink-2); font-weight:600; cursor:pointer;">
-          <input type="checkbox" id="sellerFilterInStock" onchange="updateSellerFilters()"> Sadece stokta olanlar
-        </label>
-        <label style="display:flex; align-items:center; gap:5px; font-size:12px; color:var(--ink-2); font-weight:600; cursor:pointer;">
-          <input type="checkbox" id="sellerFilterFastDelivery" onchange="updateSellerFilters()"> Hızlı kargo
-        </label>
-      </div>
-      <div id="sellerResultsContainer"></div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; max-height:60vh; overflow-y:auto; padding-right:4px;" class="custom-scrollbar">
     `;
 
+    alts.forEach((a, idx) => {
+      const brand = getStoreBrand(a.source);
+      const isCheapest = idx === 0 && a.price > 0;
+      const savingVsMax = a.price > 0 && maxPrice > a.price ? (maxPrice - a.price) : 0;
+      const escapedJson = escapeHtml(JSON.stringify(a));
+
+      let badgeTop = "";
+      if (isCheapest) badgeTop = `<div style="position:absolute;top:-1px;left:12px;background:#287a50;color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:0 0 6px 6px;letter-spacing:.3px;">EN UCUZ</div>`;
+
+      let badgesRow = "";
+      if (a.extra_info && a.extra_info.fast_delivery) badgesRow += `<span style="font-size:9.5px;background:rgba(255,152,0,.1);color:#ef6c00;border:1px solid rgba(255,152,0,.25);padding:2px 6px;border-radius:4px;font-weight:700;">⚡ Hızlı</span>`;
+      if (a.extra_info && a.extra_info.rating && parseFloat(a.extra_info.rating) >= 9.0) badgesRow += `<span style="font-size:9.5px;background:rgba(33,150,243,.1);color:#1976d2;border:1px solid rgba(33,150,243,.25);padding:2px 6px;border-radius:4px;font-weight:700;">🏆 ${a.extra_info.rating}</span>`;
+
+      listHtml += `
+        <div onclick="selectSellerAndProceed(this)" data-seller='${escapedJson}'
+          style="position:relative;border:${isCheapest ? '2px solid #287a50' : '1.5px solid var(--line)'};border-radius:10px;padding:${isCheapest ? '18px 12px 12px' : '12px'};cursor:pointer;transition:all .15s;background:var(--surface);"
+          onmouseover="this.style.borderColor='${brand.color}';this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 16px ${brand.color}22';"
+          onmouseout="this.style.borderColor='${isCheapest ? '#287a50' : 'var(--line)'}';this.style.transform='none';this.style.boxShadow='none';">
+          ${badgeTop}
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            ${storeLogoHtml(a.source, 32)}
+            <div>
+              <div style="font-size:13px;font-weight:800;color:${brand.color};line-height:1.2;">${escapeHtml(brand.name)}</div>
+              <div style="font-size:10px;color:var(--ink-2);">Ücretsiz Kargo</div>
+            </div>
+          </div>
+          <div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">₺${a.price.toFixed(2)}</div>
+          ${a.original_price && a.original_price > a.price ? `<div style="font-size:11px;color:var(--ink-2);text-decoration:line-through;">₺${a.original_price.toFixed(2)}</div>` : ""}
+          ${savingVsMax > 1 ? `<div style="font-size:10px;color:#287a50;font-weight:700;margin-top:2px;">₺${savingVsMax.toFixed(2)} tasarruf</div>` : ""}
+          ${badgesRow ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">${badgesRow}</div>` : ""}
+          <div style="margin-top:8px;text-align:center;background:${isCheapest ? '#287a50' : 'var(--line)'};color:${isCheapest ? '#fff' : 'var(--ink-2)'};border-radius:6px;padding:5px;font-size:11px;font-weight:700;">Seç ›</div>
+        </div>
+      `;
+    });
+
+    listHtml += `</div>`;
     // Backend hiç alternatif bulamadıysa (sadece orijinal ürün varsa) arama linklerini de göster
     const fallbackLinks = data.search_links || [];
     if (backendAltCount === 0 && fallbackLinks.length) {
@@ -6927,156 +6766,12 @@ async function showSellerSelectionDialog(parsed) {
         </div>`;
     }
     content.innerHTML = listHtml;
-    renderSellerResults();
-    updateSellerViewButtons();
 
   } catch(e) {
     console.error("Satıcı Seçim Ekranı Hatası:", e);
     dialog.close();
     showParsedProduct(parsed); // Hata durumunda asıl ekrana düş
   }
-}
-
-function setSellerViewMode(mode) {
-  state.sellerViewMode = mode === "table" ? "table" : "list";
-  updateSellerViewButtons();
-  renderSellerResults();
-}
-
-function updateSellerViewButtons() {
-  const listBtn = document.getElementById("sellerViewListBtn");
-  const tableBtn = document.getElementById("sellerViewTableBtn");
-  if (!listBtn || !tableBtn) return;
-  const active = "border-color:#287a50; background:#287a50; color:#fff;";
-  const inactive = "border-color:var(--line); background:var(--surface); color:var(--ink);";
-  listBtn.style.cssText += state.sellerViewMode === "list" ? active : inactive;
-  tableBtn.style.cssText += state.sellerViewMode === "table" ? active : inactive;
-}
-
-function updateSellerFilters() {
-  const inStock = document.getElementById("sellerFilterInStock");
-  const fastDelivery = document.getElementById("sellerFilterFastDelivery");
-  state.sellerFilters = {
-    inStockOnly: !!(inStock && inStock.checked),
-    fastDeliveryOnly: !!(fastDelivery && fastDelivery.checked),
-  };
-  renderSellerResults();
-}
-
-function renderSellerResults() {
-  const container = document.getElementById("sellerResultsContainer");
-  const hint = document.getElementById("sellerSavingsHint");
-  if (!container) return;
-
-  const allAlts = state.sellerAlts || [];
-  const filters = state.sellerFilters || {};
-  let alts = allAlts.filter(a => {
-    const info = a.extra_info || {};
-    if (filters.inStockOnly && info.out_of_stock) return false;
-    if (filters.fastDeliveryOnly && !info.fast_delivery) return false;
-    return true;
-  });
-
-  if (!alts.length) {
-    container.innerHTML = `<p style="text-align:center; padding:24px; color:var(--ink-2); font-size:13px;">Seçili filtrelere uyan satıcı bulunamadı.</p>`;
-    if (hint) hint.textContent = "";
-    return;
-  }
-
-  const validPrices = alts.filter(a => a.price > 0).map(a => a.price);
-  const minPrice = validPrices.length ? Math.min(...validPrices) : 0;
-  const maxPrice = validPrices.length ? Math.max(...validPrices) : 0;
-  const savings = maxPrice - minPrice;
-  if (hint) {
-    hint.innerHTML = savings > 1
-      ? `💰 En pahalı satıcıya göre <b style="color:#287a50;">₺${savings.toFixed(2)}</b> tasarruf edebilirsin!`
-      : "Bir mağaza seçip takibe alarak fiyat düşüşlerini takip et.";
-  }
-
-  if (state.sellerViewMode === "table") {
-    container.innerHTML = renderSellerTable(alts, maxPrice);
-  } else {
-    container.innerHTML = renderSellerGrid(alts, maxPrice);
-  }
-}
-
-function renderSellerGrid(alts, maxPrice) {
-  let html = `<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; max-height:60vh; overflow-y:auto; padding-right:4px;" class="custom-scrollbar">`;
-
-  alts.forEach((a, idx) => {
-    const brand = getStoreBrand(a.source);
-    const isCheapest = idx === 0 && a.price > 0;
-    const savingVsMax = a.price > 0 && maxPrice > a.price ? (maxPrice - a.price) : 0;
-    const escapedJson = escapeHtml(JSON.stringify(a));
-
-    let badgeTop = "";
-    if (isCheapest) badgeTop = `<div style="position:absolute;top:-1px;left:12px;background:#287a50;color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:0 0 6px 6px;letter-spacing:.3px;">EN UCUZ</div>`;
-
-    let badgesRow = "";
-    if (a.extra_info && a.extra_info.fast_delivery) badgesRow += `<span style="font-size:9.5px;background:rgba(255,152,0,.1);color:#ef6c00;border:1px solid rgba(255,152,0,.25);padding:2px 6px;border-radius:4px;font-weight:700;">⚡ Hızlı</span>`;
-    if (a.extra_info && a.extra_info.rating && parseFloat(a.extra_info.rating) >= 9.0) badgesRow += `<span style="font-size:9.5px;background:rgba(33,150,243,.1);color:#1976d2;border:1px solid rgba(33,150,243,.25);padding:2px 6px;border-radius:4px;font-weight:700;">🏆 ${a.extra_info.rating}</span>`;
-
-    html += `
-      <div onclick="selectSellerAndProceed(this)" data-seller='${escapedJson}'
-        style="position:relative;border:${isCheapest ? '2px solid #287a50' : '1.5px solid var(--line)'};border-radius:10px;padding:${isCheapest ? '18px 12px 12px' : '12px'};cursor:pointer;transition:all .15s;background:var(--surface);"
-        onmouseover="this.style.borderColor='${brand.color}';this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 16px ${brand.color}22';"
-        onmouseout="this.style.borderColor='${isCheapest ? '#287a50' : 'var(--line)'}';this.style.transform='none';this.style.boxShadow='none';">
-        ${badgeTop}
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          ${storeLogoHtml(a.source, 32)}
-          <div>
-            <div style="font-size:13px;font-weight:800;color:${brand.color};line-height:1.2;">${escapeHtml(brand.name)}</div>
-            <div style="font-size:10px;color:var(--ink-2);">Ücretsiz Kargo</div>
-          </div>
-        </div>
-        <div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">₺${a.price.toFixed(2)}</div>
-        ${a.original_price && a.original_price > a.price ? `<div style="font-size:11px;color:var(--ink-2);text-decoration:line-through;">₺${a.original_price.toFixed(2)}</div>` : ""}
-        ${savingVsMax > 1 ? `<div style="font-size:10px;color:#287a50;font-weight:700;margin-top:2px;">₺${savingVsMax.toFixed(2)} tasarruf</div>` : ""}
-        ${badgesRow ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">${badgesRow}</div>` : ""}
-        <div style="font-size:9.5px;color:var(--ink-2);margin-top:4px;">🕒 ${escapeHtml(formatFreshnessLabel(a))}</div>
-        <div style="margin-top:8px;text-align:center;background:${isCheapest ? '#287a50' : 'var(--line)'};color:${isCheapest ? '#fff' : 'var(--ink-2)'};border-radius:6px;padding:5px;font-size:11px;font-weight:700;">Seç ›</div>
-      </div>
-    `;
-  });
-
-  html += `</div>`;
-  return html;
-}
-
-function renderSellerTable(alts, maxPrice) {
-  let rows = "";
-  alts.forEach((a, idx) => {
-    const brand = getStoreBrand(a.source);
-    const isCheapest = idx === 0 && a.price > 0;
-    const escapedJson = escapeHtml(JSON.stringify(a));
-    const info = a.extra_info || {};
-    const stockLabel = info.out_of_stock ? "Stokta yok" : "Stokta var";
-    const deliveryLabel = info.fast_delivery ? "Hızlı kargo" : "Standart kargo";
-    rows += `
-      <tr onclick="selectSellerAndProceed(this)" data-seller='${escapedJson}' style="cursor:pointer; border-bottom:1px solid var(--line); ${isCheapest ? 'background:rgba(40,122,80,.06);' : ''}">
-        <td style="padding:8px 10px; font-weight:700; color:${brand.color};">${escapeHtml(brand.name)}${isCheapest ? ' <span style="font-size:9px; background:#287a50; color:#fff; padding:2px 5px; border-radius:4px; font-weight:800;">EN UCUZ</span>' : ''}</td>
-        <td style="padding:8px 10px; font-weight:800; color:var(--ink);">₺${a.price.toFixed(2)}</td>
-        <td style="padding:8px 10px; font-size:12px; color:${info.out_of_stock ? '#c62828' : 'var(--ink-2)'};">${stockLabel}</td>
-        <td style="padding:8px 10px; font-size:12px; color:${info.fast_delivery ? '#ef6c00' : 'var(--ink-2)'};">${deliveryLabel}</td>
-        <td style="padding:8px 10px; font-size:11px; color:var(--ink-2);">${escapeHtml(formatFreshnessLabel(a))}</td>
-      </tr>`;
-  });
-
-  return `
-    <div style="max-height:60vh; overflow:auto;" class="custom-scrollbar">
-      <table style="width:100%; border-collapse:collapse; font-size:13px;">
-        <thead>
-          <tr style="border-bottom:2px solid var(--line); text-align:left;">
-            <th style="padding:8px 10px; font-size:11px; color:var(--ink-2); text-transform:uppercase;">Mağaza</th>
-            <th style="padding:8px 10px; font-size:11px; color:var(--ink-2); text-transform:uppercase;">Fiyat</th>
-            <th style="padding:8px 10px; font-size:11px; color:var(--ink-2); text-transform:uppercase;">Stok</th>
-            <th style="padding:8px 10px; font-size:11px; color:var(--ink-2); text-transform:uppercase;">Kargo</th>
-            <th style="padding:8px 10px; font-size:11px; color:var(--ink-2); text-transform:uppercase;">Güncelleme</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
 }
 
 function selectSellerAndProceed(element) {
@@ -7097,42 +6792,6 @@ function selectSellerAndProceed(element) {
   };
 
   showParsedProduct(newParsed);
-}
-
-// --- Basit A/B test altyapisi -------------------------------------------
-// Gercek bir test senaryosu UYGULAMAZ (orn. buton metni degisikligi yok);
-// sadece kullaniciya kalici bir "variant" (A/B) atayan ve bunu backend'e
-// loglayabilen genel amacli yardimci fonksiyon.
-function getABVariant(testName) {
-  if (!testName) return "A";
-  const key = `almadan_ab_${testName}`;
-  try {
-    let variant = localStorage.getItem(key);
-    if (variant !== "A" && variant !== "B") {
-      variant = Math.random() < 0.5 ? "A" : "B";
-      localStorage.setItem(key, variant);
-    }
-    return variant;
-  } catch (e) {
-    // localStorage kapali/erisilemez (gizli sekme vb.) -- oturum boyunca
-    // sabit kalmasa da her cagride hata firlatmayan bir varsayilan don.
-    return "A";
-  }
-}
-
-function logABVariant(testName, extra) {
-  const variant = getABVariant(testName);
-  try {
-    api("/api/log-activity", {
-      method: "POST",
-      body: JSON.stringify(Object.assign({
-        action: "ab_variant",
-        ab_test: testName,
-        ab_variant: variant,
-      }, extra || {}))
-    }).catch(() => {});
-  } catch (e) { /* sessiz gec */ }
-  return variant;
 }
 
 function saveToSearchHistory(query) {
@@ -7219,170 +6878,14 @@ async function loadRecommendations() {
   }
 }
 
-/* SON GÖRÜNTÜLENENLER */
-const RECENTLY_VIEWED_KEY = "almadan_recently_viewed";
-const RECENTLY_VIEWED_MAX = 12;
-
-function addToRecentlyViewed(product) {
-  if (!product || !product.title) return;
-  try {
-    let list = JSON.parse(localStorage.getItem(RECENTLY_VIEWED_KEY) || "[]");
-    const key = (product.url || product.title || "").toLowerCase();
-    list = list.filter((p) => (p.url || p.title || "").toLowerCase() !== key);
-    list.unshift({
-      title: product.title,
-      price: product.price ?? product.current_price ?? null,
-      source: product.source || "",
-      url: product.url || product.canonical_url || "",
-      image_url: product.image_url || "",
-      viewed_at: new Date().toISOString(),
-    });
-    if (list.length > RECENTLY_VIEWED_MAX) list = list.slice(0, RECENTLY_VIEWED_MAX);
-    localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(list));
-    renderRecentlyViewed();
-  } catch (e) {
-    console.error("addToRecentlyViewed hatası:", e);
-  }
-}
-
-function clearRecentlyViewed() {
-  localStorage.removeItem(RECENTLY_VIEWED_KEY);
-  renderRecentlyViewed();
-}
-window.clearRecentlyViewed = clearRecentlyViewed;
-
-function renderRecentlyViewed() {
-  const section = document.getElementById("recentlyViewedSection");
-  const grid = document.getElementById("recentlyViewedGrid");
-  if (!section || !grid) return;
-
-  let list = [];
-  try {
-    list = JSON.parse(localStorage.getItem(RECENTLY_VIEWED_KEY) || "[]");
-  } catch (e) {
-    list = [];
-  }
-
-  if (!list.length) {
-    section.classList.add("hidden");
-    grid.innerHTML = "";
-    return;
-  }
-
-  section.classList.remove("hidden");
-  grid.innerHTML = list.map((p) => {
-    const priceStr = typeof p.price === "number" ? currency.format(p.price) : "Fiyat bilinmiyor";
-    const url = p.url ? `/?q=${encodeURIComponent(p.title)}&auto=1` : "#";
-    return `
-      <div class="store-card" style="padding:16px; display:flex; flex-direction:column; gap:8px;">
-        <div style="font-size:11px; font-weight:700; color:var(--muted); letter-spacing:.05em;">${escapeHtml((p.source || "").toUpperCase())}</div>
-        <div style="font-size:14px; font-weight:700; color:var(--ink); line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; height:40px;" title="${escapeHtml(p.title)}">${escapeHtml(p.title)}</div>
-        <div style="font-size:16px; font-weight:800; color:var(--green-dark); margin-top:4px;">${priceStr}</div>
-        <a href="${url}" class="btn-follow" style="text-align:center; text-decoration:none; margin-top:8px; display:block;" aria-label="${escapeHtml(p.title)} için tekrar ara">Tekrar Ara</a>
-      </div>
-    `;
-  }).join("");
-}
-
-/* FAVORİLER (takipten bağımsız, sadece işaretleme) */
-const FAVORITES_KEY = "almadan_favorites";
-
-function getFavorites() {
-  try {
-    return JSON.parse(localStorage.getItem(FAVORITES_KEY) || "[]");
-  } catch (e) {
-    return [];
-  }
-}
-
-function favoriteKey(item) {
-  return (item.url || `${item.source || ""}|${item.title || ""}`).toLowerCase();
-}
-
-function isFavorite(item) {
-  const key = favoriteKey(item);
-  return getFavorites().some((f) => f.key === key);
-}
-
-function toggleFavoriteFromButton(btnEl) {
-  if (!btnEl) return;
-  let item = {};
-  try {
-    item = JSON.parse(decodeURIComponent(btnEl.getAttribute("data-fav-item") || "{}"));
-  } catch (e) {
-    return;
-  }
-  toggleFavorite(item, btnEl);
-}
-window.toggleFavoriteFromButton = toggleFavoriteFromButton;
-
-function toggleFavorite(item, btnEl) {
-  const key = favoriteKey(item);
-  let favorites = getFavorites();
-  const idx = favorites.findIndex((f) => f.key === key);
-  if (idx >= 0) {
-    favorites.splice(idx, 1);
-    showToast("Favorilerden çıkarıldı.");
-  } else {
-    favorites.unshift({
-      key,
-      title: item.title,
-      source: item.source || "",
-      url: item.url || "",
-      price: item.price ?? item.current_price ?? null,
-      image_url: item.image_url || "",
-      added_at: new Date().toISOString(),
-    });
-    if (favorites.length > 100) favorites = favorites.slice(0, 100);
-    showToast("Favorilere eklendi.");
-  }
-  localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
-  if (btnEl) {
-    const fav = idx < 0;
-    btnEl.classList.toggle("active", fav);
-    btnEl.setAttribute("aria-pressed", String(fav));
-    btnEl.setAttribute("aria-label", fav ? "Favorilerden çıkar" : "Favorilere ekle");
-  }
-}
-window.toggleFavorite = toggleFavorite;
-
-function favoriteButtonHtml(item) {
-  const fav = isFavorite(item);
-  const payload = encodeURIComponent(JSON.stringify({
-    title: item.title || "",
-    source: item.source || "",
-    url: item.url || "",
-    price: item.price ?? item.current_price ?? null,
-    image_url: item.image_url || "",
-  }));
-  return `<button type="button" class="favorite-star-btn${fav ? " active" : ""}"
-      data-fav-item="${payload}"
-      aria-pressed="${fav}" aria-label="${fav ? "Favorilerden çıkar" : "Favorilere ekle"}"
-      onclick="event.stopPropagation(); toggleFavoriteFromButton(this);">
-      <i data-lucide="star"></i>
-    </button>`;
-}
-
-function trackShareUtm(utmSource, utmMedium, channel) {
-  try {
-    const payload = JSON.stringify({ utm_source: utmSource, utm_medium: utmMedium, utm_campaign: "product_share", channel });
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon("/api/track-share", new Blob([payload], { type: "application/json" }));
-    } else {
-      fetch("/api/track-share", { method: "POST", headers: { "Content-Type": "application/json" }, body: payload, keepalive: true }).catch(() => {});
-    }
-  } catch (e) { /* paylaşım takibi tali özellik, sessizce yut */ }
-}
-
 function shareProductWhatsApp(parsedOrProduct) {
   if (!parsedOrProduct) return;
   const title = parsedOrProduct.title || parsedOrProduct.product_title || "";
   const priceVal = parsedOrProduct.price ?? parsedOrProduct.current_price;
   const price = priceVal ? `₺${Number(priceVal).toFixed(2)}` : "Fiyat belirtilmedi";
   const store = parsedOrProduct.source ? parsedOrProduct.source.toUpperCase() : "MAĞAZA";
-  const url = window.location.origin + `/?q=${encodeURIComponent(title)}&auto=1&utm_source=whatsapp&utm_medium=share`;
+  const url = window.location.origin + `/?q=${encodeURIComponent(title)}&auto=1`;
   const text = `Kanka, Almadan'da aradığın ürünü buldum! 🚀\n\n📦 *${title}*\n🏪 Mağaza: ${store}\n💵 En Ucuz Fiyat: ${price}\n\nDetaylar ve karşılaştırma için tıkla:\n🔗 ${url}`;
-  trackShareUtm("whatsapp", "share", "whatsapp");
   window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
 }
 
@@ -7413,23 +6916,6 @@ async function renderPriceHistoryChart(productKey) {
 
     // Tarihe göre sıralayalım
     history.sort((a, b) => new Date(a.seen_at) - new Date(b.seen_at));
-
-    // "Geçmişte en ucuz ne zamandı" -- gerçek fiyat geçmişinden en düşük fiyat + tarihi
-    const lowestInfo = document.getElementById("priceHistoryLowestInfo");
-    if (lowestInfo) {
-      const withPrice = history.filter(h => typeof h.price === "number");
-      if (withPrice.length) {
-        const lowest = withPrice.reduce((min, h) => (h.price < min.price ? h : min), withPrice[0]);
-        const dateLabel = lowest.seen_at
-          ? new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(lowest.seen_at))
-          : "";
-        lowestInfo.textContent = dateLabel
-          ? `📉 Geçmişte en ucuz: ₺${lowest.price.toFixed(2)} (${dateLabel})`
-          : `📉 Geçmişte en ucuz: ₺${lowest.price.toFixed(2)}`;
-      } else {
-        lowestInfo.textContent = "";
-      }
-    }
 
     const labels = history.map(h => {
       if (!h.seen_at) return "İlk Kayıt";
