@@ -19,7 +19,9 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import requests
-from bs4 import BeautifulSoup
+def BeautifulSoup(markup, features="html.parser", **kwargs):
+    from bs4 import BeautifulSoup as _BS
+    return _BS(markup, features, **kwargs)
 
 # ── User-Agent Havuzu ────────────────────────────────────────
 # Gerçek Chrome/Firefox tarayıcı UA'ları — bot tespitini zorlaştırır

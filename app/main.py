@@ -172,9 +172,16 @@ def find_static_dir() -> Path:
     return candidates[0]
 
 
+class CachedStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "public, max-age=604800, must-revalidate"
+        return response
+
+
 STATIC_DIR = find_static_dir()
 if STATIC_DIR.is_dir():
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    app.mount("/static", CachedStaticFiles(directory=STATIC_DIR), name="static")
 
 ACCESS_COOKIE = "almadan_access_token"
 REFRESH_COOKIE = "almadan_refresh_token"

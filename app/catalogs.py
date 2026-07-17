@@ -7,7 +7,9 @@ from dataclasses import dataclass
 from typing import Any
 
 import requests
-from bs4 import BeautifulSoup
+def BeautifulSoup(markup, features="html.parser", **kwargs):
+    from bs4 import BeautifulSoup as _BS
+    return _BS(markup, features, **kwargs)
 
 from app.parser import USER_AGENT
 from app.storage import utc_now

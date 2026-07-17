@@ -5,7 +5,9 @@ import requests
 import math
 import hashlib
 import random
-from bs4 import BeautifulSoup
+def BeautifulSoup(markup, features="html.parser", **kwargs):
+    from bs4 import BeautifulSoup as _BS
+    return _BS(markup, features, **kwargs)
 from concurrent.futures import ThreadPoolExecutor
 from app.comparator import (
     extract_yahoo_url,

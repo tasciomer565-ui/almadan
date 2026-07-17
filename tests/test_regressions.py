@@ -75,3 +75,25 @@ def test_refurb_penalty_not_applied_when_source_itself_refurb():
         candidate["condition"] = "refurbished"
 
     assert _refurb_penalty(candidate, source_is_refurb) == 0
+
+
+def test_local_memory_hot_cache():
+    from app.cache import cache_set, cache_get, cache_invalidate, _HOT_CACHE
+    
+    # 1. Hot cache should store the products
+    key = "test_sorgu|GENEL"
+    dummy_products = [{"title": "Test Ürün", "price": 100.0, "url": "https://test.com"}]
+    
+    cache_set(key, "test sorgu", "GENEL", dummy_products)
+    
+    # Ensure it exists in the hot cache dictionary
+    assert key in _HOT_CACHE
+    
+    # 2. cache_get should hit the hot memory cache
+    cached = cache_get(key, "test sorgu", "GENEL")
+    assert cached == dummy_products
+    
+    # 3. cache_invalidate should remove it from the hot cache
+    cache_invalidate(key)
+    assert key not in _HOT_CACHE
+    assert cache_get(key, "test sorgu", "GENEL") is None

@@ -2554,7 +2554,7 @@ function showSearchResults(response) {
                  style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; ${borderStyle} border-radius: 8px; background: white; transition: all 0.2s;">
               <div style="width: 50px; height: 50px; flex-shrink: 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; justify-content: center;">
                 ${item.image_url
-                  ? `<img src="${escapeHtml(proxiedImageUrl(item.image_url))}" alt="${escapeHtml(item.title)}" style="width: 100%; height: 100%; object-fit: contain;" onerror="imageFallback(this, '${getStoreIcon(item.source, item.title)}')">`
+                  ? `<img src="${escapeHtml(proxiedImageUrl(item.image_url))}" alt="${escapeHtml(item.title)}" loading="lazy" style="width: 100%; height: 100%; object-fit: contain;" onerror="imageFallback(this, '${getStoreIcon(item.source, item.title)}')">`
                   : `<span class="product-placeholder" style="width:100%; height:100%; display:grid; place-items:center;"><i data-lucide="${getStoreIcon(item.source, item.title)}" style="width:18px; height:18px;"></i></span>`}
               </div>
               <div style="flex: 1; min-width: 0;">
@@ -2713,7 +2713,7 @@ function showParsedProduct(parsed) {
   content.innerHTML = `
     <div class="dialog-product-image">
       ${parsed.image_url
-        ? `<img src="${escapeHtml(proxiedImageUrl(parsed.image_url))}" alt="${escapeHtml(title)}"
+        ? `<img src="${escapeHtml(proxiedImageUrl(parsed.image_url))}" alt="${escapeHtml(title)}" loading="lazy"
             onerror="imageFallback(this, '${getStoreIcon(parsed.source, title)}')">`
         : `<span class="product-placeholder"><i data-lucide="${getStoreIcon(parsed.source, title)}"></i></span>`}
     </div>

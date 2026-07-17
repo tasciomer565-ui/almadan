@@ -2,7 +2,10 @@ import urllib.parse
 import re
 import json
 import requests
-from bs4 import BeautifulSoup
+def BeautifulSoup(markup, features="html.parser", **kwargs):
+    from bs4 import BeautifulSoup as _BS
+    return _BS(markup, features, **kwargs)
+
 from app.parser import parse_product_url, detect_source, USER_AGENT
 from app.storage import load_db, save_db
 from app.text_utils import normalize_turkish

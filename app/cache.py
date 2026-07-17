@@ -25,6 +25,10 @@ SUPABASE_KEY = "".join(os.getenv("SUPABASE_SERVICE_KEY", "").split())
 CACHE_TTL_HOURS = int(os.getenv("CACHE_TTL_HOURS", "6"))
 CACHE_TABLE = "product_cache"
 
+# In-memory hot cache (in-process hot cache)
+_HOT_CACHE: dict[str, tuple[list[dict], float]] = {}
+_HOT_CACHE_TTL = 60.0  # 60 seconds
+
 from app.text_utils import normalize_turkish
 
 
@@ -50,6 +54,18 @@ def _enabled() -> bool:
 
 def cache_get(cache_key: str, query: str = "", category: str = "") -> Optional[list[dict]]:
     """Cache'de taze (süresi dolmamış) veri varsa döndür, yoksa None."""
+    import time as _time
+
+    # 0. In-memory hot cache check (Task 47: local memory hot cache)
+    now_ts = _time.monotonic()
+    if cache_key in _HOT_CACHE:
+        products, expires_at = _HOT_CACHE[cache_key]
+        if now_ts < expires_at:
+            logger.info("Hot Memory HIT: %s (%d ürün)", cache_key, len(products))
+            return products
+        else:
+            del _HOT_CACHE[cache_key]
+
     # 1. Redis önce — çok daha hızlı
     try:
         from app.redis_cache import rget
@@ -135,6 +151,14 @@ def cache_get_stale(cache_key: str) -> Optional[list[dict]]:  # noqa: C901
 
 def cache_set(cache_key: str, query: str, category: str, products: list[dict]) -> None:
     """Sonuçları cache'e kaydet / varsa güncelle."""
+    import time as _time
+
+    # Write to local in-memory hot cache
+    try:
+        _HOT_CACHE[cache_key] = (products, _time.monotonic() + _HOT_CACHE_TTL)
+    except Exception:
+        pass
+
     # Redis'e de yaz (hızlı okuma için)
     try:
         from app.redis_cache import rset
@@ -175,10 +199,14 @@ def cache_set(cache_key: str, query: str, category: str, products: list[dict]) -
 
 
 def cache_invalidate(cache_key: str) -> None:
-    """Belirli bir cache kaydını sil (Redis + Supabase). cache_get Redis'i
-    ONCE kontrol ettiği icin sadece Supabase'i silmek yetersizdi -- Redis'te
-    duran (6 saate kadar) eski deger "Fiyati Guncelle" sonrasi bile geri
-    donmeye devam ediyordu."""
+    """Belirli bir cache kaydını sil (Redis + Supabase + Hot Cache)."""
+    # Remove from local in-memory hot cache
+    try:
+        if cache_key in _HOT_CACHE:
+            del _HOT_CACHE[cache_key]
+    except Exception:
+        pass
+
     try:
         from app.redis_cache import rdel
         rdel(cache_key)

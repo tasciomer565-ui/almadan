@@ -9,7 +9,9 @@ from typing import Any
 from urllib.parse import parse_qsl, unquote, urlencode, urljoin, urlparse, urlsplit, urlunsplit
 
 import requests
-from bs4 import BeautifulSoup
+def BeautifulSoup(markup, features="html.parser", **kwargs):
+    from bs4 import BeautifulSoup as _BS
+    return _BS(markup, features, **kwargs)
 
 
 USER_AGENT = (
