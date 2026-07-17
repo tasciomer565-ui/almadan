@@ -159,14 +159,12 @@ def storage_diagnostics() -> dict[str, Any]:
 
 
 def supabase_headers() -> dict[str, str]:
-    headers = {
+    return {
         "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json",
         "User-Agent": "Almadan-Backend/1.0",
     }
-    if SUPABASE_KEY.startswith("eyJ"):
-        headers["Authorization"] = f"Bearer {SUPABASE_KEY}"
-    return headers
 
 
 def load_local_db() -> dict[str, Any]:
