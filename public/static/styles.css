@@ -3303,3 +3303,187 @@ body.dark-theme .price-chart-container {
   0%, 100% { opacity: 1; }
   50% { opacity: .6; }
 }
+
+/* Custom Select Dropdowns */
+.form-select {
+  width: 100%;
+  padding: 10px 36px 10px 12px;
+  border: 1.5px solid var(--line, #e2e8f0);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  outline: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink, #1e293b);
+  background-color: var(--bg-card, #ffffff);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2523475569' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-select:hover {
+  border-color: var(--primary, #287a50);
+}
+
+.form-select:focus {
+  border-color: var(--primary, #287a50);
+  box-shadow: 0 0 0 3px rgba(40, 122, 80, 0.15);
+}
+
+/* Toast Notifications Upgrade */
+.toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 9999;
+  max-width: min(380px, calc(100% - 32px));
+  padding: 14px 20px;
+  color: #ffffff;
+  background: rgba(24, 32, 25, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 4px solid var(--primary, #287a50);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(15px) scale(0.95);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Scroll to Top Button */
+.scroll-to-top-btn {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 1000;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--line, #e2e8f0);
+  color: var(--ink, #1e293b);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+}
+
+.scroll-to-top-btn.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.scroll-to-top-btn:hover {
+  background: var(--primary, #287a50);
+  color: #ffffff;
+  border-color: var(--primary, #287a50);
+  box-shadow: 0 6px 16px rgba(40, 122, 80, 0.25);
+}
+
+body.dark-theme .scroll-to-top-btn {
+  background: #182019;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+/* Skeleton Loader */
+@keyframes skeleton-pulse {
+  0% {
+    background-color: var(--line, #e2e8f0);
+    opacity: 0.6;
+  }
+  50% {
+    background-color: var(--line, #cbd5e1);
+    opacity: 0.8;
+  }
+  100% {
+    background-color: var(--line, #e2e8f0);
+    opacity: 0.6;
+  }
+}
+
+body.dark-theme @keyframes skeleton-pulse {
+  0% {
+    background-color: rgba(255, 255, 255, 0.05);
+    opacity: 0.6;
+  }
+  50% {
+    background-color: rgba(255, 255, 255, 0.1);
+    opacity: 0.8;
+  }
+  100% {
+    background-color: rgba(255, 255, 255, 0.05);
+    opacity: 0.6;
+  }
+}
+
+.skeleton-card {
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--bg-card, #ffffff);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeleton-image {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  animation: skeleton-pulse 1.5s infinite ease-in-out;
+}
+
+.skeleton-title {
+  height: 20px;
+  width: 80%;
+  border-radius: 4px;
+  animation: skeleton-pulse 1.5s infinite ease-in-out;
+}
+
+.skeleton-price {
+  height: 24px;
+  width: 50%;
+  border-radius: 4px;
+  animation: skeleton-pulse 1.5s infinite ease-in-out;
+}
+
+.skeleton-row {
+  width: 100%;
+  background: var(--line, #e2e8f0);
+  animation: skeleton-pulse 1.5s infinite ease-in-out;
+}
+
+body.dark-theme .skeleton-card {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body.dark-theme .skeleton-image,
+body.dark-theme .skeleton-title,
+body.dark-theme .skeleton-price,
+body.dark-theme .skeleton-row {
+  background: rgba(255, 255, 255, 0.05);
+}

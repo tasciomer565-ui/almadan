@@ -2789,8 +2789,13 @@ function showParsedProduct(parsed) {
         </div>
       </div>
 
-      <div id="alternativeSellersContainer" style="margin-top: 16px; margin-bottom: 16px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
-        <div class="loading-row" style="margin: 0;"><span class="spinner" style="width:14px;height:14px;border-width:2px;border-color:#a0aab0;border-top-color:transparent;"></span><span style="font-size:13px;color:#a0aab0;">Alternatif satıcılar aranıyor... (Bu işlem birkaç saniye sürebilir)</span></div>
+      <div id="alternativeSellersContainer" style="margin-top: 16px; margin-bottom: 16px; padding: 16px; border-radius: 8px; background: rgba(255,255,255,0.02); border: 1px solid var(--line);">
+        <p style="font-size: 11px; font-weight: 700; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 12px;">Alternatif satıcılar aranıyor...</p>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div class="skeleton-row" style="height:36px; border-radius:6px;"></div>
+          <div class="skeleton-row" style="height:36px; border-radius:6px; animation-delay: 0.2s;"></div>
+          <div class="skeleton-row" style="height:36px; border-radius:6px; animation-delay: 0.4s;"></div>
+        </div>
       </div>
       <p class="dialog-error" id="trackProductError" hidden></p>
       <div class="dialog-actions" style="display:flex; flex-direction:column; gap:8px;">
@@ -6826,7 +6831,11 @@ async function loadRecommendations() {
   }
 
   container.classList.remove("hidden");
-  grid.innerHTML = `<div class="loading-state" style="grid-column:1/-1;"><span class="spinner"></span>Öneriler hazırlanıyor...</div>`;
+  grid.innerHTML = `
+    <div class="skeleton-card"><div class="skeleton-image"></div><div class="skeleton-title"></div><div class="skeleton-price"></div></div>
+    <div class="skeleton-card"><div class="skeleton-image"></div><div class="skeleton-title"></div><div class="skeleton-price"></div></div>
+    <div class="skeleton-card"><div class="skeleton-image"></div><div class="skeleton-title"></div><div class="skeleton-price"></div></div>
+  `;
 
   // csrf_token çerezi yeni sekme/oturumda henüz yazılmamış olabilir (ilk
   // sayfa yanıtıyla aynı anda ayarlanıyor, nadir bir yarış durumu) -- POST
