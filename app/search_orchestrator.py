@@ -740,9 +740,13 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
     all_tasks = base_tasks + extra_tasks
     try:
         # Kategori başına 10-40 mağaza aranabiliyor; yavaş/yanıt vermeyen birkaç
-        # kaynak tüm isteği bekletmesin diye üst süre sınırı koyuyoruz.
+        # kaynak tüm isteği bekletmesin diye üst süre sınırı koyuyoruz. 7s çok
+        # sıkıydı: MediaMarkt/Amazon gibi gerçek eşleşmesi olan ama biraz daha
+        # yavaş yanıt veren mağazalar sonuca hiç giremiyordu. Vercel fonksiyon
+        # limiti 60s olduğu için (vercel.json) 13s'e çıkarıldı -- AI doğrulama
+        # ve diğer işler için hâlâ bolca pay kalıyor.
         results_raw = await asyncio.wait_for(
-            asyncio.gather(*all_tasks, return_exceptions=True), timeout=7.0
+            asyncio.gather(*all_tasks, return_exceptions=True), timeout=13.0
         )
     except asyncio.TimeoutError:
         # Süre dolduğunda o ana kadar biten task'ların sonucunu kullan, geri kalanı iptal et.
