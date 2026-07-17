@@ -4,5 +4,6 @@ Disallow: /api/
 Disallow: /products
 Disallow: /login
 Disallow: /cron/
+Disallow: /static/admin.html
 
 Sitemap: https://www.almadan.app/sitemap.xml

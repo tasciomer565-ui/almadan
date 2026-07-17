@@ -17,7 +17,11 @@ import asyncio
 import datetime
 from concurrent.futures import ThreadPoolExecutor
 
-_HC_EXECUTOR = ThreadPoolExecutor(max_workers=16)
+# max_workers en buyuk gunluk kategori boyutuna (MODA: 48 scraper) gore
+# ayarli -- daha kucuk bir havuz, tum scraper'lar tek 8s penceresinde
+# calisamadan kuyrukta sirasini bekler ve hic calismayan scraper'lar
+# yanlislikla "kirik/0 sonuc" olarak isaretlenip sahte alarm tetikleyebilir.
+_HC_EXECUTOR = ThreadPoolExecutor(max_workers=48)
 
 # Art arda kaç gün 0 sonuç gelirse alarm verilsin (tek seferlik ağ
 # hatalarından kaynaklı yanlış alarmları önlemek için >= 2)

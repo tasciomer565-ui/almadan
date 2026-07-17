@@ -6994,7 +6994,7 @@ async def price_guide_topic(topic: str):
     data = _GSC_TOPIC_PAGES.get(topic)
     if not data:
         return HTMLResponse(
-            "<h1>Sayfa bulunamadi</h1><p><a href=\"/fiyat-rehberi\">Fiyat rehberine don</a></p>",
+            _branded_404_page("Rehber bulunamadı", "Aradığın fiyat rehberi konusu listemizde yok."),
             status_code=404,
         )
 
