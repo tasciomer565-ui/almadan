@@ -847,101 +847,6 @@ def is_challenge_page(soup: BeautifulSoup) -> bool:
     return any(signal in text for signal in signals)
 
 
-def _parse_trendyol_api(url: str) -> "ParsedProduct | None":
-    """Trendyol ürün sayfasını HTML yerine public JSON API ile çeker."""
-    import re as _re
-    match = _re.search(r"-p-(\d+)", url)
-    if not match:
-        match = _re.search(r"/p-(\d+)", url)
-    if not match:
-        return None
-    content_id = match.group(1)
-    api_url = (
-        f"https://public.trendyol.com/discovery-web-productgw-service"
-        f"/api/productDetail/{content_id}?storefrontId=1&culture=tr-TR&channelId=1"
-    )
-    try:
-        resp = requests.get(
-            api_url,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 Chrome/124 Mobile Safari/537.36",
-                "Accept": "application/json",
-                "Accept-Language": "tr-TR,tr;q=0.9",
-            },
-            timeout=10,
-        )
-        if not resp.ok:
-            return None
-        data = resp.json()
-        result = data.get("result") or data
-        title = result.get("name") or result.get("productName")
-        price_data = result.get("price") or {}
-        price = (
-            price_data.get("discountedPrice", {}).get("value")
-            or price_data.get("sellingPrice", {}).get("value")
-            or price_data.get("originalPrice", {}).get("value")
-        )
-        original_price = price_data.get("originalPrice", {}).get("value")
-        if original_price and price and float(original_price) <= float(price):
-            original_price = None
-        images = result.get("images") or []
-        image_url = None
-        if images:
-            img = images[0]
-            if isinstance(img, str):
-                image_url = img if img.startswith("http") else f"https://cdn.dsmcdn.com/{img}"
-            elif isinstance(img, dict):
-                image_url = img.get("url") or img.get("src")
-        canonical = f"https://www.trendyol.com/p-{content_id}"
-
-        # Diğer satıcıları çek (API direkt olarak bu bilgiyi de döndürür)
-        other_merchants = []
-        merchants_raw = result.get("otherMerchants") or result.get("merchants") or []
-        for merchant in merchants_raw:
-            merch_price_data = merchant.get("price") or {}
-            merch_price = (
-                merch_price_data.get("discountedPrice", {}).get("value")
-                or merch_price_data.get("sellingPrice", {}).get("value")
-            )
-            merch_info = merchant.get("merchant") or merchant
-            merch_name = merch_info.get("name") or merch_info.get("merchantName")
-            merch_url_path = merch_info.get("sellerLink") or merchant.get("sellerLink") or ""
-            merch_score = merch_info.get("sellerScore") or merch_info.get("score")
-            merch_delivery = merchant.get("deliveryInformation", {}).get("fastDeliveryOptions", [])
-            if merch_price and merch_name:
-                other_merchants.append({
-                    "title": str(title).strip() if title else "",
-                    "price": float(merch_price),
-                    "url": f"https://www.trendyol.com{merch_url_path}" if merch_url_path else canonical,
-                    "source": f"Trendyol ({merch_name})",
-                    "image_url": image_url,
-                    "extra_info": {
-                        "rating": merch_score,
-                        "fast_delivery": bool(merch_delivery),
-                    }
-                })
-
-        extra_info = {}
-        if other_merchants:
-            extra_info["otherMerchants"] = other_merchants
-
-        if title and price:
-            return ParsedProduct(
-                title=str(title).strip(),
-                price=float(price),
-                image_url=image_url,
-                source="trendyol",
-                canonical_url=canonical,
-                confidence=90,
-                warnings=[],
-                original_price=float(original_price) if original_price else None,
-                extra_info=extra_info,
-            )
-    except Exception:
-        pass
-    return None
-
-
 def _parse_hepsiburada_api(url: str) -> "ParsedProduct | None":
     """Hepsiburada ürün sayfasını mobil user-agent ile çeker."""
     import re as _re
@@ -994,12 +899,11 @@ def parse_product_url(url: str) -> ParsedProduct:
     warnings: list[str] = []
     source = detect_source(url)
 
-    # Trendyol ve Hepsiburada için önce API dene (HTML bloke sorunu)
-    if source == "trendyol":
-        api_result = _parse_trendyol_api(url)
-        if api_result and api_result.price:
-            return api_result
-    elif source == "hepsiburada":
+    # Hepsiburada için önce API dene (HTML bloke sorunu). Trendyol'un kendi
+    # public.trendyol.com API'si kapatıldı (DNS'te artık kayıtlı değil) --
+    # her çağrıda garanti başarısız olup gereksiz gecikme eklediği için
+    # kaldırıldı; Trendyol artık doğrudan HTML+JSON-LD yoluna düşer.
+    if source == "hepsiburada":
         api_result = _parse_hepsiburada_api(url)
         if api_result and api_result.price:
             return api_result
