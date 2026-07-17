@@ -6924,29 +6924,16 @@ async function showSellerSelectionDialog(parsed) {
       ? `${alts.length} Mağazada Karşılaştırma`
       : `${alts.length} Sonuç, ${storeCount} Mağazada Karşılaştırma`;
 
-    // Filtre/tablo görünümü için ham veriyi sakla — re-render bundan yapılır.
+    // Filtre için ham veriyi sakla — re-render bundan yapılır.
     state.sellerAlts = alts;
-    state.sellerViewMode = state.sellerViewMode || "list";
     state.sellerFilters = { inStockOnly: false, fastDeliveryOnly: false };
 
     let listHtml = `
-      <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
-        <div>
-          <h3 style="margin:0 0 4px 0; font-size:20px; font-weight:800; color:var(--ink);">🛒 ${headerLabel}</h3>
-          <p id="sellerSavingsHint" style="margin:0; font-size:13px; color:var(--ink-2);"></p>
-        </div>
-        <button type="button" class="ab-no-print" onclick="window.print()" title="Karşılaştırmayı yazdır / PDF olarak kaydet"
-          style="flex-shrink:0; border:1.5px solid var(--border); background:var(--surface); color:var(--ink); border-radius:8px; padding:7px 10px; font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap;">
-          🖨️ Yazdır / PDF
-        </button>
+      <div style="margin-bottom:16px; padding-right:34px;">
+        <h3 style="margin:0 0 4px 0; font-size:20px; font-weight:800; color:var(--ink);">🛒 ${headerLabel}</h3>
+        <p id="sellerSavingsHint" style="margin:0; font-size:13px; color:var(--ink-2);"></p>
       </div>
-      <div class="ab-no-print" style="display:flex; flex-wrap:wrap; align-items:center; gap:14px; margin-bottom:12px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--surface);">
-        <div style="display:flex; gap:6px;">
-          <button type="button" id="sellerViewListBtn" onclick="setSellerViewMode('list')"
-            style="border:1.5px solid var(--line); background:var(--surface); color:var(--ink); border-radius:6px; padding:5px 10px; font-size:11.5px; font-weight:700; cursor:pointer;">☰ Liste</button>
-          <button type="button" id="sellerViewTableBtn" onclick="setSellerViewMode('table')"
-            style="border:1.5px solid var(--line); background:var(--surface); color:var(--ink); border-radius:6px; padding:5px 10px; font-size:11.5px; font-weight:700; cursor:pointer;">▦ Tablo</button>
-        </div>
+      <div style="display:flex; flex-wrap:wrap; align-items:center; gap:14px; margin-bottom:12px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--surface);">
         <label style="display:flex; align-items:center; gap:5px; font-size:12px; color:var(--ink-2); font-weight:600; cursor:pointer;">
           <input type="checkbox" id="sellerFilterInStock" onchange="updateSellerFilters()"> Sadece stokta olanlar
         </label>
@@ -6968,7 +6955,6 @@ async function showSellerSelectionDialog(parsed) {
     }
     content.innerHTML = listHtml;
     renderSellerResults();
-    updateSellerViewButtons();
 
   } catch(e) {
     console.error("Satıcı Seçim Ekranı Hatası:", e);
@@ -6977,22 +6963,6 @@ async function showSellerSelectionDialog(parsed) {
   } finally {
     if (sellerStatusTimer) clearInterval(sellerStatusTimer);
   }
-}
-
-function setSellerViewMode(mode) {
-  state.sellerViewMode = mode === "table" ? "table" : "list";
-  updateSellerViewButtons();
-  renderSellerResults();
-}
-
-function updateSellerViewButtons() {
-  const listBtn = document.getElementById("sellerViewListBtn");
-  const tableBtn = document.getElementById("sellerViewTableBtn");
-  if (!listBtn || !tableBtn) return;
-  const active = "border-color:#287a50; background:#287a50; color:#fff;";
-  const inactive = "border-color:var(--line); background:var(--surface); color:var(--ink);";
-  listBtn.style.cssText += state.sellerViewMode === "list" ? active : inactive;
-  tableBtn.style.cssText += state.sellerViewMode === "table" ? active : inactive;
 }
 
 function updateSellerFilters() {
@@ -7035,54 +7005,7 @@ function renderSellerResults() {
       : "Bir mağaza seçip takibe alarak fiyat düşüşlerini takip et.";
   }
 
-  if (state.sellerViewMode === "table") {
-    container.innerHTML = renderSellerTable(alts, maxPrice);
-  } else {
-    container.innerHTML = renderSellerGrid(alts, maxPrice);
-  }
-}
-
-function renderSellerGrid(alts, maxPrice) {
-  let html = `<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; max-height:60vh; overflow-y:auto; padding-right:4px;" class="custom-scrollbar">`;
-
-  alts.forEach((a, idx) => {
-    const brand = getStoreBrand(a.source);
-    const isCheapest = idx === 0 && a.price > 0;
-    const savingVsMax = a.price > 0 && maxPrice > a.price ? (maxPrice - a.price) : 0;
-    const escapedJson = escapeHtml(JSON.stringify(a));
-
-    let badgeTop = "";
-    if (isCheapest) badgeTop = `<div style="position:absolute;top:-1px;left:12px;background:#287a50;color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:0 0 6px 6px;letter-spacing:.3px;">EN UCUZ</div>`;
-
-    let badgesRow = "";
-    if (a.extra_info && a.extra_info.fast_delivery) badgesRow += `<span style="font-size:9.5px;background:rgba(255,152,0,.1);color:#ef6c00;border:1px solid rgba(255,152,0,.25);padding:2px 6px;border-radius:4px;font-weight:700;">⚡ Hızlı</span>`;
-    if (a.extra_info && a.extra_info.rating && parseFloat(a.extra_info.rating) >= 9.0) badgesRow += `<span style="font-size:9.5px;background:rgba(33,150,243,.1);color:#1976d2;border:1px solid rgba(33,150,243,.25);padding:2px 6px;border-radius:4px;font-weight:700;">🏆 ${a.extra_info.rating}</span>`;
-
-    html += `
-      <div onclick="selectSellerAndProceed(this)" data-seller='${escapedJson}'
-        style="position:relative;border:${isCheapest ? '2px solid #287a50' : '1.5px solid var(--line)'};border-radius:10px;padding:${isCheapest ? '18px 12px 12px' : '12px'};cursor:pointer;transition:all .15s;background:var(--surface);"
-        onmouseover="this.style.borderColor='${brand.color}';this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 16px ${brand.color}22';"
-        onmouseout="this.style.borderColor='${isCheapest ? '#287a50' : 'var(--line)'}';this.style.transform='none';this.style.boxShadow='none';">
-        ${badgeTop}
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          ${storeLogoHtml(a.source, 32)}
-          <div>
-            <div style="font-size:13px;font-weight:800;color:${brand.color};line-height:1.2;">${escapeHtml(brand.name)}</div>
-            <div style="font-size:10px;color:var(--ink-2);">Ücretsiz Kargo</div>
-          </div>
-        </div>
-        <div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">₺${a.price.toFixed(2)}</div>
-        ${a.original_price && a.original_price > a.price ? `<div style="font-size:11px;color:var(--ink-2);text-decoration:line-through;">₺${a.original_price.toFixed(2)}</div>` : ""}
-        ${savingVsMax > 1 ? `<div style="font-size:10px;color:#287a50;font-weight:700;margin-top:2px;">₺${savingVsMax.toFixed(2)} tasarruf</div>` : ""}
-        ${badgesRow ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">${badgesRow}</div>` : ""}
-        <div style="font-size:9.5px;color:var(--ink-2);margin-top:4px;">🕒 ${escapeHtml(formatFreshnessLabel(a))}</div>
-        <div style="margin-top:8px;text-align:center;background:${isCheapest ? '#287a50' : 'var(--line)'};color:${isCheapest ? '#fff' : 'var(--ink-2)'};border-radius:6px;padding:5px;font-size:11px;font-weight:700;">Seç ›</div>
-      </div>
-    `;
-  });
-
-  html += `</div>`;
-  return html;
+  container.innerHTML = renderSellerTable(alts, maxPrice);
 }
 
 function renderSellerTable(alts, maxPrice) {
@@ -7096,7 +7019,7 @@ function renderSellerTable(alts, maxPrice) {
     const deliveryLabel = info.fast_delivery ? "Hızlı kargo" : "Standart kargo";
     rows += `
       <tr onclick="selectSellerAndProceed(this)" data-seller='${escapedJson}' style="cursor:pointer; border-bottom:1px solid var(--line); ${isCheapest ? 'background:rgba(40,122,80,.06);' : ''}">
-        <td style="padding:8px 10px; font-weight:700; color:${brand.color};">${escapeHtml(brand.name)}${isCheapest ? ' <span style="font-size:9px; background:#287a50; color:#fff; padding:2px 5px; border-radius:4px; font-weight:800;">EN UCUZ</span>' : ''}</td>
+        <td style="padding:8px 10px; font-weight:700; color:${brand.color};"><span style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;">${escapeHtml(brand.name)}${isCheapest ? ' <span style="white-space:nowrap; font-size:9px; background:#287a50; color:#fff; padding:2px 6px; border-radius:4px; font-weight:800;">EN UCUZ</span>' : ''}</span></td>
         <td style="padding:8px 10px; font-weight:800; color:var(--ink);">₺${a.price.toFixed(2)}</td>
         <td style="padding:8px 10px; font-size:12px; color:${info.out_of_stock ? '#c62828' : 'var(--ink-2)'};">${stockLabel}</td>
         <td style="padding:8px 10px; font-size:12px; color:${info.fast_delivery ? '#ef6c00' : 'var(--ink-2)'};">${deliveryLabel}</td>
