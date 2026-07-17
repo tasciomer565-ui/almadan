@@ -911,13 +911,13 @@ def parse_product_url(url: str) -> ParsedProduct:
     try:
         fetch_url = product_fetch_url(url, source)
         from app.scraping_proxy import proxy_enabled, proxy_get
+        response_text = None
         if proxy_enabled():
-            html = proxy_get(fetch_url, render_js=False, timeout=15)
-            if html:
-                response_text = html
-            else:
-                raise requests.RequestException("Proxy ile sayfa içeriği çekilemedi.")
-        else:
+            response_text = proxy_get(fetch_url, render_js=False, timeout=15)
+            # Proxy kredisi bitmiş/hata vermiş olabilir -- direkt bağlantıya
+            # düş (bazı mağazalar zaten IP engeli uygulamıyor, proxy'siz de
+            # çalışabilir). Sadece ikisi de başarısız olursa pes edilir.
+        if not response_text:
             response = safe_product_get(
                 fetch_url,
                 headers={
