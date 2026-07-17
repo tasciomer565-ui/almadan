@@ -2238,6 +2238,18 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
             {"source": "google", "label": "Google Shopping'de ara", "url": f"https://www.google.com/search?tbm=shop&q={q_enc}"},
         ]
 
+    # Son-hat AI doğrulaması: kural tabanlı filtreler şüphede kalınca ürünü
+    # ELEMEZ (bkz. comparator.has_model_conflict docstring'i) -- bu da
+    # regex'in yakalayamadığı varyant farklarını (renk/nesil/bundle vb.)
+    # kullanıcıya "aynı ürün" diye gösterme riski bırakır. OpenAI anahtarı
+    # yoksa/çağrı başarısız olursa listeyi değiştirmeden döner (fail-open).
+    if deduped:
+        from app.product_verifier import verify_products_ai
+        loop = asyncio.get_running_loop()
+        deduped = await loop.run_in_executor(
+            None, verify_products_ai, payload.title, deduped[:20]
+        )
+
     return {
         "alternatives": deduped[:20],
         "search_links": search_links,

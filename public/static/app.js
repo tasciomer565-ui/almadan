@@ -2940,7 +2940,7 @@ function showParsedProduct(parsed) {
       </div>
 
       <div id="alternativeSellersContainer" style="margin-top: 16px; margin-bottom: 16px; padding: 16px; border-radius: 8px; background: rgba(255,255,255,0.02); border: 1px solid var(--line);">
-        <p style="font-size: 11px; font-weight: 700; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 12px;">Alternatif satıcılar aranıyor...</p>
+        <p id="altSellersStatusText" style="font-size: 11px; font-weight: 700; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 12px; transition: opacity .25s ease;">Alternatif satıcılar aranıyor...</p>
         <div style="display:flex; flex-direction:column; gap:8px;">
           <div class="skeleton-row" style="height:36px; border-radius:6px;"></div>
           <div class="skeleton-row" style="height:36px; border-radius:6px; animation-delay: 0.2s;"></div>
@@ -3006,6 +3006,26 @@ function showParsedProduct(parsed) {
 async function findAlternativeSellers(parsed) {
   const container = document.getElementById("alternativeSellersContainer");
   if (!container) return;
+
+  // Bekleme boyunca kullanıcıyı oyalayan, gerçekte olan işi yansıtan
+  // dönen durum metni (mağaza taraması -> AI doğrulama -> son adım).
+  const statusPhases = [
+    "Mağazalar taranıyor...",
+    "Fiyatlar karşılaştırılıyor...",
+    "Doğru ürün eşleştiriliyor (AI)...",
+    "Neredeyse hazır...",
+  ];
+  let phaseIndex = 0;
+  const statusEl = document.getElementById("altSellersStatusText");
+  const statusTimer = statusEl ? setInterval(() => {
+    phaseIndex = (phaseIndex + 1) % statusPhases.length;
+    statusEl.style.opacity = "0";
+    setTimeout(() => {
+      if (!statusEl.isConnected) return;
+      statusEl.textContent = statusPhases[phaseIndex];
+      statusEl.style.opacity = "1";
+    }, 250);
+  }, 1400) : null;
 
   try {
     const data = await api("/api/find-alternatives", {
@@ -3098,6 +3118,8 @@ async function findAlternativeSellers(parsed) {
     lucide.createIcons();
   } catch (err) {
     container.innerHTML = `<p style="font-size:12px; color:#ff6b6b; margin:0; text-align:center;">Alternatifler aranırken hata oluştu.</p>`;
+  } finally {
+    if (statusTimer) clearInterval(statusTimer);
   }
 }
 
