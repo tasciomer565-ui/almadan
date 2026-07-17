@@ -2225,19 +2225,6 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
             except Exception:
                 pass
 
-    # Son çare: hazır mağaza arama linkleri — kullanıcı hiçbir zaman eli boş dönmesin
-    search_links = []
-    if not deduped:
-        from urllib.parse import quote_plus
-        q_enc = quote_plus(query)
-        search_links = [
-            {"source": "trendyol", "label": "Trendyol'da ara", "url": f"https://www.trendyol.com/sr?q={q_enc}"},
-            {"source": "hepsiburada", "label": "Hepsiburada'da ara", "url": f"https://www.hepsiburada.com/ara?q={q_enc}"},
-            {"source": "amazon", "label": "Amazon'da ara", "url": f"https://www.amazon.com.tr/s?k={q_enc}"},
-            {"source": "n11", "label": "N11'de ara", "url": f"https://www.n11.com/arama?q={q_enc}"},
-            {"source": "google", "label": "Google Shopping'de ara", "url": f"https://www.google.com/search?tbm=shop&q={q_enc}"},
-        ]
-
     # Son-hat AI doğrulaması: kural tabanlı filtreler şüphede kalınca ürünü
     # ELEMEZ (bkz. comparator.has_model_conflict docstring'i) -- bu da
     # regex'in yakalayamadığı varyant farklarını (renk/nesil/bundle vb.)
@@ -2249,6 +2236,22 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
         deduped = await loop.run_in_executor(
             None, verify_products_ai, payload.title, deduped[:20]
         )
+
+    # Son çare: hazır mağaza arama linkleri — kullanıcı hiçbir zaman eli boş
+    # dönmesin. AI doğrulamasından SONRA kontrol ediliyor: AI tüm adayları
+    # eleyebilir (ör. hepsi yanlış paket boyutu), bu durumda da linkler
+    # gösterilmeli, aksi halde kullanıcıya boş bir sonuç kalır.
+    search_links = []
+    if not deduped:
+        from urllib.parse import quote_plus
+        q_enc = quote_plus(query)
+        search_links = [
+            {"source": "trendyol", "label": "Trendyol'da ara", "url": f"https://www.trendyol.com/sr?q={q_enc}"},
+            {"source": "hepsiburada", "label": "Hepsiburada'da ara", "url": f"https://www.hepsiburada.com/ara?q={q_enc}"},
+            {"source": "amazon", "label": "Amazon'da ara", "url": f"https://www.amazon.com.tr/s?k={q_enc}"},
+            {"source": "n11", "label": "N11'de ara", "url": f"https://www.n11.com/arama?q={q_enc}"},
+            {"source": "google", "label": "Google Shopping'de ara", "url": f"https://www.google.com/search?tbm=shop&q={q_enc}"},
+        ]
 
     return {
         "alternatives": deduped[:20],
