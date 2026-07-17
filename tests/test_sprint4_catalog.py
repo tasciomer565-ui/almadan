@@ -187,6 +187,27 @@ class TestFuzzyMatcher:
         assert m.score("", "Pınar Süt") == 0.0
         assert m.score("Pınar Süt", "") == 0.0
 
+    def test_synonyms_matching(self):
+        m = self._matcher()
+        # Laptop and PC should match due to synonyms
+        score1 = m.score("Monster Laptop", "Monster PC")
+        assert score1 > 0.85
+
+    def test_stemming_matching(self):
+        m = self._matcher()
+        # Plural vs singular should match due to stemming
+        score1 = m.score("Kulaklıklar", "Kulaklık")
+        assert score1 > 0.85
+
+    def test_weighted_jaccard(self):
+        m = self._matcher()
+        # "Pınar Süt" vs "Sütaş Süt" has different brand, same generic word.
+        # "Pınar Süt" vs "Pınar Yoğurt" has same brand, different generic word.
+        # Since brand has higher weight, same brand should score higher than same generic word.
+        score_brand = m.score("Pınar Süt", "Pınar Yoğurt")
+        score_generic = m.score("Pınar Süt", "Sütaş Süt")
+        assert score_brand > score_generic
+
 
 # ── MatchingEngine ────────────────────────────────────────────
 

@@ -755,10 +755,25 @@ def has_tech_conflict(title1: str, title2: str) -> bool:
     return False
 
 
+def has_gender_conflict(query: str, title: str) -> bool:
+    """Checks if there is a gender mismatch between query and title (e.g. erkek vs kadın)."""
+    import re as _re
+    q_lower = query.lower()
+    t_lower = title.lower()
+
+    if "erkek" in q_lower and ("kadın" in t_lower or "kadin" in t_lower or "bayan" in t_lower or "kız" in t_lower or "kiz" in t_lower):
+        return True
+    if ("kadın" in q_lower or "kadin" in q_lower or "bayan" in q_lower) and ("erkek" in t_lower or _re.search(r"\bbay\b", t_lower)):
+        return True
+    return False
+
+
 def is_logical_product(query: str, product_title: str) -> bool:
     if has_physical_conflict(query, product_title):
         return False
     if has_tech_conflict(query, product_title):
+        return False
+    if has_gender_conflict(query, product_title):
         return False
 
     query_lower = query.lower()
@@ -3314,17 +3329,25 @@ def search_products_by_name(
         else:
             filtered_products = []
 
-    # Title bazlı deduplicate: aynı ürün farklı satıcıdan geliyorsa en ucuzunu tut
-    def _title_key(title: str) -> str:
-        import re
-        return re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', '', title.lower().strip()))[:60]
-
-    seen_titles: dict[str, dict] = {}
+    deduped_products = []
     for p in filtered_products:
-        tk = _title_key(p.get("title", ""))
-        if tk not in seen_titles or p["price"] < seen_titles[tk]["price"]:
-            seen_titles[tk] = p
-    filtered_products = list(seen_titles.values())
+        title = p.get("title", "")
+        match_idx = -1
+        for idx, dp in enumerate(deduped_products):
+            if (titles_match(title, dp["title"])
+                and not has_capacity_conflict(title, dp["title"])
+                and not has_physical_conflict(title, dp["title"])
+                and not has_tech_conflict(title, dp["title"])
+                and not has_gender_conflict(title, dp["title"])
+                and not has_model_conflict(title, dp["title"])):
+                match_idx = idx
+                break
+        if match_idx == -1:
+            deduped_products.append(p)
+        else:
+            if p["price"] < deduped_products[match_idx]["price"]:
+                deduped_products[match_idx] = p
+    filtered_products = deduped_products
 
     # Separate into in-stock and out-of-stock
     in_stock = [p for p in filtered_products if not p["extra_info"].get("out_of_stock")]

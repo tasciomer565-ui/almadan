@@ -5,7 +5,7 @@ from app.comparator import (
     is_refurbished_title, extract_model_numbers, has_model_conflict,
     extract_storage_capacity, has_capacity_conflict,
     extract_volume_weight_count, has_physical_conflict,
-    extract_ram_and_tv_size, has_tech_conflict, is_logical_product
+    extract_ram_and_tv_size, has_tech_conflict, is_logical_product, has_gender_conflict
 )
 
 def test_clean_product_title():
@@ -214,6 +214,26 @@ def test_is_logical_product_physical_conflicts():
     assert is_logical_product("Laptop 16 GB RAM", "Laptop 8 GB RAM") is False
 
 
+def test_has_gender_conflict():
+    assert has_gender_conflict("Erkek Parfüm", "Zara Kadın Parfüm") is True
+    assert has_gender_conflict("Erkek Parfüm", "Calvin Klein Erkek Parfüm") is False
+    assert has_gender_conflict("Kadın Ceket", "Erkek Deri Ceket") is True
+    assert has_gender_conflict("Kadın Ceket", "Zara Unisex Ceket") is False
+
+
+def test_stem_turkish_word():
+    from app.matching_engine import stem_turkish_word
+    assert stem_turkish_word("kulaklıklar") == "kulaklık"
+    assert stem_turkish_word("bilgisayardan") == "bilgisayar"
+    assert stem_turkish_word("deterjanlar") == "deterjan"
+    assert stem_turkish_word("sabun") == "sabun"
+
+
+def test_is_logical_product_gender():
+    assert is_logical_product("Erkek Parfüm", "Kadın Parfüm") is False
+    assert is_logical_product("Kadın Ceket", "Erkek Ceket") is False
+
+
 if __name__ == "__main__":
     test_clean_product_title()
     test_extract_yahoo_url()
@@ -224,4 +244,7 @@ if __name__ == "__main__":
     test_extract_ram_and_tv_size()
     test_has_tech_conflict()
     test_is_logical_product_physical_conflicts()
+    test_has_gender_conflict()
+    test_stem_turkish_word()
+    test_is_logical_product_gender()
     print("All comparator tests passed successfully!")

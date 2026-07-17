@@ -39,10 +39,36 @@ _STOP_WORDS = frozenset({
 
 _TOKEN_RE = re.compile(r"[a-z0-9çğışöü]{2,}", re.UNICODE)
 
+_SYNONYM_MAP = {
+    "pc": "bilgisayar",
+    "laptop": "bilgisayar",
+    "notebook": "bilgisayar",
+    "tv": "televizyon",
+    "pabuc": "ayakkabi",
+}
+
+
+def _canonical_token(token: str) -> str:
+    return _SYNONYM_MAP.get(token, token)
+
+
+def stem_turkish_word(word: str) -> str:
+    """A simple rule-based stemmer for Turkish nouns to strip common suffixes."""
+    if len(word) <= 4:
+        return word
+    # Plural + Case
+    word = re.sub(r"(?:ler|lar)(?:de|da|den|dan|e|a|i|ı|u|ü)?\b", "", word)
+    # Case endings only
+    word = re.sub(r"(?:den|dan|de|da)\b", "", word)
+    # Simple plural
+    word = re.sub(r"(?:ler|lar)\b", "", word)
+    return word
+
 
 def _tokenize(text: str) -> set[str]:
     """Metni anlamlı token setine dönüştür."""
-    return {t for t in _TOKEN_RE.findall(_norm(text)) if t not in _STOP_WORDS}
+    tokens = _TOKEN_RE.findall(_norm(text))
+    return {stem_turkish_word(_canonical_token(t)) for t in tokens if t not in _STOP_WORDS}
 
 
 # ── Veri Sınıfları ────────────────────────────────────────────
@@ -135,14 +161,33 @@ class FuzzyMatcher:
 
     @staticmethod
     def _jaccard(a: str, b: str) -> float:
-        """Token Jaccard benzerliği."""
+        """Token Jaccard benzerliği (Weighted Jaccard)."""
         t_a = _tokenize(a)
         t_b = _tokenize(b)
         if not t_a or not t_b:
             return 0.0
-        intersection = len(t_a & t_b)
-        union        = len(t_a | t_b)
-        return intersection / union if union else 0.0
+
+        # Define weights for common generic words (low importance)
+        generic_weights = {
+            "sut": 0.3, "yag": 0.3, "su": 0.3, "pirinc": 0.3, "makarna": 0.3,
+            "deterjan": 0.3, "sampuan": 0.3, "sabun": 0.3, "cay": 0.3, "kahve": 0.3,
+            "seker": 0.3, "un": 0.3, "tuz": 0.3, "salca": 0.3, "zeytin": 0.3,
+            "peynir": 0.3, "tereyag": 0.3, "yogurt": 0.3, "yumurta": 0.3,
+            "kagit": 0.3, "havlu": 0.3, "bez": 0.3, "islak": 0.3, "mendil": 0.3,
+        }
+
+        def get_word_weight(word: str) -> float:
+            if word.isdigit():
+                return 0.8
+            return generic_weights.get(word, 1.0)
+
+        intersection = t_a & t_b
+        union = t_a | t_b
+
+        weight_intersect = sum(get_word_weight(w) for w in intersection)
+        weight_union = sum(get_word_weight(w) for w in union)
+
+        return weight_intersect / weight_union if weight_union else 0.0
 
     @staticmethod
     def _seq(a: str, b: str) -> float:

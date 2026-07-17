@@ -1635,10 +1635,11 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
     # veya en az biri örtüşüyorken ürünü tutar.
     from app.comparator import (
         has_model_conflict, has_capacity_conflict, is_refurbished_title,
-        has_physical_conflict, has_tech_conflict
+        has_physical_conflict, has_tech_conflict, has_gender_conflict
     )
     products = [p for p in products if not has_physical_conflict(payload.title, p.get("title", ""))]
     products = [p for p in products if not has_tech_conflict(payload.title, p.get("title", ""))]
+    products = [p for p in products if not has_gender_conflict(payload.title, p.get("title", ""))]
     products = [p for p in products if not has_model_conflict(payload.title, p.get("title", ""))]
     # Depolama kapasitesi çakışması: kaynak "128 GB" iken aday "512 GB" gibi
     # farklı bir kapasiteyse ele -- aynı model ama farklı varyant gerçek
@@ -1698,15 +1699,36 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
     from collections import defaultdict
 
     def _dedup(items: list[dict]) -> list[dict]:
+        from app.comparator import titles_match
         source_count: dict[str, int] = defaultdict(int)
         out = []
-        seen: set[str] = set()
+        seen_urls: set[str] = set()
+        seen_titles_by_source: dict[str, list[str]] = defaultdict(list)
+
         for p in items:
             url_key = (p.get("url") or "").split("?")[0]
-            if url_key in seen:
+            if url_key in seen_urls:
                 continue
-            seen.add(url_key)
+
             src_key = p.get("source", "other")
+            title = p.get("title", "")
+
+            is_title_dup = False
+            for other_title in seen_titles_by_source[src_key]:
+                if (titles_match(title, other_title)
+                    and not has_capacity_conflict(title, other_title)
+                    and not has_physical_conflict(title, other_title)
+                    and not has_tech_conflict(title, other_title)
+                    and not has_gender_conflict(title, other_title)
+                    and not has_model_conflict(title, other_title)):
+                    is_title_dup = True
+                    break
+            if is_title_dup:
+                continue
+
+            seen_urls.add(url_key)
+            seen_titles_by_source[src_key].append(title)
+
             if source_count[src_key] < 3:
                 out.append(p)
                 source_count[src_key] += 1
@@ -1729,6 +1751,7 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
                                   if is_logical_product(query, p.get("title", "")) and is_same_model(p)]
                 retry_products = [p for p in retry_products if not has_physical_conflict(payload.title, p.get("title", ""))]
                 retry_products = [p for p in retry_products if not has_tech_conflict(payload.title, p.get("title", ""))]
+                retry_products = [p for p in retry_products if not has_gender_conflict(payload.title, p.get("title", ""))]
                 retry_products = [p for p in retry_products if not has_model_conflict(payload.title, p.get("title", ""))]
                 retry_products = [p for p in retry_products if not has_capacity_conflict(payload.title, p.get("title", ""))]
                 for p in retry_products:

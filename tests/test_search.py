@@ -128,6 +128,37 @@ class TestSearchByName(unittest.TestCase):
         self.assertTrue(is_store_relevant("search_trendyol_direct", "şampuan"))
         self.assertTrue(is_store_relevant("search_trendyol_direct", "canon"))
 
+    @patch("app.search_orchestrator.master_search", new_callable=AsyncMock)
+    def test_search_deduplication(self, mock_search):
+        # Return two highly similar products from the same store (different URLs)
+        mock_search.return_value = [
+            {
+                "title": "Pınar Tam Yağlı Süt 1 L",
+                "price": 40.0,
+                "original_price": None,
+                "image_url": None,
+                "source": "migros",
+                "url": "https://www.migros.com.tr/pinar-sut-1l-p-1",
+                "labels": ["Önerilen"],
+                "extra_info": {"out_of_stock": False},
+            },
+            {
+                "title": "Pınar Süt 1 L (Tam Yağlı)",
+                "price": 41.0,
+                "original_price": None,
+                "image_url": None,
+                "source": "migros",
+                "url": "https://www.migros.com.tr/pinar-sut-1l-p-2",
+                "labels": ["Önerilen"],
+                "extra_info": {"out_of_stock": False},
+            }
+        ]
+        results = search_products_by_name("süt")
+        self.assertIsInstance(results, list)
+        # Deduplication should keep only one (the first/cheaper one)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["title"], "Pınar Tam Yağlı Süt 1 L")
+
 
 if __name__ == "__main__":
     from unittest.mock import patch
