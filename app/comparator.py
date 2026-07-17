@@ -527,7 +527,7 @@ def is_refurbished_title(title: str) -> bool:
     """
     if not title:
         return False
-    norm = title.lower().translate(_REFURB_TR_MAP)
+    norm = title.translate(_REFURB_TR_MAP).lower()
     return any(pat in norm for pat in _REFURB_PATTERNS)
 
 
@@ -554,7 +554,7 @@ def extract_model_numbers(title: str) -> set[str]:
     import re as _re
     if not title:
         return set()
-    norm = title.lower().translate(_REFURB_TR_MAP)
+    norm = title.translate(_REFURB_TR_MAP).lower()
     tokens = _re.findall(r"\w+", norm)
     models: set[str] = set()
     for i, tok in enumerate(tokens):
@@ -598,7 +598,7 @@ def extract_storage_capacity(title: str) -> float | None:
     import re as _re
     if not title:
         return None
-    norm = title.lower().translate(_REFURB_TR_MAP)
+    norm = title.translate(_REFURB_TR_MAP).lower()
     matches = _re.findall(r"(\d+(?:[.,]\d+)?)\s*(tb|gb|mb)\b", norm)
     if not matches:
         return None

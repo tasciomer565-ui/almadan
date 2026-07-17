@@ -2481,14 +2481,16 @@ function showSearchResults(response) {
         ${products.map((item, index) => {
           const badgesHtml = item.labels.map(lbl => {
             let colorClass = "bg-gray";
+            let badgeTitle = "";
             if (lbl === "En Ucuz") colorClass = "bg-green";
             if (lbl === "En Yüksek İndirim") colorClass = "bg-red";
             if (lbl === "Hızlı Kargo") colorClass = "bg-blue";
             if (lbl === "En İyi Puan") colorClass = "bg-yellow";
-            if (lbl === "Şüpheli Fiyat") colorClass = "bg-red";
-            if (lbl === "Birim Fiyat Riski") colorClass = "bg-red";
+            if (lbl === "Şüpheli Fiyat") { colorClass = "bg-red"; badgeTitle = "Bu fiyat, ürünün geçmiş ortalama fiyatına göre anormal derecede düşük veya son anda yükseltilip indirim gösterilmiş olabilir. Satın almadan önce fiyat geçmişini kontrol et."; }
+            if (lbl === "Birim Fiyat Riski") { colorClass = "bg-red"; badgeTitle = "Bu ürünün birim fiyatı (ör. ml/gr başına), aynı kategorideki diğer seçeneklere göre dezavantajlı."; }
             if (lbl === "Birim Fiyat Avantajı") colorClass = "bg-green";
-            return `<span class="analysis-status-badge ${colorClass}" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase;">${escapeHtml(lbl)}</span>`;
+            const titleAttr = badgeTitle ? ` title="${escapeHtml(badgeTitle)}"` : "";
+            return `<span class="analysis-status-badge ${colorClass}"${titleAttr} style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; cursor: ${badgeTitle ? "help" : "default"};">${escapeHtml(lbl)}</span>`;
           }).join(" ");
 
           const originalPriceHtml = item.original_price && item.original_price > item.price
@@ -2517,7 +2519,7 @@ function showSearchResults(response) {
                </button>`;
 
           const suspiciousWarningHtml = item.extra_info?.suspicious
-            ? `<div style="display: flex; align-items: center; gap: 4px; color: var(--red); font-size: 11px; margin-top: 6px; font-weight: 700;">
+            ? `<div title="Bu fiyat, ürünün geçmiş ortalama fiyatına göre anormal derecede düşük veya yanıltıcı bir indirim olabilir. Satın almadan önce fiyat geçmişini kontrol et." style="display: flex; align-items: center; gap: 4px; color: var(--red); font-size: 11px; margin-top: 6px; font-weight: 700; cursor: help;">
                  <i data-lucide="shield-alert" style="width: 13px; height: 13px; flex-shrink: 0;"></i> Şüpheli Fiyat Uyarısı!
                </div>`
             : "";
@@ -2778,9 +2780,12 @@ function showParsedProduct(parsed) {
 
       <!-- Fiyat Geçmişi Grafiği -->
       <div id="parsedPriceHistoryChartContainer" class="hidden" style="margin-top: 16px; margin-bottom: 16px; padding: 12px; background: #fbfcf9; border: 1px solid var(--line); border-radius: 6px;">
-        <p class="source-name" style="margin-top: 0; margin-bottom: 8px; font-weight: 600; color: var(--ink);">Fiyat Değişim Grafiği (Son 90 Gün)</p>
-        <div style="position: relative; height: 160px; width: 100%;">
-          <canvas id="parsedPriceHistoryChart"></canvas>
+        <p id="parsedPriceHistoryEmptyState" class="hidden" style="font-size: 12px; color: var(--muted); margin: 0; padding: 8px 0; text-align: center;">Bu ürün için henüz fiyat geçmişi kaydı yok. Fiyat değişimleri izlendikçe burada görünecek.</p>
+        <div id="parsedPriceHistoryChartInner">
+          <p class="source-name" style="margin-top: 0; margin-bottom: 8px; font-weight: 600; color: var(--ink);">Fiyat Değişim Grafiği (Son 90 Gün)</p>
+          <div style="position: relative; height: 160px; width: 100%;">
+            <canvas id="parsedPriceHistoryChart"></canvas>
+          </div>
         </div>
       </div>
 
@@ -3346,9 +3351,11 @@ function openProduct(id) {
       <!-- Fiyat Geçmişi Grafiği -->
       <div class="price-chart-container" style="margin: 18px 0; padding: 12px; background: #fbfcf9; border: 1px solid var(--line); border-radius: 6px;">
         <p class="source-name" style="margin-top: 0; margin-bottom: 8px; font-weight: 600; color: var(--ink);">Fiyat Değişim Grafiği</p>
-        <div style="position: relative; height: 160px; width: 100%;">
+        ${sortedHistory.length === 0
+          ? `<p style="font-size: 12px; color: var(--muted); margin: 0; padding: 12px 0; text-align: center;">Bu ürün için henüz fiyat geçmişi kaydı yok. Fiyat değişimleri izlendikçe burada görünecek.</p>`
+          : `<div style="position: relative; height: 160px; width: 100%;">
           <canvas id="priceHistoryChart"></canvas>
-        </div>
+        </div>`}
       </div>
 
       <!-- Fiyat Karşılaştırması -->
@@ -6878,6 +6885,8 @@ let productPriceHistoryChartInstance = null;
 async function renderPriceHistoryChart(productKey) {
   const container = document.getElementById("parsedPriceHistoryChartContainer");
   const canvas = document.getElementById("parsedPriceHistoryChart");
+  const emptyState = document.getElementById("parsedPriceHistoryEmptyState");
+  const inner = document.getElementById("parsedPriceHistoryChartInner");
   if (!container || !canvas) return;
 
   try {
@@ -6885,11 +6894,15 @@ async function renderPriceHistoryChart(productKey) {
     const history = res.history || [];
 
     if (history.length === 0) {
-      container.classList.add("hidden");
+      container.classList.remove("hidden");
+      if (emptyState) emptyState.classList.remove("hidden");
+      if (inner) inner.classList.add("hidden");
       return;
     }
 
     container.classList.remove("hidden");
+    if (emptyState) emptyState.classList.add("hidden");
+    if (inner) inner.classList.remove("hidden");
     await ensureChartJs();
 
     // Tarihe göre sıralayalım

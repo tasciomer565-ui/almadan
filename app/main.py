@@ -122,6 +122,8 @@ def require_admin_secret(request: Request) -> None:
     olan ADMIN_DEBUG_SECRET ile korunuyor."""
     if not ADMIN_DEBUG_SECRET:
         raise HTTPException(status_code=503, detail="Admin paneli yapılandırılmamış (ADMIN_DEBUG_SECRET eksik).")
+    from app.security import check_rate_limit
+    check_rate_limit(request, "admin_secret_auth", limit=10, window_seconds=60)
     candidate = (
         request.headers.get("x-admin-secret", "").strip()
         or request.query_params.get("secret", "").strip()
@@ -1192,6 +1194,8 @@ _client_errors: "deque[dict]" = None  # lazy init
 @app.post("/api/client-error", include_in_schema=False)
 async def client_error_report(request: Request) -> dict:
     """Frontend hata raporlarını logla (Vercel function logs'ta görünür)."""
+    from app.security import check_rate_limit
+    check_rate_limit(request, "client_error", limit=30, window_seconds=60)
     global _client_errors
     from collections import deque
     if _client_errors is None:
@@ -1536,7 +1540,7 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
             from app.parser import safe_product_get
             import json as _json
             try:
-                resp = safe_product_get(payload.original_url)
+                resp = safe_product_get(payload.original_url, timeout=10)
                 if resp and resp.ok:
                     from bs4 import BeautifulSoup as _BS
                     _soup = _BS(resp.text, "lxml")
@@ -3990,6 +3994,17 @@ def admin_scraper_health(user=Depends(require_admin)):
     return {"scrapers": analytics_engine.get_system_health()}
 
 
+@app.get("/api/admin/deploy-info")
+def admin_deploy_info(user=Depends(require_admin)):
+    """Vercel'in otomatik sağladığı env değişkenlerinden son deploy bilgisini döner."""
+    return {
+        "commit_sha": os.getenv("VERCEL_GIT_COMMIT_SHA"),
+        "commit_message": os.getenv("VERCEL_GIT_COMMIT_MESSAGE"),
+        "commit_ref": os.getenv("VERCEL_GIT_COMMIT_REF"),
+        "deployed_at": os.getenv("VERCEL_DEPLOYMENT_ID"),
+    }
+
+
 # ── Puan Sistemi ──────────────────────────────────────────────
 
 @app.get("/api/points")
@@ -5837,10 +5852,10 @@ async def store_page(slug: str):
     # bir sey var" sinyali verir.
     if campaigns:
         seo_title = f"{name}: {len(campaigns)} Aktif Kampanya ve Fiyat Karşılaştırması — Almadan"
-        seo_desc = f"Güncel {len(campaigns)} adet {name} kampanyası, indirim kataloğu ve fiyat karşılaştırmaları. Satın almadan önce en ucuz {name} fiyatlarını görün."
+        seo_desc = f"Güncel {len(campaigns)} adet {name} kampanyası ve indirim kataloğu. En ucuz {name} fiyatlarını Almadan'da gör."
     else:
         seo_title = f"{name} Kampanyaları, İndirimleri ve Fiyatları — Almadan"
-        seo_desc = f"En güncel {name} indirim kampanyaları, fiyat karşılaştırmaları ve katalog fırsatları. Aradığınız {name} ürününü en ucuza Almadan ile bulun."
+        seo_desc = f"En güncel {name} indirim kampanyaları ve katalog fırsatları. En ucuz {name} fiyatlarını Almadan ile bul."
 
     seo_title_escaped = _html.escape(seo_title)
     seo_desc_escaped = _html.escape(seo_desc)

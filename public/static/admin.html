@@ -66,6 +66,8 @@
     <h1>Almadan — Admin Paneli</h1>
     <p class="subtitle">Sistem sağlığı, arama kalitesi ve bildirim durumu.</p>
 
+    <div id="deployInfoCard" style="background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: var(--ink-light);"></div>
+
     <div class="tabs">
       <button class="tab-btn active" data-tab="general" onclick="switchTab('general')">Genel İstatistik</button>
       <button class="tab-btn" data-tab="failed" onclick="switchTab('failed')">Başarısız Aramalar</button>
@@ -155,6 +157,19 @@
       loadCronHealth();
       loadProgress();
       loadBusiness();
+      loadDeployInfo();
+    }
+
+    async function loadDeployInfo() {
+      const el = document.getElementById("deployInfoCard");
+      try {
+        const d = await api("/api/admin/deploy-info");
+        const sha = d.commit_sha ? String(d.commit_sha).slice(0, 7) : "bilinmiyor";
+        const msg = d.commit_message ? esc(d.commit_message) : "-";
+        el.innerHTML = `Son Deploy: <strong>${sha}</strong> — ${msg}`;
+      } catch (e) {
+        el.innerHTML = `Son deploy bilgisi alınamadı.`;
+      }
     }
 
     async function loadGeneral() {
@@ -203,27 +218,66 @@
       }
     }
 
+    let _scraperHealthData = null;
+
+    function renderScraperRows(scrapers, filterText) {
+      const q = (filterText || "").trim().toLowerCase();
+      const filtered = q ? scrapers.filter(s => String(s.scraper).toLowerCase().includes(q)) : scrapers;
+      // HAZIR olanlar üstte, sonra kırık, sonra izlenenler
+      const sorted = [...filtered].sort((a, b) => {
+        const rank = s => s.ready_to_promote ? 0 : (s.currently_alerted ? 1 : 2);
+        return rank(a) - rank(b);
+      });
+      return sorted.map(s => `
+        <tr>
+          <td>${esc(s.scraper)}</td>
+          <td>${s.consecutive_zero_days}</td>
+          <td>${s.best_count_seen}</td>
+          <td>${s.currently_alerted ? '<span class="badge bad">KIRIK</span>' : (s.ready_to_promote ? '<span class="badge ok">✓ HAZIR</span>' : '<span class="badge">İzleniyor</span>')}</td>
+        </tr>
+      `).join("");
+    }
+
+    function filterScraperTable() {
+      if (!_scraperHealthData) return;
+      const input = document.getElementById("scraperFilterInput");
+      const rows = renderScraperRows(_scraperHealthData.scrapers || [], input ? input.value : "");
+      const tbody = document.getElementById("scraperTableBody");
+      if (tbody) tbody.innerHTML = rows;
+    }
+
+    function exportScraperHealth() {
+      if (!_scraperHealthData) return;
+      const blob = new Blob([JSON.stringify(_scraperHealthData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "scraper-health-" + new Date().toISOString().slice(0, 10) + ".json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
     async function loadScrapers() {
       const el = document.getElementById("panel-scrapers");
       try {
         const d = await api("/api/admin/scraper-health-report");
-        const rows = (d.scrapers || []).map(s => `
-          <tr>
-            <td>${esc(s.scraper)}</td>
-            <td>${s.consecutive_zero_days}</td>
-            <td>${s.best_count_seen}</td>
-            <td>${s.currently_alerted ? '<span class="badge bad">KIRIK</span>' : (s.ready_to_promote ? '<span class="badge ok">✓ HAZIR</span>' : '<span class="badge">İzleniyor</span>')}</td>
-          </tr>
-        `).join("");
+        _scraperHealthData = d;
+        const rows = renderScraperRows(d.scrapers || [], "");
         el.innerHTML = `
           <button class="refresh-btn" onclick="loadScrapers()">↻ Yenile</button>
+          <button class="refresh-btn" style="float:right; margin-right:8px; background:var(--blue);" onclick="exportScraperHealth()">⬇ JSON Dışa Aktar</button>
           <p class="subtitle">"HAZIR" = son günlerde art arda gerçek sonuç bulmuş, şu an sorunsuz — "yakında" listesinden çıkarıp aktif etmeyi düşünebilirsin.</p>
           <div class="stat-grid">
             <div class="stat-card"><div class="num">${d.total_tracked}</div><div class="label">Takip Edilen Scraper</div></div>
             <div class="stat-card"><div class="num" style="color:${d.currently_broken ? 'var(--red)' : 'var(--green)'}">${d.currently_broken}</div><div class="label">Şu An Kırık</div></div>
             <div class="stat-card"><div class="num" style="color:var(--green)">${d.ready_to_promote_count || 0}</div><div class="label">Aktif Etmeye Hazır</div></div>
           </div>
-          ${rows ? `<table><thead><tr><th>Scraper</th><th>Art Arda Kaç Gün 0 Sonuç</th><th>En İyi Gördüğü Sonuç</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table>`
+          ${(d.scrapers || []).length ? `
+            <input type="text" id="scraperFilterInput" placeholder="Mağaza adına göre filtrele…" oninput="filterScraperTable()"
+              style="width:100%; padding:8px 10px; border-radius:8px; margin-bottom:12px; border:1px solid var(--line); background:var(--bg); color:var(--ink); font-size:13px;">
+            <table><thead><tr><th>Scraper</th><th>Art Arda Kaç Gün 0 Sonuç</th><th>En İyi Gördüğü Sonuç</th><th>Durum</th></tr></thead><tbody id="scraperTableBody">${rows}</tbody></table>`
                  : `<p class="subtitle">Henüz veri yok, günlük sağlık kontrolü birkaç gün içinde birikecek.</p>`}
         `;
       } catch (e) {
