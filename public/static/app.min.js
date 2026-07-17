@@ -2688,7 +2688,7 @@ async function trackSearchResultProduct(button, index) {
     if (isLoginRequiredError(error)) {
       promptLoginForTracking("Bir ürünü fiyat radarına eklemek için hesap açman gerekiyor.");
     } else {
-      showToast(`Ürün kaydedilemedi: ${error.message}`);
+      showToast(`Ürün kaydedilemedi: ${escapeHtml(error.message)}`);
     }
     button.disabled = false;
     button.innerHTML = `<i data-lucide="radar" style="width:12px; height:12px; margin-right:4px;"></i> Radara Ekle`;
@@ -3651,7 +3651,7 @@ async function refreshSingleProduct(productId) {
     } else if (result.status === "success") {
       showToast("Fiyat değişmemiş.");
     } else {
-      showToast(`Fiyat bulunamadı: ${result.message}`);
+      showToast(`Fiyat bulunamadı: ${escapeHtml(result.message)}`);
     }
   } catch (error) {
     showToast(error.message);
@@ -4314,7 +4314,7 @@ async function startLiveBarcodeScanner() {
     liveBarcodeScannerRunning = false;
     liveBarcodeScanLocked = false;
     updateBarcodeScanStatus("Kamera baslatilamadi.");
-    showToast(`Kamera acilamadi: ${error.message || error}`);
+    showToast(`Kamera acilamadi: ${escapeHtml(String(error.message || error))}`);
   }
 }
 
@@ -4376,7 +4376,7 @@ async function lookupAndAddBarcode(code) {
         quantity: Math.min(99, Number(existing.quantity || 1) + 1),
         updated_at: new Date().toISOString(),
       };
-      showToast(`Miktar artırıldı: ${res.title}`);
+      showToast(`Miktar artırıldı: ${escapeHtml(res.title)}`);
     } else {
       state.cart.push({
         id: "cart-" + Date.now(),
@@ -4389,7 +4389,7 @@ async function lookupAndAddBarcode(code) {
         quantity: 1,
         updated_at: new Date().toISOString(),
       });
-      showToast(`Eklendi: ${res.title}`);
+      showToast(`Eklendi: ${escapeHtml(res.title)}`);
     }
     saveCartToLocalStorage();
     renderCart();
@@ -4591,7 +4591,7 @@ function submitManualBarcodeEntry(barcode) {
   renderCart();
   if (state.sharedListId) syncSharedListWithServer();
   closeDialog();
-  showToast(`"${title}" sepete eklendi.`);
+  showToast(`"${escapeHtml(title)}" sepete eklendi.`);
 }
 
 async function scanBarcodeImage(event) {
@@ -4617,7 +4617,7 @@ async function scanBarcodeImage(event) {
     }
     await lookupAndAddBarcode(barcodes[0].rawValue);
   } catch (error) {
-    showToast(`Barkod okunamadı: ${error.message}`);
+    showToast(`Barkod okunamadı: ${escapeHtml(error.message)}`);
   } finally {
     event.target.value = "";
   }
@@ -5857,7 +5857,7 @@ function startVoiceSearch() {
   recognition.onresult = (event) => {
     const result = event.results[0][0].transcript;
     document.getElementById("productUrl").value = result;
-    showToast(`Tanımlandı: "${result}"`);
+    showToast(`Tanımlandı: "${escapeHtml(result)}"`);
     // Automatically submit search
     document.getElementById("urlForm").dispatchEvent(new Event("submit"));
   };
@@ -6615,7 +6615,7 @@ async function searchByBarcode(code) {
         query: res.search_query || res.title || code,
         category: res.suggested_category || "general",
       });
-      showToast("✓ " + (res.title || "Ürün bulundu"));
+      showToast("✓ " + escapeHtml(res.title || "Ürün bulundu"));
     } else if (res.found) {
       // Ürün bilgisi var ama fiyat karşılaştırma sonucu yok
       switchView("discover");
