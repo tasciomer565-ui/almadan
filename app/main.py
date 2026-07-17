@@ -1633,7 +1633,12 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
     # veya "16e" gibi FARKLI bir bağımsız model numarası varsa ele.
     # has_model_conflict muhafazakârdır: iki tarafta da model adayı yokken
     # veya en az biri örtüşüyorken ürünü tutar.
-    from app.comparator import has_model_conflict, has_capacity_conflict, is_refurbished_title
+    from app.comparator import (
+        has_model_conflict, has_capacity_conflict, is_refurbished_title,
+        has_physical_conflict, has_tech_conflict
+    )
+    products = [p for p in products if not has_physical_conflict(payload.title, p.get("title", ""))]
+    products = [p for p in products if not has_tech_conflict(payload.title, p.get("title", ""))]
     products = [p for p in products if not has_model_conflict(payload.title, p.get("title", ""))]
     # Depolama kapasitesi çakışması: kaynak "128 GB" iken aday "512 GB" gibi
     # farklı bir kapasiteyse ele -- aynı model ama farklı varyant gerçek
@@ -1722,6 +1727,8 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
                                   if isinstance(p, dict) and (p.get("price") or 0) > 0]
                 retry_products = [p for p in retry_products
                                   if is_logical_product(query, p.get("title", "")) and is_same_model(p)]
+                retry_products = [p for p in retry_products if not has_physical_conflict(payload.title, p.get("title", ""))]
+                retry_products = [p for p in retry_products if not has_tech_conflict(payload.title, p.get("title", ""))]
                 retry_products = [p for p in retry_products if not has_model_conflict(payload.title, p.get("title", ""))]
                 retry_products = [p for p in retry_products if not has_capacity_conflict(payload.title, p.get("title", ""))]
                 for p in retry_products:

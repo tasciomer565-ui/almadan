@@ -479,6 +479,132 @@ async def scan_worker(query: str, category: str, fallback: bool = False) -> list
     filtered_products = [p for p in aol_products if is_logical_product(query, p["title"])]
     return filtered_products
 
+def is_store_relevant(store_name: str, query: str) -> bool:
+    """Checks if a query is relevant to a brand-specific or highly specialized store.
+    Saves scraping credits and prevents false matches.
+    """
+    from app.text_utils import normalize_turkish
+    q = normalize_turkish(query)
+
+    # Single-brand stores mapping
+    brand_keywords = {
+        "search_casper": {"casper"},
+        "search_huawei": {"huawei"},
+        "search_xiaomi": {"xiaomi"},
+        "search_lenovo": {"lenovo"},
+        "search_asusrog": {"asus", "rog"},
+        "search_canon": {"canon"},
+        "search_epson": {"epson"},
+        "search_lego": {"lego"},
+        "search_frigg": {"frigg"},
+        "search_flormar": {"flormar"},
+        "search_goldenrose": {"goldenrose", "golden rose"},
+        "search_farmasi": {"farmasi"},
+        "search_proteinocean": {"proteinocean", "protein ocean"},
+        "search_runnutrition": {"runnutrition", "run nutrition"},
+    }
+
+    if store_name in brand_keywords:
+        # Query must contain at least one of the brand keywords
+        keywords = brand_keywords[store_name]
+        return any(kw in q for kw in keywords)
+
+    return True
+
+
+def extract_color(title: str) -> str | None:
+    """Extracts a color variant name from a title if present."""
+    from app.text_utils import normalize_turkish
+    norm = normalize_turkish(title).lower()
+
+    colors = {
+        "siyah": "Siyah", "beyaz": "Beyaz", "mavi": "Mavi", "yesil": "Yeşil",
+        "kirmizi": "Kırmızı", "sari": "Sarı", "gri": "Gri", "gumus": "Gümüş",
+        "altin": "Altın", "gold": "Gold", "silver": "Silver", "pembe": "Pembe",
+        "mor": "Mor", "turuncu": "Turuncu", "lacivert": "Lacivert", "rose": "Rose",
+    }
+
+    for k_norm, color_name in colors.items():
+        if f" {k_norm} " in f" {norm} ":
+            return color_name
+
+    return None
+
+
+def validate_and_enrich_product(p: dict) -> dict | None:
+    """Validates that the scraped product has all required fields.
+    Performs brand extraction if missing, and ensures image URLs are valid.
+    """
+    if not isinstance(p, dict):
+        return None
+
+    title = p.get("title", "").strip()
+    price = p.get("price")
+    url = p.get("url", "").strip()
+
+    # 1. Validation
+    if not title or not url:
+        return None
+    try:
+        price = float(str(price).replace(",", "."))
+        if price <= 0:
+            return None
+    except (ValueError, TypeError):
+        return None
+
+    # Standardize types
+    p["title"] = title
+    p["price"] = price
+    p["url"] = url
+
+    # Set fallback placeholder image if empty/invalid
+    img = p.get("image_url", "")
+    if not img or not (img.startswith("http") or img.startswith("//") or img.startswith("/")):
+        p["image_url"] = "/static/images/placeholder.png"
+
+    # Extract seller if present in title (Satıcı: XYZ)
+    import re as _re
+    seller_match = _re.search(r"\((?:satıcı|satici):\s*([^)]+)\)", title)
+    if seller_match:
+        p["seller"] = seller_match.group(1).strip()
+        p["title"] = _re.sub(r"\s*\((?:satıcı|satici):\s*[^)]+\)", "", title).strip()
+
+    # Group colors
+    color = extract_color(p["title"])
+    if color:
+        p.setdefault("extra_info", {})["color"] = color
+
+    # 2. Brand Extraction Fallback
+    if not p.get("brand"):
+        from app.text_utils import normalize_turkish
+        norm_title = normalize_turkish(p["title"])
+
+        known_brands = {
+            "samsung": "Samsung", "apple": "Apple", "xiaomi": "Xiaomi", "huawei": "Huawei",
+            "lenovo": "Lenovo", "asus": "Asus", "casper": "Casper", "monster": "Monster",
+            "hp": "HP", "dell": "Dell", "acer": "Acer", "toshiba": "Toshiba",
+            "philips": "Philips", "sony": "Sony", "lg": "LG", "vestel": "Vestel",
+            "arcelik": "Arçelik", "beko": "Beko", "bosch": "Bosch", "siemens": "Siemens",
+            "tefal": "Tefal", "karaca": "Karaca", "korkmaz": "Korkmaz", "arzum": "Arzum",
+            "fakir": "Fakir", "braun": "Braun", "delonghi": "DeLonghi", "dyson": "Dyson",
+            "lipton": "Lipton", "nescafe": "Nescafe", "jacobs": "Jacobs", "pinar": "Pınar",
+            "sutas": "Sütaş", "sek": "Sek", "torku": "Torku", "ulker": "Ülker",
+            "eti": "Eti", "yudum": "Yudum", "komili": "Komili", "orkide": "Orkide",
+            "gratis": "Gratis", "watsons": "Watsons", "flormar": "Flormar", "goldenrose": "Golden Rose",
+            "nivea": "Nivea", "loreal": "L'Oreal", "pantene": "Pantene", "dove": "Dove",
+            "elidor": "Elidor", "colgate": "Colgate", "ipana": "Ipana", "sensodyne": "Sensodyne",
+            "ariel": "Ariel", "alo": "Alo", "omo": "Omo", "persil": "Persil",
+            "fairy": "Fairy", "pril": "Pril", "finish": "Finish", "calgon": "Calgon",
+        }
+
+        for k_norm, brand_name in known_brands.items():
+            if f" {k_norm} " in f" {norm_title} ":
+                p["brand"] = brand_name
+                break
+
+    return p
+
+
 async def marketplace_scan(query: str, fallback: bool = False, forced_category: str = None) -> list[dict]:
     """Paralel arama — çalışan kaynaklar (Vercel 10s limiti)."""
     loop = asyncio.get_running_loop()
@@ -543,12 +669,14 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         # -- bkz. app/slow_store_cache_warmer.py
         for fn in (search_mediamarkt, search_teknosa, search_vatanbilgisayar,
                    search_itopya, search_casper, search_lg, search_turkcell):
-            extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
+            if is_store_relevant(fn.__name__, query):
+                extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category == "BEBEK":
         # search_toyzz/search_bebek render_js=True gerektiriyor (10-20s),
         # canli taramadan cikarildi -- bkz. app/slow_store_cache_warmer.py
         for fn in (search_ebebek, search_lego, search_frigg):
-            extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
+            if is_store_relevant(fn.__name__, query):
+                extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category in ("EV", "MOBİLYA"):
         # search_koctas/bauhaus/korkmaz/bosch/istikbal render_js=True
         # gerektiriyor (10-20s), canli taramadan cikarildi -- bkz.
@@ -556,7 +684,8 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         for fn in (search_vivense, search_evidea, search_karaca, search_englishhome,
                    search_bellona, search_dogtas, search_kelebek,
                    search_schafer, search_tefal, search_arzum, search_fakir):
-            extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
+            if is_store_relevant(fn.__name__, query):
+                extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category in ("MODA", "SPOR"):
         # search_boyner/hm/bershka/vakko/twist/penti/derimod/damattween/
         # decathlon/adidas/puma/newbalance/sportive/lescon/pandora
@@ -567,7 +696,8 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
                    search_beymen, search_sarar, search_pierrecardin,
                    search_altinyildiz, search_shein, search_modanisa,
                    search_bigjoy, search_nike, search_reebok):
-            extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
+            if is_store_relevant(fn.__name__, query):
+                extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category == "KOZMETİK":
         # search_gratis/watsons/sephora/goldenrose/farmasi canli taramadan
         # cikarildi: render_js=True ScrapingBee istegi 10-20s surebiliyor,
@@ -576,7 +706,8 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         # artik app/slow_store_cache_warmer.py'deki ayri, zaman siniri
         # olmayan cron ile onceden taranip cache'e yaziliyor.
         for fn in (search_rossmann, search_flormar):
-            extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
+            if is_store_relevant(fn.__name__, query):
+                extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category == "GIDA":
         # search_a101 canli taramadan cikarildi: render_js=True ScrapingBee
         # istegi 10-20s surebiliyor, Vercel Hobby'nin kesin 10s fonksiyon
@@ -586,7 +717,8 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         for fn in (search_bim, search_sokmarket, search_tarimkredi,
                    search_metro, search_bizimtoptan, search_tazedirekt,
                    search_migros_proxy, search_carrefoursa):
-            extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
+            if is_store_relevant(fn.__name__, query):
+                extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     elif category in ("GENEL", "KİTAP"):
         # search_muzikdunyasi/ofissepeti/petbis/evpet/zopet: domainleri
         # artik parking/satis sayfasina yonleniyor (GoDaddy/HugeDomains) --
@@ -595,7 +727,8 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         # cikarildi -- bkz. app/slow_store_cache_warmer.py
         for fn in (search_kitapyurdu, search_dr, search_remzi,
                    search_proteinocean, search_supplementler, search_runnutrition):
-            extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
+            if is_store_relevant(fn.__name__, query):
+                extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, fn, query))
     else:
         # GENEL/bilinmeyen → MediaMarkt + Teknosa da dene
         extra_tasks.append(loop.run_in_executor(_SCAN_EXECUTOR, search_mediamarkt, query))
@@ -629,12 +762,15 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         if not isinstance(res, list):
             continue
         for p in res:
-            url_clean = p.get("url", "").split("?")[0].strip()
+            p_valid = validate_and_enrich_product(p)
+            if not p_valid:
+                continue
+            url_clean = p_valid.get("url", "").split("?")[0].strip()
             if url_clean and url_clean in seen_urls:
                 continue
             if url_clean:
                 seen_urls.add(url_clean)
-            all_products.append(p)
+            all_products.append(p_valid)
 
     return all_products
 

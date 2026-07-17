@@ -4,6 +4,8 @@ from app.comparator import (
     clean_product_title, extract_yahoo_url, find_comparison_links, compare_prices, titles_match,
     is_refurbished_title, extract_model_numbers, has_model_conflict,
     extract_storage_capacity, has_capacity_conflict,
+    extract_volume_weight_count, has_physical_conflict,
+    extract_ram_and_tv_size, has_tech_conflict, is_logical_product
 )
 
 def test_clean_product_title():
@@ -153,9 +155,73 @@ def test_extract_storage_capacity_single_capacity_normal_title():
     assert extract_storage_capacity("Xiaomi Redmi Note 12 128 GB Yıldız Mavisi") == 128.0
 
 
+def test_extract_volume_weight_count():
+    p1 = extract_volume_weight_count("Pınar Süt 1 L")
+    assert p1["volume"] == 1000.0
+    assert p1["weight"] is None
+    assert p1["count"] is None
+
+    p2 = extract_volume_weight_count("Hardline Protein 2300 gr")
+    assert p2["volume"] is None
+    assert p2["weight"] == 2300.0
+    assert p2["count"] is None
+
+    p3 = extract_volume_weight_count("Lipton Demlik Çay 100'lü Paket")
+    assert p3["volume"] is None
+    assert p3["weight"] is None
+    assert p3["count"] == 100.0
+
+
+def test_has_physical_conflict():
+    # Volume conflict
+    assert has_physical_conflict("Pınar Süt 1 L", "Pınar Süt 500 ml") is True
+    assert has_physical_conflict("Pınar Süt 1 L", "Pınar Süt 1000 ml") is False
+
+    # Weight conflict
+    assert has_physical_conflict("Un 5 kg", "Un 1 kg") is True
+    assert has_physical_conflict("Un 5 kg", "Un 5000 gr") is False
+
+    # Count conflict
+    assert has_physical_conflict("Çay 100'lü", "Çay 50'li") is True
+    assert has_physical_conflict("Çay 100'lü", "Çay 100 Adet") is False
+
+
+def test_extract_ram_and_tv_size():
+    t1 = extract_ram_and_tv_size("MSI Laptop 16 GB RAM 512 GB SSD")
+    assert t1["ram"] == 16.0
+    assert t1["tv_size"] is None
+
+    t2 = extract_ram_and_tv_size("Philips 55\" 4K Smart LED TV")
+    assert t2["ram"] is None
+    assert t2["tv_size"] == 55.0
+
+    t3 = extract_ram_and_tv_size("LG 139 Ekran OLED TV")
+    assert t3["tv_size"] == 55.0
+
+
+def test_has_tech_conflict():
+    assert has_tech_conflict("Laptop 16 GB RAM", "Laptop 8 GB RAM") is True
+    assert has_tech_conflict("Laptop 16 GB RAM", "Laptop 16GB RAM") is False
+
+    assert has_tech_conflict("TV 55 inç", "TV 43 inç") is True
+    assert has_tech_conflict("TV 55\"", "TV 139 cm") is False
+
+
+def test_is_logical_product_physical_conflicts():
+    # Filter out mismatching pack sizes/counts via is_logical_product
+    assert is_logical_product("Yudum Ayçiçek Yağı 5 L", "Yudum Ayçiçek Yağı 1 L") is False
+    assert is_logical_product("Sarıyer Gazoz 6'lı", "Sarıyer Gazoz Tekli") is False
+    assert is_logical_product("Laptop 16 GB RAM", "Laptop 8 GB RAM") is False
+
+
 if __name__ == "__main__":
     test_clean_product_title()
     test_extract_yahoo_url()
     test_find_comparison_links()
     test_titles_match()
+    test_extract_volume_weight_count()
+    test_has_physical_conflict()
+    test_extract_ram_and_tv_size()
+    test_has_tech_conflict()
+    test_is_logical_product_physical_conflicts()
     print("All comparator tests passed successfully!")

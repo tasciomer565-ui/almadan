@@ -113,6 +113,21 @@ class TestSearchByName(unittest.TestCase):
                 self.assertIsNotNone(item["longitude"])
                 self.assertTrue("Dakika" in item["delivery_time"])
 
+    def test_is_store_relevant(self):
+        from app.search_orchestrator import is_store_relevant
+        # Canon store should only receive Canon queries
+        self.assertTrue(is_store_relevant("search_canon", "canon eos 2000d"))
+        self.assertFalse(is_store_relevant("search_canon", "iphone 15"))
+        self.assertFalse(is_store_relevant("search_canon", "şampuan"))
+
+        # Lego store should only receive Lego queries
+        self.assertTrue(is_store_relevant("search_lego", "lego city"))
+        self.assertFalse(is_store_relevant("search_lego", "bebek bezi"))
+
+        # Non-brand stores should always be relevant
+        self.assertTrue(is_store_relevant("search_trendyol_direct", "şampuan"))
+        self.assertTrue(is_store_relevant("search_trendyol_direct", "canon"))
+
 
 if __name__ == "__main__":
     from unittest.mock import patch

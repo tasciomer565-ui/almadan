@@ -638,7 +638,129 @@ def has_capacity_conflict(source_title: str, candidate_title: str) -> bool:
     return src != cand
 
 
+def extract_volume_weight_count(text: str) -> dict[str, float | None]:
+    """Extracts volume (ml), weight (g), and count (pcs) from text."""
+    import re as _re
+    if not text:
+        return {"volume": None, "weight": None, "count": None}
+    text = text.lower()
+    
+    # 1. Volume: L / ml / cl
+    volume = None
+    vol_match = _re.search(r"(\d+(?:[.,]\d+)?)\s*(lt|l|ml|cl)\b", text)
+    if vol_match:
+        val = float(vol_match.group(1).replace(",", "."))
+        unit = vol_match.group(2)
+        if unit in ("l", "lt"):
+            volume = val * 1000.0
+        elif unit == "ml":
+            volume = val
+        elif unit == "cl":
+            volume = val * 10.0
+
+    # 2. Weight: kg / g / gr
+    weight = None
+    weight_match = _re.search(r"(\d+(?:[.,]\d+)?)\s*(kg|gr|g)\b", text)
+    if weight_match:
+        val = float(weight_match.group(1).replace(",", "."))
+        unit = weight_match.group(2)
+        if unit == "kg":
+            weight = val * 1000.0
+        elif unit in ("g", "gr"):
+            weight = val
+
+    # 3. Count / Pack: "3'lü", "3 adet", "3x", "x3", "tekli"
+    count = None
+    count_match = _re.search(r"\b(\d+)\s*'?\s*(?:l[iıuü]|adet|ad|x)\b|\b(?:x|\*)\s*(\d+)\b", text)
+    if count_match:
+        val_str = count_match.group(1) or count_match.group(2)
+        if val_str:
+            try:
+                count = float(val_str)
+            except ValueError:
+                pass
+    else:
+        if _re.search(r"\b(?:tekli|tek)\b", text):
+            count = 1.0
+            
+    return {"volume": volume, "weight": weight, "count": count}
+
+
+def has_physical_conflict(title1: str, title2: str) -> bool:
+    """Checks if there is a volume, weight, or count conflict between two titles."""
+    p1 = extract_volume_weight_count(title1)
+    p2 = extract_volume_weight_count(title2)
+    
+    if p1["volume"] is not None and p2["volume"] is not None:
+        if abs(p1["volume"] - p2["volume"]) > 0.01:
+            return True
+            
+    if p1["weight"] is not None and p2["weight"] is not None:
+        if abs(p1["weight"] - p2["weight"]) > 0.01:
+            return True
+            
+    if p1["count"] is not None and p2["count"] is not None:
+        if abs(p1["count"] - p2["count"]) > 0.01:
+            return True
+            
+    return False
+
+
+def extract_ram_and_tv_size(text: str) -> dict[str, float | None]:
+    """Extracts RAM (GB) and TV size (inches) from text."""
+    import re as _re
+    if not text:
+        return {"ram": None, "tv_size": None}
+    text = text.lower()
+    
+    ram = None
+    ram_match = _re.search(r"\b(\d+)\s*gb\s*ram\b", text)
+    if ram_match:
+        ram = float(ram_match.group(1))
+        
+    tv_size = None
+    tv_match = _re.search(r"\b(\d{2,3})\s*(?:inç|inc|inch|ekran|cm\b|\")", text)
+    if tv_match:
+        val = float(tv_match.group(1))
+        if val > 80:
+            if 100 <= val <= 115:
+                tv_size = 43.0
+            elif 120 <= val <= 130:
+                tv_size = 50.0
+            elif 135 <= val <= 145:
+                tv_size = 55.0
+            elif 155 <= val <= 170:
+                tv_size = 65.0
+            else:
+                tv_size = round(val / 2.54, 0)
+        else:
+            tv_size = val
+            
+    return {"ram": ram, "tv_size": tv_size}
+
+
+def has_tech_conflict(title1: str, title2: str) -> bool:
+    """Checks if there is a RAM or TV screen size conflict."""
+    p1 = extract_ram_and_tv_size(title1)
+    p2 = extract_ram_and_tv_size(title2)
+    
+    if p1["ram"] is not None and p2["ram"] is not None:
+        if p1["ram"] != p2["ram"]:
+            return True
+            
+    if p1["tv_size"] is not None and p2["tv_size"] is not None:
+        if abs(p1["tv_size"] - p2["tv_size"]) > 1.5:
+            return True
+            
+    return False
+
+
 def is_logical_product(query: str, product_title: str) -> bool:
+    if has_physical_conflict(query, product_title):
+        return False
+    if has_tech_conflict(query, product_title):
+        return False
+
     query_lower = query.lower()
     title_lower = product_title.lower()
     
