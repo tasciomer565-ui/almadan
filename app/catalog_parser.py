@@ -23,16 +23,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-# ── Türkçe karakter normalizasyonu ──────────────────────────
-_TR_MAP = {
-    ord("ç"): "c", ord("ğ"): "g", ord("ı"): "i", ord("ş"): "s",
-    ord("ö"): "o", ord("ü"): "u",
-    ord("Ç"): "C", ord("Ğ"): "G", ord("İ"): "I", ord("Ş"): "S",
-    ord("Ö"): "O", ord("Ü"): "U",
-}
+from app.text_utils import normalize_turkish
 
 def _normalize_tr(text: str) -> str:
-    return text.translate(_TR_MAP).lower().strip()
+    return normalize_turkish(text).strip()
 
 
 # ── Fiyat Regex'leri ─────────────────────────────────────────

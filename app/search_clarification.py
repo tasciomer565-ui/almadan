@@ -8,11 +8,11 @@ ek bilgi taşıyan sorgular ASLA tetiklenmez, ham arama akışı bozulmaz.
 """
 from __future__ import annotations
 
-_TR_MAP = str.maketrans("şğıöüçŞĞİÖÜÇ", "sgioucSGIOUC")
+from app.text_utils import normalize_turkish
 
 
 def _norm(text: str) -> str:
-    return text.strip().lower().translate(_TR_MAP)
+    return normalize_turkish(text).strip()
 
 
 # terim(ler) (normalize edilmiş) -> facet seçenekleri

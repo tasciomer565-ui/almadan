@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000", "--log-level", "warning"],
       "port": 8000
+    },
+    {
+      "name": "aku-site",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "E:/akutakviyecisi", "-l", "4174"],
+      "port": 4174
     }
   ]
 }

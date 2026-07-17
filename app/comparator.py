@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 from app.parser import parse_product_url, detect_source, USER_AGENT
 from app.storage import load_db, save_db
+from app.text_utils import normalize_turkish
 
 YAHOO_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0"
 
@@ -211,6 +212,12 @@ def _scrape_jsonld_itemlist(url: str, source: str, render_js: bool = False, time
         except Exception:
             results = []
     return results
+
+def _scrape_jsonld_helper(query: str, source: str, url_pattern: str, render_js: bool = False, timeout: int = 10) -> list[dict]:
+    """Helper to reduce repetitive JSON-LD itemlist scraper calls."""
+    url = url_pattern.format(urllib.parse.quote_plus(query))
+    return _scrape_jsonld_itemlist(url, source, render_js=render_js, timeout=timeout)
+
 
 def clean_product_title(title: str) -> str:
     # Remove suffix patterns
@@ -508,7 +515,7 @@ def detect_query_category(query: str) -> str:
         return "supplement"
     return "general"
 
-_REFURB_TR_MAP = str.maketrans("şğıöüçâîŞĞİÖÜÇ", "sgioucaisgiouc")
+
 
 # "2. el" / "2.el" / "ikinci el" gibi varyantlar dahil; kelime sınırına
 # dikkat ("outlet" bir mağaza adında geçebilir ama başlıkta geçiyorsa
@@ -527,7 +534,7 @@ def is_refurbished_title(title: str) -> bool:
     """
     if not title:
         return False
-    norm = title.translate(_REFURB_TR_MAP).lower()
+    norm = normalize_turkish(title)
     return any(pat in norm for pat in _REFURB_PATTERNS)
 
 
@@ -554,7 +561,7 @@ def extract_model_numbers(title: str) -> set[str]:
     import re as _re
     if not title:
         return set()
-    norm = title.translate(_REFURB_TR_MAP).lower()
+    norm = normalize_turkish(title)
     tokens = _re.findall(r"\w+", norm)
     models: set[str] = set()
     for i, tok in enumerate(tokens):
@@ -598,7 +605,7 @@ def extract_storage_capacity(title: str) -> float | None:
     import re as _re
     if not title:
         return None
-    norm = title.translate(_REFURB_TR_MAP).lower()
+    norm = normalize_turkish(title)
     matches = _re.findall(r"(\d+(?:[.,]\d+)?)\s*(tb|gb|mb)\b", norm)
     if not matches:
         return None
@@ -1200,26 +1207,17 @@ def search_amazon_tr(query: str) -> list[dict]:
 def search_karaca(query: str) -> list[dict]:
     """Karaca — eski /search?q= adresi 404 veriyordu, gerçek arama rotası
     /product/search?q= (anasayfa arama formundan doğrulandı)."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.karaca.com/product/search?q={urllib.parse.quote_plus(query)}",
-        "karaca", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "karaca", "https://www.karaca.com/product/search?q={}", render_js=False, timeout=12)
 
 def search_watsons(query: str) -> list[dict]:
     """Watsons ürün araması — doğrudan istekte 403 (bot koruması) alıyor,
     ScrapingBee render_js=True ile JS render edilmiş sayfa üzerinden dener."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.watsons.com.tr/search?text={urllib.parse.quote_plus(query)}",
-        "watsons", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "watsons", "https://www.watsons.com.tr/search?text={}", render_js=True, timeout=15)
 
 def search_gratis(query: str) -> list[dict]:
     """Gratis ürün araması — modern JS-SPA, statik HTML'de JSON-LD/fiyat yok,
     ScrapingBee render_js=True gerekiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.gratis.com/search?q={urllib.parse.quote_plus(query)}",
-        "gratis", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "gratis", "https://www.gratis.com/search?q={}", render_js=True, timeout=15)
 
 def search_mediamarkt(query: str) -> list[dict]:
     """MediaMarkt Türkiye ürün araması — JSON-LD ItemList."""
@@ -1329,10 +1327,7 @@ def search_teknosa(query: str) -> list[dict]:
 
 def search_boyner(query: str) -> list[dict]:
     """Boyner ürün araması — JSON-LD + ScrapingBee render_js."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.boyner.com.tr/arama?searchTerm={urllib.parse.quote_plus(query)}",
-        "boyner", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "boyner", "https://www.boyner.com.tr/arama?searchTerm={}", render_js=True, timeout=15)
 
 def search_flo(query: str) -> list[dict]:
     """FLO ürün araması — data-gtm-product JSON attribute."""
@@ -1372,10 +1367,7 @@ def search_flo(query: str) -> list[dict]:
 
 def search_decathlon(query: str) -> list[dict]:
     """Decathlon ürün araması — JSON-LD + ScrapingBee render_js."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.decathlon.com.tr/search?Ntt={urllib.parse.quote_plus(query)}",
-        "decathlon", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "decathlon", "https://www.decathlon.com.tr/search?Ntt={}", render_js=True, timeout=15)
 
 def search_lcwaikiki(query: str) -> list[dict]:
     """
@@ -1494,10 +1486,7 @@ def search_mavi(query: str) -> list[dict]:
 def search_zara(query: str) -> list[dict]:
     """Zara — URL doğru, eski selector'lar sitenin güncel yapısıyla
     eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.zara.com/tr/tr/search?searchTerm={urllib.parse.quote_plus(query)}",
-        "zara", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "zara", "https://www.zara.com/tr/tr/search?searchTerm={}", render_js=False, timeout=12)
 
 
 def search_bim(query: str) -> list[dict]:
@@ -1548,27 +1537,18 @@ def search_bim(query: str) -> list[dict]:
 def search_rossmann(query: str) -> list[dict]:
     """Rossmann ürün araması — Magento platformu, doğru arama URL'si
     catalogsearch/result/ (eski /ara?q= adresi 404 veriyordu)."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.rossmann.com.tr/catalogsearch/result/?q={urllib.parse.quote_plus(query)}",
-        "rossmann", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "rossmann", "https://www.rossmann.com.tr/catalogsearch/result/?q={}", render_js=False, timeout=12)
 
 def search_supplementler(query: str) -> list[dict]:
     """Supplementler.com — URL doğru, eski selector'lar sitenin güncel
     yapısıyla eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.supplementler.com/search/?q={urllib.parse.quote_plus(query)}",
-        "supplementler", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "supplementler", "https://www.supplementler.com/search/?q={}", render_js=False, timeout=12)
 
 
 def search_englishhome(query: str) -> list[dict]:
     """English Home — URL doğru, eski selector'lar sitenin güncel
     yapısıyla eşleşmiyordu."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.englishhome.com/?q={urllib.parse.quote_plus(query)}",
-        "englishhome", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "englishhome", "https://www.englishhome.com/?q={}", render_js=False, timeout=12)
 
 
 def search_a101(query: str) -> list[dict]:
@@ -1678,18 +1658,12 @@ def search_sokmarket(query: str) -> list[dict]:
 
 def search_temu(query: str) -> list[dict]:
     """temu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.temu.com/tr/search_result.html?search_key={urllib.parse.quote_plus(query)}",
-        "temu", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "temu", "https://www.temu.com/tr/search_result.html?search_key={}", render_js=False, timeout=12)
 
 
 def search_pazarama(query: str) -> list[dict]:
     """pazarama — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.pazarama.com/search?q={urllib.parse.quote_plus(query)}",
-        "pazarama", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "pazarama", "https://www.pazarama.com/search?q={}", render_js=True, timeout=15)
 
 
 def search_ciceksepeti(query: str) -> list[dict]:
@@ -1739,37 +1713,25 @@ def search_ciceksepeti(query: str) -> list[dict]:
 def search_xiaomi(query: str) -> list[dict]:
     """xiaomi — statik HTML'de yeterli ürün verisi bulunamadı,
     ScrapingBee render_js=True ile dener."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.mi.com/tr/search/?keyword={urllib.parse.quote_plus(query)}",
-        "xiaomi", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "xiaomi", "https://www.mi.com/tr/search/?keyword={}", render_js=True, timeout=15)
 
 
 def search_huawei(query: str) -> list[dict]:
     """huawei — statik HTML'de yeterli ürün verisi bulunamadı,
     ScrapingBee render_js=True ile dener."""
-    return _scrape_jsonld_itemlist(
-        f"https://consumer.huawei.com/tr/search/?keywords={urllib.parse.quote_plus(query)}",
-        "huawei", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "huawei", "https://consumer.huawei.com/tr/search/?keywords={}", render_js=True, timeout=15)
 
 
 def search_hp(query: str) -> list[dict]:
     """hp — statik HTML'de yeterli ürün verisi bulunamadı,
     ScrapingBee render_js=True ile dener."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.hp.com/tr-tr/search/results.html?query={urllib.parse.quote_plus(query)}",
-        "hp", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "hp", "https://www.hp.com/tr-tr/search/results.html?query={}", render_js=True, timeout=15)
 
 
 def search_lenovo(query: str) -> list[dict]:
     """lenovo — statik HTML'de yeterli ürün verisi bulunamadı,
     ScrapingBee render_js=True ile dener."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.lenovo.com/tr/tr/search?q={urllib.parse.quote_plus(query)}",
-        "lenovo", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "lenovo", "https://www.lenovo.com/tr/tr/search?q={}", render_js=True, timeout=15)
 
 
 def search_evkur(query: str) -> list[dict]:
@@ -1819,42 +1781,27 @@ def search_evkur(query: str) -> list[dict]:
 def search_penti(query: str) -> list[dict]:
     """penti — statik HTML'de yeterli ürün verisi bulunamadı,
     ScrapingBee render_js=True ile dener."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.penti.com/tr/search?q={urllib.parse.quote_plus(query)}",
-        "penti", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "penti", "https://www.penti.com/tr/search?q={}", render_js=True, timeout=15)
 
 
 def search_colins(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.colins.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "colins", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "colins", "https://www.colins.com.tr/search?q={}", render_js=False, timeout=12)
 
 def search_twist(query: str) -> list[dict]:
     """Twist — statik HTML'de yeterli ürün verisi bulunamadı,
     ScrapingBee render_js=True ile dener."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.twist.com.tr/?s={urllib.parse.quote_plus(query)}",
-        "twist", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "twist", "https://www.twist.com.tr/?s={}", render_js=True, timeout=15)
 
 
 def search_ltb(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.ltb.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "ltb", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "ltb", "https://www.ltb.com.tr/search?q={}", render_js=False, timeout=12)
 
 def search_modanisa(query: str) -> list[dict]:
     """Modanisa — URL doğru, eski selector'lar sitenin güncel yapısıyla
     eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.modanisa.com/search?q={urllib.parse.quote_plus(query)}",
-        "modanisa", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "modanisa", "https://www.modanisa.com/search?q={}", render_js=False, timeout=12)
 
 
 def search_nike(query: str) -> list[dict]:
@@ -1904,44 +1851,29 @@ def search_nike(query: str) -> list[dict]:
 def search_puma(query: str) -> list[dict]:
     """Puma — eski URL (/tr/tr/search) 404 veriyordu, gerçek arama rotası
     /search?q=. Yine de yeterli statik ürün verisi yok, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://tr.puma.com/search?q={urllib.parse.quote_plus(query)}",
-        "puma", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "puma", "https://tr.puma.com/search?q={}", render_js=True, timeout=15)
 
 def search_newbalance(query: str) -> list[dict]:
     """New Balance — statik HTML'de yeterli ürün verisi bulunamadı,
     ScrapingBee render_js=True ile dener."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.newbalance.com.tr/?s={urllib.parse.quote_plus(query)}",
-        "newbalance", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "newbalance", "https://www.newbalance.com.tr/?s={}", render_js=True, timeout=15)
 
 
 def search_sportive(query: str) -> list[dict]:
     """Sportive — eski /search?q= 404 veriyordu, gerçek arama rotası
     /arama?q= (15 gerçek fiyat bulundu)."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.sportive.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "sportive", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "sportive", "https://www.sportive.com.tr/arama?q={}", render_js=False, timeout=12)
 
 def search_flormar(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.flormar.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "flormar", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "flormar", "https://www.flormar.com.tr/arama?q={}", render_js=False, timeout=12)
 
 def search_goldenrose(query: str) -> list[dict]:
     """Golden Rose — www.goldenrose.com.tr sadece tanıtım sitesi, asıl
     mağaza shop.goldenrose.com.tr'de (meta-refresh ile yönlendiriyordu,
     eski kod yanlış domain'i kullanıyordu). Vue.js tabanlı dinamik arama
     (dynamic-search) kullandığı için render_js=True gerekiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://shop.goldenrose.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "goldenrose", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "goldenrose", "https://shop.goldenrose.com.tr/arama?q={}", render_js=True, timeout=15)
 
 
 def search_istikbal(query: str) -> list[dict]:
@@ -1993,10 +1925,7 @@ def search_istikbal(query: str) -> list[dict]:
 def search_bellona(query: str) -> list[dict]:
     """bellona — URL doğru, eski selector'lar sitenin güncel
     yapısıyla eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.bellona.com.tr/ara?q={urllib.parse.quote_plus(query)}",
-        "bellona", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "bellona", "https://www.bellona.com.tr/ara?q={}", render_js=False, timeout=12)
 
 
 def search_madamecoco(query: str) -> list[dict]:
@@ -2004,10 +1933,7 @@ def search_madamecoco(query: str) -> list[dict]:
     rotası /list?q= ama sonuçlar istemci tarafında render ediliyor
     (statik HTML'deki TL eşleşmeleri gerçek ürün değil, gömülü JS config).
     render_js=True gerekiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.madamecoco.com/list?q={urllib.parse.quote_plus(query)}",
-        "madamecoco", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "madamecoco", "https://www.madamecoco.com/list?q={}", render_js=True, timeout=15)
 
 
 def search_korkmaz(query: str) -> list[dict]:
@@ -2110,18 +2036,12 @@ def search_dr(query: str) -> list[dict]:
 def search_idefix(query: str) -> list[dict]:
     """Idefix — statik HTML'de gerçek fiyat var ama JSON-LD/sezgisel
     tarayıcı yakalayamıyor, render_js=True ile dener."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.idefix.com/Search?q={urllib.parse.quote_plus(query)}",
-        "idefix", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "idefix", "https://www.idefix.com/Search?q={}", render_js=True, timeout=15)
 
 def search_bebek(query: str) -> list[dict]:
     """bebek.com — Next.js App Router, statik HTML'de ürün/fiyat yok
     (istemci tarafında render ediliyor), ScrapingBee render_js=True gerekiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.bebek.com/arama?q={urllib.parse.quote_plus(query)}",
-        "bebek", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "bebek", "https://www.bebek.com/arama?q={}", render_js=True, timeout=15)
 
 
 def search_ebebek(query: str) -> list[dict]:
@@ -2179,20 +2099,14 @@ def search_ebebek(query: str) -> list[dict]:
 def search_toyzz(query: str) -> list[dict]:
     """Toyzz Shop — statik HTML'de fiyat yok (no-cache başlıkları ve boş
     yapı JS-render edildiğini gösteriyor), ScrapingBee render_js=True gerekiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.toyzzshop.com/arama?q={urllib.parse.quote_plus(query)}",
-        "toyzz", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "toyzz", "https://www.toyzzshop.com/arama?q={}", render_js=True, timeout=15)
 
 
 # EV ALETLERİ & MUTFAK
 def search_tefal(query: str) -> list[dict]:
     """Tefal — URL doğru, eski selector'lar sitenin güncel yapısıyla
     eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.tefal.com.tr/?s={urllib.parse.quote_plus(query)}",
-        "tefal", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "tefal", "https://www.tefal.com.tr/?s={}", render_js=False, timeout=12)
 
 
 def search_arnica(query: str) -> list[dict]:
@@ -2243,19 +2157,13 @@ def search_arzum(query: str) -> list[dict]:
     """arzum — eski URL (/?s=) genel WordPress arama sayfasina dusuyordu,
     ld+json yok. Gercek arama sayfasi /arama?q= duzgun Product/Offer
     JSON-LD donduruyor (2026-07-16'da dogrulandi)."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.arzum.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "arzum", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "arzum", "https://www.arzum.com.tr/arama?q={}", render_js=False, timeout=12)
 
 
 def search_schafer(query: str) -> list[dict]:
     """schafer — URL doğru, eski selector'lar sitenin güncel
     yapısıyla eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.schafer.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "schafer", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "schafer", "https://www.schafer.com.tr/search?q={}", render_js=False, timeout=12)
 
 
 def search_fakir(query: str) -> list[dict]:
@@ -2404,29 +2312,20 @@ def search_vivense(query: str) -> list[dict]:
 def search_kelebek(query: str) -> list[dict]:
     """kelebek — URL doğru, eski selector'lar sitenin güncel
     yapısıyla eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.kelebek.com/arama?q={urllib.parse.quote_plus(query)}",
-        "kelebek", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "kelebek", "https://www.kelebek.com/arama?q={}", render_js=False, timeout=12)
 
 
 def search_dogtas(query: str) -> list[dict]:
     """Doğtaş — eski /?s= adresi neredeyse boş dönüyordu, gerçek arama
     rotası /arama?q= (statik HTML'de 60+ gerçek fiyat bulundu)."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.dogtas.com/arama?q={urllib.parse.quote_plus(query)}",
-        "dogtas", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "dogtas", "https://www.dogtas.com/arama?q={}", render_js=False, timeout=12)
 
 
 # YAPI MARKET
 def search_bauhaus(query: str) -> list[dict]:
     """Bauhaus — doğrudan istekte 403 (bot koruması) alıyor,
     ScrapingBee render_js=True gerekiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.bauhaus.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "bauhaus", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "bauhaus", "https://www.bauhaus.com.tr/search?q={}", render_js=True, timeout=15)
 
 
 # PET
@@ -2434,37 +2333,25 @@ def search_petlebi(query: str) -> list[dict]:
     """Petlebi — eski /search?q= yeterli veri döndürmüyordu (site canlı
     bir öneri API'sine sahip ama arama sayfası JS-render), gerçek arama
     parametresi query'e düzeltildi + render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.petlebi.com/search?query={urllib.parse.quote_plus(query)}",
-        "petlebi", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "petlebi", "https://www.petlebi.com/search?query={}", render_js=True, timeout=15)
 
 
 # SUPPLEMENT EK
 def search_proteinocean(query: str) -> list[dict]:
     """proteinocean — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.proteinocean.com/search?q={urllib.parse.quote_plus(query)}",
-        "proteinocean", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "proteinocean", "https://www.proteinocean.com/search?q={}", render_js=False, timeout=12)
 
 
 def search_bigjoy(query: str) -> list[dict]:
     """bigjoy — URL doğru, eski selector'lar sitenin güncel
     yapısıyla eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.bigjoy.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "bigjoy", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "bigjoy", "https://www.bigjoy.com.tr/search?q={}", render_js=False, timeout=12)
 
 
 def search_runnutrition(query: str) -> list[dict]:
     """Run Nutrition — URL doğru, eski selector'lar sitenin güncel
     yapısıyla eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.runnutrition.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "runnutrition", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "runnutrition", "https://www.runnutrition.com.tr/search?q={}", render_js=False, timeout=12)
 
 
 # MODA EK
@@ -2516,54 +2403,90 @@ def search_pierrecardin(query: str) -> list[dict]:
 def search_vatanbilgisayar(query: str) -> list[dict]:
     """vatanbilgisayar — URL doğru, eski selector'lar sitenin güncel
     yapısıyla eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.vatanbilgisayar.com/?s={urllib.parse.quote_plus(query)}",
-        "vatanbilgisayar", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "vatanbilgisayar", "https://www.vatanbilgisayar.com/?s={}", render_js=False, timeout=12)
 
 
 def search_itopya(query: str) -> list[dict]:
     """itopya — URL doğru, eski selector'lar sitenin güncel
     yapısıyla eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.itopya.com/?s={urllib.parse.quote_plus(query)}",
-        "itopya", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "itopya", "https://www.itopya.com/?s={}", render_js=False, timeout=12)
 
 
 def search_casper(query: str) -> list[dict]:
     """casper — URL doğru, eski selector'lar sitenin güncel
     yapısıyla eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.casper.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "casper", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "casper", "https://www.casper.com.tr/arama?q={}", render_js=False, timeout=12)
 
 
 # KİTAP EK
 def search_remzi(query: str) -> list[dict]:
     """Remzikitabevi ürün araması — JSON-LD + ScrapingBee render_js."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.remzi.com/arama?q={urllib.parse.quote_plus(query)}",
-        "remzi", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "remzi", "https://www.remzi.com/arama?q={}", render_js=False, timeout=12)
 
 def search_tazedirekt(query: str) -> list[dict]:
-    """Tazedirekt — URL doğru (?s=, statik HTML'de gerçek fiyatlar var),
-    eski selector'lar sitenin güncel yapısıyla eşleşmiyordu."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.tazedirekt.com/?s={urllib.parse.quote_plus(query)}",
-        "tazedirekt", render_js=False, timeout=12
-    )
+    """Tazedirekt — JS-SPA arama rotası (/arama?q=) üzerinden ScrapingBee
+    render_js=True ile yüklenip fe-product-card yapılarından ayıklanır.
+    """
+    from app.scraping_proxy import proxy_get, proxy_enabled
+    url = f"https://www.tazedirekt.com/arama?q={urllib.parse.quote_plus(query)}"
+    html = None
+    if proxy_enabled():
+        html = proxy_get(url, render_js=True, timeout=20)
+    if not html:
+        try:
+            r = requests.get(url, headers=_STD_HEADERS, timeout=12)
+            html = r.text if r.ok else None
+        except Exception:
+            return []
+    if not html:
+        return []
+
+    soup = BeautifulSoup(html, "html.parser")
+    results = []
+    product_cards = soup.find_all("fe-product-card")
+    for card in product_cards[:10]:
+        name_el = card.select_one("fe-product-name a")
+        name = name_el.get_text(strip=True) if name_el else ""
+        if not name:
+            continue
+
+        href = name_el.get("href", "") if name_el else ""
+        prod_url = f"https://www.tazedirekt.com{href}" if href.startswith("/") else href
+
+        price_el = card.select_one("fe-product-price")
+        price = 0.0
+        if price_el:
+            price_text = price_el.get_text(strip=True)
+            price_match = re.search(r"(\d+(?:[.,]\d+)?)", price_text)
+            if price_match:
+                try:
+                    price = float(price_match.group(1).replace(",", "."))
+                except ValueError:
+                    continue
+        if price <= 0:
+            continue
+
+        img_el = card.select_one("fe-product-image img")
+        img = (img_el.get("src") or img_el.get("data-src") or "") if img_el else ""
+
+        results.append({
+            "title": name,
+            "price": price,
+            "original_price": None,
+            "image_url": img,
+            "source": "tazedirekt",
+            "url": prod_url,
+            "labels": ["Önerilen"],
+            "extra_info": {"out_of_stock": False},
+            "verified": True
+        })
+    return results
 
 
 def search_bizimtoptan(query: str) -> list[dict]:
     """Bizim Toptan — URL doğru (/search?q=, form action'ından doğrulandı),
     eski selector'lar sitenin güncel yapısıyla eşleşmiyordu."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.bizimtoptan.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "bizimtoptan", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "bizimtoptan", "https://www.bizimtoptan.com.tr/search?q={}", render_js=False, timeout=12)
 
 
 def search_tarimkredi(query: str) -> list[dict]:
@@ -2710,10 +2633,7 @@ def search_kutahyaporselen(query: str) -> list[dict]:
 def search_beymen(query: str) -> list[dict]:
     """beymen — URL doğru, eski selector'lar sitenin güncel
     yapısıyla eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.beymen.com/tr/search?q={urllib.parse.quote_plus(query)}",
-        "beymen", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "beymen", "https://www.beymen.com/tr/search?q={}", render_js=False, timeout=12)
 
 
 def search_vakko(query: str) -> list[dict]:
@@ -2788,19 +2708,13 @@ def search_farmasi(query: str) -> list[dict]:
     """Farmasi — Next.js sayfası ama arama sonuçları sunucu tarafında
     render edilmiyor (pageProps boş, client-side fetch ile geliyor).
     ScrapingBee render_js=True ile JS çalıştırılmış hali üzerinden dener."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.farmasi.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "farmasi", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "farmasi", "https://www.farmasi.com.tr/search?q={}", render_js=True, timeout=15)
 
 
 def search_dsmart(query: str) -> list[dict]:
     """dsmart — statik HTML'de yeterli ürün verisi bulunamadı (küçük sayfa,
     muhtemelen JS-SPA), ScrapingBee render_js=True ile dener."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.dsmart.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "dsmart", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "dsmart", "https://www.dsmart.com.tr/search?q={}", render_js=True, timeout=15)
 
 
 def search_miniso(query: str) -> list[dict]:
@@ -2892,10 +2806,7 @@ def search_action(query: str) -> list[dict]:
 def search_turkcell(query: str) -> list[dict]:
     """turkcell — URL doğru, eski selector'lar sitenin güncel
     yapısıyla eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.turkcell.com.tr/cihazlar?q={urllib.parse.quote_plus(query)}",
-        "turkcell", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "turkcell", "https://www.turkcell.com.tr/cihazlar?q={}", render_js=False, timeout=12)
 
 
 def search_hopi(query: str) -> list[dict]:
@@ -2943,10 +2854,7 @@ def search_hopi(query: str) -> list[dict]:
 
 def search_pandora(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
-    return _scrape_jsonld_itemlist(
-        f"https://tr.pandora.net/search?q={urllib.parse.quote_plus(query)}",
-        "pandora", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "pandora", "https://tr.pandora.net/search?q={}", render_js=True, timeout=15)
 
 def search_altinyildiz(query: str) -> list[dict]:
     """Altınyıldız Classics — URL doğru, eski selector'lar sitenin güncel
@@ -2962,17 +2870,11 @@ def search_altinyildiz(query: str) -> list[dict]:
 
 def search_derimod(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.derimod.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "derimod", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "derimod", "https://www.derimod.com.tr/search?q={}", render_js=True, timeout=15)
 
 def search_lescon(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.lescon.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "lescon", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "lescon", "https://www.lescon.com.tr/search?q={}", render_js=True, timeout=15)
 
 def search_namet(query: str) -> list[dict]:
     try:
@@ -3105,45 +3007,30 @@ def search_shein(query: str) -> list[dict]:
 
 def search_aliexpress(query: str) -> list[dict]:
     """aliexpress — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://tr.aliexpress.com/wholesale?SearchText={urllib.parse.quote_plus(query)}",
-        "aliexpress", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "aliexpress", "https://tr.aliexpress.com/wholesale?SearchText={}", render_js=True, timeout=15)
 
 
 def search_hm(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
-    return _scrape_jsonld_itemlist(
-        f"https://www2.hm.com/tr_tr/search-results.html?q={urllib.parse.quote_plus(query)}",
-        "hm", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "hm", "https://www2.hm.com/tr_tr/search-results.html?q={}", render_js=True, timeout=15)
 
 def search_sephora(query: str) -> list[dict]:
     """Sephora TR — eski /search?q= adresi 404 veriyordu; gerçek arama rotası
     /catalogsearch/result/ (Magento benzeri) ama doğrudan istekte 403 (bot
     koruması) alıyor, ScrapingBee proxy + render_js=True gerekiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.sephora.com.tr/catalogsearch/result/?q={urllib.parse.quote_plus(query)}",
-        "sephora", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "sephora", "https://www.sephora.com.tr/catalogsearch/result/?q={}", render_js=True, timeout=15)
 
 def search_koctas(query: str) -> list[dict]:
     """Koçtaş — doğrudan istekte 403 (bot koruması) alıyor; eski kod ayrıca
     proxy_get()'in döndürdüğü string'i yanlışlıkla requests.Response gibi
     (r.ok/r.text) kullanıyordu, bu her zaman istisna fırlatıp sessizce boş
     dönüyordu. _scrape_jsonld_itemlist proxy_get'i doğru kullanıyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.koctas.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "koctas", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "koctas", "https://www.koctas.com.tr/arama?q={}", render_js=True, timeout=15)
 
 
 def search_adidas(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.adidas.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "adidas", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "adidas", "https://www.adidas.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_metro(query: str) -> list[dict]:
     try:
@@ -3797,17 +3684,11 @@ def search_muzikdunyasi(query: str) -> list[dict]:
 
 def search_reebok(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.reebok.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "reebok", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "reebok", "https://www.reebok.com.tr/search?q={}", render_js=False, timeout=12)
 
 def search_bershka(query: str) -> list[dict]:
     """ScrapingBee render_js ile JSON-LD araması."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.bershka.com/tr/search?q={urllib.parse.quote_plus(query)}",
-        "bershka", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "bershka", "https://www.bershka.com/tr/search?q={}", render_js=True, timeout=15)
 
 def search_ulker(query: str) -> list[dict]:
     try:
@@ -3852,37 +3733,25 @@ def search_lego(query: str) -> list[dict]:
     """LEGO TR — URL doğru (lego.tr'ye yönleniyor, statik HTML'de gerçek
     fiyatlar var) ama eski selector'lar sitenin güncel yapısıyla eşleşmiyordu.
     Paylaşılan sezgisel fiyat-kart tarayıcısına geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.lego.com/tr-tr/search?q={urllib.parse.quote_plus(query)}",
-        "lego", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "lego", "https://www.lego.com/tr-tr/search?q={}", render_js=False, timeout=12)
 
 
 def search_epson(query: str) -> list[dict]:
     """epson — statik HTML'de yeterli ürün verisi bulunamadı, ScrapingBee
     render_js=True ile dener."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.epson.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "epson", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "epson", "https://www.epson.com.tr/search?q={}", render_js=True, timeout=15)
 
 
 def search_sarar(query: str) -> list[dict]:
     """Sarar — URL doğru, eski selector'lar sitenin güncel yapısıyla
     eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.sarar.com/arama?q={urllib.parse.quote_plus(query)}",
-        "sarar", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "sarar", "https://www.sarar.com/arama?q={}", render_js=False, timeout=12)
 
 
 def search_damattween(query: str) -> list[dict]:
     """DamatTween — statik HTML'de yeterli ürün verisi bulunamadı,
     ScrapingBee render_js=True ile dener."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.damattween.com/search?q={urllib.parse.quote_plus(query)}",
-        "damattween", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "damattween", "https://www.damattween.com/search?q={}", render_js=True, timeout=15)
 
 
 def search_yargici(query: str) -> list[dict]:
@@ -3940,28 +3809,19 @@ def search_yargici(query: str) -> list[dict]:
 def search_sony(query: str) -> list[dict]:
     """Sony TR — doğrudan istekte 403 (bot koruması) alıyor, ScrapingBee
     render_js=True ile dener; paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.sony.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "sony", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "sony", "https://www.sony.com.tr/search?q={}", render_js=True, timeout=15)
 
 
 def search_lg(query: str) -> list[dict]:
     """LG TR — URL doğru, statik HTML'de gerçek fiyat var, eski selector'lar
     eşleşmiyordu — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.lg.com/tr/search/?search={urllib.parse.quote_plus(query)}",
-        "lg", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "lg", "https://www.lg.com/tr/search/?search={}", render_js=False, timeout=12)
 
 
 def search_canon(query: str) -> list[dict]:
     """Canon TR — doğrudan istekte 403 (bot koruması) alıyor, ScrapingBee
     render_js=True ile dener; paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.canon.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "canon", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "canon", "https://www.canon.com.tr/search?q={}", render_js=True, timeout=15)
 
 
 def search_oyundeposu(query: str) -> list[dict]:
@@ -3981,7 +3841,7 @@ def search_oyundeposu(query: str) -> list[dict]:
             if not price_el: continue
             raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
             try: price = float(raw)
-            except: continue
+            except ValueError: continue
             if price <= 0: continue
             link_el = item.select_one("a[href]")
             href = link_el.get("href", "") if link_el else ""
@@ -3997,19 +3857,13 @@ def search_oyundeposu(query: str) -> list[dict]:
 def search_frigg(query: str) -> list[dict]:
     """Frigg — WordPress/WooCommerce arama URL'si doğru, eski selector'lar
     eşleşmiyordu. Paylaşılan sezgisel fiyat-kart tarayıcısına geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.frigg.com.tr/?s={urllib.parse.quote_plus(query)}",
-        "frigg", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "frigg", "https://www.frigg.com.tr/?s={}", render_js=False, timeout=12)
 
 
 def search_asusrog(query: str) -> list[dict]:
     """ASUS ROG — statik HTML'de yeterli ürün verisi bulunamadı,
     ScrapingBee render_js=True ile dener."""
-    return _scrape_jsonld_itemlist(
-        f"https://rog.asus.com/tr/search/?q={urllib.parse.quote_plus(query)}",
-        "asusrog", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "asusrog", "https://rog.asus.com/tr/search/?q={}", render_js=True, timeout=15)
 
 
 def search_melodika(query: str) -> list[dict]:
@@ -4029,7 +3883,7 @@ def search_melodika(query: str) -> list[dict]:
             if not price_el: continue
             raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
             try: price = float(raw)
-            except: continue
+            except ValueError: continue
             if price <= 0: continue
             link_el = item.select_one("a[href]")
             href = link_el.get("href", "") if link_el else ""
@@ -4044,10 +3898,7 @@ def search_melodika(query: str) -> list[dict]:
 
 def search_ufukkirtasiye(query: str) -> list[dict]:
     """ufukkirtasiye — paylaşılan sezgisel tarayıcıya geçirildi."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.ufukkirtasiye.com/search?q={urllib.parse.quote_plus(query)}",
-        "ufukkirtasiye", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "ufukkirtasiye", "https://www.ufukkirtasiye.com/search?q={}", render_js=True, timeout=15)
 
 
 def search_evpet(query: str) -> list[dict]:
@@ -4067,7 +3918,7 @@ def search_evpet(query: str) -> list[dict]:
             if not price_el: continue
             raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
             try: price = float(raw)
-            except: continue
+            except ValueError: continue
             if price <= 0: continue
             link_el = item.select_one("a[href]")
             href = link_el.get("href", "") if link_el else ""
@@ -4097,7 +3948,7 @@ def search_zopet(query: str) -> list[dict]:
             if not price_el: continue
             raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
             try: price = float(raw)
-            except: continue
+            except ValueError: continue
             if price <= 0: continue
             link_el = item.select_one("a[href]")
             href = link_el.get("href", "") if link_el else ""
@@ -4127,7 +3978,7 @@ def search_petbis(query: str) -> list[dict]:
             if not price_el: continue
             raw = re.sub(r"[^\d,.]", "", price_el.get_text(strip=True)).replace(",", ".")
             try: price = float(raw)
-            except: continue
+            except ValueError: continue
             if price <= 0: continue
             link_el = item.select_one("a[href]")
             href = link_el.get("href", "") if link_el else ""
@@ -4201,80 +4052,47 @@ def search_kinetix(query: str) -> list[dict]:
 
 def search_koton(query: str) -> list[dict]:
     """Koton — React SPA, render_js=True gerekiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.koton.com/arama?q={urllib.parse.quote_plus(query)}",
-        "koton", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "koton", "https://www.koton.com/arama?q={}", render_js=True, timeout=15)
 
 def search_kigili(query: str) -> list[dict]:
     """Kiğılı — SPA, render_js=True gerekiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.kigili.com/arama?q={urllib.parse.quote_plus(query)}",
-        "kigili", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "kigili", "https://www.kigili.com/arama?q={}", render_js=True, timeout=15)
 
 def search_mac(query: str) -> list[dict]:
     """MAC Cosmetics — SPA, render_js=True gerekiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.maccosmetics.com.tr/search?q={urllib.parse.quote_plus(query)}",
-        "mac", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "mac", "https://www.maccosmetics.com.tr/search?q={}", render_js=True, timeout=15)
 
 def search_instreet(query: str) -> list[dict]:
     """In Street — SPA, render_js=True gerekiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.instreet.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "instreet", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "instreet", "https://www.instreet.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_pullandbear(query: str) -> list[dict]:
     """Pull&Bear — Inditex grubu SPA, render_js=True gerekiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.pullandbear.com/tr/search?q={urllib.parse.quote_plus(query)}",
-        "pullandbear", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "pullandbear", "https://www.pullandbear.com/tr/search?q={}", render_js=True, timeout=15)
 
 def search_stradivarius(query: str) -> list[dict]:
     """Stradivarius — Inditex grubu SPA, render_js=True gerekiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.stradivarius.com/tr/search?q={urllib.parse.quote_plus(query)}",
-        "stradivarius", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "stradivarius", "https://www.stradivarius.com/tr/search?q={}", render_js=True, timeout=15)
 
 def search_massimodutti(query: str) -> list[dict]:
     """Massimo Dutti — Inditex grubu SPA, render_js=True gerekiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.massimodutti.com/tr/search?q={urllib.parse.quote_plus(query)}",
-        "massimodutti", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "massimodutti", "https://www.massimodutti.com/tr/search?q={}", render_js=True, timeout=15)
 
 def search_hatemoglu(query: str) -> list[dict]:
     """Hatemoğlu — domain hatemoglu.com (hatemoglu.com.tr yönleniyor)."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.hatemoglu.com/arama?q={urllib.parse.quote_plus(query)}",
-        "hatemoglu", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "hatemoglu", "https://www.hatemoglu.com/arama?q={}", render_js=True, timeout=15)
 
 def search_machka(query: str) -> list[dict]:
     """Machka — statik HTML'de JSON-LD dogrulandi (curl ile 200 + ld+json)."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.machka.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "machka", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "machka", "https://www.machka.com.tr/arama?q={}", render_js=False, timeout=12)
 
 def search_suvari(query: str) -> list[dict]:
     """Süvari — render_js=True gerekiyor (ilk denemede yönlendirme cikti)."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.suvari.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "suvari", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "suvari", "https://www.suvari.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_tudors(query: str) -> list[dict]:
     """Tudors — domain tudors.com (tudors.com.tr calismiyordu)."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.tudors.com/arama?q={urllib.parse.quote_plus(query)}",
-        "tudors", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "tudors", "https://www.tudors.com/arama?q={}", render_js=True, timeout=15)
 
 def search_ipekyol(query: str) -> list[dict]:
     """İpekyol — arama sayfasi Next.js SSR; sayfadaki __NEXT_DATA__ script'i
@@ -4350,143 +4168,83 @@ def search_ipekyol(query: str) -> list[dict]:
 
 def search_deichmann(query: str) -> list[dict]:
     """Deichmann Türkiye — dogru yol /tr-tr altinda."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.deichmann.com/tr-tr/search?q={urllib.parse.quote_plus(query)}",
-        "deichmann", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "deichmann", "https://www.deichmann.com/tr-tr/search?q={}", render_js=True, timeout=15)
 
 def search_troy(query: str) -> list[dict]:
     """Troy (ayakkabi) — domain troy.com.tr."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.troy.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "troy", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "troy", "https://www.troy.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_bernardo(query: str) -> list[dict]:
     """Bernardo — ayakkabi/deri, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.bernardo.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "bernardo", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "bernardo", "https://www.bernardo.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_linens(query: str) -> list[dict]:
     """Linens — ev tekstili, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.linens.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "linens", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "linens", "https://www.linens.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_pasabahce(query: str) -> list[dict]:
     """Paşabahçe — cam/kristal ev urunleri, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.pasabahce.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "pasabahce", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "pasabahce", "https://www.pasabahce.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_porland(query: str) -> list[dict]:
     """Porland — porselen/servis takimlari, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.porland.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "porland", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "porland", "https://www.porland.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_tekzen(query: str) -> list[dict]:
     """Tekzen — yapi/bahce market, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.tekzen.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "tekzen", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "tekzen", "https://www.tekzen.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_hakmar(query: str) -> list[dict]:
     """Hakmar — market zinciri, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.hakmar.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "hakmar", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "hakmar", "https://www.hakmar.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_happycenter(query: str) -> list[dict]:
     """Happy Center — market zinciri, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.happycenter.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "happycenter", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "happycenter", "https://www.happycenter.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_jumbo(query: str) -> list[dict]:
     """Jumbo — market zinciri, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.jumbo.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "jumbo", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "jumbo", "https://www.jumbo.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_mopas(query: str) -> list[dict]:
     """Mopaş — market zinciri, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.mopas.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "mopas", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "mopas", "https://www.mopas.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_onurmarket(query: str) -> list[dict]:
     """Onur Market — market zinciri, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.onurmarket.com/arama?q={urllib.parse.quote_plus(query)}",
-        "onurmarket", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "onurmarket", "https://www.onurmarket.com/arama?q={}", render_js=True, timeout=15)
 
 def search_yvesrocher(query: str) -> list[dict]:
     """Yves Rocher — dogrudan istekte bot korumasi (403), render_js=True sart."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.yvesrocher.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "yvesrocher", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "yvesrocher", "https://www.yvesrocher.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_eveshop(query: str) -> list[dict]:
     """Eve Shop — kozmetik, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.eveshop.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "eveshop", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "eveshop", "https://www.eveshop.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_atasunoptik(query: str) -> list[dict]:
     """Atasun Optik — render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.atasunoptik.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "atasunoptik", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "atasunoptik", "https://www.atasunoptik.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_mertoptik(query: str) -> list[dict]:
     """Mert Optik — domain mertoptik.com, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.mertoptik.com/arama?q={urllib.parse.quote_plus(query)}",
-        "mertoptik", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "mertoptik", "https://www.mertoptik.com/arama?q={}", render_js=True, timeout=15)
 
 def search_babymall(query: str) -> list[dict]:
     """BabyMall — anne/bebek urunleri, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.babymall.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "babymall", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "babymall", "https://www.babymall.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_gnc(query: str) -> list[dict]:
     """GNC Türkiye — takviye/vitamin, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.gnc.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "gnc", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "gnc", "https://www.gnc.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_ozdilek(query: str) -> list[dict]:
     """Özdilek — AVM/tekstil, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.ozdilek.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "ozdilek", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "ozdilek", "https://www.ozdilek.com.tr/arama?q={}", render_js=True, timeout=15)
 
 def search_superstep(query: str) -> list[dict]:
     """SuperStep — spor ayakkabi, render_js=True."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.superstep.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "superstep", render_js=True, timeout=15
-    )
+    return _scrape_jsonld_helper(query, "superstep", "https://www.superstep.com.tr/arama?q={}", render_js=True, timeout=15)
 
 
 # ── 2026-07-16: bolgesel/kucuk magazalar (Turkpatent arastirmasindan) ──
@@ -4630,19 +4388,13 @@ def search_sevil(query: str) -> list[dict]:
 def search_ozsanal(query: str) -> list[dict]:
     """Özşanal (taksitli AVM) — /arama?q= adresinde JSON-LD ItemList/Product/Offer
     dogrulandi, duz requests.get ile 200 donuyor, render gerekmiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.ozsanal.com/arama?q={urllib.parse.quote_plus(query)}",
-        "ozsanal", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "ozsanal", "https://www.ozsanal.com/arama?q={}", render_js=False, timeout=12)
 
 
 def search_joker(query: str) -> list[dict]:
     """Joker Baby — T-Soft altyapili, /arama?q= adresinde JSON-LD ItemList/Product/Offer
     dogrulandi, duz requests.get ile 200 donuyor, render gerekmiyor."""
-    return _scrape_jsonld_itemlist(
-        f"https://www.joker.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-        "joker", render_js=False, timeout=12
-    )
+    return _scrape_jsonld_helper(query, "joker", "https://www.joker.com.tr/arama?q={}", render_js=False, timeout=12)
 
 # ATLANANLAR (kod yazilmadi, sebep):
 # - Yiğit AVM (yigitalisveris.com.tr): Ticimax altyapili, arama sayfasi

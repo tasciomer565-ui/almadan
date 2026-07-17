@@ -1603,15 +1603,15 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
     query_variants = VARIANT_SUFFIXES & query_word_set
 
     # Anlamlı sorgu kelimeleri (TR normalize, 3+ harf) — örtüşme kontrolü için
-    _tr_map = str.maketrans("şğıöüçâî", "sgioucai")
-    significant_words = {w.translate(_tr_map) for w in query_words if len(w) >= 3}
+    from app.text_utils import normalize_turkish
+    significant_words = {normalize_turkish(w) for w in query_words if len(w) >= 3}
 
     def is_same_model(p: dict) -> bool:
         """Model kodu varsa başlıkta geçmeli; sorgu varyantı yoksa başlıkta da olmamalı."""
         title_words = set(re.findall(r'\w+', (p.get("title") or "").lower()))
         # Sorguyla hiç anlamlı kelime örtüşmesi yoksa alakasız (fallback/popüler ürün sızıntısı)
         if significant_words:
-            title_norm = {w.translate(_tr_map) for w in title_words}
+            title_norm = {normalize_turkish(w) for w in title_words}
             overlap = len(significant_words & title_norm)
             required = 1 if len(significant_words) <= 2 else 2
             if overlap < required:

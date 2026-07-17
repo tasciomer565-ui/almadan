@@ -13,3 +13,5 @@ n11_typo.html
 
 .vercel
 .env*
+.scratch3/
+app_logs/

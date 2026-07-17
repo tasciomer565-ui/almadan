@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
 SUPABASE_KEY = "".join(os.getenv("SUPABASE_SERVICE_KEY", "").split())
 
-_TR_MAP = str.maketrans("şğıöüçŞĞIÖÜÇ", "sgioucSGIOUC")
+from app.text_utils import normalize_turkish
 
 
 def _norm(text: str) -> str:
-    return re.sub(r"\s+", " ", text.lower().translate(_TR_MAP)).strip()
+    return re.sub(r"\s+", " ", normalize_turkish(text)).strip()
 
 
 def _headers() -> dict:

@@ -25,11 +25,11 @@ SUPABASE_KEY = "".join(os.getenv("SUPABASE_SERVICE_KEY", "").split())
 CACHE_TTL_HOURS = int(os.getenv("CACHE_TTL_HOURS", "6"))
 CACHE_TABLE = "product_cache"
 
-_TR_MAP = str.maketrans("şğıöüçŞĞIÖÜÇ", "sgioucSGIOUC")
+from app.text_utils import normalize_turkish
 
 
 def _norm(text: str) -> str:
-    return re.sub(r"\s+", " ", text.lower().translate(_TR_MAP)).strip()
+    return re.sub(r"\s+", " ", normalize_turkish(text)).strip()
 
 
 def make_cache_key(query: str, category: str = "GENEL") -> str:
