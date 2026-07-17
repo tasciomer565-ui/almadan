@@ -47,6 +47,12 @@ _MIN_HISTORY_TO_CARE = 3
 # gerekir, sadece sorgu override etmek yanlis "duzeltme" olurdu).
 _STORE_TEST_QUERY_OVERRIDES: dict[str, str] = {
     "search_vivense": "koltuk",  # custom DOM parser (data-product-name/price), tencere'de gercek eslesme yok
+    # 2026-07-17: supplementler.com gercek server-render arama sayfasi (curl ile
+    # dogrulandi: "roman" ve "protein tozu" sorgularinda <title> ve sayfa boyutu
+    # farkli, JS-SPA/sabit-shell degil) ama supplement magazasi oldugu icin
+    # "roman" ile alakasiz 3 urun (multivitamin) donuyor, "protein tozu" ile
+    # 10 alakali urun (whey protein vb) donuyor -- gercek sorgu uyumsuzlugu.
+    "search_supplementler": "protein tozu",
 }
 
 _DAILY_PLAN: dict[int, tuple[str, str, list[str]]] = {
