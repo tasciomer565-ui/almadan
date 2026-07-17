@@ -2940,6 +2940,35 @@ def admin_stats(request: Request, days: int = 7) -> dict:
     return get_dashboard_stats(days=min(days, 30))
 
 
+@app.get("/api/admin/debug-role")
+def admin_debug_role(request: Request) -> dict:
+    """GEÇICI: profiles rol sorgusunun ham sonucunu döner. Teşhis sonrası kaldırılacak."""
+    require_admin_secret(request)
+    import requests as _req
+    from app.storage import supabase_base_url, supabase_headers, supabase_enabled, SUPABASE_KEY
+
+    access_token = request.cookies.get(ACCESS_COOKIE)
+    if not access_token:
+        return {"error": "no access_token cookie"}
+    try:
+        user = get_user(access_token)
+    except Exception as exc:
+        return {"error": f"get_user failed: {exc}"}
+
+    user_id = user.get("id")
+    url = f"{supabase_base_url()}/rest/v1/profiles?id=eq.{user_id}&select=role"
+    resp = _req.get(url, headers=supabase_headers(), timeout=8)
+    return {
+        "user_id": user_id,
+        "supabase_enabled": supabase_enabled(),
+        "key_prefix": SUPABASE_KEY[:8] if SUPABASE_KEY else None,
+        "key_len": len(SUPABASE_KEY) if SUPABASE_KEY else 0,
+        "url": url,
+        "status_code": resp.status_code,
+        "body": resp.text[:1000],
+    }
+
+
 @app.get("/api/admin/failed-searches")
 def admin_failed_searches(request: Request, days: int = 7, min_count: int = 2) -> dict:
     """
