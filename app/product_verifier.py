@@ -70,9 +70,15 @@ def _call_openai(
     prompt = (
         "Aşağıda bir kaynak ürün başlığı ve numaralı aday ürün listesi var. "
         "Her aday için, kaynak ürünle TAM OLARAK AYNI ürün olup olmadığını "
-        "değerlendir (farklı renk/beden/kapasite/adet/nesil/model varyantı "
-        "veya tamamen alakasız bir ürünse AYNI DEĞİLDİR). Marka ve model "
-        "eşleşse bile paket içeriği/miktarı farklıysa aynı değildir.\n\n"
+        "değerlendir (farklı renk/beden/kapasite/nesil/model varyantı veya "
+        "tamamen alakasız bir ürünse AYNI DEĞİLDİR).\n\n"
+        "PAKET/ADET KURALI (KESİN): Kaynak başlıkta adet/koli/çoklu paket "
+        "belirtilmemişse (ör. sade 'Ülker Çikolatalı Gofret'), bunu TEKLİ "
+        "ÜRÜN olarak kabul et. Aday başlıkta '12 Adet', '24 x 35g', 'Koli', "
+        "'Paket' gibi çoklu ambalaj ifadesi varsa, kaynak da aynı adedi "
+        "açıkça belirtmediği sürece bu aday AYNI DEĞİLDİR (toplu fiyat, "
+        "tekli fiyatla karıştırılamaz). Aynı şekilde kaynak çoklu paketse "
+        "ve aday tekli/farklı adetliyse de AYNI DEĞİLDİR.\n\n"
         f"KAYNAK ÜRÜN: {source_title}\n\nADAYLAR:\n{numbered}\n\n"
         'Yalnızca şu JSON formatında yanıt ver: {"results": [true, false, ...]} '
         "-- results dizisi ADAYLAR ile aynı sırada ve aynı uzunlukta olmalı."
