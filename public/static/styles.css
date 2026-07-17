@@ -3693,3 +3693,13 @@ main > * {
     scroll-behavior: auto !important;
   }
 }
+
+@keyframes softBreathe {
+  0%, 100% { transform: scale(0.92); opacity: 0.7; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+
+@keyframes softBounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.04); }
+}

@@ -6844,9 +6844,27 @@ async function showSellerSelectionDialog(parsed) {
   content.innerHTML = `
     <div style="text-align:center; padding: 30px 20px;">
       <span class="spinner" style="display:inline-block; width:28px; height:28px; border-color:#287a50; border-right-color:transparent; border-width:3px;"></span>
-      <p style="margin-top:16px; font-weight:700; font-size:15px; color:var(--ink);">En İyi Fırsatlar Avlanıyor...</p>
+      <p id="sellerSelectionStatusText" style="margin-top:16px; font-weight:700; font-size:15px; color:var(--ink); transition: opacity .25s ease;">En iyi fiyatlar toplanıyor...</p>
     </div>
   `;
+
+  const sellerStatusPhases = [
+    "Mağazalar taranıyor...",
+    "Fiyatlar karşılaştırılıyor...",
+    "Doğru ürün eşleştiriliyor...",
+    "Son rötuşlar yapılıyor...",
+  ];
+  let sellerPhaseIndex = 0;
+  const sellerStatusEl = document.getElementById("sellerSelectionStatusText");
+  const sellerStatusTimer = sellerStatusEl ? setInterval(() => {
+    sellerPhaseIndex = (sellerPhaseIndex + 1) % sellerStatusPhases.length;
+    sellerStatusEl.style.opacity = "0";
+    setTimeout(() => {
+      if (!sellerStatusEl.isConnected) return;
+      sellerStatusEl.textContent = sellerStatusPhases[sellerPhaseIndex];
+      sellerStatusEl.style.opacity = "1";
+    }, 250);
+  }, 1400) : null;
 
   try {
     const data = await api("/api/find-alternatives", {
@@ -6956,6 +6974,8 @@ async function showSellerSelectionDialog(parsed) {
     console.error("Satıcı Seçim Ekranı Hatası:", e);
     dialog.close();
     showParsedProduct(parsed); // Hata durumunda asıl ekrana düş
+  } finally {
+    if (sellerStatusTimer) clearInterval(sellerStatusTimer);
   }
 }
 
