@@ -540,7 +540,8 @@ def validate_and_enrich_product(p: dict) -> dict | None:
     if not isinstance(p, dict):
         return None
 
-    title = p.get("title", "").strip()
+    from app.text_utils import fix_mojibake
+    title = fix_mojibake(p.get("title", "")).strip()
     price = p.get("price")
     url = p.get("url", "").strip()
 
