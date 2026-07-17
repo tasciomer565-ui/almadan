@@ -3538,7 +3538,7 @@ body.dark-theme .scroll-to-top-btn {
   }
 }
 
-body.dark-theme @keyframes skeleton-pulse {
+@keyframes skeleton-pulse-dark {
   0% {
     background-color: rgba(255, 255, 255, 0.05);
     opacity: 0.6;
@@ -3551,6 +3551,13 @@ body.dark-theme @keyframes skeleton-pulse {
     background-color: rgba(255, 255, 255, 0.05);
     opacity: 0.6;
   }
+}
+
+body.dark-theme .skeleton-image,
+body.dark-theme .skeleton-title,
+body.dark-theme .skeleton-price,
+body.dark-theme .skeleton-row {
+  animation-name: skeleton-pulse-dark;
 }
 
 .skeleton-card {
@@ -3600,4 +3607,89 @@ body.dark-theme .skeleton-title,
 body.dark-theme .skeleton-price,
 body.dark-theme .skeleton-row {
   background: rgba(255, 255, 255, 0.05);
+}
+
+/* ── Hareket cilası: mevcut renk paletine dokunmadan geçiş/etkileşimleri
+   tutarlı, yumuşak bir eğriye (--ease) oturtur ve dokunsal geri bildirim
+   ekler. prefers-reduced-motion'da tüm animasyonlar devre dışı kalır. ── */
+:root {
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+a,
+button,
+input,
+select,
+textarea,
+.card-button,
+.price-compare-card,
+.store-card,
+.btn-follow,
+.quantum-node-card,
+.floating-product-card {
+  transition-timing-function: var(--ease);
+}
+
+button:not(:disabled),
+.card-button,
+.btn-follow,
+.btn-reminder-save,
+.price-compare-card,
+.store-card,
+.primary-button,
+.scroll-to-top-btn {
+  transition-property: transform, box-shadow, background-color, border-color, opacity, color;
+  transition-duration: 0.2s;
+}
+
+button:not(:disabled):active,
+.card-button:active,
+.btn-follow:active,
+.primary-button:active {
+  transform: scale(0.97);
+  transition-duration: 0.08s;
+}
+
+.price-compare-card:hover,
+.store-card:hover {
+  transform: translateY(-3px);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+  transition: outline-offset 0.15s var(--ease);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+main > * {
+  animation: fadeSlideUp 0.45s var(--ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
