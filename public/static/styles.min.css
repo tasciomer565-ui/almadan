@@ -609,6 +609,70 @@ body.dark-theme .supported-stores-list span:hover {
   padding: 16px;
 }
 
+.offline-cache-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+body.dark-theme .offline-cache-banner {
+  color: #fbbf24;
+}
+
+.favorite-star-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, transform 0.15s;
+}
+
+.favorite-star-btn:hover {
+  transform: scale(1.1);
+}
+
+.favorite-star-btn.active {
+  color: #f5b301;
+}
+
+.favorite-star-btn.active i {
+  fill: #f5b301;
+}
+
+.why-matched-icon {
+  display: inline-flex;
+  vertical-align: middle;
+  color: var(--muted);
+  cursor: help;
+}
+
+.wrong-match-link {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px 0 0;
+  margin: 0;
+}
+
+.wrong-match-link:hover {
+  color: var(--red);
+}
+
 .source-name {
   margin-bottom: 7px;
   color: var(--muted);
@@ -1766,6 +1830,38 @@ body.dark-theme {
   --green-bg: rgba(142, 215, 170, 0.07);
   background-color: var(--bg);
   color: var(--ink);
+}
+
+/* AMOLED tema: dark-theme değişkenleri üzerine tam siyah arkaplan bindirir. */
+html.amoled-theme,
+body.amoled-theme {
+  --bg: #000000;
+  --bg-offset: #000000;
+  --paper: #000000;
+  --surface: #0a0a0a;
+  --bg-app: #000000;
+  --bg-card: #0a0a0a;
+  --line: #1a1a1a;
+  --border: #1f1f1f;
+  background-color: var(--bg);
+  color: var(--ink);
+}
+
+body.amoled-theme header.topbar {
+  background: rgba(0, 0, 0, 0.92);
+  border-bottom-color: var(--line);
+}
+
+.savings-badge {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 body.dark-theme header.topbar {
@@ -3249,6 +3345,24 @@ body.dark-theme #sellerSelectionDialog .price-chart-container {
 body.dark-theme .price-chart-container {
   background: #181c18 !important;
   border-color: var(--line) !important;
+}
+
+/* ── Yazdır / PDF Kaydet: karşılaştırma dialog'unu sadeleştirilmiş
+   halde bas, sayfanın geri kalanını gizle (window.print() kullanır,
+   harici kütüphane gerekmez). ───────────────────────────────────── */
+@media print {
+  body > *:not(dialog) { display: none !important; }
+  dialog#sellerSelectionDialog {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+  .ab-no-print { display: none !important; }
 }
 
 /* ── Fiyat Karşılaştırma İyileştirme ─────────────────────────────────────── */

@@ -76,6 +76,7 @@
       <button class="tab-btn" data-tab="cron" onclick="switchTab('cron')">Cron Sağlığı</button>
       <button class="tab-btn" data-tab="progress" onclick="switchTab('progress')">Öğrenme İlerlemesi</button>
       <button class="tab-btn" data-tab="business" onclick="switchTab('business')">İş Metrikleri</button>
+      <button class="tab-btn" data-tab="suggestions" onclick="switchTab('suggestions')">Mağaza Önerileri</button>
     </div>
 
     <div id="panel-general" class="panel active"><div class="loading">Yükleniyor…</div></div>
@@ -85,6 +86,7 @@
     <div id="panel-cron" class="panel"><div class="loading">Yükleniyor…</div></div>
     <div id="panel-progress" class="panel"><div class="loading">Yükleniyor…</div></div>
     <div id="panel-business" class="panel"><div class="loading">Yükleniyor…</div></div>
+    <div id="panel-suggestions" class="panel"><div class="loading">Yükleniyor…</div></div>
   </div>
 
   <script>
@@ -158,6 +160,35 @@
       loadProgress();
       loadBusiness();
       loadDeployInfo();
+      loadStoreSuggestions();
+    }
+
+    async function loadStoreSuggestions() {
+      const el = document.getElementById("panel-suggestions");
+      try {
+        const d = await api("/api/admin/store-suggestions");
+        const items = d.suggestions || [];
+        if (!items.length) {
+          el.innerHTML = "<p>Henüz mağaza önerisi yok.</p>";
+          return;
+        }
+        el.innerHTML = `
+          <table>
+            <thead><tr><th>Tarih</th><th>Mağaza Adı</th><th>Link</th><th>Not</th></tr></thead>
+            <tbody>
+              ${items.map(s => `
+                <tr>
+                  <td>${esc((s.created_at || "").slice(0, 19).replace("T", " "))}</td>
+                  <td>${esc(s.store_name)}</td>
+                  <td>${s.store_url ? `<a href="${esc(s.store_url)}" target="_blank" rel="noopener">${esc(s.store_url)}</a>` : "-"}</td>
+                  <td>${esc(s.note || "-")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>`;
+      } catch (e) {
+        el.innerHTML = `<p style="color:var(--red);">Yüklenemedi: ${esc(e.message)}</p>`;
+      }
     }
 
     async function loadDeployInfo() {

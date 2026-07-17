@@ -14,6 +14,13 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+def _fake_request():
+    req = MagicMock()
+    req.client.host = "127.0.0.1"
+    req.headers = {}
+    return req
+
+
 def test_parse_url_smoke():
     fake_parsed = ParsedProduct(
         title="Apple iPhone 15 128 GB Mavi",
@@ -28,7 +35,7 @@ def test_parse_url_smoke():
     )
     payload = UrlParseRequest(url="https://www.trendyol.com/apple/iphone-15-p-1")
     with patch("app.main.parse_product_url", return_value=fake_parsed):
-        result = parse_url(payload)
+        result = parse_url(payload, _fake_request())
 
     assert result["title"] == "Apple iPhone 15 128 GB Mavi"
     assert result["price"] == 32999.0
