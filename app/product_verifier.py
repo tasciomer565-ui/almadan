@@ -90,8 +90,9 @@ def _call_openai(
         "'Roborock Q8 Max Pro Akıllı Robot Süpürge' (renk yazmıyor) → "
         "true (aynı ürün, sadece renk belirtilmemiş).\n\n"
         f"KAYNAK ÜRÜN: {source_title}\n\nADAYLAR:\n{numbered}\n\n"
-        'Yalnızca şu JSON formatında yanıt ver: {"results": [true, false, ...]} '
-        "-- results dizisi ADAYLAR ile aynı sırada ve aynı uzunlukta olmalı."
+        'Yalnızca şu JSON formatında yanıt ver: {"results": [true, false, ...], '
+        '"reasons": ["kısa gerekçe", ...]} -- results ve reasons dizileri '
+        "ADAYLAR ile aynı sırada ve aynı uzunlukta olmalı."
     )
 
     with AIMonitor.trace("chat", "verify_products", model_id=_MODEL, user_id=user_id) as span:
@@ -128,8 +129,66 @@ def _call_openai(
             if not isinstance(results, list) or len(results) != len(items):
                 span.set_error("malformed response shape")
                 return None
+            reasons = parsed.get("reasons") or []
+            logger.info("AI verify reasons for %r: %s", source_title[:60], list(zip(
+                [p.get("title", "")[:50] for p in items], results, reasons)))
             return [bool(v) for v in results]
         except Exception as exc:
             span.set_error(str(exc))
             logger.warning("Ürün doğrulama AI çağrısı başarısız: %s", exc)
             return None
+
+
+def debug_verify_with_reasons(
+    source_title: str, items: list[dict]
+) -> dict | None:
+    """Teşhis amaçlı: AI'nin ham karar + gerekçesini döner (production'a bağlı değil)."""
+    numbered = "\n".join(
+        f"{i}. [{p.get('source', '?')}] {p.get('title', '')}"
+        for i, p in enumerate(items)
+    )
+    prompt = (
+        "Sen bir e-ticaret fiyat karşılaştırma sisteminde ürün eşleştirme "
+        "denetçisisin. Amacın YANLIŞ ürünleri elemek, DOĞRU eşleşmeleri "
+        "KAÇIRMAMAK. Varsayılan cevabın 'aynı ürün' (true) olsun; sadece "
+        "somut bir çelişki gördüğünde 'farklı ürün' (false) de.\n\n"
+        "KARAR KURALI: Marka + ürün tipi + model adı/numarası eşleşiyorsa "
+        "AYNI ürün kabul et (true), aday başlığın eksik/farklı sırada "
+        "yazılmış olması ya da bazı sıfatları/içerik detaylarını hiç "
+        "belirtmemiş olması ÖNEMSİZDİR. SADECE şu durumlarda false de:\n"
+        "- Marka açıkça farklı\n"
+        "- Model adı/numarası açıkça farklı (kaynak 'Q8', aday 'S8' gibi)\n"
+        "- Aday AÇIKÇA farklı bir değer belirtiyor (kaynak 'Beyaz' derken "
+        "aday açıkça 'Siyah' diyorsa -- aday hiç renk belirtmiyorsa bu "
+        "geçerli değildir, sadece belirtmemiş demektir)\n"
+        "- Aday, kaynaktan FARKLI adette ayrı satılabilir birimin toplu "
+        "satışı (kaynak tekliyse aday '12 Adet'/'Koli' gibi çoklu paketse). "
+        "Not: '60 Tablet', '400 ml' gibi TEK ürünün kendi içeriğini/"
+        "miktarını belirten ifadeler bu kapsama girmez, bunlar normal.\n"
+        "- Tamamen alakasız bir ürün\n\n"
+        "Örnek: kaynak 'Roborock Q8 Max Pro Robot Süpürge Beyaz', aday "
+        "'Roborock Q8 Max Pro Akıllı Robot Süpürge' (renk yazmıyor) → "
+        "true (aynı ürün, sadece renk belirtilmemiş).\n\n"
+        f"KAYNAK ÜRÜN: {source_title}\n\nADAYLAR:\n{numbered}\n\n"
+        'Yalnızca şu JSON formatında yanıt ver: {"results": [true, false, ...], '
+        '"reasons": ["kısa gerekçe", ...]} -- results ve reasons dizileri '
+        "ADAYLAR ile aynı sırada ve aynı uzunlukta olmalı."
+    )
+    try:
+        r = _req.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {_OPENAI_KEY}", "Content-Type": "application/json"},
+            json={
+                "model": _MODEL,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0,
+                "max_tokens": 700,
+                "response_format": {"type": "json_object"},
+            },
+            timeout=15,
+        )
+        r.raise_for_status()
+        content = r.json()["choices"][0]["message"]["content"]
+        return json.loads(content)
+    except Exception as exc:
+        return {"error": str(exc)}

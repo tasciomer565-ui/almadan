@@ -1929,6 +1929,22 @@ def _is_store_verified(slug: str) -> bool:
         return False
 
 
+class _DebugVerifyRequest(BaseModel):
+    source_title: str
+    candidates: list[dict]
+
+
+@app.post("/api/_debug/verify-ai")
+async def _debug_verify_ai(payload: _DebugVerifyRequest):
+    """GEÇİCİ teşhis endpoint'i -- AI doğrulamanın ham gerekçesini görmek için."""
+    from app.product_verifier import debug_verify_with_reasons
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(
+        None, debug_verify_with_reasons, payload.source_title, payload.candidates
+    )
+    return result
+
+
 @app.post("/api/find-alternatives")
 async def find_alternatives(payload: AlternativesRequest, request: Request):
     from app.security import check_rate_limit
