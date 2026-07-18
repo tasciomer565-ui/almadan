@@ -2020,6 +2020,12 @@ async def _debug_raw_fetch(payload: _DebugRawFetchRequest):
             ldjson_types.append("PARSE_ERROR")
     price_class_samples = re.findall(r'class="[^"]*(?:price|fiyat)[^"]*"', html, re.I)[:8]
     tl_price_samples = re.findall(r'\d{1,3}(?:[.,]\d{3})*[.,]\d{2}\s*(?:TL|₺)', html)[:8]
+    first_price_match = re.search(r'\d{1,3}(?:[.,]\d{3})*[.,]\d{2}\s*(?:TL|₺)', html)
+    price_context = ""
+    if first_price_match:
+        start = max(0, first_price_match.start() - 600)
+        end = min(len(html), first_price_match.end() + 200)
+        price_context = html[start:end]
     spa_markers = {
         "__NUXT__": "__NUXT__" in html,
         "__NEXT_DATA__": "__NEXT_DATA__" in html,
@@ -2035,6 +2041,7 @@ async def _debug_raw_fetch(payload: _DebugRawFetchRequest):
         "price_class_samples": price_class_samples,
         "tl_price_text_samples": tl_price_samples,
         "spa_markers": spa_markers,
+        "price_context": price_context,
         "html_snippet": html[:1200],
     }
 
