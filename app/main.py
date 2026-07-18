@@ -1991,6 +1991,44 @@ async def _debug_single_store(payload: _DebugSingleStoreRequest):
         return {"elapsed_s": round(time.time() - t0, 2), "error": str(exc), "traceback": traceback.format_exc()[-1500:]}
 
 
+class _DebugRawFetchRequest(BaseModel):
+    url: str
+    render_js: bool = True
+
+
+@app.post("/api/_debug/raw-fetch")
+async def _debug_raw_fetch(payload: _DebugRawFetchRequest):
+    """GEÇİCİ teşhis endpoint'i -- proxy_get'in ham HTML çıktısını analiz eder."""
+    import time
+    from app.scraping_proxy import proxy_get
+    loop = asyncio.get_running_loop()
+    t0 = time.time()
+    html = await loop.run_in_executor(
+        None, lambda: proxy_get(payload.url, render_js=payload.render_js, timeout=20)
+    )
+    if not html:
+        return {"elapsed_s": round(time.time() - t0, 2), "html": None, "error": "proxy_get returned None"}
+    import re
+    ldjson_blocks = re.findall(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', html, re.S)
+    ldjson_types = []
+    for b in ldjson_blocks:
+        try:
+            import json as _json
+            d = _json.loads(b, strict=False)
+            ldjson_types.append(d.get("@type"))
+        except Exception:
+            ldjson_types.append("PARSE_ERROR")
+    price_class_samples = re.findall(r'class="[^"]*price[^"]*"', html, re.I)[:5]
+    return {
+        "elapsed_s": round(time.time() - t0, 2),
+        "html_length": len(html),
+        "ldjson_block_count": len(ldjson_blocks),
+        "ldjson_types": ldjson_types,
+        "price_class_samples": price_class_samples,
+        "html_snippet": html[:2000],
+    }
+
+
 @app.post("/api/find-alternatives")
 async def find_alternatives(payload: AlternativesRequest, request: Request):
     from app.security import check_rate_limit
