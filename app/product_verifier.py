@@ -61,23 +61,25 @@ def verify_products_ai(
         # AI çağrısı başarısız oldu -- kural tabanlı filtrelerin sonucunu koru
         return candidates
 
-    # Güvenlik ağı: model bazen "marka farklı" diye reddedip halüsinasyon
-    # görebiliyor (ör. her iki başlıkta da "Philips" geçerken "marka farklı"
-    # demesi gibi) -- kaynağın olası markası adayın başlığında harfiyen
-    # geçiyorsa ve ret gerekçesi markadan bahsediyorsa, bu kararı geçersiz
-    # sayıp ürünü tut.
+    # Güvenlik ağı: model bazen halüsinasyon görüp gerçekte aynı olan markayı
+    # "farklı" sayabiliyor (ör. her iki başlıkta da "Philips" geçerken
+    # reddetmesi gibi) -- gerekçe metnine güvenmek kırılgan (model her zaman
+    # "marka" kelimesini kullanmıyor). Bu adaylar zaten has_model_conflict/
+    # has_capacity_conflict/has_physical_conflict/has_tech_conflict/
+    # has_gender_conflict kural filtrelerinden geçmiş durumda (main.py), yani
+    # kaynağın olası markası adayın başlığında harfiyen geçiyorsa AI'nin
+    # reddini geçersiz sayıp ürünü tutmak güvenli.
     brand = _probable_brand(source_title).lower()
     fixed_verdict = list(verdict)
     for i, (p, is_same) in enumerate(zip(items, verdict)):
         if is_same or not brand:
             continue
-        reason = (reasons[i] if i < len(reasons) else "").lower()
         cand_title = (p.get("title") or "").lower()
-        if "marka" in reason and brand in cand_title:
+        if brand in cand_title:
             fixed_verdict[i] = True
             logger.info(
-                "AI marka halüsinasyonu düzeltildi: %r adayında '%s' markası "
-                "var ama AI 'marka farklı' demiş, geri alındı.",
+                "AI reddi geçersiz sayıldı: %r adayında kaynak markası '%s' "
+                "harfiyen geçiyor (kural filtreleri zaten temizdi).",
                 p.get("title", "")[:60], brand,
             )
 
