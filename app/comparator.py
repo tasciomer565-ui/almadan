@@ -1675,9 +1675,11 @@ def search_bim(query: str) -> list[dict]:
 
 
 def search_rossmann(query: str) -> list[dict]:
-    """Rossmann ürün araması — Magento platformu, doğru arama URL'si
-    catalogsearch/result/ (eski /ara?q= adresi 404 veriyordu)."""
-    return _scrape_jsonld_helper(query, "rossmann", "https://www.rossmann.com.tr/catalogsearch/result/?q={}", render_js=False, timeout=12)
+    """Rossmann ürün araması — doğru arama URL'si catalogsearch/result/
+    (eski /ara?q= adresi 404 veriyordu). Sayfa klasik sunucu taraflı Magento
+    değil, fiyatlar Alpine.js ile istemci tarafında dolduruluyor (statik
+    HTML'de JSON-LD ItemList yok) -- render_js=True gerekiyor."""
+    return _scrape_jsonld_helper(query, "rossmann", "https://www.rossmann.com.tr/catalogsearch/result/?q={}", render_js=True, timeout=15)
 
 def search_supplementler(query: str) -> list[dict]:
     """Supplementler.com — URL doğru, eski selector'lar sitenin güncel
