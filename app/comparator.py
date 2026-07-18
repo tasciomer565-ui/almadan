@@ -1354,25 +1354,42 @@ def search_watsons(query: str) -> list[dict]:
     ScrapingBee render_js=True ile JS render edilmiş sayfa üzerinden dener."""
     return _scrape_jsonld_helper(query, "watsons", "https://www.watsons.com.tr/search?text={}", render_js=True, timeout=15)
 
+def _title_from_slug(url: str) -> str:
+    """URL'nin son path segmentindeki tire-ayraçlı slug'ı okunabilir başlığa
+    çevirir (ör. '.../maybelline-new-york-lifter-plump-glow-fondoten-116-p-123'
+    -> 'Maybelline New York Lifter Plump Glow Fondoten 116')."""
+    path = urllib.parse.urlparse(url).path.rstrip("/")
+    slug = path.rsplit("/", 1)[-1]
+    slug = re.sub(r"-p-\d+$", "", slug)  # sondaki '-p-<id>' ürün id'sini at
+    words = [w for w in slug.split("-") if w]
+    return " ".join(w.capitalize() for w in words)
+
+
 def _extract_nextjs_flight_products(
     html: str, source: str, *,
-    url_field: str = "shareLink", title_field: str = "displayName",
+    url_field: str = "shareLink",
     price_fields: tuple[str, ...] = ("discountedPriceLabel", "normalPriceLabel"),
     domain_hint: str = "",
 ) -> list[dict]:
     """Next.js App Router'ın 'flight' stream formatında (self.__next_f.push(...))
     gömülü ürün verisini çıkarır. JSON-LD ItemList olmayan modern Next.js
     SPA'larda (ör. Gratis) statik HTML'de tam veri bulunur ama standart bir
-    <script type="application/json"> içinde değildir. Escape seviyesi
-    chunk'a göre değişebildiği için (bazı bölümler \\" bazıları düz ") önce
-    tüm metin normalize edilir; alan adları siteye göre parametrik."""
+    <script type="application/json"> içinde değildir.
+
+    Başlık alanı (ör. 'displayName') KULLANILMIYOR: obje sınırları JSON
+    parse edilmeden regex ile bulunduğu için komşu ürünün alanına kayıp
+    yanlış başlık/fiyat eşleştirmesi (ör. '108' başlıklı üründe '110'
+    linkinin fiyatı) riski var. Bunun yerine başlık, HER ZAMAN doğru
+    ürüne ait olan URL slug'ından türetilir (bkz. _title_from_slug);
+    fiyat için de yalnızca çok dar bir pencere (±350 karakter) kullanılır,
+    bulunamazsa o ürün atlanır (yanlış fiyat göstermektense hiç göstermemek
+    tercih edilir)."""
     if url_field not in html:
         return []
     text = html.replace('\\"', '"').replace('\\/', '/')
     results: list[dict] = []
     seen: set[str] = set()
     url_pattern = re.compile(rf'"{url_field}"\s*:\s*"(https?://[^"]+)"')
-    title_pattern = re.compile(rf'"{title_field}"\s*:\s*"([^"]{{3,200}})"')
     price_patterns = [re.compile(rf'"{f}"\s*:\s*"([^"]+(?:TL|₺))"') for f in price_fields]
     for m in url_pattern.finditer(text):
         prod_url = m.group(1)
@@ -1380,10 +1397,10 @@ def _extract_nextjs_flight_products(
             continue
         if prod_url in seen:
             continue
-        window = text[max(0, m.start() - 1500): min(len(text), m.end() + 500)]
-        title_m = title_pattern.search(window)
-        if not title_m:
+        title = _title_from_slug(prod_url)
+        if len(title) < 3:
             continue
+        window = text[max(0, m.start() - 350): min(len(text), m.end() + 350)]
         price = None
         for pp in price_patterns:
             pm = pp.search(window)
@@ -1395,7 +1412,7 @@ def _extract_nextjs_flight_products(
             continue
         seen.add(prod_url)
         results.append({
-            "title": title_m.group(1), "price": price, "original_price": None,
+            "title": title, "price": price, "original_price": None,
             "image_url": "", "source": source, "url": prod_url,
             "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
             "verified": True,
