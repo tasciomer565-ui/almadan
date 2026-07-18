@@ -35,4 +35,10 @@ jobs:
           git config user.email "bot@almadan.app"
           git add public/sitemap.xml
           git commit -m "chore: sitemap.xml otomatik yeniden uretildi"
+          # main, job basladiktan sonra baska bir commit ile ilerlemis olabilir
+          # (ör. elle tetiklenen bir calisma sirasinda ayrica manuel push
+          # yapilmasi) -- push'tan once rebase ile guncelleyip yeniden dene,
+          # yoksa "non-fast-forward" ile sessizce basarisiz olup gercek
+          # degisiklik hic ana dala ulasmiyordu.
+          git pull --rebase origin main
           git push
