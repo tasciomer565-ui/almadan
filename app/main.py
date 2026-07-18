@@ -2051,7 +2051,24 @@ async def _debug_raw_fetch(payload: _DebugRawFetchRequest):
         "price_context_last": price_context_last,
         "total_price_matches": len(all_price_matches),
         "html_snippet": html[:1200],
+        "shareLink_script_wrapper": _find_script_wrapper(html, "shareLink"),
     }
+
+
+def _find_script_wrapper(html: str, marker: str) -> str:
+    """marker'ı içeren en yakın <script> tag'inin açılış etiketini ve
+    ilk 300 karakterini döner -- veri formatını teşhis etmek için."""
+    import re as _re
+    idx = html.find(marker)
+    if idx == -1:
+        return ""
+    script_start = html.rfind("<script", 0, idx)
+    if script_start == -1:
+        return ""
+    tag_end = html.find(">", script_start)
+    if tag_end == -1:
+        return ""
+    return html[script_start:tag_end + 1] + " ... " + html[tag_end + 1:tag_end + 301]
 
 
 @app.post("/api/find-alternatives")
