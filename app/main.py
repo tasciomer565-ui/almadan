@@ -2020,12 +2020,18 @@ async def _debug_raw_fetch(payload: _DebugRawFetchRequest):
             ldjson_types.append("PARSE_ERROR")
     price_class_samples = re.findall(r'class="[^"]*(?:price|fiyat)[^"]*"', html, re.I)[:8]
     tl_price_samples = re.findall(r'\d{1,3}(?:[.,]\d{3})*[.,]\d{2}\s*(?:TL|₺)', html)[:8]
-    first_price_match = re.search(r'\d{1,3}(?:[.,]\d{3})*[.,]\d{2}\s*(?:TL|₺)', html)
+    all_price_matches = list(re.finditer(r'\d{1,3}(?:[.,]\d{3})*[.,]\d{2}\s*(?:TL|₺)', html))
     price_context = ""
-    if first_price_match:
-        start = max(0, first_price_match.start() - 600)
-        end = min(len(html), first_price_match.end() + 200)
+    price_context_last = ""
+    if all_price_matches:
+        m = all_price_matches[0]
+        start = max(0, m.start() - 600)
+        end = min(len(html), m.end() + 200)
         price_context = html[start:end]
+        m2 = all_price_matches[-1]
+        start2 = max(0, m2.start() - 600)
+        end2 = min(len(html), m2.end() + 200)
+        price_context_last = html[start2:end2]
     spa_markers = {
         "__NUXT__": "__NUXT__" in html,
         "__NEXT_DATA__": "__NEXT_DATA__" in html,
@@ -2041,7 +2047,9 @@ async def _debug_raw_fetch(payload: _DebugRawFetchRequest):
         "price_class_samples": price_class_samples,
         "tl_price_text_samples": tl_price_samples,
         "spa_markers": spa_markers,
-        "price_context": price_context,
+        "price_context_first": price_context,
+        "price_context_last": price_context_last,
+        "total_price_matches": len(all_price_matches),
         "html_snippet": html[:1200],
     }
 
