@@ -2018,14 +2018,24 @@ async def _debug_raw_fetch(payload: _DebugRawFetchRequest):
             ldjson_types.append(d.get("@type"))
         except Exception:
             ldjson_types.append("PARSE_ERROR")
-    price_class_samples = re.findall(r'class="[^"]*price[^"]*"', html, re.I)[:5]
+    price_class_samples = re.findall(r'class="[^"]*(?:price|fiyat)[^"]*"', html, re.I)[:8]
+    tl_price_samples = re.findall(r'\d{1,3}(?:[.,]\d{3})*[.,]\d{2}\s*(?:TL|₺)', html)[:8]
+    spa_markers = {
+        "__NUXT__": "__NUXT__" in html,
+        "__NEXT_DATA__": "__NEXT_DATA__" in html,
+        "window.__INITIAL_STATE__": "window.__INITIAL_STATE__" in html,
+        "application/json script tags": len(re.findall(r'<script[^>]*type="application/json"', html)),
+        "data-product / product-card class hints": len(re.findall(r'class="[^"]*product[^"]*"', html, re.I)),
+    }
     return {
         "elapsed_s": round(time.time() - t0, 2),
         "html_length": len(html),
         "ldjson_block_count": len(ldjson_blocks),
         "ldjson_types": ldjson_types,
         "price_class_samples": price_class_samples,
-        "html_snippet": html[:2000],
+        "tl_price_text_samples": tl_price_samples,
+        "spa_markers": spa_markers,
+        "html_snippet": html[:1200],
     }
 
 
