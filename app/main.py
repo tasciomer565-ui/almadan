@@ -1945,6 +1945,28 @@ async def _debug_verify_ai(payload: _DebugVerifyRequest):
     return result
 
 
+class _DebugSlowScanRequest(BaseModel):
+    query: str
+    category: str = "KOZMETİK"
+
+
+@app.post("/api/_debug/slow-scan")
+async def _debug_slow_scan(payload: _DebugSlowScanRequest):
+    """GEÇİCİ teşhis endpoint'i -- yavaş (JS-render) mağaza taramasını izole çalıştırır."""
+    from app.search_orchestrator import slow_store_scan
+    from app.scraping_proxy import proxy_enabled, SCRAPINGDOG_KEY, SCRAPINGBEE_KEY
+    import time
+    t0 = time.time()
+    products = await slow_store_scan(payload.query, payload.category, timeout=30.0)
+    return {
+        "proxy_enabled": proxy_enabled(),
+        "using": "scrapingdog" if SCRAPINGDOG_KEY else ("scrapingbee" if SCRAPINGBEE_KEY else "none"),
+        "elapsed_s": round(time.time() - t0, 2),
+        "count": len(products),
+        "products": products[:10],
+    }
+
+
 @app.post("/api/find-alternatives")
 async def find_alternatives(payload: AlternativesRequest, request: Request):
     from app.security import check_rate_limit
