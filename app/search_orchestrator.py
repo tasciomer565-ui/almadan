@@ -781,6 +781,61 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
 
     return all_products
 
+
+async def slow_store_scan(query: str, category: str, timeout: float = 25.0) -> list[dict]:
+    """Gratis/Watsons/Sephora gibi JS-render gerektiren mağazaları BU
+    spesifik sorgu için canlı tarar (cron'un jenerik "ruj"/"maskara" gibi
+    önceden ısıtılmış kelimelerine bel bağlamadan). marketplace_scan'in 13s
+    bütçesine sıkıştırılmazlar -- ScrapingBee render_js=True istekleri
+    10-20s sürebildiği için ayrı, daha geniş bir süre penceresi kullanılır.
+    Sadece find_alternatives (link yapıştırma) akışından, kullanıcı zaten
+    hızlı sonuçları görmeye başladıktan sonra çağrılmalı.
+    """
+    from app.slow_store_cache_warmer import _SLOW_JS_STORES
+    from app import comparator
+
+    fn_names = _SLOW_JS_STORES.get(category, [])
+    if not fn_names:
+        return []
+
+    loop = asyncio.get_running_loop()
+    fns = [getattr(comparator, name, None) for name in fn_names]
+    fns = [f for f in fns if f is not None]
+    if not fns:
+        return []
+
+    tasks = [loop.run_in_executor(_SCAN_EXECUTOR, fn, query) for fn in fns]
+    try:
+        results_raw = await asyncio.wait_for(
+            asyncio.gather(*tasks, return_exceptions=True), timeout=timeout
+        )
+    except asyncio.TimeoutError:
+        results_raw = []
+        for t in tasks:
+            if t.done() and not t.cancelled():
+                exc = t.exception()
+                results_raw.append(exc if exc else t.result())
+            else:
+                t.cancel()
+
+    products = []
+    seen_urls = set()
+    for res in results_raw:
+        if isinstance(res, Exception) or not isinstance(res, list):
+            continue
+        for p in res:
+            p_valid = validate_and_enrich_product(p)
+            if not p_valid:
+                continue
+            url_clean = p_valid.get("url", "").split("?")[0].strip()
+            if url_clean and url_clean in seen_urls:
+                continue
+            if url_clean:
+                seen_urls.add(url_clean)
+            products.append(p_valid)
+    return products
+
+
 def get_simulated_location(title: str, source: str, lat: float, lon: float):
     # Stabil tohumlama
     seed_str = f"{title}_{source}"

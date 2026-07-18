@@ -1992,10 +1992,27 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
     # İlk 6 kelimeyi al — önemli model bilgisi (GB, RAM) kesilebilir
     query = " ".join(words[:6]) if words else payload.title
 
+    # Gratis/Watsons/Sephora gibi JS-render gerektiren mağazalar hızlı
+    # taramanın 13s bütçesine sığmıyor -- BU spesifik sorgu için ayrı,
+    # daha geniş süreli bir tarama paralel çalıştırılır (cron'un jenerik
+    # "ruj"/"maskara" gibi önceden ısıtılmış kelimelerine bel bağlamadan,
+    # kullanıcının gerçekten yapıştırdığı ürünü arar). Amaç: her linkte
+    # daha fazla farklı mağaza listelenmesi.
+    from app.search_orchestrator import slow_store_scan
+    slow_task = asyncio.ensure_future(
+        slow_store_scan(query, forced_category or "GENEL")
+    )
+
     if forced_category:
         products = await marketplace_scan(query, forced_category=forced_category)
     else:
         products = await master_search(query)
+
+    try:
+        slow_products = await slow_task
+    except Exception:
+        slow_products = []
+    products = products + slow_products
 
     # Kılıf/aksesuar/cam koruyucu gibi yanlış ürünleri filtrele
     from app.comparator import is_logical_product
@@ -2563,12 +2580,32 @@ def cron_catalog_vocab_crawl(request: Request) -> dict:
     from app.catalog_crawler import run_catalog_batch
     result = asyncio.run(run_catalog_batch())
 
-    # Yavaş (ScrapingBee render_js) mağazaları arka planda önceden tarayıp
-    # cache'e yaz — canlı aramanın 7s bütçesi bunlara yetmiyor.
-    # Bkz. app/slow_store_cache_warmer.py
+    # Yavaş (ScrapingBee render_js) mağazaları jenerik kelimelerle (ör.
+    # "ruj", "maskara") önceden ısıtır -- artık find_alternatives kullanıcının
+    # yapıştırdığı GERÇEK ürünü de canlı tarıyor (bkz. slow_store_scan),
+    # bu jenerik ısıtma sadece genel arama özelliği için bir yedek. Bu
+    # yüzden 30dk'lık cron tetiklemesinin hepsinde değil, saatte en fazla
+    # 1 kez çalıştırılır (render_js=True her çağrısı 5 kredi -- 48x/gün yerine
+    # ~24x/gün bile olsa gereksiz kredi israfı, saatlik yeterli).
     try:
-        from app.slow_store_cache_warmer import warm_slow_stores
-        result["slow_store_warm"] = asyncio.run(warm_slow_stores())
+        from datetime import datetime, timezone
+        db = load_db()
+        last_warm = db.get("slow_store_warm_last_run")
+        now = datetime.now(timezone.utc)
+        should_warm = True
+        if last_warm:
+            try:
+                last_dt = datetime.fromisoformat(last_warm)
+                should_warm = (now - last_dt).total_seconds() >= 3600
+            except ValueError:
+                should_warm = True
+        if should_warm:
+            from app.slow_store_cache_warmer import warm_slow_stores
+            result["slow_store_warm"] = asyncio.run(warm_slow_stores())
+            db["slow_store_warm_last_run"] = now.isoformat()
+            save_db(db)
+        else:
+            result["slow_store_warm"] = {"skipped": "throttled_to_hourly"}
     except Exception as exc:
         result["slow_store_warm_error"] = str(exc)
 
