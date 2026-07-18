@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from app.main import ALL_STORES_MAP, get_seo_price_terms, _seo_price_slug_map  # noqa: E402
+from app.comparator import normalize_turkish_search_query, search_products_by_name  # noqa: E402
 
 STATIC_PAGES = [
     ("index.html", "daily", "1.0"),
@@ -34,6 +35,23 @@ STATIC_PAGES = [
     ("fiyat-rehberi", "weekly", "0.5"),
     ("oneri", "monthly", "0.3"),
 ]
+
+
+def _term_has_live_inventory(term: str) -> bool:
+    """app/main.py:price_landing_page ile BİREBİR AYNI kontrol: sitemap'e
+    yalnızca canlı sayfanın gerçekten 200 (>=2 ürün) döneceği terimler
+    eklenir. Aksi halde Google sitemap üzerinden binlerce ölü/404 linki
+    keşfedip tarama bütçesini boşa harcıyor, bu da site genelinde düşük
+    kalite sinyali oluşturup GERÇEK sayfaların indekslenmesini geciktiriyor
+    (bkz. Search Console'daki yüksek "Keşfedildi - şu anda dizine
+    eklenmemiş" sayısı)."""
+    try:
+        query = normalize_turkish_search_query(term)
+        products = search_products_by_name(query, category="general")
+        return len(products) >= 2
+    except Exception as exc:  # noqa: BLE001
+        print(f"  envanter kontrolu basarisiz ({term!r}): {exc}", file=sys.stderr)
+        return False
 
 
 def build_sitemap() -> str:
@@ -62,9 +80,19 @@ def build_sitemap() -> str:
             add(f"magaza/{slug}", "weekly", "0.5")
 
     try:
-        price_slugs = sorted(_seo_price_slug_map().keys())
-        for slug in price_slugs:
+        slug_map = _seo_price_slug_map()
+        included, skipped = 0, 0
+        for slug, term in sorted(slug_map.items()):
+            if not _term_has_live_inventory(term):
+                skipped += 1
+                continue
             add(f"fiyat/{slug}", "monthly", "0.4")
+            included += 1
+        print(
+            f"fiyat/{{terim}}: {included} sayfa envanterli (sitemap'e eklendi), "
+            f"{skipped} sayfa envantersiz (atlandi, 404 donerdi).",
+            file=sys.stderr,
+        )
     except Exception as exc:  # noqa: BLE001
         print(f"UYARI: fiyat/{{terim}} sayfalari uretilemedi: {exc}", file=sys.stderr)
 
