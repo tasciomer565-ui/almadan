@@ -1354,10 +1354,70 @@ def search_watsons(query: str) -> list[dict]:
     ScrapingBee render_js=True ile JS render edilmiş sayfa üzerinden dener."""
     return _scrape_jsonld_helper(query, "watsons", "https://www.watsons.com.tr/search?text={}", render_js=True, timeout=15)
 
+def _extract_nextjs_flight_products(
+    html: str, source: str, *,
+    url_field: str = "shareLink", title_field: str = "displayName",
+    price_fields: tuple[str, ...] = ("discountedPriceLabel", "normalPriceLabel"),
+    domain_hint: str = "",
+) -> list[dict]:
+    """Next.js App Router'ın 'flight' stream formatında (self.__next_f.push(...))
+    gömülü ürün verisini çıkarır. JSON-LD ItemList olmayan modern Next.js
+    SPA'larda (ör. Gratis) statik HTML'de tam veri bulunur ama standart bir
+    <script type="application/json"> içinde değildir. Escape seviyesi
+    chunk'a göre değişebildiği için (bazı bölümler \\" bazıları düz ") önce
+    tüm metin normalize edilir; alan adları siteye göre parametrik."""
+    if url_field not in html:
+        return []
+    text = html.replace('\\"', '"').replace('\\/', '/')
+    results: list[dict] = []
+    seen: set[str] = set()
+    url_pattern = re.compile(rf'"{url_field}"\s*:\s*"(https?://[^"]+)"')
+    title_pattern = re.compile(rf'"{title_field}"\s*:\s*"([^"]{{3,200}})"')
+    price_patterns = [re.compile(rf'"{f}"\s*:\s*"([^"]+(?:TL|₺))"') for f in price_fields]
+    for m in url_pattern.finditer(text):
+        prod_url = m.group(1)
+        if domain_hint and domain_hint not in prod_url:
+            continue
+        if prod_url in seen:
+            continue
+        window = text[max(0, m.start() - 1500): min(len(text), m.end() + 500)]
+        title_m = title_pattern.search(window)
+        if not title_m:
+            continue
+        price = None
+        for pp in price_patterns:
+            pm = pp.search(window)
+            if pm:
+                price = parse_price(pm.group(1))
+                if price:
+                    break
+        if not price or price <= 0:
+            continue
+        seen.add(prod_url)
+        results.append({
+            "title": title_m.group(1), "price": price, "original_price": None,
+            "image_url": "", "source": source, "url": prod_url,
+            "labels": ["Önerilen"], "extra_info": {"out_of_stock": False},
+            "verified": True,
+        })
+        if len(results) >= 10:
+            break
+    return results
+
+
 def search_gratis(query: str) -> list[dict]:
-    """Gratis ürün araması — modern JS-SPA, statik HTML'de JSON-LD/fiyat yok,
-    ScrapingBee render_js=True gerekiyor."""
-    return _scrape_jsonld_helper(query, "gratis", "https://www.gratis.com/search?q={}", render_js=True, timeout=15)
+    """Gratis ürün araması — Next.js App Router SPA, JSON-LD ItemList yok
+    ama ürün verisi __next_f flight stream'inde gömülü (bkz.
+    _extract_nextjs_flight_products). ScrapingBee/ScrapingDog render_js=True
+    gerekiyor."""
+    from app.scraping_proxy import proxy_get
+    url = f"https://www.gratis.com/search?q={urllib.parse.quote_plus(query)}"
+    html = proxy_get(url, render_js=True, timeout=15)
+    if not html:
+        return []
+    return _extract_nextjs_flight_products(
+        html, "gratis", domain_hint="gratis.com",
+    )
 
 def search_mediamarkt(query: str) -> list[dict]:
     """MediaMarkt Türkiye ürün araması — JSON-LD ItemList."""
