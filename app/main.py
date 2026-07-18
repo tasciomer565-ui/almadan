@@ -1967,6 +1967,30 @@ async def _debug_slow_scan(payload: _DebugSlowScanRequest):
     }
 
 
+class _DebugSingleStoreRequest(BaseModel):
+    query: str
+    store_fn: str
+
+
+@app.post("/api/_debug/single-store")
+async def _debug_single_store(payload: _DebugSingleStoreRequest):
+    """GEÇİCİ teşhis endpoint'i -- tek bir mağaza scraper'ını izole çağırır (hata/exception görmek için)."""
+    from app import comparator
+    import time, traceback
+    fn = getattr(comparator, payload.store_fn, None)
+    if fn is None:
+        return {"error": f"no such function: {payload.store_fn}"}
+    loop = asyncio.get_running_loop()
+    t0 = time.time()
+    try:
+        result = await asyncio.wait_for(
+            loop.run_in_executor(None, fn, payload.query), timeout=30.0
+        )
+        return {"elapsed_s": round(time.time() - t0, 2), "count": len(result), "products": result[:5]}
+    except Exception as exc:
+        return {"elapsed_s": round(time.time() - t0, 2), "error": str(exc), "traceback": traceback.format_exc()[-1500:]}
+
+
 @app.post("/api/find-alternatives")
 async def find_alternatives(payload: AlternativesRequest, request: Request):
     from app.security import check_rate_limit
