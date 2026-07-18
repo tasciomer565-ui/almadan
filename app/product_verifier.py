@@ -29,6 +29,17 @@ _MODEL = "gpt-4o-mini"
 _MAX_CANDIDATES = 20  # find-alternatives zaten en fazla 20 döner
 
 
+def _probable_brand(title: str) -> str:
+    """Başlığın ilk anlamlı kelimesi -- markalar Türkçe ürün başlıklarında
+    neredeyse hep en başta yazılır (ör. 'Philips Essential...', 'Roborock
+    Vacuum...')."""
+    for word in (title or "").split():
+        cleaned = "".join(c for c in word if c.isalnum())
+        if len(cleaned) >= 3:
+            return cleaned
+    return ""
+
+
 def verify_products_ai(
     source_title: str,
     candidates: list[dict],
@@ -45,12 +56,32 @@ def verify_products_ai(
     items = candidates[:_MAX_CANDIDATES]
     rest = candidates[_MAX_CANDIDATES:]
 
-    verdict = _call_openai(source_title, items, user_id=user_id)
+    verdict, reasons = _call_openai(source_title, items, user_id=user_id)
     if verdict is None:
         # AI çağrısı başarısız oldu -- kural tabanlı filtrelerin sonucunu koru
         return candidates
 
-    kept = [p for p, is_same in zip(items, verdict) if is_same]
+    # Güvenlik ağı: model bazen "marka farklı" diye reddedip halüsinasyon
+    # görebiliyor (ör. her iki başlıkta da "Philips" geçerken "marka farklı"
+    # demesi gibi) -- kaynağın olası markası adayın başlığında harfiyen
+    # geçiyorsa ve ret gerekçesi markadan bahsediyorsa, bu kararı geçersiz
+    # sayıp ürünü tut.
+    brand = _probable_brand(source_title).lower()
+    fixed_verdict = list(verdict)
+    for i, (p, is_same) in enumerate(zip(items, verdict)):
+        if is_same or not brand:
+            continue
+        reason = (reasons[i] if i < len(reasons) else "").lower()
+        cand_title = (p.get("title") or "").lower()
+        if "marka" in reason and brand in cand_title:
+            fixed_verdict[i] = True
+            logger.info(
+                "AI marka halüsinasyonu düzeltildi: %r adayında '%s' markası "
+                "var ama AI 'marka farklı' demiş, geri alındı.",
+                p.get("title", "")[:60], brand,
+            )
+
+    kept = [p for p, is_same in zip(items, fixed_verdict) if is_same]
     dropped = len(items) - len(kept)
     if dropped:
         logger.info(
@@ -62,7 +93,7 @@ def verify_products_ai(
 
 def _call_openai(
     source_title: str, items: list[dict], *, user_id: str | None
-) -> list[bool] | None:
+) -> tuple[list[bool] | None, list[str]]:
     numbered = "\n".join(
         f"{i}. [{p.get('source', '?')}] {p.get('title', '')}"
         for i, p in enumerate(items)
@@ -128,67 +159,19 @@ def _call_openai(
             results = parsed.get("results")
             if not isinstance(results, list) or len(results) != len(items):
                 span.set_error("malformed response shape")
-                return None
+                return None, []
             reasons = parsed.get("reasons") or []
-            logger.info("AI verify reasons for %r: %s", source_title[:60], list(zip(
-                [p.get("title", "")[:50] for p in items], results, reasons)))
-            return [bool(v) for v in results]
+            return [bool(v) for v in results], reasons
         except Exception as exc:
             span.set_error(str(exc))
             logger.warning("Ürün doğrulama AI çağrısı başarısız: %s", exc)
-            return None
+            return None, []
 
 
-def debug_verify_with_reasons(
-    source_title: str, items: list[dict]
-) -> dict | None:
-    """Teşhis amaçlı: AI'nin ham karar + gerekçesini döner (production'a bağlı değil)."""
-    numbered = "\n".join(
-        f"{i}. [{p.get('source', '?')}] {p.get('title', '')}"
-        for i, p in enumerate(items)
-    )
-    prompt = (
-        "Sen bir e-ticaret fiyat karşılaştırma sisteminde ürün eşleştirme "
-        "denetçisisin. Amacın YANLIŞ ürünleri elemek, DOĞRU eşleşmeleri "
-        "KAÇIRMAMAK. Varsayılan cevabın 'aynı ürün' (true) olsun; sadece "
-        "somut bir çelişki gördüğünde 'farklı ürün' (false) de.\n\n"
-        "KARAR KURALI: Marka + ürün tipi + model adı/numarası eşleşiyorsa "
-        "AYNI ürün kabul et (true), aday başlığın eksik/farklı sırada "
-        "yazılmış olması ya da bazı sıfatları/içerik detaylarını hiç "
-        "belirtmemiş olması ÖNEMSİZDİR. SADECE şu durumlarda false de:\n"
-        "- Marka açıkça farklı\n"
-        "- Model adı/numarası açıkça farklı (kaynak 'Q8', aday 'S8' gibi)\n"
-        "- Aday AÇIKÇA farklı bir değer belirtiyor (kaynak 'Beyaz' derken "
-        "aday açıkça 'Siyah' diyorsa -- aday hiç renk belirtmiyorsa bu "
-        "geçerli değildir, sadece belirtmemiş demektir)\n"
-        "- Aday, kaynaktan FARKLI adette ayrı satılabilir birimin toplu "
-        "satışı (kaynak tekliyse aday '12 Adet'/'Koli' gibi çoklu paketse). "
-        "Not: '60 Tablet', '400 ml' gibi TEK ürünün kendi içeriğini/"
-        "miktarını belirten ifadeler bu kapsama girmez, bunlar normal.\n"
-        "- Tamamen alakasız bir ürün\n\n"
-        "Örnek: kaynak 'Roborock Q8 Max Pro Robot Süpürge Beyaz', aday "
-        "'Roborock Q8 Max Pro Akıllı Robot Süpürge' (renk yazmıyor) → "
-        "true (aynı ürün, sadece renk belirtilmemiş).\n\n"
-        f"KAYNAK ÜRÜN: {source_title}\n\nADAYLAR:\n{numbered}\n\n"
-        'Yalnızca şu JSON formatında yanıt ver: {"results": [true, false, ...], '
-        '"reasons": ["kısa gerekçe", ...]} -- results ve reasons dizileri '
-        "ADAYLAR ile aynı sırada ve aynı uzunlukta olmalı."
-    )
-    try:
-        r = _req.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {_OPENAI_KEY}", "Content-Type": "application/json"},
-            json={
-                "model": _MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0,
-                "max_tokens": 700,
-                "response_format": {"type": "json_object"},
-            },
-            timeout=15,
-        )
-        r.raise_for_status()
-        content = r.json()["choices"][0]["message"]["content"]
-        return json.loads(content)
-    except Exception as exc:
-        return {"error": str(exc)}
+def debug_verify_with_reasons(source_title: str, items: list[dict]) -> dict:
+    """Teşhis amaçlı: AI'nin ham karar + gerekçesini döner."""
+    results, reasons = _call_openai(source_title, items, user_id=None)
+    if results is None:
+        return {"error": "AI call failed"}
+    brand = _probable_brand(source_title)
+    return {"results": results, "reasons": reasons, "detected_brand": brand}
