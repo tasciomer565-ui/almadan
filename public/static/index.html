@@ -48,8 +48,8 @@
       }
     }
     </script>
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" media="print" onload="this.onload=null;this.media='all';this.rel='stylesheet'">
-    <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet"></noscript>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=Space+Mono:wght@400;700&family=Archivo+Black&display=swap" media="print" onload="this.onload=null;this.media='all';this.rel='stylesheet'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=Space+Mono:wght@400;700&family=Archivo+Black&display=swap" rel="stylesheet"></noscript>
     <!-- chart.js ve html5-qrcode artık app.js'te gerçekten kullanıldıkları anda
          (Tasarrufum grafikleri / Barkod Tara) tembel yükleniyor -- her sayfada
          indirilip 357 KiB "kullanılmayan JS" olarak işaretlenmelerini önler. -->
@@ -180,11 +180,18 @@
     <main>
       <section class="intro-band">
         <div class="intro-content">
-          <p class="eyebrow">ALIŞVERİŞ KARAR ASİSTANI</p>
-          <h1>Satın almadan önce fiyat karşılaştır.</h1>
-          <p class="intro-copy">Trendyol, Hepsiburada, Amazon, N11 ve daha fazlası — tek tıkla fiyat karşılaştırması. Link yapıştır, en ucuz mağazayı hemen bul.</p>
+        <div class="receipt-hero">
+          <div class="receipt-card" id="receiptCard">
+            <div class="receipt-letterhead">
+              <span class="receipt-store-name">ALMADAN</span>
+              <span class="receipt-store-tag">FİYAT FİŞİ</span>
+            </div>
+            <div class="receipt-divider" aria-hidden="true"></div>
+            <p class="eyebrow receipt-eyebrow">ALIŞVERİŞ KARAR ASİSTANI</p>
+            <h1 class="receipt-headline">Satın almadan<br>önce <span class="receipt-stamp">fiyat karşılaştır.</span></h1>
+            <p class="intro-copy receipt-copy">Trendyol, Hepsiburada, Amazon, N11 ve daha fazlası — tek tıkla fiyat karşılaştırması. Link yapıştır, en ucuz mağazayı hemen bul.</p>
 
-
+            <div class="receipt-divider receipt-divider-dashed" aria-hidden="true"></div>
 
           <form class="url-form" id="urlForm" style="display:flex;flex-direction:column;gap:10px;">
             <div class="url-actions-row" style="display:flex;gap:10px;width:min(800px,100%);">
@@ -222,6 +229,10 @@
           <input type="checkbox" id="globalModeCheckbox" style="display:none">
           <select id="searchCategorySelector" style="display:none"><option value="general">Genel</option></select>
           <span id="gpsStatusIndicator" style="display:none"></span>
+
+            <div class="receipt-barcode" aria-hidden="true"></div>
+          </div>
+        </div>
 
           <div class="supported-stores-container">
             <button type="button" class="supported-stores-toggle" onclick="toggleSupportedStores()" aria-expanded="false" aria-controls="supportedStoresPanel">

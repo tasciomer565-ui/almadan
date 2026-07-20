@@ -248,6 +248,153 @@ h1 {
   line-height: 1.6;
 }
 
+/* ── Hero: "Fiş" (kasa fişi) vitrini ──────────────────────────
+   Almadan'ın işi tam olarak bu: kasaya gitmeden (almadan) fiyatları
+   gormek. Hero'yu gercek bir kasa fisi gibi kurup sayfa yuklenince
+   yazicidan cikiyormus gibi canlandiriyoruz -- "Fiş Hafızası" (Tasarrufum
+   sekmesi) ozelliginde zaten var olan fis motifini vitrine tasiyor. */
+.intro-band {
+  background:
+    radial-gradient(ellipse 900px 480px at 12% -15%, rgba(40, 122, 80, .28), transparent 60%),
+    radial-gradient(ellipse 700px 460px at 105% 0%, rgba(217, 239, 87, .09), transparent 55%),
+    #0d0f0d;
+}
+
+.receipt-hero {
+  display: flex;
+}
+
+.receipt-card {
+  position: relative;
+  width: min(720px, 100%);
+  padding: 32px 38px 28px;
+  background: linear-gradient(180deg, #171914 0%, #121412 100%);
+  border: 1px solid rgba(217, 239, 87, .14);
+  border-radius: 6px;
+  box-shadow: 0 30px 70px -22px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .02) inset;
+  transform: rotate(-.35deg);
+  transform-origin: top center;
+  animation: receiptPrint .85s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.receipt-letterhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: "Space Mono", monospace;
+  animation: receiptLineIn .5s ease both;
+  animation-delay: .3s;
+}
+
+.receipt-store-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--lime);
+  letter-spacing: .14em;
+}
+
+.receipt-store-tag {
+  font-size: 11px;
+  color: rgba(255, 255, 255, .38);
+  letter-spacing: .06em;
+}
+
+.receipt-divider {
+  height: 1px;
+  margin: 16px 0;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, .16) 0 6px, transparent 6px 12px);
+  animation: receiptLineIn .5s ease both;
+  animation-delay: .38s;
+}
+
+.receipt-divider-dashed {
+  margin: 22px 0 18px;
+  animation-delay: .58s;
+}
+
+.receipt-eyebrow {
+  font-family: "Space Mono", monospace;
+  animation: receiptLineIn .5s ease both;
+  animation-delay: .44s;
+}
+
+.receipt-headline {
+  font-family: "Archivo Black", "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 42px;
+  line-height: 1.12;
+  letter-spacing: -.005em;
+  animation: receiptLineIn .55s ease both;
+  animation-delay: .5s;
+}
+
+.receipt-stamp {
+  position: relative;
+  display: inline-block;
+  color: #121412;
+  background: var(--lime);
+  padding: 1px 10px 4px;
+  border-radius: 3px;
+  transform: rotate(-1.4deg);
+  animation: stampDown .4s cubic-bezier(.34, 1.56, .64, 1) both;
+  animation-delay: .92s;
+}
+
+.receipt-copy {
+  animation: receiptLineIn .55s ease both;
+  animation-delay: .64s;
+}
+
+#urlForm {
+  animation: receiptLineIn .55s ease both;
+  animation-delay: .72s;
+}
+
+.receipt-barcode {
+  height: 28px;
+  margin-top: 20px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, .5) 0 2px, transparent 2px 3px,
+    rgba(255, 255, 255, .5) 3px 5px, transparent 5px 10px,
+    rgba(255, 255, 255, .5) 10px 11px, transparent 11px 16px,
+    rgba(255, 255, 255, .5) 16px 19px, transparent 19px 24px
+  );
+  opacity: .32;
+  animation: receiptLineIn .5s ease both;
+  animation-delay: .8s;
+}
+
+@keyframes receiptPrint {
+  from { clip-path: inset(0 0 100% 0); opacity: 0; }
+  to { clip-path: inset(0 0 0 0); opacity: 1; }
+}
+
+@keyframes receiptLineIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes stampDown {
+  from { opacity: 0; transform: rotate(-1.4deg) scale(1.7); }
+  to { opacity: 1; transform: rotate(-1.4deg) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .receipt-card,
+  .receipt-letterhead,
+  .receipt-divider,
+  .receipt-eyebrow,
+  .receipt-headline,
+  .receipt-stamp,
+  .receipt-copy,
+  #urlForm,
+  .receipt-barcode {
+    animation: none !important;
+  }
+}
+
 .url-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1470,6 +1617,15 @@ body.dark-theme .offline-cache-banner {
 
   .intro-band {
     padding: 34px 18px 30px;
+  }
+
+  .receipt-card {
+    padding: 24px 20px 20px;
+    transform: none;
+  }
+
+  .receipt-headline {
+    font-size: 30px;
   }
 
   /* Mağaza takip promo kutusu: masaüstü yan-yana düzeni mobilde metni
