@@ -7760,6 +7760,88 @@ def _render_price_history_svg(history: list[dict]) -> str:
     </div>'''
 
 
+_PRICE_PAGE_GENERIC_TIPS = [
+    "Aynı ürün farklı mağazalarda farklı model/varyant adıyla listelenebilir; en doğru karşılaştırma için ürün adını ve modelini birlikte kontrol edin.",
+    "En düşük fiyat her zaman en iyi teklif olmayabilir — kargo ücreti, teslimat süresi ve satıcı puanı toplam maliyeti etkiler.",
+    "Fiyatlar mağazalarda günlük değişebilir; büyük bir alışverişten önce fiyatı tekrar kontrol etmek avantaj sağlayabilir.",
+]
+
+
+def _price_page_editorial_html(term: str, products: list[dict]) -> str:
+    """/fiyat/{terim} sayfalarina, sadece urun listesinden ibaret kalmayip
+    gercek hesaplanmis veriye dayali ozgun bir icerik bloğu (istatistik +
+    rehber ipuclari + SSS) ekler.
+
+    Neden gerekli: bu sayfalar onceden sadece baslik + tek cumle + urun
+    listesinden ibaretti -- AdSense/Google'in "dusuk degerli/ince icerik"
+    olarak isaretleyebilecegi klasik bir sablon-sayfa deseniydi (795 terim,
+    neredeyse ayni yapida). Burada eklenen metin spin/uydurma degil,
+    gercek arama sonucundan hesaplanan sayilara dayaniyor -- bu yuzden
+    her sayfada gercekten farkli ve dogru.
+    """
+    import html as _html
+
+    priced = [p for p in products if isinstance(p.get("price"), (int, float)) and p["price"] > 0]
+    if not priced:
+        return ""
+
+    def _tr_price(value: float) -> str:
+        """1234.5 -> '1.234,50' (TR ondalik bicimi)."""
+        return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    prices = [p["price"] for p in priced]
+    avg_price = sum(prices) / len(prices)
+    cheapest_p = min(priced, key=lambda p: p["price"])
+    store_count = len({p.get("source") for p in priced if p.get("source")})
+    title_term = term.capitalize()
+
+    # Terimin ait oldugu konu grubunu bul (varsa) -- zaten elle yazilmis,
+    # gercek editoryal ipuclarini burada da kullan (tekrar yazmaya gerek yok).
+    normalized_term = term.translate(_SEO_TR_TO_ASCII).casefold()
+    tips = _PRICE_PAGE_GENERIC_TIPS
+    for topic in _GSC_TOPIC_PAGES.values():
+        topic_terms = {t.translate(_SEO_TR_TO_ASCII).casefold() for t in topic.get("terms", [])}
+        if normalized_term in topic_terms:
+            tips = topic.get("tips") or _PRICE_PAGE_GENERIC_TIPS
+            break
+
+    stats_html = (
+        f"<p>{_html.escape(title_term)} için karşılaştırdığımız {len(priced)} üründe "
+        f"ortalama fiyat <strong>{_tr_price(avg_price)} ₺</strong>, en düşük fiyat "
+        f"<strong>{_tr_price(cheapest_p['price'])} ₺</strong> ile "
+        f"<strong>{_html.escape(cheapest_p.get('source', ''))}</strong> mağazasında, "
+        f"toplam <strong>{store_count} farklı mağaza</strong> taranarak bulundu.</p>"
+    )
+
+    tips_html = "".join(f"<li>{_html.escape(t)}</li>" for t in tips)
+
+    faq_items = [
+        (f"En ucuz {term} nereden alınır?",
+         f"Şu anki karşılaştırmaya göre en uygun fiyat {_tr_price(cheapest_p['price'])} ₺ ile "
+         f"{cheapest_p.get('source', '')} mağazasında."),
+        (f"{title_term} ortalama fiyatı ne kadar?",
+         f"Karşılaştırılan {len(priced)} ürünün ortalama fiyatı {_tr_price(avg_price)} ₺."),
+        (f"{title_term} fiyatları kaç mağazadan karşılaştırılıyor?",
+         f"Almadan bu arama için {store_count} farklı mağazadan güncel fiyat verisi topluyor."),
+    ]
+    faq_html = "".join(
+        f'<div class="bp-faq-item"><h3>{_html.escape(q)}</h3><p>{_html.escape(a)}</p></div>'
+        for q, a in faq_items
+    )
+
+    return f"""
+      <section class="bp-editorial">
+        <h2><i data-lucide="line-chart"></i> {_html.escape(title_term)} Fiyat Analizi</h2>
+        {stats_html}
+        <ul class="bp-tips">{tips_html}</ul>
+      </section>
+      <section class="bp-faq">
+        <h2><i data-lucide="help-circle"></i> Sıkça Sorulan Sorular</h2>
+        {faq_html}
+      </section>
+    """
+
+
 @app.get("/fiyat/{slug}", response_class=HTMLResponse)
 async def price_landing_page(slug: str):
     """
@@ -7828,6 +7910,7 @@ async def price_landing_page(slug: str):
             f'<a href="{url}" rel="nofollow noopener" target="_blank">Ürüne Git</a></div>'
         )
     products_html = "".join(rows)
+    editorial_html = _price_page_editorial_html(term, products)
     cheapest = min((p.get("price") or 0 for p in products if p.get("price")), default=0)
     intro = f"{title_term} için {len(products)} mağazadan güncel fiyat karşılaştırması. En ucuz: {cheapest:.2f} ₺." if cheapest else f"{title_term} için güncel fiyat karşılaştırması."
 
@@ -7898,6 +7981,38 @@ async def price_landing_page(slug: str):
                 "highPrice": agg_high,
                 "offerCount": len(priced),
             },
+        })
+        avg_price = sum(p["price"] for p in priced) / len(priced)
+        store_count = len({p.get("source") for p in priced if p.get("source")})
+        cheapest_p = min(priced, key=lambda p: p["price"])
+        graph_nodes.append({
+            "@type": "FAQPage",
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "name": f"En ucuz {term} nereden alınır?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": f"Şu anki karşılaştırmaya göre en uygun fiyat {cheapest_p['price']:.2f} ₺ ile {cheapest_p.get('source', '')} mağazasında.",
+                    },
+                },
+                {
+                    "@type": "Question",
+                    "name": f"{title_term} ortalama fiyatı ne kadar?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": f"Karşılaştırılan {len(priced)} ürünün ortalama fiyatı {avg_price:.2f} ₺.",
+                    },
+                },
+                {
+                    "@type": "Question",
+                    "name": f"{title_term} fiyatları kaç mağazadan karşılaştırılıyor?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": f"Almadan bu arama için {store_count} farklı mağazadan güncel fiyat verisi topluyor.",
+                    },
+                },
+            ],
         })
     combined_schema = _json.dumps({
         "@context": "https://schema.org",
@@ -7983,6 +8098,7 @@ async def price_landing_page(slug: str):
       <div class="bp-feature-grid">
         {products_html}
       </div>
+      {editorial_html}
       <a class="bp-cta bp-cta-block" href="/"><i data-lucide="arrow-right"></i> Başka Ürün Ara</a>
     </main>
 

@@ -177,6 +177,39 @@ i[data-lucide] { width: 18px; height: 18px; stroke-width: 2.2; flex-shrink: 0; }
 .bp-feature h3 { font-size: 15px; margin-bottom: 6px; }
 .bp-feature p { font-size: 13.5px; color: var(--ink-2); margin: 0; }
 
+/* ── Fiyat sayfası: analiz + SSS ─────────────────────── */
+.bp-editorial p { font-size: 14px; line-height: 1.6; color: var(--ink-2); }
+.bp-tips {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bp-tips li {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  position: relative;
+  padding-left: 32px;
+}
+.bp-tips li::before {
+  content: "💡";
+  position: absolute;
+  left: 12px;
+}
+.bp-faq-item {
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0;
+}
+.bp-faq-item:last-child { border-bottom: none; }
+.bp-faq-item h3 { font-size: 14.5px; margin: 0 0 6px; }
+.bp-faq-item p { font-size: 13.5px; color: var(--ink-2); margin: 0; line-height: 1.5; }
+
 /* ── Kart (Gizlilik/İletişim) ───────────────────────── */
 .bp-card {
   background: var(--surface);
