@@ -7561,20 +7561,28 @@ def _seo_clean_term(t: str) -> str | None:
 
 
 def _seo_extract_keyword_sets() -> dict[str, set[str]]:
-    """classify_intent'in kendi mantigini degistirmeden, kaynak kodundaki
-    literal anahtar kelime setlerini okuyup cikarir (guvenli, salt-okunur)."""
-    import inspect
-    import re as _re
+    """search_orchestrator'daki modul seviyesi anahtar kelime setlerini
+    (GROCERY_KEYWORDS, TECH_KEYWORDS, vb.) dogrudan okur.
+
+    NOT: onceki surum inspect.getsource(classify_intent) kaynagini
+    kucuk-harfli "fashion_keywords"/"home_keywords" gibi isimler icin
+    regex ile araniyordu -- ama bu setler classify_intent icinde degil,
+    modul seviyesinde BUYUK HARFLI sabitler olarak tanimli
+    (FASHION_KEYWORDS, HOME_KEYWORDS, ...) ve fonksiyon onlara sadece
+    CATEGORY_KEYWORD_SETS uzerinden erisiyor. Regex hicbir zaman
+    eslesmiyordu, bu yuzden renk x moda/ev kombinasyonlari ve nohut,
+    kefir, airpods, buzdolabi, mikser gibi yuzlerce temel kategori
+    kelimesi whitelist'e hic girmemisti (2026-07-20'de Search Console'da
+    yuksek gosterim/0 tiklama alan cok sayida sorgu 404 vererek fark
+    edildi)."""
     from app import search_orchestrator as _so
-    src = inspect.getsource(_so.classify_intent)
-    result: dict[str, set[str]] = {}
-    for kw_name in (
-        "grocery_keywords", "tech_keywords", "cosmetics_keywords",
-        "fashion_keywords", "home_keywords",
-    ):
-        m = _re.search(kw_name + r"\s*=\s*\{(.*?)\n    \}", src, _re.DOTALL)
-        result[kw_name] = set(_re.findall(r'"([^"]+)"', m.group(1))) if m else set()
-    return result
+    return {
+        "grocery_keywords": set(_so.GROCERY_KEYWORDS),
+        "tech_keywords": set(_so.TECH_KEYWORDS),
+        "cosmetics_keywords": set(_so.COSMETICS_KEYWORDS),
+        "fashion_keywords": set(_so.FASHION_KEYWORDS),
+        "home_keywords": set(_so.HOME_KEYWORDS),
+    }
 
 
 def get_seo_price_terms() -> list[str]:
