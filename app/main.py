@@ -2598,6 +2598,22 @@ def cron_catalog_vocab_crawl(request: Request) -> dict:
     return result
 
 
+@app.get("/cron/warm-price-terms")
+async def cron_warm_price_terms(request: Request) -> dict:
+    """
+    /fiyat/{slug} SEO sayfalarının whitelist'indeki (~795 terim) her
+    birini en az bir kez tarayıp product_cache'e yazar -- böylece bu
+    sayfalar canlı istekte (kullanıcı veya Googlebot) hiç taranmamış bir
+    terimle karşılaşıp gerçek 404 vermez (bkz. app/price_term_cache_warmer.py).
+    GitHub Actions'tan 30 dakikada bir küçük gruplar halinde çağrılır.
+    """
+    require_cron_request(request)
+    from app.price_term_cache_warmer import run_price_term_warm_batch
+    result = await run_price_term_warm_batch()
+    record_cron_run("warm-price-terms", success=True, detail=f"cursor={result.get('cursor')}/{result.get('total_terms')}")
+    return result
+
+
 @app.get("/api/catalogs")
 def list_catalog_status() -> list[dict]:
     db = load_db()

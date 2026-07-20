@@ -1,0 +1,21 @@
+name: Fiyat Sayfaları Önbellek Isıtma
+
+# /fiyat/{terim} SEO sayfalarinin (~795 terim whitelist) her birini en
+# az bir kez tarayip product_cache'e yazar -- boylece bu sayfalar canli
+# istekte (kullanici veya Googlebot) hic taranmamis bir terimle
+# karsilasip gercek 404 vermez. Sadece /cron/warm-price-terms
+# endpoint'ine istek atar, gercek isi backend yapar.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger price-term cache warm batch
+        run: |
+          curl -sS -f -X GET \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            "https://www.almadan.app/cron/warm-price-terms"
