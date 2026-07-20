@@ -9,6 +9,9 @@ on:
     - cron: "0 4 * * 1"
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   regenerate:
     runs-on: ubuntu-latest

@@ -138,6 +138,7 @@ async def run_daily_healthcheck(weekday: int | None = None, slot: int = 0) -> di
 
     loop = asyncio.get_running_loop()
     valid_names = []
+    queries_used: dict[str, str] = {}
     tasks = []
     for name in fn_names:
         fn = getattr(comparator, name, None) or getattr(search_orchestrator, name, None)
@@ -145,6 +146,7 @@ async def run_daily_healthcheck(weekday: int | None = None, slot: int = 0) -> di
             continue
         valid_names.append(name)
         store_query = _STORE_TEST_QUERY_OVERRIDES.get(name, test_query)
+        queries_used[name] = store_query
         tasks.append(loop.run_in_executor(_HC_EXECUTOR, fn, store_query))
 
     try:
@@ -202,7 +204,7 @@ async def run_daily_healthcheck(weekday: int | None = None, slot: int = 0) -> di
     for name, best, streak in alerts:
         notify_failure(
             f"⚠️ {name} scraper'ı {streak} gündür 0 sonuç veriyor "
-            f"(önceden ~{best} ürün buluyordu, test sorgusu: '{test_query}', "
+            f"(önceden ~{best} ürün buluyordu, test sorgusu: '{queries_used.get(name, test_query)}', "
             f"kategori: {category}). Site yapısı değişmiş olabilir, kontrol edin.",
             test_name=f"scraper_{name}",
         )
