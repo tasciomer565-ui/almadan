@@ -25,7 +25,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from app.main import ALL_STORES_MAP, get_seo_price_terms, _seo_price_slug_map  # noqa: E402
-from app.comparator import normalize_turkish_search_query, search_products_by_name  # noqa: E402
+from app.comparator import normalize_turkish_search_query  # noqa: E402
+from app.cache import make_cache_key, cache_get_stale  # noqa: E402
 
 STATIC_PAGES = [
     ("index.html", "daily", "1.0"),
@@ -38,17 +39,29 @@ STATIC_PAGES = [
 
 
 def _term_has_live_inventory(term: str) -> bool:
-    """app/main.py:price_landing_page ile BİREBİR AYNI kontrol: sitemap'e
-    yalnızca canlı sayfanın gerçekten 200 (>=2 ürün) döneceği terimler
-    eklenir. Aksi halde Google sitemap üzerinden binlerce ölü/404 linki
-    keşfedip tarama bütçesini boşa harcıyor, bu da site genelinde düşük
-    kalite sinyali oluşturup GERÇEK sayfaların indekslenmesini geciktiriyor
-    (bkz. Search Console'daki yüksek "Keşfedildi - şu anda dizine
-    eklenmemiş" sayısı)."""
+    """app/main.py:price_landing_page'in dondurecegi sonucu ONBELLEKTEN
+    (product_cache) kontrol eder -- CANLI TARAMA YAPMAZ.
+
+    2026-07-20'de whitelist 795'ten 3994 terime cikinca (bkz.
+    _seo_extract_keyword_sets duzeltmesi), eski surum (her terim icin
+    gercek search_products_by_name cagirip canli tarama yapan) GitHub
+    Actions'in sabit 6 saatlik is limitine takilip yarida kesildi (hicbir
+    terim sitemap'e eklenemeden calisma iptal oldu).
+
+    Artik app/price_term_cache_warmer.py'nin (30 dk'da bir calisan ayri
+    cron) doldurdugu product_cache'e (Supabase REST, ~100-300ms/terim)
+    bakiyoruz -- canli scraping'in kendisi degil. Bir terim henuz hic
+    isitilmamissa (cache'de hic kaydi yoksa) bu turda sitemap'e girmez,
+    warmer onu isittiginde bir sonraki haftalik/manuel calistirmada
+    otomatik eklenir. Boylece script dakikalar icinde biter."""
     try:
         query = normalize_turkish_search_query(term)
-        products = search_products_by_name(query, category="general")
-        return len(products) >= 2
+        cache_key = make_cache_key(query, "GENEL")
+        products = cache_get_stale(cache_key)
+        if not products:
+            return False
+        real = [p for p in products if isinstance(p, dict) and p.get("title") and p.get("url")]
+        return len(real) >= 2
     except Exception as exc:  # noqa: BLE001
         print(f"  envanter kontrolu basarisiz ({term!r}): {exc}", file=sys.stderr)
         return False
