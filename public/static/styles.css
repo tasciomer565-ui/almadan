@@ -212,8 +212,10 @@ button {
 .eyebrow {
   margin: 0 0 10px;
   color: var(--green);
-  font-size: 12px;
-  font-weight: 800;
+  font-family: "Space Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .1em;
 }
 
 .intro-band .eyebrow {
@@ -1215,8 +1217,9 @@ body.dark-theme .offline-cache-banner {
 .savings-highlight strong {
   display: block;
   margin: 12px 0;
-  font-family: "Manrope", sans-serif;
-  font-size: 42px;
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  font-size: 38px;
 }
 
 .savings-highlight p {
@@ -1249,8 +1252,9 @@ body.dark-theme .offline-cache-banner {
 
 .savings-stats strong {
   margin-top: 8px;
-  font-family: "Manrope", sans-serif;
-  font-size: 25px;
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  font-size: 22px;
 }
 
 .analytics-grid {
@@ -2543,8 +2547,9 @@ body.dark-theme .opt-savings-tag {
 
 .receipt-summary-card strong {
   color: var(--ink);
-  font-family: "Manrope", sans-serif;
-  font-size: 24px;
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  font-size: 21px;
 }
 
 .receipt-history-list {
