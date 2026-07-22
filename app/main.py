@@ -1394,7 +1394,7 @@ def store_suggestion_form() -> HTMLResponse:
     <meta name="description" content="Almadan'a hangi mağazanın eklenmesini istersin? Mağaza adı ve linkini paylaş, topluluğun önerilerini oylayalım.">
     <link rel="canonical" href="https://www.almadan.app/oneri">
     <meta name="robots" content="index, follow">
-    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
+    <link rel="stylesheet" href="/static/brand-pages.css?v=2">
   </head>
   <body>
     <header class="bp-header">
@@ -6736,7 +6736,7 @@ async def store_page(slug: str):
     <script type="application/ld+json">
     {schema_json}
     </script>
-    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
+    <link rel="stylesheet" href="/static/brand-pages.css?v=2">
   </head>
   <body>
     <header class="bp-header">
@@ -7090,7 +7090,7 @@ async def catalog_page(store: str):
     <script type="application/ld+json">
     {schema_json}
     </script>
-    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
+    <link rel="stylesheet" href="/static/brand-pages.css?v=2">
   </head>
   <body>
     <header class="bp-header">
@@ -7289,7 +7289,7 @@ async def category_page(category: str):
     <script type="application/ld+json">
     {schema_json}
     </script>
-    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
+    <link rel="stylesheet" href="/static/brand-pages.css?v=2">
   </head>
   <body>
     <header class="bp-header">
@@ -7420,7 +7420,7 @@ async def trend_page():
     <meta name="robots" content="index, follow">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
+    <link rel="stylesheet" href="/static/brand-pages.css?v=2">
   </head>
   <body>
     <header class="bp-header">
@@ -7491,7 +7491,7 @@ async def price_records_page():
     <meta name="robots" content="index, follow">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
+    <link rel="stylesheet" href="/static/brand-pages.css?v=2">
   </head>
   <body>
     <header class="bp-header">
@@ -8077,7 +8077,7 @@ async def price_landing_page(slug: str):
     <script type="application/ld+json">
     {combined_schema}
     </script>
-    <link rel="stylesheet" href="/static/brand-pages.css?v=1">
+    <link rel="stylesheet" href="/static/brand-pages.css?v=2">
   </head>
   <body>
     <header class="bp-header">
