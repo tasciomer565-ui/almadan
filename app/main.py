@@ -6396,7 +6396,11 @@ def _notify_follow_confirmation(uid: str, slug: str, store_name: str) -> None:
         from app.whatsapp import whatsapp_enabled, send_whatsapp_template
         if whatsapp_enabled():
             follow_template = os.getenv("WHATSAPP_FOLLOW_TEMPLATE_NAME", "store_follow_confirm").strip()
-            sent = send_whatsapp_template(phone, follow_template, params=[display_name, store_name])
+            sent = send_whatsapp_template(
+                phone, follow_template,
+                params=[display_name, store_name],
+                button_param=f"magaza/{slug}",
+            )
     except Exception as wa_err:
         log.warning("Takip onay WhatsApp gönderilemedi user=%s: %s", uid, wa_err)
 
