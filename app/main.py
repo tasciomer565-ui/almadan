@@ -3021,11 +3021,30 @@ def admin_whatsapp_debug_test(
 ) -> dict:
     """GEÇICI: onayli bir sablonla gercek WhatsApp gonderimini test eder."""
     require_admin_secret(request)
-    from app.whatsapp import whatsapp_enabled, send_whatsapp_template
+    import requests as _req
+    from app.whatsapp import WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_API_URL, whatsapp_enabled, _normalize_phone
     if not whatsapp_enabled():
         return {"enabled": False}
-    sent = send_whatsapp_template(phone, template, params=[p1, p2], button_param="magaza/sok")
-    return {"enabled": True, "template": template, "sent": sent}
+    to = _normalize_phone(phone)
+    body = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "template",
+        "template": {
+            "name": template,
+            "language": {"code": "tr"},
+            "components": [
+                {"type": "body", "parameters": [{"type": "text", "text": p1}, {"type": "text", "text": p2}]},
+                {"type": "button", "sub_type": "url", "index": "0", "parameters": [{"type": "text", "text": "magaza/sok"}]},
+            ],
+        },
+    }
+    resp = _req.post(
+        f"{WHATSAPP_API_URL}/{WHATSAPP_PHONE_NUMBER_ID}/messages",
+        headers={"Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}", "Content-Type": "application/json"},
+        json=body, timeout=10,
+    )
+    return {"enabled": True, "template": template, "to": to, "status_code": resp.status_code, "response": resp.json() if resp.content else None}
 
 
 @app.get("/api/admin/failed-searches")
