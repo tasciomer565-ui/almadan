@@ -3014,40 +3014,6 @@ def admin_stats(request: Request, days: int = 7) -> dict:
     return get_dashboard_stats(days=min(days, 30))
 
 
-@app.post("/api/admin/whatsapp-debug-test")
-def admin_whatsapp_debug_test(
-    request: Request, phone: str, template: str = "campaign_alert",
-    p1: str = "Ömer", p2: str = "ŞOK",
-) -> dict:
-    """GEÇICI: onayli bir sablonla gercek WhatsApp gonderimini test eder."""
-    require_admin_secret(request)
-    import requests as _req
-    from app.whatsapp import WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_API_URL, whatsapp_enabled, _normalize_phone
-    if not whatsapp_enabled():
-        return {"enabled": False}
-    to = _normalize_phone(phone)
-    body = {
-        "messaging_product": "whatsapp",
-        "to": to,
-        "type": "template",
-        "template": {
-            "name": template,
-            "language": {"code": "tr"},
-            "components": [
-                {"type": "header", "parameters": [{"type": "image", "image": {"link": "https://www.almadan.app/static/icon-512.png"}}]},
-                {"type": "body", "parameters": [{"type": "text", "text": p1}, {"type": "text", "text": p2}, {"type": "text", "text": "Tüm ürünlerde %20 indirim"}]},
-                {"type": "button", "sub_type": "url", "index": "0", "parameters": [{"type": "text", "text": "magaza/sok"}]},
-            ],
-        },
-    }
-    resp = _req.post(
-        f"{WHATSAPP_API_URL}/{WHATSAPP_PHONE_NUMBER_ID}/messages",
-        headers={"Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}", "Content-Type": "application/json"},
-        json=body, timeout=10,
-    )
-    return {"enabled": True, "template": template, "to": to, "status_code": resp.status_code, "response": resp.json() if resp.content else None}
-
-
 @app.get("/api/admin/failed-searches")
 def admin_failed_searches(request: Request, days: int = 7, min_count: int = 2) -> dict:
     """
