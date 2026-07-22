@@ -27,6 +27,7 @@ def send_whatsapp_template(
     lang: str = "tr",
     params: list[str] | None = None,
     button_param: str | None = None,
+    header_image_url: str | None = None,
 ) -> bool:
     """
     Onaylanmis bir WhatsApp sablonunu (template) gonderir. Business-initiated
@@ -36,6 +37,11 @@ def send_whatsapp_template(
     button_param: sablonda dinamik URL butonu varsa (orn. price_alert
     sablonundaki "Urunu Gor" butonu https://www.almadan.app/{{1}}), butonun
     {{1}} kismina eklenecek yol/parca (orn. "urun/samsung-galaxy-s24").
+
+    header_image_url: sablonda resim basligi varsa (orn. campaign_alert --
+    Meta, sablon olusturulurken resim eklenmisse her gonderimde gercek bir
+    resim URL'i bekler, aksi halde "expected IMAGE, received UNKNOWN"
+    hatasiyla reddeder) -- Almadan logosu gibi sabit bir gorsel verilir.
     """
     if not whatsapp_enabled():
         return False
@@ -50,6 +56,10 @@ def send_whatsapp_template(
         },
     }
     components = []
+    if header_image_url:
+        components.append(
+            {"type": "header", "parameters": [{"type": "image", "image": {"link": header_image_url}}]}
+        )
     if params:
         components.append(
             {"type": "body", "parameters": [{"type": "text", "text": p} for p in params]}

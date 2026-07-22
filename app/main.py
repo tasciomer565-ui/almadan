@@ -3034,7 +3034,8 @@ def admin_whatsapp_debug_test(
             "name": template,
             "language": {"code": "tr"},
             "components": [
-                {"type": "body", "parameters": [{"type": "text", "text": p1}, {"type": "text", "text": p2}, {"type": "text", "text": "Haftalık Aktüel Katalog Yayında!"}]},
+                {"type": "header", "parameters": [{"type": "image", "image": {"link": "https://www.almadan.app/static/icon-512.png"}}]},
+                {"type": "body", "parameters": [{"type": "text", "text": p1}, {"type": "text", "text": p2}, {"type": "text", "text": "Tüm ürünlerde %20 indirim"}]},
                 {"type": "button", "sub_type": "url", "index": "0", "parameters": [{"type": "text", "text": "magaza/sok"}]},
             ],
         },
@@ -9080,7 +9081,8 @@ async def cron_store_newsletters(request: Request):
                             send_whatsapp_template(
                                 phone, campaign_template,
                                 params=[display_name, store["name"], campaign_title or "Yeni kampanya"],
-                                button_param=slug,
+                                button_param=f"magaza/{slug}",
+                                header_image_url="https://www.almadan.app/static/icon-512.png",
                             )
                 except Exception as wa_err:
                     logger.warning("Follower WhatsApp gönderilemedi user=%s: %s", uid, wa_err)
