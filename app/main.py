@@ -3034,7 +3034,7 @@ def admin_whatsapp_debug_test(
             "name": template,
             "language": {"code": "tr"},
             "components": [
-                {"type": "body", "parameters": [{"type": "text", "text": p1}, {"type": "text", "text": p2}]},
+                {"type": "body", "parameters": [{"type": "text", "text": p1}, {"type": "text", "text": p2}, {"type": "text", "text": "Haftalık Aktüel Katalog Yayında!"}]},
                 {"type": "button", "sub_type": "url", "index": "0", "parameters": [{"type": "text", "text": "magaza/sok"}]},
             ],
         },
