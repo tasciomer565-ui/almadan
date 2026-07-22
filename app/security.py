@@ -295,6 +295,7 @@ _ADMIN_SECRET_BYPASS_PATHS = {
     "/api/admin/system-progress",
     "/api/admin/business-metrics",
     "/api/admin/user-details",
+    "/api/admin/whatsapp-debug-test",
 }
 _ADMIN_SECRET_BYPASS_PREFIXES = (
     "/api/admin/products/",

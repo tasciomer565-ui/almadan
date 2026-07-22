@@ -3014,6 +3014,20 @@ def admin_stats(request: Request, days: int = 7) -> dict:
     return get_dashboard_stats(days=min(days, 30))
 
 
+@app.post("/api/admin/whatsapp-debug-test")
+def admin_whatsapp_debug_test(
+    request: Request, phone: str, template: str = "campaign_alert",
+    p1: str = "Ömer", p2: str = "ŞOK",
+) -> dict:
+    """GEÇICI: onayli bir sablonla gercek WhatsApp gonderimini test eder."""
+    require_admin_secret(request)
+    from app.whatsapp import whatsapp_enabled, send_whatsapp_template
+    if not whatsapp_enabled():
+        return {"enabled": False}
+    sent = send_whatsapp_template(phone, template, params=[p1, p2], button_param="magaza/sok")
+    return {"enabled": True, "template": template, "sent": sent}
+
+
 @app.get("/api/admin/failed-searches")
 def admin_failed_searches(request: Request, days: int = 7, min_count: int = 2) -> dict:
     """
