@@ -3014,43 +3014,6 @@ def admin_stats(request: Request, days: int = 7) -> dict:
     return get_dashboard_stats(days=min(days, 30))
 
 
-@app.post("/api/admin/whatsapp-debug-test")
-def admin_whatsapp_debug_test(request: Request, phone: str, template: str = "store_follow_confirm") -> dict:
-    """GEÇICI: WhatsApp API'nin tam hata mesajini gormek icin. Teshis sonrasi kaldirilacak."""
-    require_admin_secret(request)
-    import requests as _req
-    from app.whatsapp import WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_API_URL, whatsapp_enabled, _normalize_phone
-
-    if not whatsapp_enabled():
-        return {"enabled": False, "detail": "WHATSAPP_ACCESS_TOKEN veya WHATSAPP_PHONE_NUMBER_ID eksik."}
-
-    to = _normalize_phone(phone)
-    body = {
-        "messaging_product": "whatsapp",
-        "to": to,
-        "type": "template",
-        "template": {
-            "name": template,
-            "language": {"code": "tr"},
-            "components": [{"type": "body", "parameters": [{"type": "text", "text": "Test"}, {"type": "text", "text": "Test Mağaza"}]}],
-        },
-    }
-    resp = _req.post(
-        f"{WHATSAPP_API_URL}/{WHATSAPP_PHONE_NUMBER_ID}/messages",
-        headers={"Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}", "Content-Type": "application/json"},
-        json=body,
-        timeout=10,
-    )
-    return {
-        "enabled": True,
-        "phone_number_id": WHATSAPP_PHONE_NUMBER_ID,
-        "to": to,
-        "template": template,
-        "status_code": resp.status_code,
-        "response": resp.json() if resp.headers.get("content-type", "").startswith("application/json") else resp.text[:500],
-    }
-
-
 @app.get("/api/admin/failed-searches")
 def admin_failed_searches(request: Request, days: int = 7, min_count: int = 2) -> dict:
     """
