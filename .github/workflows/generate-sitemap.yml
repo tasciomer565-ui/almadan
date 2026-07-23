@@ -6,7 +6,7 @@ name: Sitemap Yeniden Üretimi
 # yeniden uretip degisiklik varsa otomatik commitler.
 on:
   schedule:
-    - cron: "0 4 * * 1"
+    - cron: "0 4 * * *"
   workflow_dispatch: {}
 
 permissions:
