@@ -636,6 +636,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/bose</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/calvin-klein</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -662,6 +667,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/hardline</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/hawk</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -696,12 +706,27 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/olimp</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/optimum</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/ossee</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/police</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/prada</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -767,6 +792,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/under-armour</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/vogue</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
