@@ -56,7 +56,20 @@ def _term_has_live_inventory(term: str) -> bool:
     otomatik eklenir. Boylece script dakikalar icinde biter."""
     try:
         query = normalize_turkish_search_query(term)
-        cache_key = make_cache_key(query, "GENEL")
+        # master_search (bkz. app/search_orchestrator.py) cache'e query'yi
+        # "GENEL" ile degil, classify_intent'in cozdugu gercek kategoriyle
+        # (TEKNOLOJI/EV/KOZMETIK/GIDA/MODA/GENEL) yaziyor -- burada sabit
+        # "GENEL" kullanmak, warmer'in gunlerdir isittigi neredeyse tum
+        # elektronik/ev/kozmetik terimlerini "envantersiz" sanip atlatiyordu
+        # (3994 terimden sadece 20-28'i sitemap'e giriyordu).
+        from app.query_intelligence import correct_query
+        from app.search_orchestrator import classify_intent
+        try:
+            corrected = correct_query(query)
+        except Exception:
+            corrected = query
+        category = classify_intent(corrected)
+        cache_key = make_cache_key(query, category)
         products = cache_get_stale(cache_key)
         if not products:
             return False
