@@ -2526,11 +2526,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/braun</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/bulasik</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -5061,6 +5056,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/kirmizi-home</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/kirmizi-ic-camasir</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -6942,11 +6942,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/monitor</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/monster</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
