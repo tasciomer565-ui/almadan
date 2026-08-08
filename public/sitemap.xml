@@ -2546,11 +2546,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/calvin-klein</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/camasir</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -7126,6 +7121,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/mor-kanepe</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/mor-kase</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -9122,6 +9122,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/siyah-ic-camasir</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/siyah-iron</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
