@@ -3666,6 +3666,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/gumus-madame-coco</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/gumus-masa</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -9946,6 +9951,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/turkuaz-mobilya</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/turkuaz-mop</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -10252,6 +10262,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/turuncu-masa</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/turuncu-microdalga</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
