@@ -32,6 +32,7 @@ STATIC_PAGES = [
     ("index.html", "daily", "1.0"),
     ("hakkinda", "monthly", "0.6"),
     ("gizlilik", "monthly", "0.3"),
+    ("kullanim-kosullari", "monthly", "0.3"),
     ("iletisim", "monthly", "0.4"),
     ("fiyat-rehberi", "weekly", "0.5"),
     ("oneri", "monthly", "0.3"),

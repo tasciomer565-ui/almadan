@@ -1427,7 +1427,7 @@ def store_suggestion_form() -> HTMLResponse:
       </form>
     </main>
     <footer class="bp-footer">
-      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
+      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
       <p>© 2026 Almadan</p>
     </footer>
     <script>
@@ -1525,6 +1525,7 @@ def admin_list_store_suggestions(request: Request) -> dict:
 
 @app.get("/hakkinda", include_in_schema=False)
 @app.get("/gizlilik", include_in_schema=False)
+@app.get("/kullanim-kosullari", include_in_schema=False)
 @app.get("/iletisim", include_in_schema=False)
 def static_page(request: Request) -> Response:
     page_file = STATIC_DIR / f"{request.url.path.strip('/')}.html"
@@ -6676,11 +6677,13 @@ async def store_page(slug: str):
     }}"""
 
     # Find up to 4 other stores in the same category
+    editorial_html = _store_page_editorial_html(store, campaigns, category_display_name)
+
     other_stores = [
         s for s in DEFAULT_STORE_NEWSLETTERS
         if s["category"] == store.get("category") and s["slug"] != slug
     ][:4]
-    
+
     related_stores_html = ""
     if other_stores:
         related_items = []
@@ -6774,12 +6777,13 @@ async def store_page(slug: str):
       <div class="bp-feature-grid">
         {campaigns_html}
       </div>
+      {editorial_html}
       {related_stores_html}
       <a class="bp-cta bp-cta-block" style="margin-top: 24px;" href="/"><i data-lucide="arrow-right"></i> Tüm Mağazalarda Karşılaştır</a>
     </main>
 
     <footer class="bp-footer">
-      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
+      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
       <p>© 2026 Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
@@ -6878,7 +6882,7 @@ async def coupons_page():
       </div>
     </main>
     <footer class="bp-footer">
-      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
+      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
       <p>© 2026 Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
@@ -7134,7 +7138,7 @@ async def catalog_page(store: str):
     </main>
 
     <footer class="bp-footer">
-      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
+      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
       <p>© 2026 Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
@@ -7225,6 +7229,8 @@ async def category_page(category: str):
             f'<a class="bp-feature" href="/magaza/{slug}"><h3>{store_name}</h3><p>Kampanyaları ve fiyatları gör</p></a>'
         )
     stores_html = "".join(store_links)
+
+    editorial_html = _category_page_editorial_html(display_name, store_count, ALL_STORES_MAP[category])
 
     schema_json = f"""{{
       "@context": "https://schema.org",
@@ -7326,11 +7332,12 @@ async def category_page(category: str):
         {price_index_html}
         {stores_html}
       </div>
+      {editorial_html}
       <a class="bp-cta bp-cta-block" style="margin-top: 24px;" href="/"><i data-lucide="arrow-right"></i> Tüm Mağazalarda Karşılaştır</a>
     </main>
 
     <footer class="bp-footer">
-      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
+      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
       <p>© 2026 Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
@@ -7450,7 +7457,7 @@ async def trend_page():
       </div>
     </main>
     <footer class="bp-footer">
-      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
+      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
       <p>© 2026 Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
@@ -7521,7 +7528,7 @@ async def price_records_page():
       </div>
     </main>
     <footer class="bp-footer">
-      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
+      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
       <p>© 2026 Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
@@ -7775,6 +7782,117 @@ def _render_price_history_svg(history: list[dict]) -> str:
       </svg>
       <p class="bp-price-history-caption">Fiyat geçmişi: en düşük {lo_s}, en yüksek {hi_s} ({n} kayıt)</p>
     </div>'''
+
+
+_STORE_PAGE_GENERIC_TIPS = [
+    "Aynı ürün, mağazanın kendi sitesinde farklı bir kampanya kapsamında daha ucuza gelebilir; ana sayfadan link yapıştırarak güncel fiyatı diğer mağazalarla karşılaştır.",
+    "Kampanya bitiş tarihine dikkat et — bazı indirimler stokla veya süreyle sınırlıdır, son gün beklemek riskli olabilir.",
+    "Kargo bedava eşiği ve iade koşulları mağazadan mağazaya değişir; sepet toplamını tamamlamadan önce bu koşulları kontrol et.",
+]
+
+
+def _store_page_editorial_html(store: dict, campaigns: list[dict], category_display_name: str) -> str:
+    """/magaza/{slug} sayfalarina, sadece kampanya listesinden ibaret
+    kalmayip gercek veriye dayali kisa bir analiz + SSS bloğu ekler.
+
+    Neden gerekli: bu sayfalar da /fiyat/{terim} sayfalari gibi ayni
+    sablon-sayfa deseninde -- 112 magaza sayfasi neredeyse ayni yapida
+    (baslik + kampanya listesi). AdSense'in "dusuk degerli icerik"
+    incelemesi sadece /fiyat sayfalarina degil site geneline bakiyor,
+    bu yuzden ayni tedaviyi burada da uyguluyoruz.
+    """
+    import html as _html
+
+    name = _html.escape(store.get("name") or "")
+    active_count = len(campaigns)
+
+    if active_count:
+        stats_html = (
+            f"<p>Şu anda <strong>{name}</strong> için <strong>{active_count} aktif kampanya</strong> "
+            f"takip ediyoruz. Kampanyalar otomatik olarak süresi dolduğunda listeden kaldırılır, "
+            f"bu yüzden burada gördüğün fırsatlar güncel.</p>"
+        )
+    else:
+        stats_html = (
+            f"<p><strong>{name}</strong> için şu anda listelenen aktif bir kampanya yok. "
+            f"Yeni bir kampanya yayınlandığında bu sayfa otomatik güncellenir.</p>"
+        )
+
+    tips_html = "".join(f"<li>{_html.escape(t)}</li>" for t in _STORE_PAGE_GENERIC_TIPS)
+
+    faq_items = [
+        (f"{name} kampanyaları ne sıklıkla güncelleniyor?",
+         f"{name} kampanyalarını düzenli aralıklarla takip ediyoruz; süresi dolan kampanyalar otomatik olarak kaldırılır, yenileri eklendikçe bu sayfaya yansır."),
+        (f"{name} en ucuz fiyatı Almadan'da mı bulunur?",
+         f"Almadan {name} dahil 100'den fazla mağazanın fiyatlarını karşılaştırır; en ucuz fiyatı görmek için ana sayfadan ürün linkini veya adını arayabilirsin."),
+        (f"{name} hangi kategoride yer alıyor?",
+         f"{name}, Almadan'da {_html.escape(category_display_name)} kategorisinde listelenir."),
+    ]
+    faq_html = "".join(
+        f'<div class="bp-faq-item"><h3>{_html.escape(q)}</h3><p>{_html.escape(a)}</p></div>'
+        for q, a in faq_items
+    )
+
+    return f"""
+      <section class="bp-editorial">
+        <h2><i data-lucide="line-chart"></i> {name} Kampanya Durumu</h2>
+        {stats_html}
+        <ul class="bp-tips">{tips_html}</ul>
+      </section>
+      <section class="bp-faq">
+        <h2><i data-lucide="help-circle"></i> Sıkça Sorulan Sorular</h2>
+        {faq_html}
+      </section>
+    """
+
+
+_CATEGORY_PAGE_GENERIC_TIPS = [
+    "Bütçe planlarken sadece etiket fiyatına değil, kargo ücreti ve teslimat süresine de bak — bazı mağazalarda görünürde ucuz olan ürün toplamda daha pahalıya gelebilir.",
+    "Kampanya dönemlerinde (yılbaşı, indirim sezonları) fiyatlar hızlı değişir; almadan önce fiyat geçmişini kontrol etmek gerçek bir indirim olup olmadığını gösterir.",
+    "Aynı ürün farklı mağazalarda farklı model kodu veya varyant adıyla satılabilir; karşılaştırma yaparken ürün özelliklerinin birebir aynı olduğundan emin ol.",
+]
+
+
+def _category_page_editorial_html(display_name: str, store_count: int, stores: list[str]) -> str:
+    """/kategori/{category} sayfalarina, sadece magaza listesinden ibaret
+    kalmayip kisa bir analiz + SSS bloğu ekler (bkz. _store_page_editorial_html
+    ve _price_page_editorial_html ile ayni gerekce)."""
+    import html as _html
+
+    sample_stores = ", ".join(_format_store_name(s) for s in stores[:3])
+    stats_html = (
+        f"<p><strong>{_html.escape(display_name)}</strong> kategorisinde şu anda "
+        f"<strong>{store_count} mağaza</strong> takip ediyoruz"
+        + (f" ({_html.escape(sample_stores)} ve diğerleri)" if sample_stores else "")
+        + ". Yeni bir mağaza eklendiğinde bu liste otomatik güncellenir.</p>"
+    )
+
+    tips_html = "".join(f"<li>{_html.escape(t)}</li>" for t in _CATEGORY_PAGE_GENERIC_TIPS)
+
+    faq_items = [
+        (f"{display_name} kategorisinde kaç mağaza karşılaştırılıyor?",
+         f"Almadan bu kategoride {store_count} mağazanın fiyatlarını karşılaştırır."),
+        (f"{display_name} kategorisinde en ucuz fiyatı nasıl bulurum?",
+         "Ana sayfadan ürün adını veya link/barkodunu girerek bu kategorideki tüm mağazaların güncel fiyatlarını tek ekranda görebilirsin."),
+        ("Fiyatlar ne sıklıkla güncelleniyor?",
+         "Mağaza fiyatları düzenli aralıklarla yeniden taranır; büyük bir alışveriş öncesi fiyatı tekrar kontrol etmen önerilir."),
+    ]
+    faq_html = "".join(
+        f'<div class="bp-faq-item"><h3>{_html.escape(q)}</h3><p>{_html.escape(a)}</p></div>'
+        for q, a in faq_items
+    )
+
+    return f"""
+      <section class="bp-editorial">
+        <h2><i data-lucide="line-chart"></i> {_html.escape(display_name)} Kategori Analizi</h2>
+        {stats_html}
+        <ul class="bp-tips">{tips_html}</ul>
+      </section>
+      <section class="bp-faq">
+        <h2><i data-lucide="help-circle"></i> Sıkça Sorulan Sorular</h2>
+        {faq_html}
+      </section>
+    """
 
 
 _PRICE_PAGE_GENERIC_TIPS = [
@@ -8120,7 +8238,7 @@ async def price_landing_page(slug: str):
     </main>
 
     <footer class="bp-footer">
-      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
+      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
       <p>© 2026 Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
@@ -8331,7 +8449,7 @@ async def price_guide_index():
       <div class="bp-feature-grid">{cards}</div>
     </main>
     <footer class="bp-footer">
-      <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkinda</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">Iletisim</a>
+      <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkinda</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanim Kosullari</a> · <a href="/iletisim">Iletisim</a>
       <p>© 2026 Almadan</p>
     </footer>
   </body>
@@ -8428,7 +8546,7 @@ async def price_guide_topic(topic: str):
       <a class="bp-cta bp-cta-block" href="/fiyat-rehberi"><i data-lucide="arrow-left"></i> Tum Rehberler</a>
     </main>
     <footer class="bp-footer">
-      <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkinda</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">Iletisim</a>
+      <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkinda</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanim Kosullari</a> · <a href="/iletisim">Iletisim</a>
       <p>© 2026 Almadan</p>
     </footer>
   </body>
