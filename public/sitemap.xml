@@ -956,6 +956,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/altin-perde</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/altin-pike</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -1592,6 +1597,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/bej-paspas</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/bej-perde</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -2372,6 +2382,16 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/bordo-paspas</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/bordo-perde</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/bordo-pike</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -10031,6 +10051,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/turkuaz-raf</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/turkuaz-robot-supurge</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -10927,6 +10952,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/yesil-puf</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/yesil-raf</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
