@@ -7,7 +7,11 @@ name: Fiyat Sayfaları Önbellek Isıtma
 # endpoint'ine istek atar, gercek isi backend yapar.
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    # 10dk -> 30dk: Vercel Hobby (ucretsiz) plan Fluid Active CPU limitini
+    # asip hesabin "Paused" duruma dusmesine yol acmisti (11h49m/4h) --
+    # bu cron gunde 144 kez, her seferinde 56s'e kadar gercek tarama
+    # yapabildigi icin tek basina en buyuk tuketiciydi.
+    - cron: "*/30 * * * *"
   workflow_dispatch: {}
 
 jobs:

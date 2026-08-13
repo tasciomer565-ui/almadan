@@ -4422,6 +4422,7 @@ function toggleScannerArea(type) {
     barcode.classList.toggle("hidden", !isHidden);
     ocr.classList.add("hidden");
     if (isHidden) {
+      document.getElementById("barcodeFallbackArea")?.classList.add("hidden");
       startLiveBarcodeScanner();
     } else {
       stopLiveBarcodeScanner();
@@ -4450,6 +4451,7 @@ async function startLiveBarcodeScanner() {
   } catch {
     updateBarcodeScanStatus("Kamera tarayici kutuphanesi yuklenemedi.");
     showToast("Barkod tarayici yuklenemedi. Internet baglantisini kontrol edin.");
+    document.getElementById("barcodeFallbackArea")?.classList.remove("hidden");
     return;
   }
 
@@ -4501,6 +4503,7 @@ async function startLiveBarcodeScanner() {
     liveBarcodeScanLocked = false;
     updateBarcodeScanStatus("Kamera baslatilamadi.");
     showToast(`Kamera acilamadi: ${escapeHtml(String(error.message || error))}`);
+    document.getElementById("barcodeFallbackArea")?.classList.remove("hidden");
   }
 }
 

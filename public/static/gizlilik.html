@@ -68,7 +68,7 @@
     </section>
 
     <main class="bp-main">
-      <span class="bp-updated"><i data-lucide="clock" style="width:13px;height:13px;"></i> Son güncelleme: 5 Temmuz 2026</span>
+      <span class="bp-updated"><i data-lucide="clock" style="width:13px;height:13px;"></i> Son güncelleme: 13 Ağustos 2026</span>
 
       <h2><i data-lucide="database"></i> Hangi verileri topluyoruz?</h2>
       <ul class="bp-list">
@@ -86,17 +86,25 @@
       <p class="bp-body">Verilerin üçüncü taraflara <strong>satılmaz</strong> ve reklam amacıyla paylaşılmaz.</p>
 
       <h2><i data-lucide="cookie"></i> Çerezler</h2>
-      <p class="bp-body">Yalnızca hizmetin çalışması için zorunlu çerezler kullanılır: oturum kimliği, cihaz kimliği ve güvenlik (CSRF) çerezi. Reklam veya izleme çerezi kullanılmaz.</p>
+      <p class="bp-body">Hizmetin çalışması için zorunlu çerezler kullanılır: oturum kimliği, cihaz kimliği ve güvenlik (CSRF) çerezi. Ayrıca sitede Google AdSense ile reklam gösterilebilir; Google ve reklam ortakları, ilgi alanına göre reklam sunmak için kendi çerezlerini kullanabilir. Bu çerezleri tarayıcı ayarlarından reddedebilir ya da <a href="https://adssettings.google.com" class="bp-link" target="_blank" rel="noopener">Google Reklam Ayarları</a>'ndan yönetebilirsin.</p>
 
-      <h2><i data-lucide="scale"></i> KVKK haklerin</h2>
-      <p class="bp-body">6698 sayılı KVKK ve GDPR kapsamında şu haklara sahipsin:</p>
+      <h2><i data-lucide="scale"></i> KVKK Hakların</h2>
+      <p class="bp-body">6698 sayılı KVKK ve GDPR kapsamında şu haklara sahipsin. Erişim yolu, hesaplı ve anonim (hesapsız, sadece cihaz kimliğine bağlı) kullanıcılar için farklıdır:</p>
+      <div class="bp-card">
+        <h3><i data-lucide="user-check"></i> Hesabın varsa</h3>
+        <p>Erişim, indirme, düzeltme ve silme işlemlerini hesap ayarlarından ("Verilerimi indir" / "Beni unut") anında ve kendi kendine yapabilirsin.</p>
+      </div>
+      <div class="bp-card">
+        <h3><i data-lucide="smartphone"></i> Hesabın yoksa (anonim/cihaz kimlikli kullanım)</h3>
+        <p><a href="/iletisim" class="bp-link">İletişim sayfasından</a> "KVKK" konu başlığıyla bize cihaz kimliğini (Ayarlar &gt; Cihaz Bilgisi'nde görünür) ileterek erişim, indirme veya silme talebinde bulunabilirsin; talebi en geç 30 gün içinde sonuçlandırırız.</p>
+      </div>
       <div class="bp-card">
         <h3><i data-lucide="download"></i> Erişim hakkı</h3>
-        <p>Hakkında sakladığımız tüm veriyi indirebilirsin (hesap ayarlarından "Verilerimi indir").</p>
+        <p>Hakkında sakladığımız tüm veriyi indirebilirsin.</p>
       </div>
       <div class="bp-card">
         <h3><i data-lucide="trash-2"></i> Unutulma hakkı</h3>
-        <p>Hesabını ve tüm verilerini kalıcı olarak silebilirsin (hesap ayarlarından "Beni unut").</p>
+        <p>Hesabını (veya anonim cihaz verini) ve tüm verilerini kalıcı olarak silebilirsin.</p>
       </div>
       <div class="bp-card">
         <h3><i data-lucide="pencil"></i> Düzeltme hakkı</h3>
@@ -119,9 +127,9 @@
     </main>
 
     <footer class="bp-footer">
-      <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
-      <p>© 2026 Almadan</p>
+      <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
+      <p>© <span id="copyYear">2026</span> Almadan</p>
     </footer>
-    <script>window.addEventListener('load', () => { if (window.lucide) lucide.createIcons(); });</script>
+    <script>window.addEventListener('load', () => { if (window.lucide) lucide.createIcons(); const y = document.getElementById('copyYear'); if (y) y.textContent = new Date().getFullYear(); });</script>
   </body>
 </html>

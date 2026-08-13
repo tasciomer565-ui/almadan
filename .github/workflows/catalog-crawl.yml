@@ -6,7 +6,9 @@ name: Katalog Kelime Dağarcığı Crawl
 # istek atar, gerçek işi backend yapar.
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    # 30dk -> saatlik: Vercel Hobby (ucretsiz) plan Fluid Active CPU
+    # limitini asip hesabin "Paused" duruma dusmesine katkida bulunuyordu.
+    - cron: "0 * * * *"
   workflow_dispatch: {}
 
 jobs:

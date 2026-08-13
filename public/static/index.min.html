@@ -17,16 +17,16 @@
     <title>Almadan — Fiyat Karşılaştırma ve Alışveriş Asistanı</title>
     <meta name="description" content="Trendyol, Hepsiburada, Amazon, N11 ve 100'den fazla mağazada ürün fiyatlarını tek tıkla karşılaştır. Link yapıştır veya barkod tara, en ucuz mağazayı anında bul — ücretsiz.">
     <meta name="keywords" content="fiyat karşılaştırma, alışveriş asistanı, en ucuz fiyat, trendyol hepsiburada karşılaştırma, barkod tarama, fiyat takip">
-    <link rel="canonical" href="https://www.almadan.app/index.html">
-    <link rel="alternate" hreflang="tr-TR" href="https://www.almadan.app/index.html">
-    <link rel="alternate" hreflang="x-default" href="https://www.almadan.app/index.html">
+    <link rel="canonical" href="https://www.almadan.app/">
+    <link rel="alternate" hreflang="tr-TR" href="https://www.almadan.app/">
+    <link rel="alternate" hreflang="x-default" href="https://www.almadan.app/">
     <meta name="robots" content="index, follow">
 
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Almadan">
     <meta property="og:title" content="Almadan — Fiyat Karşılaştırma ve Alışveriş Asistanı">
     <meta property="og:description" content="100+ mağazada ürün fiyatlarını tek tıkla karşılaştır. Satın almadan önce en ucuzu bul.">
-    <meta property="og:url" content="https://www.almadan.app/index.html">
+    <meta property="og:url" content="https://www.almadan.app/">
     <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
     <meta property="og:locale" content="tr_TR">
     <meta name="twitter:card" content="summary_large_image">
@@ -39,11 +39,11 @@
       "@context": "https://schema.org",
       "@type": "WebSite",
       "name": "Almadan",
-      "url": "https://www.almadan.app/index.html",
+      "url": "https://www.almadan.app/",
       "description": "Türkiye'deki online mağazalarda ürün fiyatlarını karşılaştıran alışveriş karar asistanı.",
       "potentialAction": {
         "@type": "SearchAction",
-        "target": "https://www.almadan.app/index.html?q={search_term_string}",
+        "target": "https://www.almadan.app/?q={search_term_string}",
         "query-input": "required name=search_term_string"
       }
     }
@@ -154,9 +154,9 @@
       </a>
       <nav class="desktop-nav" aria-label="Ana menü">
         <button class="nav-item active" data-view="discover">Keşfet</button>
-        <button class="nav-item" data-view="tracking">Takiptekiler</button>
-        <button class="nav-item" data-view="savings">Tasarrufum</button>
-        <button class="nav-item" data-view="bulletins">B&uuml;ltenler</button>
+        <button class="nav-item" data-view="tracking">Takip</button>
+        <button class="nav-item" data-view="savings">Tasarruf</button>
+        <button class="nav-item" data-view="bulletins">B&uuml;lten</button>
       </nav>
       <div class="topbar-actions">
         <span class="network-status" id="networkStatus" role="status" aria-live="polite">
@@ -295,149 +295,6 @@
           <span>Ürün linkini yapıştır veya barkod tara — sistem fiyatları otomatik karşılaştırır.</span>
         </div>
 
-        <!-- Yakında Eklenecek Mağazalar Duyuru Afişi (Açılır Liste) -->
-        <div class="coming-soon-stores-box" style="margin-bottom: 24px;">
-          <button type="button" class="coming-soon-toggle" onclick="toggleComingSoonStores()" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: linear-gradient(135deg, rgba(40,122,80,0.05) 0%, rgba(217,239,87,0.03) 100%); border: 1.5px solid rgba(40,122,80,0.15); border-radius: 12px; font-size: 14px; font-weight: 800; color: var(--ink); cursor: pointer; transition: all 0.2s;">
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-              <i data-lucide="rocket" style="width: 18px; height: 18px; color: var(--green); stroke-width: 2.5; flex-shrink:0;"></i>
-              <span style="text-align: left;">🚀 Yakında Eklenecek Yeni Mağazalar (50+ Entegrasyon)</span>
-              <span style="background: var(--lime); color: #121412; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink:0;">Yolda</span>
-            </div>
-            <i data-lucide="chevron-down" id="comingSoonChevron" style="width: 18px; height: 18px; transition: transform 0.2s; flex-shrink:0;"></i>
-          </button>
-          
-          <div id="comingSoonStoresContainer" style="display: none; background: var(--surface,#fff); border: 1.5px solid var(--border); border-top: none; border-radius: 0 0 12px 12px; padding: 20px; margin-top: -2px;">
-            <p style="font-size: 12.5px; color: var(--ink-2); margin-top: 0; margin-bottom: 16px; line-height: 1.5; border-bottom: 1px dashed var(--border); padding-bottom: 10px;">
-              Aşağıdaki mağazaların fiyat tarama entegrasyonları arka planda test ediliyor. Çok yakında karşılaştırma sonuçlarında aktif olacaklardır:
-            </p>
-            <div class="coming-soon-grid">
-              
-              <div class="coming-soon-card">
-                <h4 style="font-size: 12px; color: var(--green); font-weight: 800; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; border-bottom: 1px dashed var(--border); padding-bottom: 6px;">
-                  <i data-lucide="shopping-basket" style="width: 13.5px; height: 13.5px;"></i> Gıda & Süpermarket
-                </h4>
-                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>A101</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>FİLE</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Macrocenter</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Happy Center</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Onur Market</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Mopaş</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Hakmar</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Çağrı Market</span>
-                </div>
-              </div>
-
-              <div class="coming-soon-card">
-                <h4 style="font-size: 12px; color: var(--green); font-weight: 800; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; border-bottom: 1px dashed var(--border); padding-bottom: 6px;">
-                  <i data-lucide="smartphone" style="width: 13.5px; height: 13.5px;"></i> Teknoloji & Elektronik
-                </h4>
-                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Troy</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Gürgençler</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Pozitif Teknoloji</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Samsung</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Evkur</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Çetmen</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Yiğit AVM</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Özşanal</span>
-                </div>
-              </div>
-
-              <div class="coming-soon-card">
-                <h4 style="font-size: 12px; color: var(--green); font-weight: 800; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; border-bottom: 1px dashed var(--border); padding-bottom: 6px;">
-                  <i data-lucide="sparkles" style="width: 13.5px; height: 13.5px;"></i> Kozmetik & Kişisel Bakım
-                </h4>
-                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Eve Shop</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Sevil</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Yves Rocher</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>MAC</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Kiko Milano</span>
-                </div>
-              </div>
-
-              <div class="coming-soon-card">
-                <h4 style="font-size: 12px; color: var(--green); font-weight: 800; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; border-bottom: 1px dashed var(--border); padding-bottom: 6px;">
-                  <i data-lucide="shirt" style="width: 13.5px; height: 13.5px;"></i> Giyim, Ayakkabı & Moda
-                </h4>
-                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>DeFacto</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Koton</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>LTB</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Colin's</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Özdilek</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Beymen</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Kiğılı</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Süvari</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Hatemoğlu</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Tudors</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>İpekyol</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Machka</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Pull&Bear</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Stradivarius</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Massimo Dutti</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>In Street</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Deichmann</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Ayakkabı Dünyası</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>SuperStep</span>
-                </div>
-              </div>
-
-              <div class="coming-soon-card">
-                <h4 style="font-size: 12px; color: var(--green); font-weight: 800; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; border-bottom: 1px dashed var(--border); padding-bottom: 6px;">
-                  <i data-lucide="baby" style="width: 13.5px; height: 13.5px;"></i> Sağlık & Anne-Bebek
-                </h4>
-                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Atasun Optik</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Opmar Optik</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Elegance Optik</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Mert Optik</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Babymall</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Joker</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>GNC</span>
-                </div>
-              </div>
-
-              <div class="coming-soon-card">
-                <h4 style="font-size: 12px; color: var(--green); font-weight: 800; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; border-bottom: 1px dashed var(--border); padding-bottom: 6px;">
-                  <i data-lucide="home" style="width: 13.5px; height: 13.5px;"></i> Ev & Yapı Market
-                </h4>
-                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Paşabahçe</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Bernardo</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Jumbo</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Porland</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Hisar</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Linens</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Bella Maison</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Karaca Home</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>IKEA</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Koçtaş Fix</span>
-                  <span class="store-badge-soon"><span style="width: 5px; height: 5px; background: var(--green); border-radius: 50%; opacity: 0.6;"></span>Tekzen</span>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-        
-        <script>
-          function toggleComingSoonStores() {
-            const container = document.getElementById('comingSoonStoresContainer');
-            const chevron = document.getElementById('comingSoonChevron');
-            const btn = document.querySelector('.coming-soon-toggle');
-            if (container.style.display === 'none') {
-              container.style.display = 'block';
-              chevron.style.transform = 'rotate(180deg)';
-              btn.style.borderRadius = '12px 12px 0 0';
-            } else {
-              container.style.display = 'none';
-              chevron.style.transform = 'none';
-              btn.style.borderRadius = '12px';
-            }
-          }
-        </script>
         <div id="latestCampaignsSection" class="hidden" style="margin-bottom:22px;">
           <div class="section-heading" style="margin-bottom:10px;">
             <div>
@@ -709,18 +566,20 @@
                     <span>Kamera veya barkod fotoğrafı seç</span>
                     <input id="barcodeImageInput" type="file" accept="image/*" capture="environment">
                   </label>
-                  <p class="scanner-divider"><span>veya demo barkod</span></p>
-                  <select id="barcodeSelector" class="form-select">
-                    <option value="">-- Barkod Seçin --</option>
-                    <option value="8690506390074">Yudum Ayçiçek Yağı 5 L (8690506390074)</option>
-                    <option value="8690506390081">Yudum Ayçiçek Yağı 2 L (8690506390081)</option>
-                    <option value="8690632034071">Hardline Whey 3 Matrix 2300 Gr (8690632034071)</option>
-                    <option value="8690506000010">Migros Süt 1 L (8690506000010)</option>
-                    <option value="8690605061033">İpana 3D White Diş Macunu 75 ml (8690605061033)</option>
-                    <option value="8696001002003">Samsung T7 Portable SSD 1 TB (8696001002003)</option>
-                    <option value="8697001003004">Defacto Erkek Çorap 3'lü Paket (8697001003004)</option>
-                  </select>
-                  <button class="primary-button" id="runBarcodeScanBtn">Taramayı Simüle Et</button>
+                  <div id="barcodeFallbackArea" class="hidden">
+                    <p class="scanner-divider"><span>Kamera çalışmıyor mu? Örnek üründen seç</span></p>
+                    <select id="barcodeSelector" class="form-select">
+                      <option value="">-- Barkod Seçin --</option>
+                      <option value="8690506390074">Yudum Ayçiçek Yağı 5 L (8690506390074)</option>
+                      <option value="8690506390081">Yudum Ayçiçek Yağı 2 L (8690506390081)</option>
+                      <option value="8690632034071">Hardline Whey 3 Matrix 2300 Gr (8690632034071)</option>
+                      <option value="8690506000010">Migros Süt 1 L (8690506000010)</option>
+                      <option value="8690605061033">İpana 3D White Diş Macunu 75 ml (8690605061033)</option>
+                      <option value="8696001002003">Samsung T7 Portable SSD 1 TB (8696001002003)</option>
+                      <option value="8697001003004">Defacto Erkek Çorap 3'lü Paket (8697001003004)</option>
+                    </select>
+                    <button class="primary-button" id="runBarcodeScanBtn">Barkodu Sorgula</button>
+                  </div>
                 </div>
                 <div id="receiptOcrUploadArea" class="hidden">
                   <p class="ocr-info">Fiş fotoğrafını seç. Ürünleri kontrol edip harcama geçmişine kaydet.</p>
@@ -773,14 +632,14 @@
               <div class="optimizer-location-settings" style="display: flex; gap: 8px; margin-top: 12px; align-items: center; justify-content: space-between; font-size: 12px; background: rgba(0, 0, 0, 0.02); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 6px; flex: 1;">
                   <i data-lucide="map-pin" style="width: 15px; height: 15px; color: var(--green);"></i>
-                  <select id="userLocationSelector" class="form-select" style="font-size: 11px; padding: 2px 4px; border: none; background: transparent; color: var(--ink); font-weight: 700; cursor: pointer;" onchange="updateUserLocation(this.value)">
+                  <select id="userLocationSelector" class="form-select" title="Listede şehrin yoksa 'GPS Konumu Al' seçeneğini kullan; en yakın mağazalar otomatik bulunur, kapsam dışındaysa açıkça belirtilir." style="font-size: 11px; padding: 2px 4px; border: none; background: transparent; color: var(--ink); font-weight: 700; cursor: pointer;" onchange="updateUserLocation(this.value)">
                     <option value="default">📍 Konum Belirtilmedi</option>
                     <option value="besiktas">📍 İstanbul, Beşiktaş</option>
                     <option value="kadikoy">📍 İstanbul, Kadıköy</option>
                     <option value="cankaya">📍 Ankara, Çankaya</option>
                     <option value="karsiyaka">📍 İzmir, Karşıyaka</option>
                     <option value="bodrum">📍 Muğla, Bodrum</option>
-                    <option value="gps">📍 GPS Konumu Al</option>
+                    <option value="gps">📍 GPS Konumu Al (önerilir)</option>
                   </select>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
@@ -811,22 +670,22 @@
             <a href="/kategori/market" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, var(--surface,#fff) 0%, rgba(247,248,255,0.7) 100%); border:1.5px solid rgba(40,122,80,0.15); padding:9px 16px; border-radius:30px; font-size:12.5px; font-weight:600; color:var(--ink); text-decoration:none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);" onmouseover="this.style.borderColor='var(--green)'; this.style.color='var(--green)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 14px rgba(40,122,80,0.12)';" onmouseout="this.style.borderColor='rgba(40,122,80,0.15)'; this.style.color='var(--ink)'; this.style.transform='none'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.02)';">
               <i data-lucide="shopping-basket" style="width:14.5px; height:14.5px; stroke-width:2.5; color:var(--green);"></i> Market / Gıda
             </a>
-            <a href="/kategori/tech" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, var(--surface,#fff) 0%, rgba(247,248,255,0.7) 100%); border:1.5px solid rgba(40,122,80,0.15); padding:9px 16px; border-radius:30px; font-size:12.5px; font-weight:600; color:var(--ink); text-decoration:none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);" onmouseover="this.style.borderColor='var(--green)'; this.style.color='var(--green)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 14px rgba(40,122,80,0.12)';" onmouseout="this.style.borderColor='rgba(40,122,80,0.15)'; this.style.color='var(--ink)'; this.style.transform='none'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.02)';">
+            <a href="/kategori/teknoloji" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, var(--surface,#fff) 0%, rgba(247,248,255,0.7) 100%); border:1.5px solid rgba(40,122,80,0.15); padding:9px 16px; border-radius:30px; font-size:12.5px; font-weight:600; color:var(--ink); text-decoration:none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);" onmouseover="this.style.borderColor='var(--green)'; this.style.color='var(--green)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 14px rgba(40,122,80,0.12)';" onmouseout="this.style.borderColor='rgba(40,122,80,0.15)'; this.style.color='var(--ink)'; this.style.transform='none'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.02)';">
               <i data-lucide="smartphone" style="width:14.5px; height:14.5px; stroke-width:2.5; color:var(--green);"></i> Teknoloji
             </a>
-            <a href="/kategori/beauty" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, var(--surface,#fff) 0%, rgba(247,248,255,0.7) 100%); border:1.5px solid rgba(40,122,80,0.15); padding:9px 16px; border-radius:30px; font-size:12.5px; font-weight:600; color:var(--ink); text-decoration:none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);" onmouseover="this.style.borderColor='var(--green)'; this.style.color='var(--green)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 14px rgba(40,122,80,0.12)';" onmouseout="this.style.borderColor='rgba(40,122,80,0.15)'; this.style.color='var(--ink)'; this.style.transform='none'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.02)';">
+            <a href="/kategori/kozmetik" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, var(--surface,#fff) 0%, rgba(247,248,255,0.7) 100%); border:1.5px solid rgba(40,122,80,0.15); padding:9px 16px; border-radius:30px; font-size:12.5px; font-weight:600; color:var(--ink); text-decoration:none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);" onmouseover="this.style.borderColor='var(--green)'; this.style.color='var(--green)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 14px rgba(40,122,80,0.12)';" onmouseout="this.style.borderColor='rgba(40,122,80,0.15)'; this.style.color='var(--ink)'; this.style.transform='none'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.02)';">
               <i data-lucide="sparkles" style="width:14.5px; height:14.5px; stroke-width:2.5; color:var(--green);"></i> Kozmetik
             </a>
-            <a href="/kategori/fashion" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, var(--surface,#fff) 0%, rgba(247,248,255,0.7) 100%); border:1.5px solid rgba(40,122,80,0.15); padding:9px 16px; border-radius:30px; font-size:12.5px; font-weight:600; color:var(--ink); text-decoration:none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);" onmouseover="this.style.borderColor='var(--green)'; this.style.color='var(--green)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 14px rgba(40,122,80,0.12)';" onmouseout="this.style.borderColor='rgba(40,122,80,0.15)'; this.style.color='var(--ink)'; this.style.transform='none'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.02)';">
+            <a href="/kategori/moda" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, var(--surface,#fff) 0%, rgba(247,248,255,0.7) 100%); border:1.5px solid rgba(40,122,80,0.15); padding:9px 16px; border-radius:30px; font-size:12.5px; font-weight:600; color:var(--ink); text-decoration:none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);" onmouseover="this.style.borderColor='var(--green)'; this.style.color='var(--green)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 14px rgba(40,122,80,0.12)';" onmouseout="this.style.borderColor='rgba(40,122,80,0.15)'; this.style.color='var(--ink)'; this.style.transform='none'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.02)';">
               <i data-lucide="shirt" style="width:14.5px; height:14.5px; stroke-width:2.5; color:var(--green);"></i> Moda
             </a>
-            <a href="/kategori/health" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, var(--surface,#fff) 0%, rgba(247,248,255,0.7) 100%); border:1.5px solid rgba(40,122,80,0.15); padding:9px 16px; border-radius:30px; font-size:12.5px; font-weight:600; color:var(--ink); text-decoration:none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);" onmouseover="this.style.borderColor='var(--green)'; this.style.color='var(--green)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 14px rgba(40,122,80,0.12)';" onmouseout="this.style.borderColor='rgba(40,122,80,0.15)'; this.style.color='var(--ink)'; this.style.transform='none'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.02)';">
+            <a href="/kategori/saglik" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, var(--surface,#fff) 0%, rgba(247,248,255,0.7) 100%); border:1.5px solid rgba(40,122,80,0.15); padding:9px 16px; border-radius:30px; font-size:12.5px; font-weight:600; color:var(--ink); text-decoration:none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);" onmouseover="this.style.borderColor='var(--green)'; this.style.color='var(--green)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 14px rgba(40,122,80,0.12)';" onmouseout="this.style.borderColor='rgba(40,122,80,0.15)'; this.style.color='var(--ink)'; this.style.transform='none'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.02)';">
               <i data-lucide="baby" style="width:14.5px; height:14.5px; stroke-width:2.5; color:var(--green);"></i> Sağlık / Bebek
             </a>
-            <a href="/kategori/home" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, var(--surface,#fff) 0%, rgba(247,248,255,0.7) 100%); border:1.5px solid rgba(40,122,80,0.15); padding:9px 16px; border-radius:30px; font-size:12.5px; font-weight:600; color:var(--ink); text-decoration:none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);" onmouseover="this.style.borderColor='var(--green)'; this.style.color='var(--green)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 14px rgba(40,122,80,0.12)';" onmouseout="this.style.borderColor='rgba(40,122,80,0.15)'; this.style.color='var(--ink)'; this.style.transform='none'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.02)';">
+            <a href="/kategori/ev-yasam" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, var(--surface,#fff) 0%, rgba(247,248,255,0.7) 100%); border:1.5px solid rgba(40,122,80,0.15); padding:9px 16px; border-radius:30px; font-size:12.5px; font-weight:600; color:var(--ink); text-decoration:none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);" onmouseover="this.style.borderColor='var(--green)'; this.style.color='var(--green)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 14px rgba(40,122,80,0.12)';" onmouseout="this.style.borderColor='rgba(40,122,80,0.15)'; this.style.color='var(--ink)'; this.style.transform='none'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.02)';">
               <i data-lucide="home" style="width:14.5px; height:14.5px; stroke-width:2.5; color:var(--green);"></i> Ev / Yaşam
             </a>
-            <a href="/kategori/online" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, var(--surface,#fff) 0%, rgba(247,248,255,0.7) 100%); border:1.5px solid rgba(40,122,80,0.15); padding:9px 16px; border-radius:30px; font-size:12.5px; font-weight:600; color:var(--ink); text-decoration:none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);" onmouseover="this.style.borderColor='var(--green)'; this.style.color='var(--green)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 14px rgba(40,122,80,0.12)';" onmouseout="this.style.borderColor='rgba(40,122,80,0.15)'; this.style.color='var(--ink)'; this.style.transform='none'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.02)';">
+            <a href="/kategori/pazaryeri" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, var(--surface,#fff) 0%, rgba(247,248,255,0.7) 100%); border:1.5px solid rgba(40,122,80,0.15); padding:9px 16px; border-radius:30px; font-size:12.5px; font-weight:600; color:var(--ink); text-decoration:none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);" onmouseover="this.style.borderColor='var(--green)'; this.style.color='var(--green)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 14px rgba(40,122,80,0.12)';" onmouseout="this.style.borderColor='rgba(40,122,80,0.15)'; this.style.color='var(--ink)'; this.style.transform='none'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.02)';">
               <i data-lucide="shopping-cart" style="width:14.5px; height:14.5px; stroke-width:2.5; color:var(--green);"></i> Pazaryeri
             </a>
           </div>
@@ -840,7 +699,7 @@
           <span style="color: var(--border); font-size: 12px;">•</span>
           <a href="/iletisim" style="color: var(--ink-2); text-decoration: none; font-weight: 600; font-size: 12.5px; transition: color 0.15s;" onmouseover="this.style.color='var(--green)'" onmouseout="this.style.color='var(--ink-2)'">İletişim</a>
         </div>
-        <p style="margin:8px 0 0;">© 2026 Almadan</p>
+        <p style="margin:8px 0 0;">© <span id="copyYear">2026</span> Almadan</p><script>(function(){var y=document.getElementById("copyYear");if(y)y.textContent=new Date().getFullYear();})();</script>
       </footer>
     </main>
 

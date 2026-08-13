@@ -127,9 +127,9 @@
     </main>
 
     <footer class="bp-footer">
-      <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/iletisim">İletişim</a>
-      <p>© 2026 Almadan</p>
+      <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
+      <p>© <span id="copyYear">2026</span> Almadan</p>
     </footer>
-    <script>window.addEventListener('load', () => { if (window.lucide) lucide.createIcons(); });</script>
+    <script>window.addEventListener('load', () => { if (window.lucide) lucide.createIcons(); const y = document.getElementById('copyYear'); if (y) y.textContent = new Date().getFullYear(); });</script>
   </body>
 </html>
