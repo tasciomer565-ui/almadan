@@ -771,6 +771,30 @@ def has_gender_conflict(query: str, title: str) -> bool:
     return False
 
 
+_TITLE_SAFE_TRAILING_TOKENS = {
+    "s", "m", "l", "xl", "xs", "xxl", "xxs", "2xl", "3xl", "4xl",
+}
+
+
+def _clean_scraped_title(title: str) -> str:
+    """Kaynak mağazadan (n11 vb.) gelen, listeleme kartında kendi kırpma
+    limitleriyle yarım kelimede kesilmiş başlıkları temizler (ör. "...İki A").
+
+    Bizim tarafımızda karakter sayısıyla kırpma yapmıyoruz -- kaynağın kendi
+    HTML'inde zaten kesilmiş geliyor. Burada sadece açıkça yarım kalmış tek
+    harflik son token'ı (bilinen beden/varyant kodları hariç) atıyoruz; agresif
+    tahmin yürütmüyoruz ki gerçek "L", "XL" gibi bedenler yanlışlıkla silinmesin.
+    """
+    if not title:
+        return title
+    title = title.strip()
+    tokens = title.split(" ")
+    if len(tokens) > 1 and len(tokens[-1]) == 1 and tokens[-1].isalpha():
+        if tokens[-1].lower() not in _TITLE_SAFE_TRAILING_TOKENS:
+            title = " ".join(tokens[:-1]).rstrip(" -,")
+    return title
+
+
 def is_logical_product(query: str, product_title: str) -> bool:
     if has_physical_conflict(query, product_title):
         return False
@@ -3384,6 +3408,8 @@ def search_products_by_name(
             p["price"] = 0
         p.setdefault("title", "")
         p.setdefault("url", "")
+        if p["title"]:
+            p["title"] = _clean_scraped_title(p["title"])
 
     # 5. Filter out accessory/irrelevant products (like cloth, case, cables)
     filtered_products = [p for p in all_products if is_logical_product(corrected_query, p["title"])]

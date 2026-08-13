@@ -9,9 +9,11 @@
       "maxDuration": 60
     }
   },
+  "redirects": [
+    { "source": "/index.html", "destination": "/", "permanent": true }
+  ],
   "rewrites": [
     { "source": "/", "destination": "/static/index.min.html" },
-    { "source": "/index.html", "destination": "/static/index.min.html" },
     { "source": "/hakkinda", "destination": "/static/hakkinda.html" },
     { "source": "/gizlilik", "destination": "/static/gizlilik.html" },
     { "source": "/iletisim", "destination": "/static/iletisim.html" },

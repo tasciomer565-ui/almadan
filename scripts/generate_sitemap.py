@@ -24,7 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app.main import ALL_STORES_MAP, get_seo_price_terms, _seo_price_slug_map  # noqa: E402
+from app.main import ALL_STORES_MAP, CATEGORY_URL_SLUGS, get_seo_price_terms, _seo_price_slug_map  # noqa: E402
 from app.comparator import normalize_turkish_search_query  # noqa: E402
 from app.cache import make_cache_key, cache_get_stale  # noqa: E402
 
@@ -96,7 +96,7 @@ def build_sitemap() -> str:
         add(path, freq, prio)
 
     for category in ALL_STORES_MAP:
-        add(f"kategori/{category}", "weekly", "0.6")
+        add(f"kategori/{CATEGORY_URL_SLUGS.get(category, category)}", "weekly", "0.6")
 
     seen_slugs: set[str] = set()
     for slugs in ALL_STORES_MAP.values():

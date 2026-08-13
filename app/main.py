@@ -1269,20 +1269,16 @@ def storage_health() -> dict:
 
 @app.get("/", include_in_schema=False)
 def home(request: Request) -> Response:
+    # Tek canonical URL / kökü -- /index.html'e artık redirect etmiyoruz
+    # (vercel.json'daki 301 zaten /index.html -> / yönlendirmesini yapıyor,
+    # buraya /index.html'e giden bir redirect eklemek döngü oluştururdu).
+    # /hakkinda, /gizlilik gibi statik sayfalar da aynı STATIC_DIR üzerinden
+    # prod'da sorunsuz serve ediliyor -- "public/ prod'da yok" varsayımı artık
+    # doğru değil, bu yüzden index.html için de aynı yolu kullanıyoruz.
     index_file = STATIC_DIR / "index.html"
     if index_file.is_file():
         return FileResponse(index_file, media_type="text/html; charset=utf-8")
-    # Vercel lambda paketi public/ içermediği için prod'da hep bu dala düşer --
-    # query string'i (?list=... gibi paylaşılan sepet linkleri) korumazsak
-    # ortak liste özelliği sessizce kırılır.
-    target = "/index.html"
-    if request.url.query:
-        target += f"?{request.url.query}"
-    # Prod'da bu yonlendirme HER ZAMAN gerceklesiyor (yapisal, gecici degil)
-    # -- 301 (kalici) kullanmak Google'a ve tarayiciya dogru sinyali verir,
-    # 307 "gecici" oldugu icin arama motoru sinyal degerini / yi tutmaya
-    # calisip kafasi karisabiliyordu.
-    return RedirectResponse(target, status_code=301)
+    return HTMLResponse("<h1>Almadan</h1><p>Ana sayfa şu anda yüklenemiyor.</p>", status_code=503)
 
 
 # ── İstemci hata raporları ──────────────────────────────────
@@ -1461,7 +1457,7 @@ def store_suggestion_form() -> HTMLResponse:
       });
     </script>
   </body>
-</html>"""
+</html>""".replace("© 2026 Almadan", f"© {datetime.now().year} Almadan")
     return HTMLResponse(page)
 
 
@@ -5969,7 +5965,7 @@ def _branded_404_page(title: str, message: str = "") -> str:
     <div class="wrap">
       <h1>{title_esc}</h1>
       {f'<p>{message_esc}</p>' if message_esc else ''}
-      <a class="cta" href="/index.html">Ana Sayfaya Dön</a>
+      <a class="cta" href="/">Ana Sayfaya Dön</a>
     </div>
   </body>
 </html>"""
@@ -6529,6 +6525,7 @@ async def store_page(slug: str):
     name = _html.escape(store["name"])
     description = _html.escape(store.get("description") or f"{name} kampanya ve fiyat karşılaştırması.")
     category = _html.escape(store.get("category") or "")
+    category_url_slug = CATEGORY_URL_SLUGS.get(store.get("category") or "", store.get("category") or "")
     category_display_name, _ = _CATEGORY_DISPLAY.get(store.get("category", ""), (store.get("category", "").capitalize(), ""))
 
     verified_badge_html = ""
@@ -6647,7 +6644,7 @@ async def store_page(slug: str):
           "url": "https://www.almadan.app/magaza/{slug}",
           "name": "{seo_title_escaped}",
           "description": "{seo_desc_escaped}",
-          "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app/index.html" }},
+          "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app/" }},
           "about": {{ "@type": "Organization", "name": "{name}"{offers_json} }}
         }},
         {{
@@ -6657,13 +6654,13 @@ async def store_page(slug: str):
               "@type": "ListItem",
               "position": 1,
               "name": "Ana Sayfa",
-              "item": "https://www.almadan.app/index.html"
+              "item": "https://www.almadan.app/"
             }},
             {{
               "@type": "ListItem",
               "position": 2,
               "name": "{category_display_name_escaped}",
-              "item": "https://www.almadan.app/kategori/{category}"
+              "item": "https://www.almadan.app/kategori/{category_url_slug}"
             }},
             {{
               "@type": "ListItem",
@@ -6756,9 +6753,9 @@ async def store_page(slug: str):
     </header>
 
     <div class="bp-breadcrumbs" style="padding: 16px 5vw 0; max-width: 820px; margin: 0 auto; font-size: 13.5px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-      <a href="/index.html" style="text-decoration: none; color: var(--green); font-weight: 600;">Ana Sayfa</a>
+      <a href="/" style="text-decoration: none; color: var(--green); font-weight: 600;">Ana Sayfa</a>
       <span style="color: var(--border);">/</span>
-      <a href="/kategori/{category}" style="text-decoration: none; color: var(--green); font-weight: 600;">{category_display_name_escaped}</a>
+      <a href="/kategori/{category_url_slug}" style="text-decoration: none; color: var(--green); font-weight: 600;">{category_display_name_escaped}</a>
       <span style="color: var(--border);">/</span>
       <span style="color: var(--ink-2); font-weight: 500;">{name}</span>
     </div>
@@ -6784,7 +6781,7 @@ async def store_page(slug: str):
 
     <footer class="bp-footer">
       <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
-      <p>© 2026 Almadan</p>
+      <p>© {datetime.now().year} Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
   </body>
@@ -6861,7 +6858,7 @@ async def coupons_page():
   </head>
   <body class="bp-body-page">
     <header class="bp-header">
-      <a href="/index.html" class="bp-logo">Almadan</a>
+      <a href="/" class="bp-logo">Almadan</a>
       <nav>
         <a href="/hakkinda">Hakkında</a>
         <a href="/iletisim">İletişim</a>
@@ -6883,7 +6880,7 @@ async def coupons_page():
     </main>
     <footer class="bp-footer">
       <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
-      <p>© 2026 Almadan</p>
+      <p>© {datetime.now().year} Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
   </body>
@@ -7011,6 +7008,7 @@ async def catalog_page(store: str):
         category_slug = "market"
         category_display_name = "Market / Gıda"
         store_name = _format_store_name(store)
+    category_url_slug = CATEGORY_URL_SLUGS.get(category_slug, category_slug)
 
     # CTR icin: kac urun taranmis somut sayiyla baslikta -- "Aktuel Urunler
     # Katalogu" gibi jenerik ifadeden daha ikna edici.
@@ -7033,7 +7031,7 @@ async def catalog_page(store: str):
           "url": "https://www.almadan.app/aktuel/{store}",
           "name": "{seo_title_escaped}",
           "description": "{seo_desc_escaped}",
-          "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app/index.html" }}
+          "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app/" }}
         }},
         {{
           "@type": "BreadcrumbList",
@@ -7042,13 +7040,13 @@ async def catalog_page(store: str):
               "@type": "ListItem",
               "position": 1,
               "name": "Ana Sayfa",
-              "item": "https://www.almadan.app/index.html"
+              "item": "https://www.almadan.app/"
             }},
             {{
               "@type": "ListItem",
               "position": 2,
               "name": "{category_display_name_escaped}",
-              "item": "https://www.almadan.app/kategori/{category_slug}"
+              "item": "https://www.almadan.app/kategori/{category_url_slug}"
             }},
             {{
               "@type": "ListItem",
@@ -7111,9 +7109,9 @@ async def catalog_page(store: str):
     </header>
 
     <div class="bp-breadcrumbs" style="padding: 16px 5vw 0; max-width: 820px; margin: 0 auto; font-size: 13.5px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-      <a href="/index.html" style="text-decoration: none; color: var(--green); font-weight: 600;">Ana Sayfa</a>
+      <a href="/" style="text-decoration: none; color: var(--green); font-weight: 600;">Ana Sayfa</a>
       <span style="color: var(--border);">/</span>
-      <a href="/kategori/{category_slug}" style="text-decoration: none; color: var(--green); font-weight: 600;">{category_display_name_escaped}</a>
+      <a href="/kategori/{category_url_slug}" style="text-decoration: none; color: var(--green); font-weight: 600;">{category_display_name_escaped}</a>
       <span style="color: var(--border);">/</span>
       <a href="/magaza/{store}" style="text-decoration: none; color: var(--green); font-weight: 600;">{store_name_escaped}</a>
       <span style="color: var(--border);">/</span>
@@ -7139,7 +7137,7 @@ async def catalog_page(store: str):
 
     <footer class="bp-footer">
       <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
-      <p>© 2026 Almadan</p>
+      <p>© {datetime.now().year} Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
   </body>
@@ -7169,21 +7167,42 @@ _CATEGORY_TR_ALIASES = {
     "market": "market", "pazaryeri": "online", "online": "online",
 }
 
+# Tek dil standardi: kategori URL'leri Turkce (SEO trafigi TR hedefli).
+# internal key (ALL_STORES_MAP) -> canonical TR slug.
+CATEGORY_URL_SLUGS = {
+    "tech": "teknoloji", "beauty": "kozmetik", "fashion": "moda",
+    "health": "saglik", "home": "ev-yasam", "online": "pazaryeri",
+    "market": "market",
+}
+_CATEGORY_URL_SLUGS_REV = {v: k for k, v in CATEGORY_URL_SLUGS.items()}
+
 
 @app.get("/kategori/{category}", response_class=HTMLResponse)
 async def category_page(category: str):
-    """Kategori bazli SEO sayfasi -- ilgili tum magazalara link verir."""
+    """Kategori bazli SEO sayfasi -- ilgili tum magazalara link verir.
+
+    URL her zaman TR canonical slug'i kullanir (ör. /kategori/teknoloji);
+    eski Ingilizce slug'lar (tech, beauty, ...) ve eski TR varyantlar 301
+    ile canonical'a yonlendirilir -- SEO degerini korur, 404 vermez.
+    """
     import html as _html
 
-    alias_target = _CATEGORY_TR_ALIASES.get(category.lower())
-    if alias_target and alias_target != category:
-        return RedirectResponse(f"/kategori/{alias_target}", status_code=301)
+    category_key = category.lower()
+    if category_key in _CATEGORY_URL_SLUGS_REV:
+        category = _CATEGORY_URL_SLUGS_REV[category_key]
+    else:
+        internal_key = _CATEGORY_TR_ALIASES.get(category_key, category_key)
+        if internal_key in CATEGORY_URL_SLUGS:
+            return RedirectResponse(f"/kategori/{CATEGORY_URL_SLUGS[internal_key]}", status_code=301)
+        category = internal_key
 
     if category not in ALL_STORES_MAP:
         return HTMLResponse(
             _branded_404_page("Kategori bulunamadı", "Aradığın kategori listemizde yok."),
             status_code=404,
         )
+
+    category_url_slug = CATEGORY_URL_SLUGS[category]
 
     display_name, raw_desc = _CATEGORY_DISPLAY.get(category, (category.capitalize(), ""))
     display_name = _html.escape(display_name)
@@ -7237,10 +7256,10 @@ async def category_page(category: str):
       "@graph": [
         {{
           "@type": "CollectionPage",
-          "url": "https://www.almadan.app/kategori/{category}",
+          "url": "https://www.almadan.app/kategori/{category_url_slug}",
           "name": "{seo_title_escaped}",
           "description": "{seo_desc_escaped}",
-          "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app/index.html" }}
+          "isPartOf": {{ "@type": "WebSite", "name": "Almadan", "url": "https://www.almadan.app/" }}
         }},
         {{
           "@type": "BreadcrumbList",
@@ -7249,13 +7268,13 @@ async def category_page(category: str):
               "@type": "ListItem",
               "position": 1,
               "name": "Ana Sayfa",
-              "item": "https://www.almadan.app/index.html"
+              "item": "https://www.almadan.app/"
             }},
             {{
               "@type": "ListItem",
               "position": 2,
               "name": "{display_name}",
-              "item": "https://www.almadan.app/kategori/{category}"
+              "item": "https://www.almadan.app/kategori/{category_url_slug}"
             }}
           ]
         }}
@@ -7280,13 +7299,13 @@ async def category_page(category: str):
     <meta name="theme-color" content="#121412">
     <title>{seo_title_escaped}</title>
     <meta name="description" content="{seo_desc_escaped}">
-    <link rel="canonical" href="https://www.almadan.app/kategori/{category}">
+    <link rel="canonical" href="https://www.almadan.app/kategori/{category_url_slug}">
     <meta name="robots" content="index, follow">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Almadan">
     <meta property="og:title" content="{seo_title_escaped}">
     <meta property="og:description" content="{seo_desc_escaped}">
-    <meta property="og:url" content="https://www.almadan.app/kategori/{category}">
+    <meta property="og:url" content="https://www.almadan.app/kategori/{category_url_slug}">
     <meta property="og:image" content="https://www.almadan.app/static/icon-512.png">
     <meta property="og:locale" content="tr_TR">
     <meta name="twitter:card" content="summary">
@@ -7312,7 +7331,7 @@ async def category_page(category: str):
     </header>
 
     <div class="bp-breadcrumbs" style="padding: 16px 5vw 0; max-width: 820px; margin: 0 auto; font-size: 13.5px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-      <a href="/index.html" style="text-decoration: none; color: var(--green); font-weight: 600;">Ana Sayfa</a>
+      <a href="/" style="text-decoration: none; color: var(--green); font-weight: 600;">Ana Sayfa</a>
       <span style="color: var(--border);">/</span>
       <span style="color: var(--ink-2); font-weight: 500;">{display_name}</span>
     </div>
@@ -7338,7 +7357,7 @@ async def category_page(category: str):
 
     <footer class="bp-footer">
       <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
-      <p>© 2026 Almadan</p>
+      <p>© {datetime.now().year} Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
   </body>
@@ -7458,12 +7477,22 @@ async def trend_page():
     </main>
     <footer class="bp-footer">
       <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
-      <p>© 2026 Almadan</p>
+      <p>© {datetime.now().year} Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
   </body>
 </html>"""
     return HTMLResponse(page)
+
+
+def _truncate_title(title: str, max_len: int = 70) -> str:
+    """Sabit karakter sayısında rastgele kesmek yerine kelime sınırında keser
+    ve "…" ekler -- aksi halde "...Oyun Hoparlörü İki A" gibi yarım kelimede
+    biten başlıklar görünüyordu."""
+    if not title or len(title) <= max_len:
+        return title
+    truncated = title[:max_len].rsplit(" ", 1)[0]
+    return (truncated or title[:max_len]).rstrip(" -,") + "…"
 
 
 @app.get("/rekortmenler", response_class=HTMLResponse)
@@ -7476,7 +7505,7 @@ async def price_records_page():
 
     if movers:
         cards_html = "".join(
-            f'<div class="bp-feature"><h3>{_html.escape(m["title"][:70] or "Ürün")}</h3>'
+            f'<div class="bp-feature"><h3>{_html.escape(_truncate_title(m["title"]) or "Ürün")}</h3>'
             f'<p>{_html.escape(m["source"])} · %{m["change_pct"]} düşüş · '
             f'En düşük ₺{m["min_price"]:.2f} · Şimdi ₺{m["last_price"]:.2f}</p></div>'
             for m in movers if m["change_pct"] > 0
@@ -7529,7 +7558,7 @@ async def price_records_page():
     </main>
     <footer class="bp-footer">
       <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
-      <p>© 2026 Almadan</p>
+      <p>© {datetime.now().year} Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
   </body>
@@ -7902,6 +7931,14 @@ _PRICE_PAGE_GENERIC_TIPS = [
 ]
 
 
+def _tr_price(value: float) -> str:
+    """1234.5 -> '1.234,50' (TR ondalik bicimi). Sayfa govdesi ve meta
+    description/og:description ayni formati kullansin diye modul seviyesinde --
+    daha once meta description'da {cheapest:.2f} (nokta ondalik, binlik yok)
+    kullanilirken govde bu fonksiyonla TR bicimindeydi, ikisi birbirini tutmuyordu."""
+    return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
 def _price_page_editorial_html(term: str, products: list[dict]) -> str:
     """/fiyat/{terim} sayfalarina, sadece urun listesinden ibaret kalmayip
     gercek hesaplanmis veriye dayali ozgun bir icerik bloğu (istatistik +
@@ -7920,10 +7957,6 @@ def _price_page_editorial_html(term: str, products: list[dict]) -> str:
     if not priced:
         return ""
 
-    def _tr_price(value: float) -> str:
-        """1234.5 -> '1.234,50' (TR ondalik bicimi)."""
-        return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
     prices = [p["price"] for p in priced]
     avg_price = sum(prices) / len(prices)
     cheapest_p = min(priced, key=lambda p: p["price"])
@@ -7932,12 +7965,22 @@ def _price_page_editorial_html(term: str, products: list[dict]) -> str:
 
     # Terimin ait oldugu konu grubunu bul (varsa) -- zaten elle yazilmis,
     # gercek editoryal ipuclarini burada da kullan (tekrar yazmaya gerek yok).
+    # Konunun TÜM ipuçlarını degil, sadece bu terimle alakalı olanları (keywords
+    # eşleşiyorsa) veya her zaman geçerli genel ipuçlarını (keywords: None)
+    # göster -- aksi halde ör. "razer hoparlör" sayfasında powerbank/AirPods
+    # gibi alakasız ipuçları çıkıyordu (topic'in TÜM ipuçları kopyalanıyordu).
     normalized_term = term.translate(_SEO_TR_TO_ASCII).casefold()
     tips = _PRICE_PAGE_GENERIC_TIPS
     for topic in _GSC_TOPIC_PAGES.values():
         topic_terms = {t.translate(_SEO_TR_TO_ASCII).casefold() for t in topic.get("terms", [])}
         if normalized_term in topic_terms:
-            tips = topic.get("tips") or _PRICE_PAGE_GENERIC_TIPS
+            topic_tips = topic.get("tips") or []
+            matched = [
+                tip["text"] for tip in topic_tips
+                if tip.get("keywords") is None
+                or any(kw in normalized_term for kw in tip["keywords"])
+            ]
+            tips = matched or _PRICE_PAGE_GENERIC_TIPS
             break
 
     stats_html = (
@@ -8040,14 +8083,14 @@ async def price_landing_page(slug: str):
         history_svg = _render_price_history_svg(_hist_map.get(hist_key, []))
         rows.append(
             f'<div class="bp-feature"><h3>{p_title}</h3>'
-            f'<p>{price:.2f} ₺ — {source}</p>'
+            f'<p>{_tr_price(price)} ₺ — {source}</p>'
             f'{history_svg}'
             f'<a href="{url}" rel="nofollow noopener" target="_blank">Ürüne Git</a></div>'
         )
     products_html = "".join(rows)
     editorial_html = _price_page_editorial_html(term, products)
     cheapest = min((p.get("price") or 0 for p in products if p.get("price")), default=0)
-    intro = f"{title_term} için {len(products)} mağazadan güncel fiyat karşılaştırması. En ucuz: {cheapest:.2f} ₺." if cheapest else f"{title_term} için güncel fiyat karşılaştırması."
+    intro = f"{title_term} için {len(products)} mağazadan güncel fiyat karşılaştırması. En ucuz: {_tr_price(cheapest)} ₺." if cheapest else f"{title_term} için güncel fiyat karşılaştırması."
 
     intro_escaped = _html.escape(intro)
 
@@ -8128,7 +8171,7 @@ async def price_landing_page(slug: str):
                     "name": f"En ucuz {term} nereden alınır?",
                     "acceptedAnswer": {
                         "@type": "Answer",
-                        "text": f"Şu anki karşılaştırmaya göre en uygun fiyat {cheapest_p['price']:.2f} ₺ ile {cheapest_p.get('source', '')} mağazasında.",
+                        "text": f"Şu anki karşılaştırmaya göre en uygun fiyat {_tr_price(cheapest_p['price'])} ₺ ile {cheapest_p.get('source', '')} mağazasında.",
                     },
                 },
                 {
@@ -8136,7 +8179,7 @@ async def price_landing_page(slug: str):
                     "name": f"{title_term} ortalama fiyatı ne kadar?",
                     "acceptedAnswer": {
                         "@type": "Answer",
-                        "text": f"Karşılaştırılan {len(priced)} ürünün ortalama fiyatı {avg_price:.2f} ₺.",
+                        "text": f"Karşılaştırılan {len(priced)} ürünün ortalama fiyatı {_tr_price(avg_price)} ₺.",
                     },
                 },
                 {
@@ -8155,7 +8198,7 @@ async def price_landing_page(slug: str):
             {
                 "@type": "BreadcrumbList",
                 "itemListElement": [
-                    {"@type": "ListItem", "position": 1, "name": "Ana Sayfa", "item": "https://www.almadan.app/index.html"},
+                    {"@type": "ListItem", "position": 1, "name": "Ana Sayfa", "item": "https://www.almadan.app/"},
                     {"@type": "ListItem", "position": 2, "name": "Fiyat Rehberi", "item": "https://www.almadan.app/fiyat-rehberi"},
                     {"@type": "ListItem", "position": 3, "name": f"{title_term} Fiyatları", "item": f"https://www.almadan.app/fiyat/{slug}"},
                 ],
@@ -8212,7 +8255,7 @@ async def price_landing_page(slug: str):
     </header>
 
     <div class="bp-breadcrumbs" style="padding: 16px 5vw 0; max-width: 820px; margin: 0 auto; font-size: 13.5px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-      <a href="/index.html" style="text-decoration: none; color: var(--green); font-weight: 600;">Ana Sayfa</a>
+      <a href="/" style="text-decoration: none; color: var(--green); font-weight: 600;">Ana Sayfa</a>
       <span style="color: var(--border);">/</span>
       <a href="/fiyat-rehberi" style="text-decoration: none; color: var(--green); font-weight: 600;">Fiyat Rehberi</a>
       <span style="color: var(--border);">/</span>
@@ -8239,7 +8282,7 @@ async def price_landing_page(slug: str):
 
     <footer class="bp-footer">
       <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
-      <p>© 2026 Almadan</p>
+      <p>© {datetime.now().year} Almadan</p>
     </footer>
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
   </body>
@@ -8250,7 +8293,7 @@ async def price_landing_page(slug: str):
 _GSC_TOPIC_PAGES = {
     "elektronik": {
         "title": "Hoparlör, AirPods ve Powerbank Fiyat Karşılaştırma",
-        "eyebrow": "ELEKTRONIK",
+        "eyebrow": "ELEKTRONİK",
         "description": "Razer hoparlör, Apple hoparlör, LG hoparlör, AirPods ve powerbank aramalarında mağazalar arası fiyat farkını hızlı kontrol et.",
         "terms": [
             "razer hoparlör", "apple hoparlör", "lg hoparlör", "iphone hoparlör",
@@ -8260,14 +8303,14 @@ _GSC_TOPIC_PAGES = {
             "xiaomi redmi", "monster monitör", "monster a27",
         ],
         "tips": [
-            "Kulaklik ve hoparlor aramalarinda resmi distribitor, garanti ve satici puani fiyat kadar onemlidir.",
-            "Powerbank ararken kapasite (mAh), cikis gucu ve kablosuz sarj destegi ayni model karsilastirmasinda kontrol edilmeli.",
-            "AirPods ve Apple aksesuarlarinda benzer gorunen yan sanayi urunler fiyat listesini bozabilir; model adini net yazmak daha temiz sonuc verir.",
+            {"keywords": ["hoparlör", "hoparlor", "kulaklık", "kulaklik"], "text": "Kulaklık ve hoparlör aramalarında resmi distribütör, garanti ve satıcı puanı fiyat kadar önemlidir."},
+            {"keywords": ["powerbank"], "text": "Powerbank ararken kapasite (mAh), çıkış gücü ve kablosuz şarj desteği aynı model karşılaştırmasında kontrol edilmeli."},
+            {"keywords": ["airpods", "apple"], "text": "AirPods ve Apple aksesuarlarında benzer görünen yan sanayi ürünler fiyat listesini bozabilir; model adını net yazmak daha temiz sonuç verir."},
         ],
     },
     "elektrikli-ev-aletleri": {
         "title": "Kettle, Süpürge ve Blender Seti En Ucuz Fiyatlar",
-        "eyebrow": "EV ALETLERI",
+        "eyebrow": "EV ALETLERİ",
         "description": "Tefal kettle, Philips kettle, Bosch kettle, Beko süpürge ve Vestel blender gibi aramalarda en ucuz mağazayı bulmaya odaklanan rehber.",
         "terms": [
             "tefal kettle fiyatları", "kettle tefal", "tefal su ısıtıcı", "tefal kettle",
@@ -8284,15 +8327,15 @@ _GSC_TOPIC_PAGES = {
             "vestel sessiz süpürge", "tefal süpürge", "tefal kablosuz süpürge",
         ],
         "tips": [
-            "Supurge aramalarinda torbali/torbasiz, kablolu/kablosuz ve emiş gucu ayni sepette karsilastirilmali.",
-            "Kettle ve su isiticida litre hacmi, celik/cam govde ve otomatik kapanma ozellikleri fiyat farkini aciklar.",
-            "Blender setlerinde parca sayisi ve motor gucu ayni degilse en ucuz gorunen teklif gercekte daha zayif paket olabilir.",
+            {"keywords": ["süpürge", "supurge"], "text": "Süpürge aramalarında torbalı/torbasız, kablolu/kablosuz ve emiş gücü aynı sepette karşılaştırılmalı."},
+            {"keywords": ["kettle", "ısıtıcı", "isitici"], "text": "Kettle ve su ısıtıcıda litre hacmi, çelik/cam gövde ve otomatik kapanma özellikleri fiyat farkını açıklar."},
+            {"keywords": ["blender", "mikser", "mutfak robotu"], "text": "Blender setlerinde parça sayısı ve motor gücü aynı değilse en ucuz görünen teklif gerçekte daha zayıf paket olabilir."},
         ],
     },
     "moda-renk": {
         "title": "Renk ve Kategoriye Göre Moda Fiyat Karşılaştırma",
         "eyebrow": "MODA",
-        "description": "Lacivert kaban, sari tisort, bordo etek, bej hirka ve benzeri renkli moda aramalarini tek yerde karsilastir.",
+        "description": "Lacivert kaban, sarı tişört, bordo etek, bej hırka ve benzeri renkli moda aramalarını tek yerde karşılaştır.",
         "terms": [
             "lacivert kaban", "kırmızı kaban", "mor kravat", "lacivert kravat",
             "sarı tişört", "sarı tişört erkek", "turkuaz tişört erkek",
@@ -8301,15 +8344,15 @@ _GSC_TOPIC_PAGES = {
             "lacivert ayakkabı boyası",
         ],
         "tips": [
-            "Renkli moda aramalarinda beden, sezon ve kumas bilgisi fiyati ciddi etkiler.",
-            "Ayni urun farkli pazaryerlerinde farkli satici adiyla listelenebilir; model ve marka bilgisini birlikte aramak daha iyi sonuc verir.",
-            "Kaban, ceket ve denim gibi urunlerde kargo/iade kosullari toplam maliyetin parcasi olarak dusunulmeli.",
+            {"keywords": None, "text": "Renkli moda aramalarında beden, sezon ve kumaş bilgisi fiyatı ciddi etkiler."},
+            {"keywords": None, "text": "Aynı ürün farklı pazaryerlerinde farklı satıcı adıyla listelenebilir; model ve marka bilgisini birlikte aramak daha iyi sonuç verir."},
+            {"keywords": ["kaban", "ceket", "denim", "jean"], "text": "Kaban, ceket ve denim gibi ürünlerde kargo/iade koşulları toplam maliyetin parçası olarak düşünülmeli."},
         ],
     },
     "ev-yasam": {
         "title": "Mobilya, Raf, Avize ve Ev Tekstili Fiyatları",
-        "eyebrow": "EV VE YASAM",
-        "description": "Yatak, kitaplik, raf, avize, perde, kanepe ve buzdolabi gibi ev alisverisi aramalarinda fiyat farklarini yakala.",
+        "eyebrow": "EV VE YAŞAM",
+        "description": "Yatak, kitaplık, raf, avize, perde, kanepe ve buzdolabı gibi ev alışverişi aramalarında fiyat farklarını yakala.",
         "terms": [
             "mor yatak", "pembe çocuk yatağı", "pembe kitaplık", "bordo kitaplık",
             "mavi raf", "gold raf", "mavi avize", "pembe avize", "yesil kanepe",
@@ -8317,38 +8360,38 @@ _GSC_TOPIC_PAGES = {
             "ikea teşhir ürünleri fiyatları",
         ],
         "tips": [
-            "Mobilya ve beyaz esyada teslimat, kurulum ve garanti bedelleri urun fiyatina eklenebilir.",
-            "Renk odakli aramalarda ayni urun farkli adlarla listelenebilir; ana kategoriyle birlikte aramak daha iyi eslesme saglar.",
-            "Teşhir urunlerinde stok ve kondisyon bilgisi hizli degistigi icin fiyat takibi faydalidir.",
+            {"keywords": None, "text": "Mobilya ve beyaz eşyada teslimat, kurulum ve garanti bedelleri ürün fiyatına eklenebilir."},
+            {"keywords": None, "text": "Renk odaklı aramalarda aynı ürün farklı adlarla listelenebilir; ana kategoriyle birlikte aramak daha iyi eşleşme sağlar."},
+            {"keywords": ["teşhir", "teshir"], "text": "Teşhir ürünlerinde stok ve kondisyon bilgisi hızlı değiştiği için fiyat takibi faydalıdır."},
         ],
     },
     "kozmetik": {
         "title": "Gratis, Flormar ve Golden Rose Kozmetik Fiyatları",
-        "eyebrow": "KOZMETIK",
-        "description": "Gratis ruj, Flormar parfum, kalici ruj ve Golden Rose parfum gibi kozmetik aramalarinda kampanya ve fiyat farklarini takip et.",
+        "eyebrow": "KOZMETİK",
+        "description": "Gratis ruj, Flormar parfüm, kalıcı ruj ve Golden Rose parfüm gibi kozmetik aramalarında kampanya ve fiyat farklarını takip et.",
         "terms": [
             "flormar parfüm", "flormar parfüm kadın", "gratis ruj seti",
             "gratis ruj", "gratis kalıcı ruj", "golden rose parfüm",
         ],
         "tips": [
-            "Kozmetikte renk kodu, seri adi ve ml/gr bilgisi ayni urunu bulmak icin kritik.",
-            "Set urunlerde adet ve gramaj farki oldugu icin sadece toplam fiyata bakmak yaniltabilir.",
-            "Kampanya donemlerinde ayni urun market, kozmetik zinciri ve pazaryerinde farkli fiyatla gorunebilir.",
+            {"keywords": None, "text": "Kozmetikte renk kodu, seri adı ve ml/gr bilgisi aynı ürünü bulmak için kritik."},
+            {"keywords": ["set", "seti"], "text": "Set ürünlerde adet ve gramaj farkı olduğu için sadece toplam fiyata bakmak yanıltabilir."},
+            {"keywords": None, "text": "Kampanya dönemlerinde aynı ürün market, kozmetik zinciri ve pazaryerinde farklı fiyatla görünebilir."},
         ],
     },
     "market": {
         "title": "Market Ürünleri, ŞOK Katalog ve Gıda Fiyatları",
         "eyebrow": "MARKET",
-        "description": "Nohut, kefir, semolina, Hakmar ve Sok katalog aramalarinda market fiyatlarini ve aktuel firsatlari takip et.",
+        "description": "Nohut, kefir, semolina, Hakmar ve ŞOK katalog aramalarında market fiyatlarını ve aktüel fırsatları takip et.",
         "terms": [
             "nohut fiyatları", "kefir fiyat", "kefir kaç tl", "kefir al",
             "semola", "semolina", "semolina unu", "hakmar",
             "şok indirimleri", "şok katalog",
         ],
         "tips": [
-            "Gida aramalarinda gramaj ve paket adedi fiyat karsilastirmasinin en onemli parcasidir.",
-            "Aktuel katalog urunleri kisa sureli oldugu icin stok ve tarih bilgisini kontrol etmek gerekir.",
-            "Market urunlerinde en yakin magaza, teslimat ucreti ve minimum sepet tutari toplam fiyati degistirebilir.",
+            {"keywords": None, "text": "Gıda aramalarında gramaj ve paket adedi fiyat karşılaştırmasının en önemli parçasıdır."},
+            {"keywords": ["katalog", "aktüel", "aktuel", "şok", "sok"], "text": "Aktüel katalog ürünleri kısa süreli olduğu için stok ve tarih bilgisini kontrol etmek gerekir."},
+            {"keywords": None, "text": "Market ürünlerinde en yakın mağaza, teslimat ücreti ve minimum sepet tutarı toplam fiyatı değiştirebilir."},
         ],
     },
 }
@@ -8432,15 +8475,15 @@ async def price_guide_index():
       <a href="/" class="bp-logo"><span class="bp-logo-mark">A</span>almadan</a>
       <nav class="bp-nav">
         <a href="/fiyat-rehberi" class="active">Fiyat Rehberi</a>
-        <a href="/hakkinda">Hakkinda</a>
-        <a href="/iletisim">Iletisim</a>
+        <a href="/hakkinda">Hakkında</a>
+        <a href="/iletisim">İletişim</a>
       </nav>
     </header>
     <section class="bp-hero">
       <div class="bp-hero-inner">
         <p class="bp-eyebrow">DOGAL TRAFIK REHBERI</p>
-        <h1>En cok aranan urunlerde fiyat karsilastirma</h1>
-        <p class="bp-hero-copy">Google'da gorunum almaya baslayan urun ve kategori aramalarini tek tek fiyat karsilastirma akisine bagladik.</p>
+        <h1>En çok aranan ürünlerde fiyat karşılaştırma</h1>
+        <p class="bp-hero-copy">Google'da görünüm almaya başlayan ürün ve kategori aramalarını tek tek fiyat karşılaştırma akışına bağladık.</p>
         <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> Urun Ara</a>
       </div>
     </section>
@@ -8449,8 +8492,8 @@ async def price_guide_index():
       <div class="bp-feature-grid">{cards}</div>
     </main>
     <footer class="bp-footer">
-      <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkinda</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanim Kosullari</a> · <a href="/iletisim">Iletisim</a>
-      <p>© 2026 Almadan</p>
+      <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
+      <p>© {datetime.now().year} Almadan</p>
     </footer>
   </body>
 </html>"""
@@ -8473,7 +8516,7 @@ async def price_guide_topic(topic: str):
     description = _html.escape(data["description"])
     chips = _seo_query_chips(data["terms"])
     tips = "".join(
-        f'<div class="bp-card"><p>{_html.escape(tip)}</p></div>'
+        f'<div class="bp-card"><p>{_html.escape(tip["text"])}</p></div>'
         for tip in data["tips"]
     )
     term_count = len(data["terms"])
@@ -8525,8 +8568,8 @@ async def price_guide_topic(topic: str):
       <a href="/" class="bp-logo"><span class="bp-logo-mark">A</span>almadan</a>
       <nav class="bp-nav">
         <a href="/fiyat-rehberi" class="active">Fiyat Rehberi</a>
-        <a href="/hakkinda">Hakkinda</a>
-        <a href="/iletisim">Iletisim</a>
+        <a href="/hakkinda">Hakkında</a>
+        <a href="/iletisim">İletişim</a>
       </nav>
     </header>
     <section class="bp-hero">
@@ -8534,20 +8577,20 @@ async def price_guide_topic(topic: str):
         <p class="bp-eyebrow">{eyebrow}</p>
         <h1>{title}</h1>
         <p class="bp-hero-copy">{description}</p>
-        <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> Hemen Karsilastir</a>
+        <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> Hemen Karşılaştır</a>
       </div>
     </section>
     <main class="bp-main">
       <h2><i data-lucide="search"></i> Bu sayfadaki aramalar</h2>
-      <p class="bp-body muted">Bir sorguya dokununca Almadan ana arama ekrani acilir ve fiyat karsilastirmasi otomatik baslar.</p>
+      <p class="bp-body muted">Bir sorguya dokununca Almadan ana arama ekranı açılır ve fiyat karşılaştırması otomatik başlar.</p>
       <div class="bp-chip-grid">{chips}</div>
-      <h2><i data-lucide="check-circle"></i> Karsilastirirken dikkat et</h2>
+      <h2><i data-lucide="check-circle"></i> Karşılaştırırken dikkat et</h2>
       {tips}
-      <a class="bp-cta bp-cta-block" href="/fiyat-rehberi"><i data-lucide="arrow-left"></i> Tum Rehberler</a>
+      <a class="bp-cta bp-cta-block" href="/fiyat-rehberi"><i data-lucide="arrow-left"></i> Tüm Rehberler</a>
     </main>
     <footer class="bp-footer">
-      <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkinda</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanim Kosullari</a> · <a href="/iletisim">Iletisim</a>
-      <p>© 2026 Almadan</p>
+      <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
+      <p>© {datetime.now().year} Almadan</p>
     </footer>
   </body>
 </html>"""
