@@ -8157,7 +8157,7 @@ async def price_landing_page(slug: str):
         p_title = p.get("title", "") or term
         price = p.get("price") or 0
         url = p.get("url", "")
-        image = p.get("image") or ""
+        image = p.get("image_url") or ""
         if not url or not price:
             continue
         product_schema = {
@@ -8197,7 +8197,7 @@ async def price_landing_page(slug: str):
     if len(priced) >= 2:
         agg_low = round(float(min(p["price"] for p in priced)), 2)
         agg_high = round(float(max(p["price"] for p in priced)), 2)
-        agg_image = next((p.get("image") for p in priced if p.get("image")), "")
+        agg_image = next((p.get("image_url") for p in priced if p.get("image_url")), "")
         agg_product = {
             "@type": "Product",
             "name": f"{title_term} Fiyatları",
