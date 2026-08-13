@@ -8121,6 +8121,14 @@ async def price_landing_page(slug: str):
     products_html = "".join(rows)
     editorial_html = _price_page_editorial_html(term, products)
     cheapest = min((p.get("price") or 0 for p in products if p.get("price")), default=0)
+
+    # Thin-content riski: 2 urun bariyeri gercek 404'e yeterse de, sadece
+    # 2-4 urun + tek magazadan gelen sayfalar Google/AdSense'in "dusuk
+    # degerli/programatik" olarak isaretleyebilecegi sinirda kaliyordu.
+    # En az 3 farkli magaza VE 5 urun yoksa indexlemeyi engelle (sayfa
+    # yine de erisilebilir/linklenebilir kalir, sadece SERP'e girmez).
+    store_count = len({p.get("source") for p in products if p.get("source")})
+    robots_content = "index, follow" if (store_count >= 3 and len(products) >= 5) else "noindex, follow"
     intro = f"{title_term} için {len(products)} mağazadan güncel fiyat karşılaştırması. En ucuz: {_tr_price(cheapest)} ₺." if cheapest else f"{title_term} için güncel fiyat karşılaştırması."
 
     intro_escaped = _html.escape(intro)
@@ -8139,28 +8147,38 @@ async def price_landing_page(slug: str):
     # ItemList'i gercek Product/Offer verisiyle dolduruyoruz -- onceden
     # sadece isim/url iceren bos bir ItemList'ti, zenginlestirme sansi yoktu.
     import json as _json
+    from datetime import timedelta as _timedelta
+    # Google Zengin Sonuclar Testi "Satici girisleri" icin image ve
+    # priceValidUntil alanlarini eksik/gecersiz olarak isaretliyordu --
+    # image zaten scraper verisinde vardi, sadece JSON-LD'ye eklenmemisti.
+    _price_valid_until = (datetime.now(timezone.utc) + _timedelta(days=3)).strftime("%Y-%m-%d")
     item_list_elements = []
     for i, p in enumerate(products[:15], start=1):
         p_title = p.get("title", "") or term
         price = p.get("price") or 0
         url = p.get("url", "")
+        image = p.get("image") or ""
         if not url or not price:
             continue
+        product_schema = {
+            "@type": "Product",
+            "name": p_title,
+            "url": url,
+            "offers": {
+                "@type": "Offer",
+                "price": round(float(price), 2),
+                "priceCurrency": "TRY",
+                "priceValidUntil": _price_valid_until,
+                "availability": "https://schema.org/InStock",
+                "url": url,
+            },
+        }
+        if image:
+            product_schema["image"] = image
         item_list_elements.append({
             "@type": "ListItem",
             "position": i,
-            "item": {
-                "@type": "Product",
-                "name": p_title,
-                "url": url,
-                "offers": {
-                    "@type": "Offer",
-                    "price": round(float(price), 2),
-                    "priceCurrency": "TRY",
-                    "availability": "https://schema.org/InStock",
-                    "url": url,
-                },
-            },
+            "item": product_schema,
         })
     # Birden fazla magaza fiyati varsa tek bir Product'in offers alanini
     # AggregateOffer (lowPrice/highPrice/offerCount) olarak da yayinla --
@@ -8179,7 +8197,8 @@ async def price_landing_page(slug: str):
     if len(priced) >= 2:
         agg_low = round(float(min(p["price"] for p in priced)), 2)
         agg_high = round(float(max(p["price"] for p in priced)), 2)
-        graph_nodes.append({
+        agg_image = next((p.get("image") for p in priced if p.get("image")), "")
+        agg_product = {
             "@type": "Product",
             "name": f"{title_term} Fiyatları",
             "url": f"https://www.almadan.app/fiyat/{slug}",
@@ -8188,9 +8207,13 @@ async def price_landing_page(slug: str):
                 "priceCurrency": "TRY",
                 "lowPrice": agg_low,
                 "highPrice": agg_high,
+                "priceValidUntil": _price_valid_until,
                 "offerCount": len(priced),
             },
-        })
+        }
+        if agg_image:
+            agg_product["image"] = agg_image
+        graph_nodes.append(agg_product)
         avg_price = sum(p["price"] for p in priced) / len(priced)
         store_count = len({p.get("source") for p in priced if p.get("source")})
         cheapest_p = min(priced, key=lambda p: p["price"])
@@ -8255,7 +8278,7 @@ async def price_landing_page(slug: str):
     <title>{seo_title_escaped}</title>
     <meta name="description" content="{intro_escaped}">
     <link rel="canonical" href="https://www.almadan.app/fiyat/{slug}">
-    <meta name="robots" content="index, follow">
+    <meta name="robots" content="{robots_content}">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Almadan">
     <meta property="og:title" content="{seo_title_escaped}">
