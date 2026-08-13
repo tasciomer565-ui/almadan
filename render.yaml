@@ -1,0 +1,86 @@
+services:
+  - type: web
+    name: almadan
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      # Supabase (veritabanı + auth)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_TABLE
+        value: app_state
+      # Cron endpoint doğrulaması -- GitHub Actions'taki secrets.CRON_SECRET
+      # ile AYNI değeri kullanmalı, aksi halde tüm cron job'lar 401 döner.
+      - key: CRON_SECRET
+        sync: false
+      - key: ALMADAN_APP_URL
+        value: https://almadan.app
+      # Web Push (VAPID)
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      # SMS (Netgsm)
+      - key: NETGSM_USERCODE
+        sync: false
+      - key: NETGSM_PASSWORD
+        sync: false
+      - key: NETGSM_MSGHEADER
+        sync: false
+      # WhatsApp Cloud API
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_WELCOME_TEMPLATE_NAME
+        value: welcome
+      - key: WHATSAPP_CAMPAIGN_TEMPLATE_NAME
+        value: campaign_alert
+      - key: WHATSAPP_FOLLOW_TEMPLATE_NAME
+        value: store_follow_confirm
+      # SMTP (e-posta bildirimleri)
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: FROM_EMAIL
+        value: noreply@almadan.app
+      # AI / Scraper / OCR
+      - key: REPLICATE_API_TOKEN
+        sync: false
+      - key: AI_WEBHOOK_SECRET
+        sync: false
+      - key: OCR_SPACE_API_KEY
+        sync: false
+      - key: CACHE_TTL_HOURS
+        value: "6"
+      - key: CHAOS_ENABLED
+        value: "false"
+      - key: RAILWAY_SCRAPER_URL
+        sync: false
+      - key: SCRAPER_SECRET
+        sync: false
+      - key: ADMIN_DEBUG_SECRET
+        sync: false
+      - key: GO_UPC_API_KEY
+        sync: false
+      # Google Sheets senkronizasyonu
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: GOOGLE_SHEET_ID
+        sync: false
