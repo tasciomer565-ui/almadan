@@ -75,7 +75,12 @@ def _term_has_live_inventory(term: str) -> bool:
         if not products:
             return False
         real = [p for p in products if isinstance(p, dict) and p.get("title") and p.get("url")]
-        return len(real) >= 2
+        # app/main.py:price_landing_page ile ayni esik -- en az 3 farkli
+        # magaza ve 5 urun yoksa sayfa artik noindex donuyor, sitemap'e
+        # noindex sayfa eklemek Search Console'da tutarsizlik uyarisi
+        # verir (bkz. AdSense "dusuk degerli icerik" reddi sonrasi denetim).
+        store_count = len({p.get("source") for p in real if p.get("source")})
+        return len(real) >= 5 and store_count >= 3
     except Exception as exc:  # noqa: BLE001
         print(f"  envanter kontrolu basarisiz ({term!r}): {exc}", file=sys.stderr)
         return False

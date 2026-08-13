@@ -8121,6 +8121,14 @@ async def price_landing_page(slug: str):
     products_html = "".join(rows)
     editorial_html = _price_page_editorial_html(term, products)
     cheapest = min((p.get("price") or 0 for p in products if p.get("price")), default=0)
+
+    # Thin-content riski: 2 urun bariyeri gercek 404'e yeterse de, sadece
+    # 2-4 urun + tek magazadan gelen sayfalar Google/AdSense'in "dusuk
+    # degerli/programatik" olarak isaretleyebilecegi sinirda kaliyordu.
+    # En az 3 farkli magaza VE 5 urun yoksa indexlemeyi engelle (sayfa
+    # yine de erisilebilir/linklenebilir kalir, sadece SERP'e girmez).
+    store_count = len({p.get("source") for p in products if p.get("source")})
+    robots_content = "index, follow" if (store_count >= 3 and len(products) >= 5) else "noindex, follow"
     intro = f"{title_term} için {len(products)} mağazadan güncel fiyat karşılaştırması. En ucuz: {_tr_price(cheapest)} ₺." if cheapest else f"{title_term} için güncel fiyat karşılaştırması."
 
     intro_escaped = _html.escape(intro)
@@ -8255,7 +8263,7 @@ async def price_landing_page(slug: str):
     <title>{seo_title_escaped}</title>
     <meta name="description" content="{intro_escaped}">
     <link rel="canonical" href="https://www.almadan.app/fiyat/{slug}">
-    <meta name="robots" content="index, follow">
+    <meta name="robots" content="{robots_content}">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Almadan">
     <meta property="og:title" content="{seo_title_escaped}">
