@@ -119,11 +119,25 @@ async def run_catalog_batch() -> dict:
     total_products = 0
     per_query_counts: dict[str, int] = {}
 
+    from app.comparator import _call_railway_scraper
+
     for category, query in batch:
+        # Once proxy scraper'i (RAILWAY_SCRAPER_URL) dene -- Render'in
+        # paylasimli IP'si N11/Amazon'a dogrudan baglanirken sessizce
+        # zaman asimina ugruyordu (bkz. fiyat sayfalari network engeli
+        # teshisi), bu batch de ayni sorunu yasiyordu (502). marketplace_scan
+        # zaten master_search icinden proxy uzerinden calisiyor, burada da
+        # ayni yolu kullaniyoruz. Proxy set degilse ya da basarisiz olursa
+        # eski yerel tarama yoluna dus.
         try:
-            products = await marketplace_scan(query, forced_category=category)
+            products = await asyncio.to_thread(_call_railway_scraper, query, category)
         except Exception:
-            products = []
+            products = None
+        if products is None:
+            try:
+                products = await marketplace_scan(query, forced_category=category)
+            except Exception:
+                products = []
         if products:
             total_words += learn_from_products(products, category)
             total_products += len(products)
