@@ -186,6 +186,36 @@ STATIC_DIR = find_static_dir()
 if STATIC_DIR.is_dir():
     app.mount("/static", CachedStaticFiles(directory=STATIC_DIR), name="static")
 
+# public/ kökündeki dosyalar (sitemap.xml, robots.txt, ads.txt) -- Vercel
+# bunları otomatik olarak site kökünde sunuyordu (public/ klasör konvansiyonu),
+# Render'da böyle bir davranış yok, bu yüzden 404 veriyordu (2026-08-13).
+_PUBLIC_ROOT_DIR = STATIC_DIR.parent
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+def sitemap_xml() -> Response:
+    path = _PUBLIC_ROOT_DIR / "sitemap.xml"
+    if path.is_file():
+        return FileResponse(path, media_type="application/xml")
+    raise HTTPException(status_code=404, detail="sitemap.xml bulunamadı")
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots_txt() -> Response:
+    path = _PUBLIC_ROOT_DIR / "robots.txt"
+    if path.is_file():
+        return FileResponse(path, media_type="text/plain")
+    raise HTTPException(status_code=404, detail="robots.txt bulunamadı")
+
+
+@app.get("/ads.txt", include_in_schema=False)
+def ads_txt() -> Response:
+    path = _PUBLIC_ROOT_DIR / "ads.txt"
+    if path.is_file():
+        return FileResponse(path, media_type="text/plain")
+    raise HTTPException(status_code=404, detail="ads.txt bulunamadı")
+
+
 ACCESS_COOKIE = "almadan_access_token"
 REFRESH_COOKIE = "almadan_refresh_token"
 
