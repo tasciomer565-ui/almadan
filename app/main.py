@@ -2632,16 +2632,17 @@ async def cron_warm_price_terms(request: Request) -> dict:
     birini en az bir kez tarayıp product_cache'e yazar -- böylece bu
     sayfalar canlı istekte (kullanıcı veya Googlebot) hiç taranmamış bir
     terimle karşılaşıp gerçek 404 vermez (bkz. app/price_term_cache_warmer.py).
-    GitHub Actions'tan 10 dakikada bir küçük gruplar halinde çağrılır.
+    GitHub Actions'tan 30 dakikada bir küçük gruplar halinde çağrılır.
 
-    batch_size=7: her terim en kotu ihtimalle ~8s canli tarama butcesi
-    kullanabiliyor (7*8=56s), Vercel'in 60s fonksiyon sinirinin altinda
-    guvenli marj birakiyor -- whitelist 795->3994'e ciktiktan sonra tam
-    tur suresini kisaltmak icin varsayilan 6'dan yukseltildi.
+    batch_size=2: Vercel'den Render'a geçişte (2026-08-13) batch_size=7
+    (7*8s=56s) Render'ın ücretsiz plan zayıf CPU'sunda (0.1 çekirdek)
+    502 (gateway timeout) ile patlıyordu -- Vercel'in serverless burst
+    CPU'suna göre ayarlanmış degerdi. 2'ye düşürüldü, tam tur daha uzun
+    sürer ama her çağrı güvenle tamamlanır.
     """
     require_cron_request(request)
     from app.price_term_cache_warmer import run_price_term_warm_batch
-    result = await run_price_term_warm_batch(batch_size=7)
+    result = await run_price_term_warm_batch(batch_size=2)
     record_cron_run("warm-price-terms", success=True, detail=f"cursor={result.get('cursor')}/{result.get('total_terms')}")
     return result
 
