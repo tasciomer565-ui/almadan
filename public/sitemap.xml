@@ -4726,6 +4726,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/kasa</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/kasar</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -9312,6 +9317,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/turuncu-stor-perde</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/turuncu-supurge</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
