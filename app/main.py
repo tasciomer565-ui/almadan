@@ -8051,6 +8051,42 @@ def _price_page_editorial_html(term: str, products: list[dict]) -> str:
     """
 
 
+def _related_price_terms_html(term: str, slug: str) -> str:
+    """/fiyat/{terim} sayfalari birbirine hic link vermiyordu -- sadece
+    sitemap'ten erisiliyorlardi, bu yuzden site ici link otoritesi
+    almiyorlardi (GSC'de yuksek gosterim/dusuk siralama gorulen sayfalarin
+    ortak sorunlarindan biri). Ayni marka veya ayni jenerik urun kelimesini
+    paylasan diger whitelist terimlerine link vererek hem kullaniciya hem
+    Google'a "bu konuda baska sayfalar da var" sinyali veriyoruz.
+    """
+    import html as _html
+
+    slug_map = _seo_price_slug_map()
+    term_words = set(term.lower().split())
+    scored: list[tuple[int, str, str]] = []
+    for other_slug, other_term in slug_map.items():
+        if other_slug == slug:
+            continue
+        other_words = set(other_term.lower().split())
+        overlap = len(term_words & other_words)
+        if overlap > 0:
+            scored.append((overlap, other_slug, other_term))
+    if not scored:
+        return ""
+
+    scored.sort(key=lambda x: (-x[0], x[2]))
+    top = scored[:6]
+    items = "".join(
+        f'<a class="bp-feature" href="/fiyat/{_html.escape(s)}">'
+        f'<h3>{_html.escape(t.capitalize())}</h3><p>Fiyatları Karşılaştır</p></a>'
+        for _, s, t in top
+    )
+    return f"""
+      <h2 style="margin-top:32px;"><i data-lucide="search"></i> Benzer Aramalar</h2>
+      <div class="bp-feature-grid">{items}</div>
+    """
+
+
 @app.get("/fiyat/{slug}", response_class=HTMLResponse)
 async def price_landing_page(slug: str):
     """
@@ -8120,6 +8156,7 @@ async def price_landing_page(slug: str):
         )
     products_html = "".join(rows)
     editorial_html = _price_page_editorial_html(term, products)
+    related_terms_html = _related_price_terms_html(term, slug)
     cheapest = min((p.get("price") or 0 for p in products if p.get("price")), default=0)
 
     # Thin-content riski: 2 urun bariyeri gercek 404'e yeterse de, sadece
@@ -8129,16 +8166,25 @@ async def price_landing_page(slug: str):
     # yine de erisilebilir/linklenebilir kalir, sadece SERP'e girmez).
     store_count = len({p.get("source") for p in products if p.get("source")})
     robots_content = "index, follow" if (store_count >= 3 and len(products) >= 5) else "noindex, follow"
-    intro = f"{title_term} için {len(products)} mağazadan güncel fiyat karşılaştırması. En ucuz: {_tr_price(cheapest)} ₺." if cheapest else f"{title_term} için güncel fiyat karşılaştırması."
+    # NOT: onceki surum burada yanlislikla len(products) (urun sayisi) yazip
+    # "magaza" diyordu -- gercek magaza sayisi store_count'tur, o kullanilmali.
+    intro = (
+        f"{title_term} için {len(products)} üründe, {store_count} farklı mağazadan güncel fiyat karşılaştırması. "
+        f"En ucuz: {_tr_price(cheapest)} ₺."
+        if cheapest else f"{title_term} için güncel fiyat karşılaştırması."
+    )
 
     intro_escaped = _html.escape(intro)
 
-    # Baslikta fiyati dogrudan gostermek CTR'yi artiriyor (SERP'te rakip
-    # sonuclarin cogu bunu yapiyor) -- "X Fiyatlari - Almadan" yerine
-    # "X Fiyatlari: En Ucuz 2.990 TL'den | Almadan".
+    # Baslikta hem magaza sayisini hem fiyati somut gostermek CTR'yi
+    # artiriyor -- GSC verisinde bu sayfalarin cogu sayfa 1-2 sinirinda
+    # (pozisyon ~9-15) yuksek gosterim/sifira yakin tiklama aliyordu; sade
+    # "X Fiyatlari: En Ucuz Y TL'den" kalibi rakip sonuclardan (Cimri,
+    # Akakce, Trendyol) yeterince ayrismiyordu. "N Magaza Karsilastirildi"
+    # somut sayisi ekstra guven/ozgunluk sinyali veriyor.
     if cheapest:
         price_display = f"{cheapest:,.0f}".replace(",", ".")
-        seo_title = f"{title_term} Fiyatları: En Ucuz {price_display} TL'den — Almadan"
+        seo_title = f"{title_term} Fiyatları: {store_count} Mağaza, En Ucuz {price_display} TL — Almadan"
     else:
         seo_title = f"{title_term} Fiyatları — Almadan"
     seo_title_escaped = _html.escape(seo_title)
@@ -8331,6 +8377,7 @@ async def price_landing_page(slug: str):
         {products_html}
       </div>
       {editorial_html}
+      {related_terms_html}
       <a class="bp-cta bp-cta-block" href="/"><i data-lucide="arrow-right"></i> Başka Ürün Ara</a>
     </main>
 
