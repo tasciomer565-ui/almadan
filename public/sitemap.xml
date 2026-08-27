@@ -7896,6 +7896,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/seftali</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/seker</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -7937,6 +7942,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/siemens-blender</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/siemens-hali</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -8207,6 +8217,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/siyah-mikrodalga</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/siyah-mikser</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -8482,11 +8497,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/suts</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/switch</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -9001,6 +9011,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/turkuaz-utu</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/turkuaz-wok</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -9067,6 +9082,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/turuncu-bulasik-makinesi</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/turuncu-buzdolabi</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -9847,6 +9867,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/yesil-tencere</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/yesil-toaster</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
