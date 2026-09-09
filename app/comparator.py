@@ -3364,6 +3364,31 @@ def _call_railway_scraper(query: str, category: str) -> list[dict] | None:
     return None
 
 
+def call_railway_parse_url(url_to_parse: str) -> dict | None:
+    """Tek urun linki parse istegini proxy servisine yonlendirir -- ayni
+    Render IP engeli /parse-url (yapistir-ve-karsilastir, sitenin ana
+    ozelligi) icin de gecerliydi, sadece /scrape icin duzeltilmisti."""
+    import requests as _req, os as _os
+    proxy_url = _os.getenv("RAILWAY_SCRAPER_URL", "").rstrip("/")
+    secret = _os.getenv("SCRAPER_SECRET", "")
+    if not proxy_url:
+        return None
+    try:
+        r = _req.get(
+            f"{proxy_url}/parse-url",
+            params={"url": url_to_parse, "secret": secret},
+            timeout=55,
+        )
+        if r.ok:
+            data = r.json()
+            if "error" not in data:
+                return data
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Railway parse-url hata: %s", e)
+    return None
+
+
 def search_products_by_name(
     query: str,
     category: str = "general",

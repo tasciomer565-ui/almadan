@@ -49,7 +49,8 @@ _CSP = (
     "img-src 'self' data: https:; "
     "frame-src https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com; "
     "connect-src 'self' https://*.supabase.co https://api.replicate.com https://app.scrapingbee.com "
-    "https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com; "
+    "https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com "
+    "https://*.adtrafficquality.google; "
     "frame-ancestors 'none';"
 )
 

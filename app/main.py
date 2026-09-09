@@ -1765,32 +1765,41 @@ def parse_url(payload: UrlParseRequest, request: Request) -> dict:
         cached_at, cached_data = _url_cache[cache_key]
         if now - cached_at < 3600:  # 60 dakika
             return cached_data
-    
-    parsed = parse_product_url(payload.url)
-    result = {
-        "title": parsed.title,
-        "price": parsed.price,
-        "image_url": parsed.image_url,
-        "source": parsed.source,
-        "canonical_url": parsed.canonical_url,
-        "confidence": parsed.confidence,
-        "warnings": parsed.warnings,
-        "original_price": parsed.original_price,
-        "extra_info": parsed.extra_info,
-    }
+
+    # Proxy'yi (RAILWAY_SCRAPER_URL) once dene -- Render'in paylasimli IP'si
+    # magaza sitelerine dogrudan baglanirken sessizce zaman asimina
+    # ugruyordu (bkz. /api/search icin yapilan ayni tesbih); "yapistir ve
+    # karsilastir" sitenin ana ozelligi oldugu icin bu da ayni yolu kullanmali.
+    from app.comparator import call_railway_parse_url
+    proxied = call_railway_parse_url(payload.url)
+    if proxied is not None:
+        result = proxied
+    else:
+        parsed = parse_product_url(payload.url)
+        result = {
+            "title": parsed.title,
+            "price": parsed.price,
+            "image_url": parsed.image_url,
+            "source": parsed.source,
+            "canonical_url": parsed.canonical_url,
+            "confidence": parsed.confidence,
+            "warnings": parsed.warnings,
+            "original_price": parsed.original_price,
+            "extra_info": parsed.extra_info,
+        }
 
     # "Bu fiyata değer mi?" -- gerçek fiyat geçmişinden deal_score/verdict
     # hesapla ve tek cümlelik mesaj üret (bkz. app/scoring.py). Yeterli
     # geçmiş yoksa mesaj eklenmez -- uydurma yorum gösterilmez.
-    if parsed.price and parsed.title and parsed.source:
+    if result.get("price") and result.get("title") and result.get("source"):
         try:
             from app.price_history import get_price_list
-            hist = get_price_list(parsed.title, parsed.source)
+            hist = get_price_list(result["title"], result["source"])
             if hist:
-                decision = calculate_deal_score(parsed.price, hist)
+                decision = calculate_deal_score(result["price"], hist)
                 result["deal_score"] = decision.score
                 result["deal_verdict"] = decision.verdict
-                if decision.verdict == "al" and parsed.price <= min(hist) * 1.03:
+                if decision.verdict == "al" and result["price"] <= min(hist) * 1.03:
                     message = "Bu ürün son dönemin en düşük fiyatlarından birinde."
                 elif decision.verdict == "al":
                     message = "Bu ürün fiyat geçmişine göre güçlü bir fırsat."
@@ -1808,17 +1817,17 @@ def parse_url(payload: UrlParseRequest, request: Request) -> dict:
     # edilebilsin diye kaydediliyor (bkz. /api/admin/viewed-not-tracked).
     try:
         uid = getattr(request.state, "user_id", None)
-        if parsed.title and parsed.source:
+        if result.get("title") and result.get("source"):
             _log_event(uid, "product_view", {
-                "title": parsed.title[:200],
-                "source": parsed.source,
+                "title": result["title"][:200],
+                "source": result["source"],
                 "email": getattr(request.state, "user_email", None) or "Anonymous",
             })
     except Exception:
         pass
 
     # Sadece başarılı sonuçları önbellekle
-    if parsed.price and parsed.title:
+    if result.get("price") and result.get("title"):
         _url_cache[cache_key] = (now, result)
         # Önbelleği 500 girişle sınırla
         if len(_url_cache) > 500:
