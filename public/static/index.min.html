@@ -1208,7 +1208,7 @@
                 if (!data) return;
                 var unread = (data.notifications||[]).filter(function(n){ return !n.is_read; });
                 var dot = document.querySelector('.notification-dot');
-                if (dot) dot.style.display = unread.length ? '' : 'none';
+                if (dot) dot.style.display = unread.length ? 'block' : 'none';
               }).catch(function(){});
           }, 2500);
         }, 10000);
