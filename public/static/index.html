@@ -1194,9 +1194,14 @@
           });
         }
 
-        /* Sayfa yüklenince okunmamış bildirim varsa dot göster */
+        /* Sayfa yüklenince okunmamış bildirim varsa dot göster --
+           /api/notifications hesap gerektirir, girişsizken hep 403 döner
+           (bkz. app/main.py). Anonim ziyaretçilerin (trafiğin çoğu) her
+           sayfa yüklemesinde gereksiz 403 istegi atmasını önlemek için
+           önce giriş durumu kontrol ediliyor. */
         window.setTimeout(function() {
           (window.scheduleIdleTask || window.setTimeout)(function() {
+            if (typeof state === 'undefined' || !state.auth || !state.auth.authenticated) return;
             fetch('/api/notifications', { credentials: 'same-origin' })
               .then(function(r){ return r.ok ? r.json() : null; })
               .then(function(data){
