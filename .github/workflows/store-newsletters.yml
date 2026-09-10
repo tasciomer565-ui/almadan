@@ -1,0 +1,23 @@
+name: Mağaza Bültenleri ve Kampanya Üretimi
+
+# Haftalık aktüel katalog (BİM/A101/ŞOK), kampanya sayfası değişikliği ve
+# büyük fiyat düşüşü tespitine dayalı kampanya kayıtlarını üretir, mağaza
+# takipçilerine bildirim gönderir. Vercel->Render göçünde (2026-08) bu
+# cron'u tetikleyen bir GitHub Actions workflow'u hiç oluşturulmamıştı --
+# /cron/store-newsletters o tarihten beri hiç çağrılmıyordu, bu yüzden
+# "Mağaza Bültenleri" (Bülten sekmesi) kampanya/bildirim üretmiyordu.
+on:
+  schedule:
+    # Her gün 06:00 UTC (=09:00 TRT)
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  newsletters:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger store newsletters cron
+        run: |
+          curl -sS -f -X GET \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            "https://www.almadan.app/cron/store-newsletters"
