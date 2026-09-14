@@ -1,0 +1,20 @@
+name: Render Uyanik Tutma (Keep-Alive)
+
+# Render ucretsiz plan 15 dakika trafik almayan servisi uykuya aliyor;
+# tekrar uyanmasi 30-50s surebiliyor. warm-price-cache 30 dakikada bir
+# calistigi icin her dongude ~15 dakikalik bir "uyku penceresi" olusuyor
+# -- bu pencerede gelen tek seferlik istekler (orn. Google AdSense'in
+# site-uygunluk taramasi) siteyi "kullanilamiyor" olarak isaretleyebiliyor.
+# Bu is /health'i (agir islem yapmayan, DB'ye dokunmayan endpoint) 10
+# dakikada bir pingleyerek servisi surekli sicak tutar.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: curl -sS -f "https://www.almadan.app/health"
