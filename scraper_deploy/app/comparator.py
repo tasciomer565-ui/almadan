@@ -795,6 +795,54 @@ def _clean_scraped_title(title: str) -> str:
     return title
 
 
+_IRRELEVANT_OVERLAP_STOPWORDS = {
+    "gr", "gram", "g", "kg", "ml", "lt", "litre", "l", "cm", "mm", "adet",
+    "paket", "pk", "kutu", "kutusu", "li", "lu", "lı", "lü", "ve", "ile",
+    "icin", "için", "bir", "the",
+}
+
+# Urun formu/tur belirten genel kelimeler -- tek basina eslesme icin yeterli
+# sayilmaz (orn. "persil jel" aramasinda "jel kalem" ya da "jel camasir
+# suyu" sadece "jel" ortak diye eslesmemeli; marka/urun adi da gecmeli).
+_GENERIC_DESCRIPTOR_TOKENS = {
+    "jel", "krem", "toz", "sivi", "sprey", "losyon", "sabun", "sise",
+    "banyo", "yuzey", "genel", "sut", "yag", "su", "kagit", "mendil",
+    "deterjan", "sampuan", "solusyon",
+}
+
+
+def _meaningful_tokens(text: str) -> set[str]:
+    norm = normalize_turkish(text or "")
+    tokens = re.findall(r"[a-z0-9şğıöüç]+", norm)
+    return {t for t in tokens if len(t) >= 3 and t not in _IRRELEVANT_OVERLAP_STOPWORDS and not t.isdigit()}
+
+
+def has_meaningful_overlap(query: str, title: str) -> bool:
+    """Sorgudaki en az bir anlamli kelime (marka/urun adi) baslikta gecmiyorsa
+    False doner. Magaza siteleri kendi arama motorlarinin dondurdugu
+    (bazen alakasiz -- orn. "jel" aramasinda "jel kalem") sonuclari hicbir
+    filtre uygulamadan bize geri veriyor; bu, o gurultuyu eleyen son bir
+    genel-amacli kontrol (bkz. is_logical_product).
+
+    Genel tanimlayici kelimeler (jel, krem, deterjan vb.) sorguda baska
+    ayirt edici kelime varken tek basina eslesme icin yeterli sayilmaz --
+    aksi halde marka adi hic kontrol edilmemis olur."""
+    q_tokens = _meaningful_tokens(query)
+    if not q_tokens:
+        return True  # filtrelenecek anlamli kelime yok, ele gecir
+
+    distinctive_tokens = q_tokens - _GENERIC_DESCRIPTOR_TOKENS
+    check_tokens = distinctive_tokens if distinctive_tokens else q_tokens
+
+    title_tokens = _meaningful_tokens(title)
+    for qt in check_tokens:
+        if qt in title_tokens:
+            return True
+        if any(qt in tt or tt in qt for tt in title_tokens):
+            return True
+    return False
+
+
 def is_logical_product(query: str, product_title: str) -> bool:
     if has_physical_conflict(query, product_title):
         return False
@@ -870,7 +918,10 @@ def is_logical_product(query: str, product_title: str) -> bool:
     for term in irrelevant_terms:
         if term in title_lower and term not in query_lower:
             return False
-            
+
+    if not has_meaningful_overlap(query, product_title):
+        return False
+
     return True
 
 def apply_gender_to_query(query: str, user_gender: str | None) -> str:
@@ -3361,6 +3412,31 @@ def _call_railway_scraper(query: str, category: str) -> list[dict] | None:
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning("Railway scraper hata: %s", e)
+    return None
+
+
+def call_railway_parse_url(url_to_parse: str) -> dict | None:
+    """Tek urun linki parse istegini proxy servisine yonlendirir -- ayni
+    Render IP engeli /parse-url (yapistir-ve-karsilastir, sitenin ana
+    ozelligi) icin de gecerliydi, sadece /scrape icin duzeltilmisti."""
+    import requests as _req, os as _os
+    proxy_url = _os.getenv("RAILWAY_SCRAPER_URL", "").rstrip("/")
+    secret = _os.getenv("SCRAPER_SECRET", "")
+    if not proxy_url:
+        return None
+    try:
+        r = _req.get(
+            f"{proxy_url}/parse-url",
+            params={"url": url_to_parse, "secret": secret},
+            timeout=55,
+        )
+        if r.ok:
+            data = r.json()
+            if "error" not in data:
+                return data
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Railway parse-url hata: %s", e)
     return None
 
 

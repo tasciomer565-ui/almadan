@@ -772,6 +772,8 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
             p_valid = validate_and_enrich_product(p)
             if not p_valid:
                 continue
+            if not is_logical_product(query, p_valid["title"]):
+                continue
             url_clean = p_valid.get("url", "").split("?")[0].strip()
             if url_clean and url_clean in seen_urls:
                 continue
@@ -826,6 +828,8 @@ async def slow_store_scan(query: str, category: str, timeout: float = 25.0) -> l
         for p in res:
             p_valid = validate_and_enrich_product(p)
             if not p_valid:
+                continue
+            if not is_logical_product(query, p_valid["title"]):
                 continue
             url_clean = p_valid.get("url", "").split("?")[0].strip()
             if url_clean and url_clean in seen_urls:
