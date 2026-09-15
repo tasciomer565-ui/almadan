@@ -16,6 +16,7 @@ from uuid import uuid4
 
 import requests
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, BackgroundTasks
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -372,6 +373,51 @@ async def auth_error_handler(_, exc: AuthError) -> JSONResponse:
         status_code=exc.status_code,
         content={"detail": str(exc)},
     )
+
+
+_NOT_FOUND_HTML = """<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#121412">
+    <meta name="robots" content="noindex, follow">
+    <title>Sayfa Bulunamadı — Almadan</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {{ margin:0; background:#121412; color:#f7f8f5; font-family:"DM Sans",sans-serif;
+        min-height:100vh; display:flex; align-items:center; justify-content:center; text-align:center; padding:24px; box-sizing:border-box; }}
+      .wrap {{ max-width:420px; }}
+      .code {{ font-size:15px; font-weight:700; letter-spacing:.08em; color:#d9ef57; text-transform:uppercase; }}
+      h1 {{ font-size:28px; margin:12px 0; }}
+      p {{ color:#a7ada7; line-height:1.5; }}
+      a.cta {{ display:inline-block; margin-top:20px; background:#287a50; color:#fff; text-decoration:none;
+        font-weight:600; padding:12px 24px; border-radius:10px; }}
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <p class="code">404</p>
+      <h1>Bu sayfayı bulamadık.</h1>
+      <p>Aradığın sayfa taşınmış veya kaldırılmış olabilir. Ana sayfadan fiyat karşılaştırmaya devam edebilirsin.</p>
+      <a class="cta" href="/">Ana Sayfaya Dön</a>
+    </div>
+  </body>
+</html>"""
+
+
+@app.exception_handler(StarletteHTTPException)
+async def not_found_handler(request: Request, exc: StarletteHTTPException):
+    # /api/*, /cron/*, /auth/* gibi programatik uc noktalar JSON beklerken
+    # gercek bir tarayicida 404'e duşen kullanicinin cıplak {"detail":...}
+    # gormesi istenmiyor -- yalnizca sayfa (HTML) rotalarinda markali bir
+    # 404 ekrani goster, API/dosya rotalarinda mevcut JSON davranisi kalsin.
+    if exc.status_code == 404 and not any(
+        request.url.path.startswith(p) for p in ("/api/", "/cron/", "/auth/", "/static/")
+    ):
+        return HTMLResponse(_NOT_FOUND_HTML, status_code=404)
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 proxy_cache = {}
