@@ -3808,7 +3808,12 @@ def extract_volume_info(title: str) -> tuple[float, str] | None:
             pass
 
     match_g = re.search(r"(\d+(?:[\.,]\d+)?)\s*(?:g|gr|gram)\b", title_lower)
-    if match_g:
+    # "5G"/"4G"/"3G" gibi mobil ağ nesli ifadeleri yanlislikla gram olarak
+    # eslesip (orn. "Samsung Galaxy A17 5G" -> 5 gram, 0.005 kg gibi
+    # anlamsiz bir birim fiyat) telefon/tablet urunlerinde saçma
+    # "kg basina fiyat" gostermesine yol aciyordu -- bu ozel durumu ele.
+    is_network_gen = bool(match_g) and re.fullmatch(r"[2-5]\s*g", match_g.group(0))
+    if match_g and not is_network_gen:
         try:
             val = float(match_g.group(1).replace(",", "."))
             if val > 0:
@@ -3826,10 +3831,14 @@ def extract_volume_info(title: str) -> tuple[float, str] | None:
         except ValueError:
             pass
 
-    match_gb = re.search(r"(\d+(?:[\.,]\d+)?)\s*(?:gb|gigabayt)\b", title_lower)
-    if match_gb:
+    # Telefon/tablet basliklarinda genelde hem RAM hem depolama GB olarak
+    # gecer (orn. "8GB RAM, 256GB Hafiza") -- ilk eslesmeyi (soldan) almak
+    # cogunlukla daha kucuk olan RAM'i seçip birim fiyati yanlis hesaplar.
+    # En buyuk GB degeri (depolama) daha anlamli bir karsilastirma sagliyor.
+    gb_matches = re.findall(r"(\d+(?:[\.,]\d+)?)\s*(?:gb|gigabayt)\b", title_lower)
+    if gb_matches:
         try:
-            val = float(match_gb.group(1).replace(",", "."))
+            val = max(float(m.replace(",", ".")) for m in gb_matches)
             if val > 0:
                 return val, "GB"
         except ValueError:
