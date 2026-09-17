@@ -1051,20 +1051,35 @@ def _fetch_aol_urls(query: str) -> list[str]:
     return found_urls
 
 def search_n11_direct(query: str) -> tuple[list[dict], str]:
+    """N11 arama.
+
+    Diger pazaryeri scraper'lari (Trendyol/Hepsiburada) doğrudan
+    isteklerde bot korumasina takilip proxy (ScrapingDog/ScrapingBee,
+    Turk IP'siyle) kullanmaya zorlanmisti; N11 icin de ayni koruma
+    devreye girmis olabilir -- ayni guvenli fallback deseni burada da
+    uygulaniyor (proxy tanimli degilse veya basarisiz olursa dogrudan
+    istege duser, davranis degismez)."""
+    from app.scraping_proxy import proxy_get, proxy_enabled
+
     url = f"https://www.n11.com/arama?q={urllib.parse.quote_plus(query)}"
     headers = {
         "User-Agent": YAHOO_USER_AGENT,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
     }
-    
+
     parsed_results = []
     corrected_query = query
     try:
-        r = requests.get(url, headers=headers, timeout=12)
-        if r.status_code == 200:
-            corrected_query = extract_corrected_query(r.text, query)
-            soup = BeautifulSoup(r.text, "html.parser")
+        html = None
+        if proxy_enabled():
+            html = proxy_get(url, render_js=False, timeout=12)
+        if html is None:
+            r = requests.get(url, headers=headers, timeout=12)
+            html = r.text if r.status_code == 200 else None
+        if html:
+            corrected_query = extract_corrected_query(html, query)
+            soup = BeautifulSoup(html, "html.parser")
             items = soup.select("a.product-item")
             
             for item in items:
