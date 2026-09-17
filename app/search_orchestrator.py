@@ -982,7 +982,15 @@ async def master_search(
     loop = asyncio.get_running_loop()
 
     try:
-        async with asyncio.timeout(8.0):
+        # marketplace_scan kendi icinde 13s'lik bir butce kullanip o sure
+        # icinde bitmis task'lari kurtarmaya calisiyor (bkz. asyncio.wait_for
+        # icindeki timeout); buradaki dis timeout bundan KISA olursa (eskiden
+        # 8.0s) marketplace_scan'in kendi kurtarma mantigina hic firsat
+        # kalmadan sonuc atiliyor. Bu, MODA gibi cok magazali (17+ store)
+        # kategorilerde HER ZAMAN bos sonuc donmesine yol aciyordu (gercek
+        # kullanici testiyle bulundu: "erkek tisort" her zaman tam ~8s'de
+        # 0 urunle donuyordu). Ic butceden en az birkac saniye fazla olmali.
+        async with asyncio.timeout(16.0):
             if mode == "global" or lat is None or lon is None:
                 results = await marketplace_scan(query, forced_category=category)
             elif mode == "local":

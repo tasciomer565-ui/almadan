@@ -3408,7 +3408,14 @@ def _call_railway_scraper(query: str, category: str) -> list[dict] | None:
         )
         if r.ok:
             data = r.json()
-            return data.get("products") or []
+            products = data.get("products")
+            # Bos liste donerse None don ki cagiran taraf (search_products_by_name)
+            # yerel marketplace_scan'e de bir sans versin -- proxy'nin kendi ici
+            # de ayni zaman butcesi/IP kisitlarina tabi, bos sonuc proxy'nin
+            # basarisiz oldugunun (gercekten "eslesme yok" degil) bir isareti
+            # olabilir. Bu, MODA gibi cok magazali kategorilerde tek bir
+            # gecici basarisizligin kalici bos sonuca donusmesini onler.
+            return products if products else None
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning("Railway scraper hata: %s", e)
