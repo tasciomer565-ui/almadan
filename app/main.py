@@ -8301,7 +8301,7 @@ def _price_page_cached_products(query: str) -> tuple[list[dict] | None, str | No
     except Exception as exc:  # noqa: BLE001
         __import__("logging").getLogger(__name__).warning("fiyat sayfasi cache okuma hatasi (%s): %s", query, exc)
         return None, None, f"error:{type(exc).__name__}"
-    return None, None, "miss"
+    return None, None, f"miss:{_cache.LAST_STALE_DIAG or '?'}"
 
 
 _PRICE_REFRESH_INFLIGHT: set[str] = set()

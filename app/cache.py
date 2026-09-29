@@ -29,6 +29,11 @@ CACHE_TABLE = "product_cache"
 _HOT_CACHE: dict[str, tuple[list[dict], float]] = {}
 _HOT_CACHE_TTL = 60.0  # 60 seconds
 
+# Son cache_get_stale denemesinin sonucu (teshis): "empty", "http:<kod>" ya da
+# "exc:<Tip>". Hata mesaji degil sadece tipi -- mesajda URL/anahtar olabilir.
+# /fiyat sayfasinin X-Price-Source basligina eklenir.
+LAST_STALE_DIAG = ""
+
 from app.text_utils import normalize_turkish
 
 
@@ -114,6 +119,7 @@ def cache_get_stale(cache_key: str) -> Optional[list[dict]]:  # noqa: C901
     """Süresi dolmuş olsa bile son başarılı veriyi döndür (fault-tolerance fallback).
     Dönen ürünlere 'stale': True etiketi eklenir — frontend uyarı gösterir.
     """
+    global LAST_STALE_DIAG
     if not _enabled():
         return None
     try:
@@ -126,6 +132,7 @@ def cache_get_stale(cache_key: str) -> Optional[list[dict]]:  # noqa: C901
         )
         resp = requests.get(url, headers=_headers(), timeout=3)
         rows = resp.json() if resp.ok else []
+        LAST_STALE_DIAG = "empty" if resp.ok else f"http:{resp.status_code}"
         if rows and rows[0].get("products"):
             products = rows[0]["products"]
             created_at = rows[0].get("created_at", "")
@@ -145,6 +152,7 @@ def cache_get_stale(cache_key: str) -> Optional[list[dict]]:  # noqa: C901
             logger.warning("Stale cache fallback: %s (%d ürün, %s önce)", cache_key, len(products), age_label)
             return products
     except Exception as exc:
+        LAST_STALE_DIAG = f"exc:{type(exc).__name__}"
         logger.warning("cache_get_stale error: %s", exc)
     return None
 
