@@ -182,8 +182,11 @@ def cache_set(cache_key: str, query: str, category: str, products: list[dict]) -
             "source_count": len(products),
             "expires_at": expires,
         }
-        url = f"{SUPABASE_URL}/rest/v1/{CACHE_TABLE}"
-        # Upsert — aynı key varsa güncelle
+        # Upsert — aynı key varsa güncelle. on_conflict=cache_key sart: PK
+        # "id" (BIGSERIAL), UNIQUE kisit cache_key'de -- parametre olmadan
+        # PostgREST PK'ya bakiyor, var olan anahtar 409 Conflict aliyordu ve
+        # cache hic tazelenmiyordu (canlida teshis: 2026-09-29).
+        url = f"{SUPABASE_URL}/rest/v1/{CACHE_TABLE}?on_conflict=cache_key"
         resp = requests.post(
             url,
             headers={**_headers(), "Prefer": "resolution=merge-duplicates"},
