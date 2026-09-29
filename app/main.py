@@ -8688,10 +8688,14 @@ async def price_landing_page(slug: str):
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
   </body>
 </html>"""
-    if len(_PRICE_PAGE_HTML_CACHE) >= _PRICE_PAGE_HTML_CACHE_MAX:
-        oldest = min(_PRICE_PAGE_HTML_CACHE, key=lambda k: _PRICE_PAGE_HTML_CACHE[k][0])
-        _PRICE_PAGE_HTML_CACHE.pop(oldest, None)
-    _PRICE_PAGE_HTML_CACHE[cache_key] = (time.time(), page)
+    # Eski (stale) veriden cizilen sayfa HTML cache'e girmez: arka plan
+    # tazelemesi bu satirdan once biterse (cache'i bosaltip) eski sayfa 1 saat
+    # yapisip kalirdi. Stale yol zaten Supabase'ten ~0.3s'de ciziliyor.
+    if not stale_age:
+        if len(_PRICE_PAGE_HTML_CACHE) >= _PRICE_PAGE_HTML_CACHE_MAX:
+            oldest = min(_PRICE_PAGE_HTML_CACHE, key=lambda k: _PRICE_PAGE_HTML_CACHE[k][0])
+            _PRICE_PAGE_HTML_CACHE.pop(oldest, None)
+        _PRICE_PAGE_HTML_CACHE[cache_key] = (time.time(), page)
     return HTMLResponse(page, headers=_PRICE_PAGE_CACHE_HEADERS)
 
 
