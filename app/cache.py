@@ -37,6 +37,8 @@ _HOT_CACHE_TTL = 60.0  # 60 seconds
 # "exc:<Tip>". Hata mesaji degil sadece tipi -- mesajda URL/anahtar olabilir.
 # /fiyat sayfasinin X-Price-Source basligina eklenir.
 LAST_STALE_DIAG = ""
+# Son cache_set Supabase yazmasinin sonucu (teshis): "ok", "http:<kod>", "exc:<Tip>".
+LAST_SET_DIAG = ""
 
 from app.text_utils import normalize_turkish
 
@@ -198,6 +200,7 @@ def cache_get_latest(cache_key: str) -> Optional[tuple[list[dict], bool, float]]
 
 def cache_set(cache_key: str, query: str, category: str, products: list[dict]) -> None:
     """Sonuçları cache'e kaydet / varsa güncelle."""
+    global LAST_SET_DIAG
     import time as _time
 
     # Write to local in-memory hot cache
@@ -237,11 +240,13 @@ def cache_set(cache_key: str, query: str, category: str, products: list[dict]) -
             json=payload,
             timeout=5,
         )
+        LAST_SET_DIAG = "ok" if resp.ok else f"http:{resp.status_code}"
         if resp.ok:
             logger.info("Cache SET: %s → %d ürün", cache_key, len(products))
         else:
             logger.warning("cache_set failed: %s %s", resp.status_code, resp.text[:200])
     except Exception as exc:
+        LAST_SET_DIAG = f"exc:{type(exc).__name__}"
         logger.warning("cache_set error: %s", exc)
 
 

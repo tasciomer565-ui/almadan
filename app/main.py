@@ -8308,6 +8308,9 @@ def _price_page_cached_products(query: str) -> tuple[list[dict] | None, str | No
 
 
 _PRICE_REFRESH_INFLIGHT: set[str] = set()
+# slug -> son tazeleme sonucu (teshis, X-Price-Source'a eklenir):
+# "railway+set:ok", "railway+set:http:409", "local", "err:<Tip>", "skipped:busy".
+_PRICE_REFRESH_LAST: dict[str, str] = {}
 _PRICE_REFRESH_LOCK = __import__("threading").Lock()
 # Googlebot bir seferde yuzlerce sayfa tarayabilir -- her stale sayfa icin
 # canli tarama baslatmak scraper'i/ScrapingBee kredisini yigar. Ayni anda en
@@ -8322,6 +8325,7 @@ def _schedule_price_page_refresh(slug: str, query: str) -> None:
         if slug in _PRICE_REFRESH_INFLIGHT:
             return
         if not _PRICE_REFRESH_SLOTS.acquire(blocking=False):
+            _PRICE_REFRESH_LAST[slug] = "skipped:busy"
             return
         _PRICE_REFRESH_INFLIGHT.add(slug)
 
@@ -8332,14 +8336,20 @@ def _schedule_price_page_refresh(slug: str, query: str) -> None:
             # Railway'in product_cache'e yazmasina guvenilemiyor (canlida
             # tazelemeden sonra da stale kaliyordu) -- ham sonucu burada yaz.
             # Railway yoksa/bossa yerel master_search cache'i kendisi yazar.
+            from app import cache as _cache
+            t0 = time.time()
             raw = _call_railway_scraper(query, "general")
             if raw:
                 key, category = _price_page_cache_key(query)
                 cache_set(key, query, category, raw)
+                result = f"railway+set:{_cache.LAST_SET_DIAG or '?'}"
             else:
                 search_products_by_name(query, category="general")
+                result = f"local(railway:{'bos' if raw == [] else 'yok'})"
+            _PRICE_REFRESH_LAST[slug] = f"{result};{int(time.time() - t0)}s"
             _PRICE_PAGE_HTML_CACHE.pop(slug, None)
         except Exception as exc:  # noqa: BLE001
+            _PRICE_REFRESH_LAST[slug] = f"err:{type(exc).__name__}"
             __import__("logging").getLogger(__name__).warning("fiyat sayfasi arka plan tazeleme hatasi (%s): %s", slug, exc)
         finally:
             with _PRICE_REFRESH_LOCK:
@@ -8716,6 +8726,11 @@ async def price_landing_page(slug: str):
             oldest = min(_PRICE_PAGE_HTML_CACHE, key=lambda k: _PRICE_PAGE_HTML_CACHE[k][0])
             _PRICE_PAGE_HTML_CACHE.pop(oldest, None)
         _PRICE_PAGE_HTML_CACHE[cache_key] = (time.time(), page)
+    last_refresh = _PRICE_REFRESH_LAST.get(slug.lower())
+    if slug.lower() in _PRICE_REFRESH_INFLIGHT:
+        last_refresh = "running"
+    if last_refresh:
+        price_source += f";refresh={last_refresh}"
     return HTMLResponse(page, headers={**_PRICE_PAGE_CACHE_HEADERS, "X-Price-Source": price_source})
 
 

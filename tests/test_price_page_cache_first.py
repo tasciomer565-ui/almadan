@@ -23,6 +23,7 @@ def _products():
 def _get(latest, live, railway=None):
     """latest: cache_get_latest donusu ((urunler, taze_mi, yas_saat) ya da None)."""
     main._PRICE_PAGE_HTML_CACHE.clear()
+    main._PRICE_REFRESH_LAST.clear()
     with mock.patch.object(cache, "_enabled", return_value=True), \
          mock.patch.object(cache, "cache_get_latest", return_value=latest), \
          mock.patch.object(cache, "cache_set") as cache_set, \
@@ -72,6 +73,7 @@ def test_no_cache_falls_back_to_live_scrape():
 
 def test_cache_disabled_is_reported_in_header():
     main._PRICE_PAGE_HTML_CACHE.clear()
+    main._PRICE_REFRESH_LAST.clear()
     with mock.patch.object(cache, "_enabled", return_value=False), \
          mock.patch.object(comparator, "search_products_by_name", return_value=_products()):
         resp = client.get(f"/fiyat/{SLUG}")
