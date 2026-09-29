@@ -8311,6 +8311,8 @@ _PRICE_REFRESH_INFLIGHT: set[str] = set()
 # slug -> son tazeleme sonucu (teshis, X-Price-Source'a eklenir):
 # "railway+set:ok", "railway+set:http:409", "local", "err:<Tip>", "skipped:busy".
 _PRICE_REFRESH_LAST: dict[str, str] = {}
+# slug -> (calisan adim, baslangic zamani) -- takilan tazelemenin yeri (teshis)
+_PRICE_REFRESH_STAGE: dict[str, tuple[str, float]] = {}
 _PRICE_REFRESH_LOCK = __import__("threading").Lock()
 # Googlebot bir seferde yuzlerce sayfa tarayabilir -- her stale sayfa icin
 # canli tarama baslatmak scraper'i/ScrapingBee kredisini yigar. Ayni anda en
@@ -8332,26 +8334,32 @@ def _schedule_price_page_refresh(slug: str, query: str) -> None:
     def _run() -> None:
         try:
             from app.cache import cache_set
-            from app.comparator import _call_railway_scraper, search_products_by_name
+            from app.comparator import _call_railway_scraper
             # Railway'in product_cache'e yazmasina guvenilemiyor (canlida
             # tazelemeden sonra da stale kaliyordu) -- ham sonucu burada yaz.
             # Railway yoksa/bossa yerel master_search cache'i kendisi yazar.
             from app import cache as _cache
             t0 = time.time()
+            _PRICE_REFRESH_STAGE[slug] = ("railway", t0)
             raw = _call_railway_scraper(query, "general")
             if raw:
+                _PRICE_REFRESH_STAGE[slug] = ("cache_set", time.time())
                 key, category = _price_page_cache_key(query)
                 cache_set(key, query, category, raw)
                 result = f"railway+set:{_cache.LAST_SET_DIAG or '?'}"
             else:
-                search_products_by_name(query, category="general")
-                result = f"local(railway:{'bos' if raw == [] else 'yok'})"
+                # Yerel tam arama (master_search) burada calistirilmiyor:
+                # canlida arka plan thread'inde dakikalarca takili kaldi ve
+                # 2 tazeleme slotunu kalici olarak kilitledi. Sonraki ziyaret
+                # tekrar dener.
+                result = "railway:sonuc-yok"
             _PRICE_REFRESH_LAST[slug] = f"{result};{int(time.time() - t0)}s"
             _PRICE_PAGE_HTML_CACHE.pop(slug, None)
         except Exception as exc:  # noqa: BLE001
             _PRICE_REFRESH_LAST[slug] = f"err:{type(exc).__name__}"
             __import__("logging").getLogger(__name__).warning("fiyat sayfasi arka plan tazeleme hatasi (%s): %s", slug, exc)
         finally:
+            _PRICE_REFRESH_STAGE.pop(slug, None)
             with _PRICE_REFRESH_LOCK:
                 _PRICE_REFRESH_INFLIGHT.discard(slug)
             _PRICE_REFRESH_SLOTS.release()
@@ -8728,7 +8736,8 @@ async def price_landing_page(slug: str):
         _PRICE_PAGE_HTML_CACHE[cache_key] = (time.time(), page)
     last_refresh = _PRICE_REFRESH_LAST.get(slug.lower())
     if slug.lower() in _PRICE_REFRESH_INFLIGHT:
-        last_refresh = "running"
+        stage, since = _PRICE_REFRESH_STAGE.get(slug.lower(), ("?", time.time()))
+        last_refresh = f"running:{stage}:{int(time.time() - since)}s"
     if last_refresh:
         price_source += f";refresh={last_refresh}"
     return HTMLResponse(page, headers={**_PRICE_PAGE_CACHE_HEADERS, "X-Price-Source": price_source})

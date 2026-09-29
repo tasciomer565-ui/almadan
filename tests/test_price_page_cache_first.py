@@ -59,10 +59,12 @@ def test_stale_age_in_days():
     assert "Fiyatlar 2 gün önce güncellendi" in resp.text
 
 
-def test_stale_refresh_falls_back_to_local_search_without_railway():
+def test_stale_refresh_without_railway_does_not_run_local_search():
+    # Yerel tam arama arka plan thread'inde canlida dakikalarca takiliyordu
     _, calls, writes = _get((_products(), False, 7.0), _products(), railway=None)
-    assert calls == 1
+    assert calls == 0
     assert writes == 0
+    assert main._PRICE_REFRESH_LAST[SLUG].startswith("railway:sonuc-yok")
 
 
 def test_no_cache_falls_back_to_live_scrape():
