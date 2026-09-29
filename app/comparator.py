@@ -986,6 +986,37 @@ def detect_brand_in_query(query: str) -> str | None:
             return brand
     return None
 
+# Basliklarda marka adi yerine urun ailesi gecebiliyor ("iPhone 15",
+# "Galaxy A55", "Redmi Note 13") -- marka filtresi bunlari elememeli.
+_BRAND_TITLE_ALIASES = {
+    "apple": ["apple", "iphone", "ipad", "macbook", "airpods", "imac"],
+    "samsung": ["samsung", "galaxy"],
+    "xiaomi": ["xiaomi", "redmi", "poco"],
+    "lc waikiki": ["lc waikiki", "lcw"],
+    "lcw": ["lc waikiki", "lcw"],
+    "ray-ban": ["rayban"],
+    "rayban": ["rayban"],
+}
+_BRAND_TR_ASCII = str.maketrans("çğıöşüÇĞIÖŞÜ", "cgiosucgiosu")
+
+
+def _brand_norm(text: str) -> str:
+    return text.replace("İ", "i").lower().translate(_BRAND_TR_ASCII).replace("-", "")
+
+
+def title_has_brand(title: str, brand: str) -> bool:
+    """Baslikta marka (veya urun ailesi) tam kelime olarak geciyor mu.
+    Turkce karakter (arçelik/arcelik), tire (ray-ban) ve bosluk (lc waikiki /
+    lcwaikiki) farklarini tolere eder; kisa markalar ("hp") kelime icinde
+    ("chp") eslesmez."""
+    norm_title = _brand_norm(title)
+    for alias in _BRAND_TITLE_ALIASES.get(brand, [brand]):
+        pattern = r"\b" + re.escape(_brand_norm(alias)).replace(r"\ ", r"\s*") + r"\b"
+        if re.search(pattern, norm_title):
+            return True
+    return False
+
+
 def extract_corrected_query(html_content: str, default_query: str) -> str:
     spelled_match = re.search(r'"spelledQuery"\s*:\s*"([^"]*)"', html_content)
     if spelled_match and spelled_match.group(1).strip():
@@ -3522,14 +3553,15 @@ def postprocess_search_products(query: str, all_products: list) -> list[dict]:
     filtered_products = [p for p in all_products if is_logical_product(corrected_query, p["title"])]
     
     # 6. Apply brand filter if specified in the query
+    # 2026-06-12'den beri brand_filtered hesaplanip HIC kullanilmiyordu --
+    # "sony hoparlor" aramasinda JBL de listelenip "En Ucuz" etiketi alabiliyordu.
+    # Markayi iceren urun hic yoksa (baslikta marka yazmayan magazalar) listeyi
+    # bosaltmak yerine eskisi gibi filtresiz birak.
     brand = detect_brand_in_query(corrected_query)
     if brand:
-        brand_lower = brand.lower().replace("-", "")
-        brand_filtered = []
-        for p in filtered_products:
-            title_clean = p["title"].lower().replace("-", "")
-            if brand_lower in title_clean:
-                brand_filtered.append(p)
+        brand_filtered = [p for p in filtered_products if title_has_brand(p["title"], brand)]
+        if brand_filtered:
+            filtered_products = brand_filtered
     # Sorgu kelimelerinden hicbirini icermeyen tek tek urunleri ele --
     # eskiden bu kontrol tum listeye "en az bir eslesme var mi" seklinde
     # bakiyordu, listede bir-iki alakasiz urun (orn. "makarna" aramasinda
