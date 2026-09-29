@@ -8375,7 +8375,11 @@ async def price_landing_page(slug: str):
     from app.comparator import postprocess_search_products
     products: list[dict] = []
     stale_age: str | None = None
+    _t_cache = time.time()
     cached_raw, cached_age = _price_page_cached_products(query)
+    # Teshis: hangi yoldan cizildi + cache okumasi kac ms (X-Price-Source).
+    price_source = f"cache-{'stale' if cached_age else 'fresh'}" if cached_raw else "cache-miss"
+    price_source += f";cache_ms={int((time.time() - _t_cache) * 1000)}"
     if cached_raw:
         products = postprocess_search_products(query, _copy.deepcopy(cached_raw))
         if len(products) >= 2 and cached_age:
@@ -8383,6 +8387,7 @@ async def price_landing_page(slug: str):
             _schedule_price_page_refresh(slug.lower(), query)
     if len(products) < 2:
         stale_age = None
+        price_source += ";live"
         try:
             products = search_products_by_name(query, category="general")
         except Exception:
@@ -8696,7 +8701,7 @@ async def price_landing_page(slug: str):
             oldest = min(_PRICE_PAGE_HTML_CACHE, key=lambda k: _PRICE_PAGE_HTML_CACHE[k][0])
             _PRICE_PAGE_HTML_CACHE.pop(oldest, None)
         _PRICE_PAGE_HTML_CACHE[cache_key] = (time.time(), page)
-    return HTMLResponse(page, headers=_PRICE_PAGE_CACHE_HEADERS)
+    return HTMLResponse(page, headers={**_PRICE_PAGE_CACHE_HEADERS, "X-Price-Source": price_source})
 
 
 _GSC_TOPIC_PAGES = {
