@@ -8268,6 +8268,72 @@ _PRICE_PAGE_HTML_CACHE_MAX = 2000  # ~50KB/sayfa -> en fazla ~100MB
 _PRICE_PAGE_CACHE_HEADERS = {"Cache-Control": "public, max-age=600"}
 
 
+def _price_page_cached_products(query: str) -> tuple[list[dict] | None, str | None]:
+    """/fiyat sayfasi icin Supabase product_cache'teki ham sonuc.
+
+    Donus: (urunler, eskilik etiketi). Taze kayitta etiket None; sure dolmus
+    (stale) kayitta "3 saat" gibi bir etiket; kayit yoksa (None, None).
+    Anahtar master_search'un yazdigi gibi classify_intent kategorisiyle
+    kurulur (bkz. scripts/generate_sitemap.py:_term_has_live_inventory)."""
+    from app.cache import cache_get, cache_get_stale, make_cache_key
+    from app.query_intelligence import correct_query
+    from app.search_orchestrator import classify_intent
+    try:
+        try:
+            corrected = correct_query(query)
+        except Exception:
+            corrected = query
+        key = make_cache_key(query, classify_intent(corrected))
+        fresh = cache_get(key)
+        if fresh:
+            return fresh, None
+        stale = cache_get_stale(key)
+        if stale:
+            age = stale[0].get("stale_age") or "birkaç saat"
+            hours = age.split()[0]
+            if age.endswith(" saat") and hours.isdigit() and int(hours) >= 48:
+                age = f"{int(hours) // 24} gün"
+            return stale, age
+    except Exception as exc:  # noqa: BLE001
+        __import__("logging").getLogger(__name__).warning("fiyat sayfasi cache okuma hatasi (%s): %s", query, exc)
+    return None, None
+
+
+_PRICE_REFRESH_INFLIGHT: set[str] = set()
+_PRICE_REFRESH_LOCK = __import__("threading").Lock()
+# Googlebot bir seferde yuzlerce sayfa tarayabilir -- her stale sayfa icin
+# canli tarama baslatmak scraper'i/ScrapingBee kredisini yigar. Ayni anda en
+# fazla 2 tazeleme; dolu ise bu ziyarette atla, sonraki ziyaret dener.
+_PRICE_REFRESH_SLOTS = __import__("threading").BoundedSemaphore(2)
+
+
+def _schedule_price_page_refresh(slug: str, query: str) -> None:
+    import threading
+
+    with _PRICE_REFRESH_LOCK:
+        if slug in _PRICE_REFRESH_INFLIGHT:
+            return
+        if not _PRICE_REFRESH_SLOTS.acquire(blocking=False):
+            return
+        _PRICE_REFRESH_INFLIGHT.add(slug)
+
+    def _run() -> None:
+        try:
+            from app.comparator import search_products_by_name
+            # Canli yol (Railway/master_search) product_cache'i kendisi yazar;
+            # HTML cache'i dusur ki sonraki ziyaret taze veriden cizilsin.
+            search_products_by_name(query, category="general")
+            _PRICE_PAGE_HTML_CACHE.pop(slug, None)
+        except Exception as exc:  # noqa: BLE001
+            __import__("logging").getLogger(__name__).warning("fiyat sayfasi arka plan tazeleme hatasi (%s): %s", slug, exc)
+        finally:
+            with _PRICE_REFRESH_LOCK:
+                _PRICE_REFRESH_INFLIGHT.discard(slug)
+            _PRICE_REFRESH_SLOTS.release()
+
+    threading.Thread(target=_run, daemon=True, name=f"price-refresh-{slug}").start()
+
+
 @app.get("/fiyat/{slug}", response_class=HTMLResponse)
 async def price_landing_page(slug: str):
     """
@@ -8301,10 +8367,26 @@ async def price_landing_page(slug: str):
         search_products_by_name,
     )
     query = normalize_turkish_search_query(term)
-    try:
-        products = search_products_by_name(query, category="general")
-    except Exception:
-        products = []
+    # Once product_cache: ilk ziyarette bile canli tarama (3-10s) beklenmesin.
+    # Kayit eskiyse eski veriyle hemen ciz + arka planda tazele (stale-while-
+    # revalidate); kayit yoksa ya da filtre sonrasi 2 urunden azsa eskisi gibi
+    # canli tara.
+    import copy as _copy
+    from app.comparator import postprocess_search_products
+    products: list[dict] = []
+    stale_age: str | None = None
+    cached_raw, cached_age = _price_page_cached_products(query)
+    if cached_raw:
+        products = postprocess_search_products(query, _copy.deepcopy(cached_raw))
+        if len(products) >= 2 and cached_age:
+            stale_age = cached_age
+            _schedule_price_page_refresh(slug.lower(), query)
+    if len(products) < 2:
+        stale_age = None
+        try:
+            products = search_products_by_name(query, category="general")
+        except Exception:
+            products = []
 
     # Gercek icerik yoksa GERCEK 404 don (sahte 200 + "sonuc yok" mesaji
     # degil) -- boylece binlerce kombinasyon terimi uretsek bile Google
@@ -8385,6 +8467,13 @@ async def price_landing_page(slug: str):
         intro = f"{title_term} için güncel fiyat karşılaştırması."
 
     intro_escaped = _html.escape(intro)
+    # Eski (stale) cache'ten cizildiyse kullaniciya durustce soyle -- fiyatlar
+    # arka planda tazeleniyor, bir sonraki ziyarette guncel olur.
+    freshness_html = (
+        f'<p class="bp-hero-copy" style="font-size:13px;opacity:.75;margin-top:-6px;">'
+        f'Fiyatlar {_html.escape(stale_age)} önce güncellendi, yenileniyor.</p>'
+        if stale_age else ""
+    )
 
     # Baslikta somut sayi + fiyat CTR'yi artiriyor. Ama "1 Magaza" bir
     # karsilastirma sitesi icin ters sinyal (GSC: sony-hoparlor, vestel-
@@ -8577,6 +8666,7 @@ async def price_landing_page(slug: str):
         <p class="bp-eyebrow">FİYAT KARŞILAŞTIRMA</p>
         <h1>{title_term} Fiyatları</h1>
         <p class="bp-hero-copy">{intro_escaped}</p>
+        {freshness_html}
         <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> Tüm Sonuçları Gör</a>
       </div>
     </section>
