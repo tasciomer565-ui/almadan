@@ -8107,6 +8107,89 @@ def _price_page_editorial_html(term: str, products: list[dict]) -> str:
     """
 
 
+_SEO_WORD_DISPLAY_CACHE: dict[str, str] | None = None
+# Iki kelimelik urun adlari: "bulasik makinesi" ile "cay makinesi" ayni
+# tur degil; "mor home" / "yesil english home" ise English Home markasi.
+_SEO_COMPOUND_HEADS = {"makinesi", "seti", "takimi"}
+_SEO_NOUN_ALIASES = {"home": "english home", "coco": "madame coco"}
+
+
+def _seo_display_term(term: str) -> str:
+    """Terim listesinde ayni kelime bazen ASCII ("supurge"), bazen Turkce
+    ("süpürge") geciyor. Link metni/baslik icin Turkce karakterli yazimi
+    tercih eder -- slug ve arama sorgusu degismez."""
+    global _SEO_WORD_DISPLAY_CACHE
+    if _SEO_WORD_DISPLAY_CACHE is None:
+        # Listede hic Turkce yazimi gecmeyen kelimeler (bkz. kaynak kelime
+        # setleri app/search_orchestrator.py'de ASCII yazilmis).
+        display: dict[str, str] = {
+            "bicak": "bıçak", "catal": "çatal", "camasir": "çamaşır", "bulasik": "bulaşık",
+            "cay": "çay", "sirt": "sırt", "cantasi": "çantası", "ic": "iç", "yagmurluk": "yağmurluk",
+            "kiyafet": "kıyafet", "cuzdan": "cüzdan", "gozluk": "gözlük", "sutyen": "sütyen",
+            "cizme": "çizme", "corap": "çorap", "hirka": "hırka", "kulot": "külot",
+            "sapka": "şapka", "sort": "şort", "buzdolabi": "buzdolabı", "kitaplik": "kitaplık",
+            "cerceve": "çerçeve", "duduklu": "düdüklü", "carsaf": "çarşaf", "firin": "fırın",
+            "kasik": "kaşık", "dus": "duş", "utu": "ütü", "koctas": "koçtaş", "schafer": "schafer",
+        }
+        for t in _seo_price_slug_map().values():
+            for w in t.lower().split():
+                key = w.translate(_SEO_TR_TO_ASCII)
+                if key not in display or (display[key] == key and w != key):
+                    display[key] = w
+        _SEO_WORD_DISPLAY_CACHE = display
+    return " ".join(_SEO_WORD_DISPLAY_CACHE.get(w.translate(_SEO_TR_TO_ASCII), w) for w in term.lower().split())
+
+
+def _seo_noun_key(term: str) -> str:
+    """Terimin urun turu (ASCII): 'pembe kanepe' -> 'kanepe',
+    'bej bulasik makinesi' -> 'bulasik makinesi'."""
+    words = term.lower().translate(_SEO_TR_TO_ASCII).split()
+    last = words[-1]
+    if last in _SEO_NOUN_ALIASES:
+        return _SEO_NOUN_ALIASES[last]
+    if last in _SEO_COMPOUND_HEADS and len(words) >= 2:
+        return " ".join(words[-2:])
+    return last
+
+
+_INDEXABLE_PRICE_SLUGS_CACHE: tuple[float, set[str]] | None = None
+_SEO_BOOST_RANK_CACHE: dict[str, int] | None = None
+
+
+def _indexable_price_slugs() -> set[str]:
+    """Sitemap'teki /fiyat slug'lari = indexlenebilir sayfalar (sitemap
+    app/seo_rules.py esigiyle otomatik uretiliyor). Ic linkler noindex/404
+    sayfalara link otoritesi harcamasin diye filtre. Sitemap yoksa bos set
+    doner -- cagiranlar bu durumda filtrelemez."""
+    global _INDEXABLE_PRICE_SLUGS_CACHE
+    path = _PUBLIC_ROOT_DIR / "sitemap.xml"
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return set()
+    if _INDEXABLE_PRICE_SLUGS_CACHE and _INDEXABLE_PRICE_SLUGS_CACHE[0] == mtime:
+        return _INDEXABLE_PRICE_SLUGS_CACHE[1]
+    slugs = set(re.findall(r"/fiyat/([a-z0-9-]+)</loc>", path.read_text(encoding="utf-8")))
+    _INDEXABLE_PRICE_SLUGS_CACHE = (mtime, slugs)
+    return slugs
+
+
+def _seo_boost_rank() -> dict[str, int]:
+    """GSC'de sayfa 2'de (poz. 10-20) duran /fiyat sayfalari -> oncelik sirasi
+    (0 = en cok gosterim). Ic linklerde bunlar one alinir; ilk sayfaya
+    cikmalari icin en az emekle en cok gosterim/tik kazanilacak grup.
+    Kaynak: app/seo_boost_slugs.json (GSC exportundan uretilir)."""
+    global _SEO_BOOST_RANK_CACHE
+    if _SEO_BOOST_RANK_CACHE is None:
+        import json as _json
+        try:
+            data = _json.loads((Path(__file__).parent / "seo_boost_slugs.json").read_text(encoding="utf-8"))
+            _SEO_BOOST_RANK_CACHE = {s: i for i, s in enumerate(data.get("slugs", []))}
+        except (OSError, ValueError):
+            _SEO_BOOST_RANK_CACHE = {}
+    return _SEO_BOOST_RANK_CACHE
+
+
 def _related_price_terms_html(term: str, slug: str) -> str:
     """/fiyat/{terim} sayfalari birbirine hic link vermiyordu -- sadece
     sitemap'ten erisiliyorlardi, bu yuzden site ici link otoritesi
@@ -8117,24 +8200,38 @@ def _related_price_terms_html(term: str, slug: str) -> str:
     """
     import html as _html
 
+    # Onceki surum alfabetik siraliyordu: ayni kelimeyi paylasan yuzlerce
+    # terimden hep alfabede ilk 6'si link aliyor, geri kalani hic almiyordu;
+    # noindex/404 sayfalara da link veriyordu. Simdi: sadece indexlenebilir
+    # sayfalar, ayni urun turu (son kelime) renk/markadan once, sayfa 2'deki
+    # (GSC poz. 10-20) sayfalar oncelikli, kalan esitlik kaynak slug'a gore
+    # karistirilir ki link otoritesi tum sayfalara dagilsin.
+    import hashlib as _hashlib
+
     slug_map = _seo_price_slug_map()
-    term_words = set(term.lower().split())
-    scored: list[tuple[int, str, str]] = []
+    indexable = _indexable_price_slugs()
+    boost = _seo_boost_rank()
+    noun = _seo_noun_key(term)
+    modifiers = set(term.lower().translate(_SEO_TR_TO_ASCII).split()) - set(noun.split())
+    scored: list[tuple[int, int, str, str, str]] = []
     for other_slug, other_term in slug_map.items():
-        if other_slug == slug:
+        if other_slug == slug or (indexable and other_slug not in indexable):
             continue
-        other_words = set(other_term.lower().split())
-        overlap = len(term_words & other_words)
-        if overlap > 0:
-            scored.append((overlap, other_slug, other_term))
+        other_noun = _seo_noun_key(other_term)
+        other_mods = set(other_term.lower().translate(_SEO_TR_TO_ASCII).split()) - set(other_noun.split())
+        score = (3 if other_noun == noun else 0) + len(modifiers & other_mods)
+        if not score:
+            continue
+        shuffle = _hashlib.md5(f"{slug}:{other_slug}".encode()).hexdigest()
+        scored.append((score, boost.get(other_slug, len(boost)), shuffle, other_slug, other_term))
     if not scored:
         return ""
 
-    scored.sort(key=lambda x: (-x[0], x[2]))
-    top = scored[:6]
+    scored.sort(key=lambda x: (-x[0], x[1], x[2]))
+    top = [(None, s, t) for _, _, _, s, t in scored[:8]]
     items = "".join(
         f'<a class="bp-feature" href="/fiyat/{_html.escape(s)}">'
-        f'<h3>{_html.escape(t.capitalize())}</h3><p>Fiyatları Karşılaştır</p></a>'
+        f'<h3>{_html.escape(_seo_display_term(t).capitalize())}</h3><p>Fiyatları Karşılaştır</p></a>'
         for _, s, t in top
     )
     return f"""
@@ -8198,7 +8295,7 @@ async def price_landing_page(slug: str):
             status_code=404,
         )
 
-    title_term = _html.escape(term.capitalize())
+    title_term = _html.escape(_seo_display_term(term).capitalize())
 
     # Fiyat gecmisi (varsa) icin yerel db'den once tek seferde bak --
     # her urun icin ayri sorgu yerine source::title -> history sozlugu.
@@ -8606,6 +8703,59 @@ def _seo_topic_cards() -> str:
     return "".join(cards)
 
 
+def _price_directory_html() -> str:
+    """/fiyat-rehberi icin tum indexlenebilir /fiyat sayfalarinin urun turune
+    gore gruplu dizini. Ana sayfa -> /fiyat-rehberi -> /fiyat/{terim}: her
+    sayfa ana sayfadan en fazla 2 tik uzakta olur (onceden cogu sayfaya
+    sadece sitemap'ten ulasiliyordu). Sayfa 2'deki (GSC poz. 10-20) sayfalar
+    ayrica ustte "Populer" blogunda one cikar."""
+    import html as _html
+
+    slug_map = _seo_price_slug_map()
+    indexable = _indexable_price_slugs()
+    slugs = [s for s in slug_map if s in indexable] if indexable else list(slug_map)
+    if not slugs:
+        return ""
+
+    def _link(s: str) -> str:
+        return f'<a href="/fiyat/{_html.escape(s)}">{_html.escape(_seo_display_term(slug_map[s]).capitalize())}</a>'
+
+    boost = _seo_boost_rank()
+    popular = sorted((s for s in slugs if s in boost), key=boost.get)[:30]
+    popular_html = (
+        '<h2 style="margin-top:32px;"><i data-lucide="trending-up"></i> Popüler Karşılaştırmalar</h2>'
+        '<div class="bp-feature-grid">'
+        + "".join(
+            f'<a class="bp-feature" href="/fiyat/{_html.escape(s)}"><h3>{_html.escape(_seo_display_term(slug_map[s]).capitalize())}</h3>'
+            f'<p>Fiyatları Karşılaştır</p></a>'
+            for s in popular[:12]
+        )
+        + "</div>"
+        + (f'<p style="line-height:2;">{" · ".join(_link(s) for s in popular[12:])}</p>' if len(popular) > 12 else "")
+    ) if popular else ""
+
+    groups: dict[str, list[str]] = {}
+    for s in slugs:
+        groups.setdefault(_seo_noun_key(slug_map[s]), []).append(s)
+    multi = sorted(((n, ss) for n, ss in groups.items() if len(ss) >= 2), key=lambda x: (-len(x[1]), x[0]))
+    singles = sorted(s for ss in groups.values() if len(ss) == 1 for s in ss)
+    sections = "".join(
+        f'<h3 style="margin:20px 0 6px;">{_html.escape(_seo_display_term(noun).capitalize())} fiyatları ({len(ss)})</h3>'
+        f'<p style="line-height:2;margin:0;">{" · ".join(_link(s) for s in sorted(ss))}</p>'
+        for noun, ss in multi
+    )
+    if singles:
+        sections += (
+            '<h3 style="margin:20px 0 6px;">Diğer ürünler</h3>'
+            f'<p style="line-height:2;margin:0;">{" · ".join(_link(s) for s in singles)}</p>'
+        )
+    return (
+        popular_html
+        + f'<h2 style="margin-top:32px;"><i data-lucide="list"></i> Tüm Fiyat Karşılaştırmaları ({len(slugs)})</h2>'
+        + sections
+    )
+
+
 def _seo_query_chips(terms: list[str]) -> str:
     import html as _html
     from urllib.parse import quote_plus
@@ -8677,15 +8827,16 @@ async def price_guide_index():
     </header>
     <section class="bp-hero">
       <div class="bp-hero-inner">
-        <p class="bp-eyebrow">DOGAL TRAFIK REHBERI</p>
+        <p class="bp-eyebrow">FİYAT REHBERİ</p>
         <h1>En çok aranan ürünlerde fiyat karşılaştırma</h1>
-        <p class="bp-hero-copy">Google'da görünüm almaya başlayan ürün ve kategori aramalarını tek tek fiyat karşılaştırma akışına bağladık.</p>
-        <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> Urun Ara</a>
+        <p class="bp-hero-copy">Marka, renk ve ürün türüne göre gruplanmış fiyat karşılaştırma sayfaları. Her sayfada birden fazla mağazanın güncel fiyatı ve fiyat geçmişi var.</p>
+        <a class="bp-cta" href="/"><i data-lucide="scan-search"></i> Ürün Ara</a>
       </div>
     </section>
     <main class="bp-main">
-      <h2><i data-lucide="layout-grid"></i> Rehber Basliklari</h2>
+      <h2><i data-lucide="layout-grid"></i> Rehber Başlıkları</h2>
       <div class="bp-feature-grid">{cards}</div>
+      {_price_directory_html()}
     </main>
     <footer class="bp-footer">
       <a href="/fiyat-rehberi">Fiyat Rehberi</a> · <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
