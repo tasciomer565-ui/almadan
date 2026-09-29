@@ -7,6 +7,7 @@ import ipaddress
 import os
 import re
 import socket
+import time
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -8142,6 +8143,12 @@ def _related_price_terms_html(term: str, slug: str) -> str:
     """
 
 
+_PRICE_PAGE_HTML_CACHE: dict[str, tuple[float, str]] = {}
+_PRICE_PAGE_HTML_TTL = 3600  # fiyatlar saatlik degisse de sayfa icin yeterince taze
+_PRICE_PAGE_HTML_CACHE_MAX = 2000  # ~50KB/sayfa -> en fazla ~100MB
+_PRICE_PAGE_CACHE_HEADERS = {"Cache-Control": "public, max-age=600"}
+
+
 @app.get("/fiyat/{slug}", response_class=HTMLResponse)
 async def price_landing_page(slug: str):
     """
@@ -8160,6 +8167,15 @@ async def price_landing_page(slug: str):
             "<h1>Sayfa bulunamadı</h1><p><a href=\"/\">Ana sayfaya dön</a></p>",
             status_code=404,
         )
+
+    # Her istek uzak scraper'a canli tarama atiyordu (TTFB 3-10s, Googlebot
+    # tarama butcesi + Core Web Vitals icin kotu). Render uzun omurlu surec
+    # oldugu icin render edilmis HTML'i surec icinde tutuyoruz. Sadece 200
+    # cevaplar cache'lenir -- scraper zaman asimindan dogan 404 yapismasin.
+    cache_key = slug.lower()
+    cached = _PRICE_PAGE_HTML_CACHE.get(cache_key)
+    if cached and time.time() - cached[0] < _PRICE_PAGE_HTML_TTL:
+        return HTMLResponse(cached[1], headers=_PRICE_PAGE_CACHE_HEADERS)
 
     from app.comparator import (
         normalize_turkish_search_query,
@@ -8214,32 +8230,52 @@ async def price_landing_page(slug: str):
     related_terms_html = _related_price_terms_html(term, slug)
     cheapest = min((p.get("price") or 0 for p in products if p.get("price")), default=0)
 
-    # Thin-content riski: 2 urun bariyeri gercek 404'e yeterse de, sadece
-    # 2-4 urun + tek magazadan gelen sayfalar Google/AdSense'in "dusuk
-    # degerli/programatik" olarak isaretleyebilecegi sinirda kaliyordu.
-    # En az 3 farkli magaza VE 5 urun yoksa indexlemeyi engelle (sayfa
-    # yine de erisilebilir/linklenebilir kalir, sadece SERP'e girmez).
-    store_count = len({p.get("source") for p in products if p.get("source")})
-    robots_content = "index, follow" if (store_count >= 3 and len(products) >= 5) else "noindex, follow"
-    # NOT: onceki surum burada yanlislikla len(products) (urun sayisi) yazip
-    # "magaza" diyordu -- gercek magaza sayisi store_count'tur, o kullanilmali.
-    intro = (
-        f"{title_term} için {len(products)} üründe, {store_count} farklı mağazadan güncel fiyat karşılaştırması. "
-        f"En ucuz: {_tr_price(cheapest)} ₺."
-        if cheapest else f"{title_term} için güncel fiyat karşılaştırması."
+    # Thin-content riski: tek magazali sayfalar gercek bir karsilastirma
+    # sunmuyor, Google/AdSense'in "dusuk degerli/programatik" olarak
+    # isaretleyebilecegi sinirda. Esik app/seo_rules.py'de (sitemap ile
+    # ortak); altinda kalan sayfa erisilebilir/linklenebilir kalir, sadece
+    # SERP'e girmez.
+    from app.seo_rules import is_price_page_indexable, price_page_store_count
+    store_count = price_page_store_count(products)
+    robots_content = "index, follow" if is_price_page_indexable(products) else "noindex, follow"
+
+    priced_all = [p for p in products if p.get("price")]
+    cheapest_source = (
+        min(priced_all, key=lambda p: p["price"]).get("source", "") if priced_all else ""
     )
+    highest = max((p["price"] for p in priced_all), default=0)
+    # Meta description SERP snippet'i olarak gorunuyor -- onceki duz
+    # "X icin N urunde..." cumlesi rakiplerden ayrismiyordu (GSC: sayfa 1'de
+    # sifir tik). Fiyat araligi + en ucuz magaza somut, tiklamaya deger bilgi.
+    # Snippet'te kisa kalsin diye kurussuz; magaza adina ek ("'da/'de/'ta")
+    # ses uyumu gerektirdigi icin "En ucuz teklif: X" kalibi.
+    def _whole_price(v: float) -> str:
+        return f"{v:,.0f}".replace(",", ".")
+
+    if cheapest and highest > cheapest:
+        intro = (
+            f"{title_term} fiyatları {_whole_price(cheapest)} ₺ ile {_whole_price(highest)} ₺ arasında. "
+            + (f"{store_count} mağazada " if store_count >= 2 else "")
+            + f"{len(products)} ürün karşılaştırıldı."
+            + (f" En ucuz teklif: {cheapest_source.capitalize()}." if cheapest_source else "")
+            + " Fiyat geçmişini gör, indirimi kaçırma."
+        )
+    elif cheapest:
+        intro = f"{title_term} için {len(products)} üründe güncel fiyat karşılaştırması. En ucuz: {_tr_price(cheapest)} ₺."
+    else:
+        intro = f"{title_term} için güncel fiyat karşılaştırması."
 
     intro_escaped = _html.escape(intro)
 
-    # Baslikta hem magaza sayisini hem fiyati somut gostermek CTR'yi
-    # artiriyor -- GSC verisinde bu sayfalarin cogu sayfa 1-2 sinirinda
-    # (pozisyon ~9-15) yuksek gosterim/sifira yakin tiklama aliyordu; sade
-    # "X Fiyatlari: En Ucuz Y TL'den" kalibi rakip sonuclardan (Cimri,
-    # Akakce, Trendyol) yeterince ayrismiyordu. "N Magaza Karsilastirildi"
-    # somut sayisi ekstra guven/ozgunluk sinyali veriyor.
+    # Baslikta somut sayi + fiyat CTR'yi artiriyor. Ama "1 Magaza" bir
+    # karsilastirma sitesi icin ters sinyal (GSC: sony-hoparlor, vestel-
+    # supurge sayfa 1-2'de sifir tik) -- tek magazada urun sayisini goster.
     if cheapest:
         price_display = f"{cheapest:,.0f}".replace(",", ".")
-        seo_title = f"{title_term} Fiyatları: {store_count} Mağaza, En Ucuz {price_display} TL — Almadan"
+        if store_count >= 2:
+            seo_title = f"{title_term} Fiyatları: {store_count} Mağaza, En Ucuz {price_display} TL — Almadan"
+        else:
+            seo_title = f"{title_term} Fiyatları: {len(products)} Ürün, En Ucuz {price_display} TL — Almadan"
     else:
         seo_title = f"{title_term} Fiyatları — Almadan"
     seo_title_escaped = _html.escape(seo_title)
@@ -8443,7 +8479,11 @@ async def price_landing_page(slug: str):
     <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
   </body>
 </html>"""
-    return HTMLResponse(page)
+    if len(_PRICE_PAGE_HTML_CACHE) >= _PRICE_PAGE_HTML_CACHE_MAX:
+        oldest = min(_PRICE_PAGE_HTML_CACHE, key=lambda k: _PRICE_PAGE_HTML_CACHE[k][0])
+        _PRICE_PAGE_HTML_CACHE.pop(oldest, None)
+    _PRICE_PAGE_HTML_CACHE[cache_key] = (time.time(), page)
+    return HTMLResponse(page, headers=_PRICE_PAGE_CACHE_HEADERS)
 
 
 _GSC_TOPIC_PAGES = {
