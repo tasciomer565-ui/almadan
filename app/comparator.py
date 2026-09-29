@@ -3696,6 +3696,24 @@ def postprocess_search_products(query: str, all_products: list) -> list[dict]:
                 break
         diversified.sort(key=lambda x: x["price"])
         in_stock = diversified
+    else:
+        # Markali aramada liste olduğu gibi kesiliyordu: ilk magaza (genelde
+        # n11) 5 slotun hepsini dolduruyor, Trendyol/Hepsiburada/Amazon
+        # sonuclari hic gorunmuyordu -- /fiyat/sony-hoparlor, vestel-supurge,
+        # apple-powerbank... "1 magaza" yuzunden noindex kaliyordu.
+        # Alaka sirasi korunarak magazalar arasinda sirayla dagit; baska
+        # magaza yoksa kalan slotlari yine ayni magazayla doldur (urun sayisi
+        # dusmesin).
+        by_source_b: dict[str, list[dict]] = {}
+        for p in in_stock:
+            by_source_b.setdefault(p.get("source", ""), []).append(p)
+        interleaved: list[dict] = []
+        queues = list(by_source_b.values())
+        while len(interleaved) < limit and any(queues):
+            for q in queues:
+                if q and len(interleaved) < limit:
+                    interleaved.append(q.pop(0))
+        in_stock = interleaved
 
     output_in_stock = in_stock[:limit]
     output_out_of_stock = out_of_stock[:2] if limit == 15 else out_of_stock[:1]

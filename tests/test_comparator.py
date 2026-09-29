@@ -278,6 +278,23 @@ def test_postprocess_brand_query_drops_other_brands_keeps_models():
     assert len(titles) == 2
 
 
+def _sony(src, n, base, model):
+    return [{"title": f"Sony SRS-{model}{i} Bluetooth Hoparlör", "price": base + i * 100,
+             "source": src, "url": f"{src}{i}"} for i in range(n)]
+
+
+def test_postprocess_brand_query_interleaves_stores():
+    # Markali aramada ilk magaza 5 slotun hepsini dolduruyordu (/fiyat "1 magaza" -> noindex)
+    raw = _sony("n11", 6, 8000, "XB") + _sony("trendyol", 3, 7000, "XE") + _sony("hepsiburada", 2, 9000, "ULT")
+    sources = [p["source"] for p in postprocess_search_products("sony hoparlör", raw)]
+    assert set(sources) == {"n11", "trendyol", "hepsiburada"}
+
+
+def test_postprocess_brand_query_single_store_keeps_count():
+    sources = [p["source"] for p in postprocess_search_products("sony hoparlör", _sony("n11", 6, 8000, "XB"))]
+    assert sources == ["n11"] * 5
+
+
 if __name__ == "__main__":
     test_clean_product_title()
     test_extract_yahoo_url()
