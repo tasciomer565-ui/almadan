@@ -8301,7 +8301,12 @@ def _price_page_cached_products(query: str) -> tuple[list[dict] | None, str | No
     except Exception as exc:  # noqa: BLE001
         __import__("logging").getLogger(__name__).warning("fiyat sayfasi cache okuma hatasi (%s): %s", query, exc)
         return None, None, f"error:{type(exc).__name__}"
-    return None, None, f"miss:{_cache.LAST_STALE_DIAG or '?'}"
+    diag = f"miss:{_cache.LAST_STALE_DIAG or '?'}"
+    if "InvalidSchema" in diag or "MissingSchema" in diag:
+        # Sadece "://" oncesi (protokol) -- host/anahtar icermez, gizli degil.
+        scheme = _cache.SUPABASE_URL.split("://", 1)[0] if "://" in _cache.SUPABASE_URL else "(yok)"
+        diag += f";scheme={ascii(scheme[:16])};len={len(_cache.SUPABASE_URL)}"
+    return None, None, diag + ";cv=3"
 
 
 _PRICE_REFRESH_INFLIGHT: set[str] = set()
