@@ -19,8 +19,12 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
-SUPABASE_KEY = "".join(os.getenv("SUPABASE_SERVICE_KEY", "").split())
+# Render panelinde degerler tirnak icinde girilmis ('"https://..."') --
+# requests bunu InvalidSchema ile reddediyordu, cache canlida hic calismiyordu
+# (/fiyat X-Price-Source: cache-miss:exc:InvalidSchema, 2026-09-29).
+# storage.py ile ayni temizlik.
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().strip("\"'").rstrip("/")
+SUPABASE_KEY = "".join(os.getenv("SUPABASE_SERVICE_KEY", "").strip().strip("\"'").split())
 
 CACHE_TTL_HOURS = int(os.getenv("CACHE_TTL_HOURS", "6"))
 CACHE_TABLE = "product_cache"
