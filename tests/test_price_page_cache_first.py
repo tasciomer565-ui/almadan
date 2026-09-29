@@ -26,7 +26,8 @@ def _products(stale_hours=None):
 
 def _get(fresh, stale, live):
     main._PRICE_PAGE_HTML_CACHE.clear()
-    with mock.patch.object(cache, "cache_get", return_value=fresh), \
+    with mock.patch.object(cache, "_enabled", return_value=True), \
+         mock.patch.object(cache, "cache_get", return_value=fresh), \
          mock.patch.object(cache, "cache_get_stale", return_value=stale), \
          mock.patch.object(comparator, "search_products_by_name", return_value=live) as live_search:
         resp = client.get(f"/fiyat/{SLUG}")
@@ -56,6 +57,15 @@ def test_no_cache_falls_back_to_live_scrape():
     resp, calls = _get(None, None, _products())
     assert resp.status_code == 200
     assert calls == 1
+
+
+def test_cache_disabled_is_reported_in_header():
+    main._PRICE_PAGE_HTML_CACHE.clear()
+    with mock.patch.object(cache, "_enabled", return_value=False), \
+         mock.patch.object(comparator, "search_products_by_name", return_value=_products()):
+        resp = client.get(f"/fiyat/{SLUG}")
+    assert resp.headers["X-Price-Source"].startswith("cache-disabled")
+    assert resp.headers["X-Price-Source"].endswith(";live")
 
 
 def test_nothing_anywhere_is_404():

@@ -8268,35 +8268,40 @@ _PRICE_PAGE_HTML_CACHE_MAX = 2000  # ~50KB/sayfa -> en fazla ~100MB
 _PRICE_PAGE_CACHE_HEADERS = {"Cache-Control": "public, max-age=600"}
 
 
-def _price_page_cached_products(query: str) -> tuple[list[dict] | None, str | None]:
+def _price_page_cached_products(query: str) -> tuple[list[dict] | None, str | None, str]:
     """/fiyat sayfasi icin Supabase product_cache'teki ham sonuc.
 
-    Donus: (urunler, eskilik etiketi). Taze kayitta etiket None; sure dolmus
-    (stale) kayitta "3 saat" gibi bir etiket; kayit yoksa (None, None).
+    Donus: (urunler, eskilik etiketi, teshis). Taze kayitta etiket None; sure
+    dolmus (stale) kayitta "3 saat" gibi bir etiket; kayit yoksa (None, None).
+    Teshis X-Price-Source basligina gider: "fresh", "stale", "miss",
+    "disabled" (Supabase env yok) ya da "error:<Tip>".
     Anahtar master_search'un yazdigi gibi classify_intent kategorisiyle
     kurulur (bkz. scripts/generate_sitemap.py:_term_has_live_inventory)."""
-    from app.cache import cache_get, cache_get_stale, make_cache_key
-    from app.query_intelligence import correct_query
-    from app.search_orchestrator import classify_intent
     try:
+        from app import cache as _cache
+        from app.query_intelligence import correct_query
+        from app.search_orchestrator import classify_intent
+        if not _cache._enabled():
+            return None, None, "disabled"
         try:
             corrected = correct_query(query)
         except Exception:
             corrected = query
-        key = make_cache_key(query, classify_intent(corrected))
-        fresh = cache_get(key)
+        key = _cache.make_cache_key(query, classify_intent(corrected))
+        fresh = _cache.cache_get(key)
         if fresh:
-            return fresh, None
-        stale = cache_get_stale(key)
+            return fresh, None, "fresh"
+        stale = _cache.cache_get_stale(key)
         if stale:
             age = stale[0].get("stale_age") or "birkaç saat"
             hours = age.split()[0]
             if age.endswith(" saat") and hours.isdigit() and int(hours) >= 48:
                 age = f"{int(hours) // 24} gün"
-            return stale, age
+            return stale, age, "stale"
     except Exception as exc:  # noqa: BLE001
         __import__("logging").getLogger(__name__).warning("fiyat sayfasi cache okuma hatasi (%s): %s", query, exc)
-    return None, None
+        return None, None, f"error:{type(exc).__name__}"
+    return None, None, "miss"
 
 
 _PRICE_REFRESH_INFLIGHT: set[str] = set()
@@ -8376,9 +8381,9 @@ async def price_landing_page(slug: str):
     products: list[dict] = []
     stale_age: str | None = None
     _t_cache = time.time()
-    cached_raw, cached_age = _price_page_cached_products(query)
+    cached_raw, cached_age, cache_status = _price_page_cached_products(query)
     # Teshis: hangi yoldan cizildi + cache okumasi kac ms (X-Price-Source).
-    price_source = f"cache-{'stale' if cached_age else 'fresh'}" if cached_raw else "cache-miss"
+    price_source = f"cache-{cache_status}"
     price_source += f";cache_ms={int((time.time() - _t_cache) * 1000)}"
     if cached_raw:
         products = postprocess_search_products(query, _copy.deepcopy(cached_raw))
