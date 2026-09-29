@@ -6094,9 +6094,31 @@ def _format_store_name(slug: str) -> str:
         "mertoptik": "Mert Optik", "ebebek": "e-bebek", "babymall": "BabyMall",
         "pasabahce": "Paşabahçe", "englishhome": "English Home", "madamecoco": "Madame Coco",
         "bellamaison": "Bella Maison", "karacahome": "Karaca Home", "koctas": "Koçtaş",
-        "koctasfix": "Koçtaş Fix"
+        "koctasfix": "Koçtaş Fix",
+        # Scraper'larin urune yazdigi "source" degerleri magaza slug'indan
+        # farkli olabiliyor ("sokmarket" vs "sok") -- /fiyat sayfalari,
+        # meta description ve JSON-LD bunlari ham gosteriyordu ("Sokmarket").
+        "sokmarket": "ŞOK", "hakmar": "Hakmar", "file": "File Market", "metro": "Metro",
+        "cagrimarket": "Çağrı Market", "mopas": "Mopaş", "teknosa": "Teknosa",
+        "cetmen": "Çetmen", "gurgencler": "Gürgençler", "gurgencer": "Gürgençler",
+        "yigitavm": "Yiğit AVM", "evkur": "Evkur", "itopya": "İtopya", "huawei": "Huawei",
+        "samsung": "Samsung", "rossmann": "Rossmann", "sephora": "Sephora", "sevil": "Sevil",
+        "flormar": "Flormar", "ozdilek": "Özdilek", "altinyildiz": "Altınyıldız",
+        "hatemoglu": "Hatemoğlu", "ipekyol": "İpekyol", "ltb": "LTB", "colins": "Colin's",
+        "pierrecardin": "Pierre Cardin", "yargici": "Yargıcı", "ciceksepeti": "Çiçeksepeti",
+        "evidea": "Evidea", "istikbal": "İstikbal", "vivense": "Vivense",
+        "kutahyaporselen": "Kütahya Porselen", "dardanel": "Dardanel", "ulker": "Ülker",
+        "kitapyurdu": "Kitapyurdu", "muzikdunyasi": "Müzik Dünyası", "oyundeposu": "Oyun Deposu",
+        "gamegaraj": "Game Garaj", "ofissepeti": "Ofis Sepeti", "tazedirekt": "Tazedirekt",
+        "supplementler": "Supplementler", "proteinocean": "Proteinocean", "gnc": "GNC",
+        "bernardo": "Bernardo", "schafer": "Schafer", "karaca": "Karaca", "korkmaz": "Korkmaz",
+        "ikea": "IKEA", "bauhaus": "Bauhaus", "tekzen": "Tekzen", "linens": "Linens",
+        "shein": "SHEIN", "miniso": "Miniso", "nike": "Nike", "flo": "FLO", "mavi": "Mavi",
+        "dr": "D&R", "fakir": "Fakir", "arnica": "Arnica", "evpet": "Evpet", "zopet": "Zopet",
+        "petbis": "Petbis", "kinetix": "Kinetix", "namet": "Namet", "melodika": "Melodika",
     }
-    return known.get(slug, slug.capitalize())
+    key = (slug or "").strip().casefold()
+    return known.get(key, (slug or "").strip().capitalize())
 
 _STORE_DESCRIPTIONS = {
     "bim": "Haftalık aktüel ürün katalogları ve fırsatlar anında gelsin.",
@@ -7002,7 +7024,7 @@ async def embed_compare_page(terim: str, request: Request):
         rows = []
         for p in products:
             title = _html.escape(str(p.get("title") or ""))[:80]
-            store = _html.escape(str(p.get("source") or ""))
+            store = _html.escape(_format_store_name(str(p.get("source") or "")))
             price = p.get("current_price")
             price_str = f"₺{price:,.2f}".replace(",", ".") if price else "—"
             url = _html.escape(str(p.get("url") or "#"))
@@ -7593,7 +7615,7 @@ async def price_records_page():
     if movers:
         cards_html = "".join(
             f'<div class="bp-feature"><h3>{_html.escape(_truncate_title(m["title"]) or "Ürün")}</h3>'
-            f'<p>{_html.escape(m["source"])} · %{m["change_pct"]} düşüş · '
+            f'<p>{_html.escape(_format_store_name(m["source"]))} · %{m["change_pct"]} düşüş · '
             f'En düşük ₺{m["min_price"]:.2f} · Şimdi ₺{m["last_price"]:.2f}</p></div>'
             for m in movers if m["change_pct"] > 0
         )
@@ -8074,7 +8096,7 @@ def _price_page_editorial_html(term: str, products: list[dict]) -> str:
         f"<p>{_html.escape(title_term)} için karşılaştırdığımız {len(priced)} üründe "
         f"ortalama fiyat <strong>{_tr_price(avg_price)} ₺</strong>, en düşük fiyat "
         f"<strong>{_tr_price(cheapest_p['price'])} ₺</strong> ile "
-        f"<strong>{_html.escape(cheapest_p.get('source', ''))}</strong> mağazasında, "
+        f"<strong>{_html.escape(_format_store_name(cheapest_p.get('source', '')))}</strong> mağazasında, "
         f"toplam <strong>{store_count} farklı mağaza</strong> taranarak bulundu.</p>"
     )
 
@@ -8083,7 +8105,7 @@ def _price_page_editorial_html(term: str, products: list[dict]) -> str:
     faq_items = [
         (f"En ucuz {term} nereden alınır?",
          f"Şu anki karşılaştırmaya göre en uygun fiyat {_tr_price(cheapest_p['price'])} ₺ ile "
-         f"{cheapest_p.get('source', '')} mağazasında."),
+         f"{_format_store_name(cheapest_p.get('source', ''))} mağazasında."),
         (f"{title_term} ortalama fiyatı ne kadar?",
          f"Karşılaştırılan {len(priced)} ürünün ortalama fiyatı {_tr_price(avg_price)} ₺."),
         (f"{title_term} fiyatları kaç mağazadan karşılaştırılıyor?",
@@ -8312,7 +8334,7 @@ async def price_landing_page(slug: str):
     for p in products[:15]:
         p_title = _html.escape(p.get("title", ""))
         price = p.get("price") or 0
-        source = _html.escape(p.get("source", ""))
+        source = _html.escape(_format_store_name(p.get("source", "")))
         url = _html.escape(p.get("url", ""))
         hist_key = f"{p.get('source')}::{p.get('title')}"
         history_svg = _render_price_history_svg(_hist_map.get(hist_key, []))
@@ -8338,7 +8360,7 @@ async def price_landing_page(slug: str):
 
     priced_all = [p for p in products if p.get("price")]
     cheapest_source = (
-        min(priced_all, key=lambda p: p["price"]).get("source", "") if priced_all else ""
+        _format_store_name(min(priced_all, key=lambda p: p["price"]).get("source", "")) if priced_all else ""
     )
     highest = max((p["price"] for p in priced_all), default=0)
     # Meta description SERP snippet'i olarak gorunuyor -- onceki duz
@@ -8354,7 +8376,7 @@ async def price_landing_page(slug: str):
             f"{title_term} fiyatları {_whole_price(cheapest)} ₺ ile {_whole_price(highest)} ₺ arasında. "
             + (f"{store_count} mağazada " if store_count >= 2 else "")
             + f"{len(products)} ürün karşılaştırıldı."
-            + (f" En ucuz teklif: {cheapest_source.capitalize()}." if cheapest_source else "")
+            + (f" En ucuz teklif: {cheapest_source}." if cheapest_source else "")
             + " Fiyat geçmişini gör, indirimi kaçırma."
         )
     elif cheapest:
@@ -8459,7 +8481,7 @@ async def price_landing_page(slug: str):
                     "name": f"En ucuz {term} nereden alınır?",
                     "acceptedAnswer": {
                         "@type": "Answer",
-                        "text": f"Şu anki karşılaştırmaya göre en uygun fiyat {_tr_price(cheapest_p['price'])} ₺ ile {cheapest_p.get('source', '')} mağazasında.",
+                        "text": f"Şu anki karşılaştırmaya göre en uygun fiyat {_tr_price(cheapest_p['price'])} ₺ ile {_format_store_name(cheapest_p.get('source', ''))} mağazasında.",
                     },
                 },
                 {
