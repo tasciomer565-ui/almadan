@@ -5196,11 +5196,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/kola</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/kolonya</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -8357,11 +8352,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/skechers</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/skechers-esofman</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
