@@ -8320,7 +8320,7 @@ _PRICE_REFRESH_LOCK = __import__("threading").Lock()
 _PRICE_REFRESH_SLOTS = __import__("threading").BoundedSemaphore(2)
 
 
-def _schedule_price_page_refresh(slug: str, query: str) -> None:
+def _schedule_price_page_refresh(slug: str, query: str, current_stores: int = 0) -> None:
     import threading
 
     with _PRICE_REFRESH_LOCK:
@@ -8342,7 +8342,14 @@ def _schedule_price_page_refresh(slug: str, query: str) -> None:
             t0 = time.time()
             _PRICE_REFRESH_STAGE[slug] = ("railway", t0)
             raw = _call_railway_scraper(query, "general")
-            if raw:
+            new_stores = len({p.get("source") for p in (raw or []) if isinstance(p, dict) and p.get("source")})
+            if raw and new_stores < current_stores:
+                # Taze ama daha az magazali sonuc eski/cok magazali kaydin
+                # ustune yazilmasin: Railway su an bazi magazalarda bos donuyor
+                # (2026-09-29: cogu terimde sadece Amazon), vestel-blender
+                # boyle 2 magazadan 1'e dusup noindex oldu.
+                result = f"railway:az-magaza({new_stores}<{current_stores})"
+            elif raw:
                 _PRICE_REFRESH_STAGE[slug] = ("cache_set", time.time())
                 key, category = _price_page_cache_key(query)
                 cache_set(key, query, category, raw)
@@ -8417,7 +8424,8 @@ async def price_landing_page(slug: str):
         products = postprocess_search_products(query, _copy.deepcopy(cached_raw))
         if len(products) >= 2 and cached_age:
             stale_age = cached_age
-            _schedule_price_page_refresh(slug.lower(), query)
+            from app.seo_rules import price_page_store_count as _psc
+            _schedule_price_page_refresh(slug.lower(), query, _psc(cached_raw))
     if len(products) < 2:
         stale_age = None
         price_source += ";live"

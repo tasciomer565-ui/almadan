@@ -67,6 +67,15 @@ def test_stale_refresh_without_railway_does_not_run_local_search():
     assert main._PRICE_REFRESH_LAST[SLUG].startswith("railway:sonuc-yok")
 
 
+def test_stale_refresh_does_not_overwrite_with_fewer_stores():
+    # Railway su an cogu terimde sadece Amazon donuyor; 4 magazali eski kayit
+    # tek magazali taze sonucla ezilmemeli
+    amazon_only = [dict(p, source="amazon") for p in _products()]
+    _, _, writes = _get((_products(), False, 7.0), _products(), railway=amazon_only)
+    assert writes == 0
+    assert main._PRICE_REFRESH_LAST[SLUG].startswith("railway:az-magaza(1<4)")
+
+
 def test_no_cache_falls_back_to_live_scrape():
     resp, calls, _ = _get(None, _products())
     assert resp.status_code == 200
