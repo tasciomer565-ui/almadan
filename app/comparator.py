@@ -438,6 +438,66 @@ def titles_match(original_title: str, candidate_title: str) -> bool:
     ratio = len(overlap) / len(orig_words)
     return ratio >= 0.50
 
+def _product_tokens(title: str) -> set[str]:
+    # "128GB" ile "128 GB" ayni token'lara dussun diye sayi/harf sinirinda bol.
+    t = normalize_turkish(title or "")
+    t = re.sub(r"(?<=\d)(?=[a-z])|(?<=[a-z])(?=\d)", " ", t)
+    return {w for w in re.findall(r"\w+", t) if len(w) > 1 or w.isdigit()}
+
+
+_MEASURE_UNITS = {
+    "gb", "tb", "mb", "l", "lt", "litre", "ml", "cl", "gr", "g", "gram", "kg", "mg",
+    "w", "watt", "mah", "cm", "mm", "m", "inc", "inch", "hz", "v", "adet", "li", "lu",
+}
+
+
+def _model_codes(title: str) -> set[str]:
+    """Rakam iceren butun token'lar (a55, ko1501, xb13, 15) -- olcu/kapasite
+    degerleri (128gb, "128 gb", "1.7 l", "2300 gr") haric."""
+    tokens = re.findall(r"\w+", normalize_turkish(title or ""))
+    codes: set[str] = set()
+    for i, tok in enumerate(tokens):
+        if not any(ch.isdigit() for ch in tok):
+            continue
+        unit_suffix = re.fullmatch(r"\d+([a-z]+)", tok)
+        if unit_suffix and unit_suffix.group(1) in _MEASURE_UNITS:
+            continue
+        nxt = tokens[i + 1] if i + 1 < len(tokens) else ""
+        if tok.isdigit() and nxt in _MEASURE_UNITS:
+            continue
+        codes.add(tok)
+    return codes
+
+
+def same_product(title_a: str, title_b: str, ignore_words: set[str] | None = None) -> bool:
+    """Iki ilan AYNI urun mu (tekrar eleme icin).
+
+    titles_match "aday, kaynagin kelimelerinin yarisini iceriyor mu" diye
+    bakar -- urun dogrulamada (compare_prices) dogru, ama tekrar elemede
+    markali aramalarda her baslik marka + urun turunu paylastigi icin farkli
+    modelleri birlestiriyordu ("JBL Go 3" = "JBL Flip 6", "Tefal Kettle
+    KO1501" = "KI2008"), kullaniciya sadece en ucuzu gosteriliyordu.
+
+    - Arama kelimeleri (ignore_words: marka/urun turu) benzerlige sayilmaz.
+    - Benzerlik simetrik: ortak / kisa baslik >= 0.6.
+    - Iki tarafta da model kodu (rakam iceren token, olcu/kapasite haric:
+      a55, ko1501, xb13) varsa en az biri ortak olmali.
+    - Arama kelimeleri cikinca bir taraf bos kaliyorsa ayirt edici bilgi yok
+      -- birlestirme (fazladan bir urun gostermek, farkli urunu gizlemekten
+      daha az zararli).
+    """
+    ignore = {normalize_turkish(w) for w in (ignore_words or set())}
+    a = _product_tokens(title_a) - ignore
+    b = _product_tokens(title_b) - ignore
+    if not a or not b:
+        return False
+    a_codes = _model_codes(title_a) - ignore
+    b_codes = _model_codes(title_b) - ignore
+    if a_codes and b_codes and not (a_codes & b_codes):
+        return False
+    return len(a & b) / min(len(a), len(b)) >= 0.6
+
+
 def compare_prices(title: str, exclude_source: str) -> list[dict]:
     links = find_comparison_links(title, exclude_source)
     
@@ -3576,12 +3636,15 @@ def postprocess_search_products(query: str, all_products: list) -> list[dict]:
         else:
             filtered_products = []
 
+    # Arama kelimeleri (marka/urun turu) her sonucta var -- ayni urun mu
+    # kararinda sayilmamali (bkz. same_product).
+    dedup_ignore = set(corrected_query.lower().split()) | set(query.lower().split())
     deduped_products = []
     for p in filtered_products:
         title = p.get("title", "")
         match_idx = -1
         for idx, dp in enumerate(deduped_products):
-            if (titles_match(title, dp["title"])
+            if (same_product(title, dp["title"], dedup_ignore)
                 and not has_capacity_conflict(title, dp["title"])
                 and not has_physical_conflict(title, dp["title"])
                 and not has_tech_conflict(title, dp["title"])

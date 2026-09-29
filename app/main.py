@@ -2260,7 +2260,7 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
     from collections import defaultdict
 
     def _dedup(items: list[dict]) -> list[dict]:
-        from app.comparator import titles_match
+        from app.comparator import same_product
         source_count: dict[str, int] = defaultdict(int)
         out = []
         seen_urls: set[str] = set()
@@ -2276,7 +2276,7 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
 
             is_title_dup = False
             for other_title in seen_titles_by_source[src_key]:
-                if (titles_match(title, other_title)
+                if (same_product(title, other_title)
                     and not has_capacity_conflict(title, other_title)
                     and not has_physical_conflict(title, other_title)
                     and not has_tech_conflict(title, other_title)

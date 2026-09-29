@@ -5,7 +5,8 @@ from app.comparator import (
     is_refurbished_title, extract_model_numbers, has_model_conflict,
     extract_storage_capacity, has_capacity_conflict,
     extract_volume_weight_count, has_physical_conflict,
-    extract_ram_and_tv_size, has_tech_conflict, is_logical_product, has_gender_conflict
+    extract_ram_and_tv_size, has_tech_conflict, is_logical_product, has_gender_conflict,
+    same_product, title_has_brand, postprocess_search_products,
 )
 
 def test_clean_product_title():
@@ -232,6 +233,49 @@ def test_stem_turkish_word():
 def test_is_logical_product_gender():
     assert is_logical_product("Erkek Parfüm", "Kadın Parfüm") is False
     assert is_logical_product("Kadın Ceket", "Erkek Ceket") is False
+
+
+# ── same_product (tekrar eleme) ──────────────────────────────
+
+@pytest.mark.parametrize("a,b,query", [
+    ("Apple iPhone 15 128GB Siyah", "iPhone 15 128 GB Siyah Cep Telefonu", "iphone 15"),
+    ("JBL Go 3 Bluetooth Hoparlör Siyah", "JBL GO 3 Taşınabilir Bluetooth Hoparlör", "jbl hoparlör"),
+    ("Tefal KO1501 Express Kettle 1.7 L", "Tefal Express KO1501 Su Isıtıcı Kettle", "tefal kettle"),
+    ("Samsung Galaxy A55 128GB Lacivert", "Samsung Galaxy A55 5G 128 GB Lacivert", "samsung telefon"),
+])
+def test_same_product_merges_same_model(a, b, query):
+    assert same_product(a, b, set(query.split())) is True
+
+
+@pytest.mark.parametrize("a,b,query", [
+    ("JBL Go 3 Hoparlör", "JBL Flip 6 Hoparlör", "jbl hoparlör"),
+    ("Tefal Kettle KO1501", "Tefal Kettle KI2008", "tefal kettle"),
+    ("Sony SRS-XB13 Bluetooth Hoparlör", "Sony ULT Field 1 Hoparlör", "sony hoparlör"),
+    ("Samsung Galaxy A55 128GB", "Samsung Galaxy A35 128GB", "samsung telefon"),
+])
+def test_same_product_keeps_different_models(a, b, query):
+    # titles_match bunlari "ayni" sayiyordu -- markali aramada sadece en ucuz model kaliyordu
+    assert same_product(a, b, set(query.split())) is False
+
+
+# ── marka filtresi ───────────────────────────────────────────
+
+def test_title_has_brand_aliases_and_boundaries():
+    assert title_has_brand("iPhone 14 Pro", "apple") is True
+    assert title_has_brand("ARÇELİK Bulaşık Makinesi", "arcelik") is True
+    assert title_has_brand("CHP Rozeti", "hp") is False
+    assert title_has_brand("JBL Go 3", "sony") is False
+
+
+def test_postprocess_brand_query_drops_other_brands_keeps_models():
+    raw = [
+        {"title": "Sony SRS-XB13 Bluetooth Hoparlör", "price": 1500, "source": "trendyol", "url": "u1"},
+        {"title": "JBL Go 3 Hoparlör", "price": 1200, "source": "n11", "url": "u2"},
+        {"title": "Sony ULT Field 1 Hoparlör", "price": 3500, "source": "hepsiburada", "url": "u3"},
+    ]
+    titles = [p["title"] for p in postprocess_search_products("sony hoparlör", raw)]
+    assert "JBL Go 3 Hoparlör" not in titles
+    assert len(titles) == 2
 
 
 if __name__ == "__main__":
