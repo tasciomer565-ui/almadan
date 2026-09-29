@@ -3477,6 +3477,15 @@ def search_products_by_name(
         # 1. Lokal orkestratör (sadece N11+Amazon)
         from app.search_orchestrator import master_search
         all_products = run_async(master_search(query, selected_category=category, lat=lat, lon=lon, mode=mode))
+    return postprocess_search_products(query, all_products)
+
+
+def postprocess_search_products(query: str, all_products: list) -> list[dict]:
+    """Ham tarama/cache sonucunu kullaniciya (ve /fiyat sayfasina) gosterilen
+    listeye cevirir: alaka/marka filtresi, dedup, magaza cesitliligi, limit,
+    etiketler. scripts/generate_sitemap.py de cache'teki ham sonuca AYNI
+    islemi uygular -- yoksa sitemap ham listeyle "3 magaza" sayip sayfanin
+    filtrelenmis listede "1 magaza -> noindex" dedigi sayfalari da ekliyordu."""
     try:
         from app.query_intelligence import correct_query
         corrected_query = correct_query(query)

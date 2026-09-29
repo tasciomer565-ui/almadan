@@ -74,11 +74,16 @@ def _term_has_live_inventory(term: str) -> bool:
         products = cache_get_stale(cache_key)
         if not products:
             return False
-        real = [p for p in products if isinstance(p, dict) and p.get("title") and p.get("url")]
-        # app/main.py:price_landing_page ile ayni esik (bkz. app/seo_rules.py)
-        # -- noindex sayfa eklemek Search Console'da tutarsizlik uyarisi verir.
+        # Sayfa ham listeyi degil, search_products_by_name'in filtrelenmis
+        # (alaka/marka/dedup/limit) listesini sayiyor -- ayni islemi uygula,
+        # yoksa ham listede 3 magaza gorunup sayfada 1 magazaya dusen
+        # terimler (sony-hoparlor, apple-powerbank...) sitemap'e giriyor ama
+        # sayfa noindex donuyordu. Esik app/seo_rules.py'de ortak.
+        import copy
+        from app.comparator import postprocess_search_products
         from app.seo_rules import is_price_page_indexable
-        return is_price_page_indexable(real)
+        shown = postprocess_search_products(query, copy.deepcopy(products))
+        return is_price_page_indexable(shown)
     except Exception as exc:  # noqa: BLE001
         print(f"  envanter kontrolu basarisiz ({term!r}): {exc}", file=sys.stderr)
         return False
