@@ -292,6 +292,15 @@ function getStoreBrand(source) {
   return STORE_BRANDS[key] || { name: source || "Mağaza", color: "#287a50", bg: "rgba(40,122,80,0.08)", emoji: "🛒" };
 }
 
+// Scraper'in ham "source" degeri ("sokmarket", "karaca", "vivense") yerine
+// kullaniciya gosterilecek magaza adi. STORE_BRANDS'te yoksa bas harfi buyuk.
+function storeDisplayName(source) {
+  const key = String(source || "").toLowerCase().replace(/\s+.*$/, "").replace(/[^a-z0-9]/g, "");
+  if (STORE_BRANDS[key]) return STORE_BRANDS[key].name;
+  const raw = String(source || "").trim();
+  return raw ? raw.charAt(0).toLocaleUpperCase("tr-TR") + raw.slice(1) : "Mağaza";
+}
+
 function storeLogoHtml(source, size = 36) {
   const brand = getStoreBrand(source);
   const initial = brand.name.charAt(0).toUpperCase();
@@ -1695,7 +1704,7 @@ function renderDeals() {
         ${discountBadge}
       </div>
       <div class="deal-body">
-        <p class="source-name">${escapeHtml(product.source)}</p>
+        <p class="source-name">${escapeHtml(storeDisplayName(product.source))}</p>
         <h3>${escapeHtml(product.title)}</h3>
         ${forecastBadge}
         <div class="price-row">
@@ -1734,7 +1743,7 @@ function renderTracking() {
         <span class="tracking-thumb">${productImage(product)}</span>
         <span class="tracking-copy">
           <h3>${escapeHtml(product.title)}</h3>
-          <p>${escapeHtml(product.source)} · ${product.price_history.length} fiyat kaydı</p>
+          <p>${escapeHtml(storeDisplayName(product.source))} · ${product.price_history.length} fiyat kaydı</p>
           <span class="check-status">
             <span class="status-dot ${escapeHtml(product.last_check_status || "pending")}"></span>
             ${escapeHtml(checkStatusText(product))}
@@ -2619,7 +2628,7 @@ function showSearchResults(response) {
                </a>`
             : "";
 
-          const whyMatchedText = `Bu ürün ${item.source} mağazasındaki sonuçlar arasından "${originalQuery}" araması ile eşleştirildi.`;
+          const whyMatchedText = `Bu ürün ${storeDisplayName(item.source)} mağazasındaki sonuçlar arasından "${originalQuery}" araması ile eşleştirildi.`;
           const whyMatchedHtml = `<span class="why-matched-icon" tabindex="0" role="img" title="${escapeHtml(whyMatchedText)}" aria-label="${escapeHtml(whyMatchedText)}">
               <i data-lucide="info" style="width:12px; height:12px;"></i>
             </span>`;
@@ -2676,7 +2685,7 @@ function showSearchResults(response) {
                   : `<span class="product-placeholder" style="width:100%; height:100%; display:grid; place-items:center;"><i data-lucide="${getStoreIcon(item.source, item.title)}" style="width:18px; height:18px;"></i></span>`}
               </div>
               <div style="flex: 1; min-width: 0;">
-                <p class="source-name" style="margin: 0 0 2px 0; font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--muted);">${escapeHtml(item.source)} ${whyMatchedHtml}</p>
+                <p class="source-name" style="margin: 0 0 2px 0; font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--muted);">${escapeHtml(storeDisplayName(item.source))} ${whyMatchedHtml}</p>
                 <h4 style="margin: 0 0 6px 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</h4>
                 <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px;">
                   ${badgesHtml}
@@ -2859,7 +2868,7 @@ function showParsedProduct(parsed) {
         : `<span class="product-placeholder"><i data-lucide="${getStoreIcon(parsed.source, title)}"></i></span>`}
     </div>
     <div class="dialog-body">
-      <p class="source-name">${escapeHtml(parsed.source)}</p>
+      <p class="source-name">${escapeHtml(storeDisplayName(parsed.source))}</p>
       <h2>${escapeHtml(title)}</h2>
       <div class="decision-panel">
         <div class="score-ring">${parsed.confidence}</div>
@@ -3145,7 +3154,7 @@ window.selectAlternativeSeller = function(el) {
   }
 
   const sourceNameEl = document.querySelector(".dialog-body .source-name");
-  if (sourceNameEl) sourceNameEl.innerText = alt.source;
+  if (sourceNameEl) sourceNameEl.innerText = storeDisplayName(alt.source);
 
   if (state.parsedProduct) {
      state.parsedProduct.canonical_url = addAffiliateTag(alt.url || alt.canonical_url || state.parsedProduct.canonical_url, alt.source);
@@ -3506,7 +3515,7 @@ function openProduct(id) {
   content.innerHTML = `
     <div class="dialog-product-image">${productImage(product)}</div>
     <div class="dialog-body">
-      <p class="source-name">${escapeHtml(product.source)}</p>
+      <p class="source-name">${escapeHtml(storeDisplayName(product.source))}</p>
       <h2>${escapeHtml(product.title)}</h2>
       <div class="decision-panel">
         <div class="score-ring">${product.deal_score}</div>
@@ -3791,7 +3800,7 @@ async function shareProduct(productId) {
   if (!product) return;
 
   const price = currency.format(product.current_price);
-  const storeName = escapeHtml(product.source || "mağaza");
+  const storeName = escapeHtml(product.source ? storeDisplayName(product.source) : "mağaza");
   const text = `${product.title} — ${storeName}'da ${price}! Almadan ile karşılaştır:`;
   const baseUrl = product.url || window.location.href;
   const sep = baseUrl.includes("?") ? "&" : "?";
