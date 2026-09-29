@@ -8268,45 +8268,43 @@ _PRICE_PAGE_HTML_CACHE_MAX = 2000  # ~50KB/sayfa -> en fazla ~100MB
 _PRICE_PAGE_CACHE_HEADERS = {"Cache-Control": "public, max-age=600"}
 
 
+def _price_page_cache_key(query: str) -> tuple[str, str]:
+    """master_search'un product_cache'e yazdigi (anahtar, kategori) --
+    classify_intent kategorisiyle (bkz. scripts/generate_sitemap.py)."""
+    from app.cache import make_cache_key
+    from app.query_intelligence import correct_query
+    from app.search_orchestrator import classify_intent
+    try:
+        corrected = correct_query(query)
+    except Exception:
+        corrected = query
+    category = classify_intent(corrected)
+    return make_cache_key(query, category), category
+
+
 def _price_page_cached_products(query: str) -> tuple[list[dict] | None, str | None, str]:
-    """/fiyat sayfasi icin Supabase product_cache'teki ham sonuc.
+    """/fiyat sayfasi icin Supabase product_cache'teki ham sonuc (tek sorgu).
 
     Donus: (urunler, eskilik etiketi, teshis). Taze kayitta etiket None; sure
-    dolmus (stale) kayitta "3 saat" gibi bir etiket; kayit yoksa (None, None).
-    Teshis X-Price-Source basligina gider: "fresh", "stale", "miss",
-    "disabled" (Supabase env yok) ya da "error:<Tip>".
-    Anahtar master_search'un yazdigi gibi classify_intent kategorisiyle
-    kurulur (bkz. scripts/generate_sitemap.py:_term_has_live_inventory)."""
+    dolmus (stale) kayitta "7 saat" / "2 gün" gibi bir etiket.
+    Teshis X-Price-Source basligina gider: "fresh", "stale", "miss:<sebep>",
+    "disabled" (Supabase env yok) ya da "error:<Tip>"."""
     try:
         from app import cache as _cache
-        from app.query_intelligence import correct_query
-        from app.search_orchestrator import classify_intent
         if not _cache._enabled():
             return None, None, "disabled"
-        try:
-            corrected = correct_query(query)
-        except Exception:
-            corrected = query
-        key = _cache.make_cache_key(query, classify_intent(corrected))
-        fresh = _cache.cache_get(key)
-        if fresh:
-            return fresh, None, "fresh"
-        stale = _cache.cache_get_stale(key)
-        if stale:
-            age = stale[0].get("stale_age") or "birkaç saat"
-            hours = age.split()[0]
-            if age.endswith(" saat") and hours.isdigit() and int(hours) >= 48:
-                age = f"{int(hours) // 24} gün"
-            return stale, age, "stale"
+        key, _category = _price_page_cache_key(query)
+        latest = _cache.cache_get_latest(key)
+        if latest:
+            products, is_fresh, age_hours = latest
+            if is_fresh:
+                return products, None, "fresh"
+            age = f"{int(age_hours) // 24} gün" if age_hours >= 48 else f"{max(1, int(age_hours))} saat"
+            return products, age, "stale"
     except Exception as exc:  # noqa: BLE001
         __import__("logging").getLogger(__name__).warning("fiyat sayfasi cache okuma hatasi (%s): %s", query, exc)
         return None, None, f"error:{type(exc).__name__}"
-    diag = f"miss:{_cache.LAST_STALE_DIAG or '?'}"
-    if "InvalidSchema" in diag or "MissingSchema" in diag:
-        # Sadece "://" oncesi (protokol) -- host/anahtar icermez, gizli degil.
-        scheme = _cache.SUPABASE_URL.split("://", 1)[0] if "://" in _cache.SUPABASE_URL else "(yok)"
-        diag += f";scheme={ascii(scheme[:16])};len={len(_cache.SUPABASE_URL)}"
-    return None, None, diag + ";cv=3"
+    return None, None, f"miss:{_cache.LAST_STALE_DIAG or '?'}"
 
 
 _PRICE_REFRESH_INFLIGHT: set[str] = set()
@@ -8329,10 +8327,17 @@ def _schedule_price_page_refresh(slug: str, query: str) -> None:
 
     def _run() -> None:
         try:
-            from app.comparator import search_products_by_name
-            # Canli yol (Railway/master_search) product_cache'i kendisi yazar;
-            # HTML cache'i dusur ki sonraki ziyaret taze veriden cizilsin.
-            search_products_by_name(query, category="general")
+            from app.cache import cache_set
+            from app.comparator import _call_railway_scraper, search_products_by_name
+            # Railway'in product_cache'e yazmasina guvenilemiyor (canlida
+            # tazelemeden sonra da stale kaliyordu) -- ham sonucu burada yaz.
+            # Railway yoksa/bossa yerel master_search cache'i kendisi yazar.
+            raw = _call_railway_scraper(query, "general")
+            if raw:
+                key, category = _price_page_cache_key(query)
+                cache_set(key, query, category, raw)
+            else:
+                search_products_by_name(query, category="general")
             _PRICE_PAGE_HTML_CACHE.pop(slug, None)
         except Exception as exc:  # noqa: BLE001
             __import__("logging").getLogger(__name__).warning("fiyat sayfasi arka plan tazeleme hatasi (%s): %s", slug, exc)

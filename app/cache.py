@@ -161,6 +161,41 @@ def cache_get_stale(cache_key: str) -> Optional[list[dict]]:  # noqa: C901
     return None
 
 
+def cache_get_latest(cache_key: str) -> Optional[tuple[list[dict], bool, float]]:
+    """Tek sorguda en son kayit: (urunler, taze_mi, yas_saat) ya da None.
+
+    cache_get + cache_get_stale iki ayri Supabase istegi (canlida 0.7-1.4s)
+    atiyordu. Ayrica cache_set upsert'u created_at'i guncellemiyor, sadece
+    expires_at'i ileri aliyor -- bu yuzden yas created_at'ten degil,
+    expires_at - CACHE_TTL_HOURS'tan (son yazma zamani) hesaplanir."""
+    global LAST_STALE_DIAG
+    if not _enabled():
+        return None
+    try:
+        url = (
+            f"{SUPABASE_URL}/rest/v1/{CACHE_TABLE}"
+            f"?cache_key=eq.{requests.utils.quote(cache_key)}"
+            f"&select=products,expires_at"
+            f"&order=expires_at.desc"
+            f"&limit=1"
+        )
+        resp = requests.get(url, headers=_headers(), timeout=3)
+        rows = resp.json() if resp.ok else []
+        LAST_STALE_DIAG = "empty" if resp.ok else f"http:{resp.status_code}"
+        if not rows or not rows[0].get("products"):
+            return None
+        from datetime import timedelta
+        expires_at = datetime.fromisoformat(rows[0]["expires_at"].replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        written_at = expires_at - timedelta(hours=CACHE_TTL_HOURS)
+        age_hours = max(0.0, (now - written_at).total_seconds() / 3600)
+        return rows[0]["products"], expires_at > now, age_hours
+    except Exception as exc:
+        LAST_STALE_DIAG = f"exc:{type(exc).__name__}"
+        logger.warning("cache_get_latest error: %s", exc)
+    return None
+
+
 def cache_set(cache_key: str, query: str, category: str, products: list[dict]) -> None:
     """Sonuçları cache'e kaydet / varsa güncelle."""
     import time as _time
