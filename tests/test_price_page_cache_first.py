@@ -95,3 +95,30 @@ def test_cache_disabled_is_reported_in_header():
 def test_nothing_anywhere_is_404():
     resp, _, _ = _get(None, [])
     assert resp.status_code == 404
+
+
+def test_slow_live_scrape_does_not_block_other_requests():
+    """price_landing_page 'async def' iken canli tarama event loop'u kilitliyor,
+    o sirada /health (ve robots.txt, sitemap) yanit veremiyordu."""
+    import threading
+
+    def slow_search(*_a, **_k):
+        time.sleep(1.5)
+        return _products()
+
+    main._PRICE_PAGE_HTML_CACHE.clear()
+    main._PRICE_REFRESH_LAST.clear()
+    with TestClient(main.app) as shared, \
+         mock.patch.object(cache, "_enabled", return_value=False), \
+         mock.patch.object(comparator, "search_products_by_name", side_effect=slow_search):
+        result = {}
+        worker = threading.Thread(target=lambda: result.update(page=shared.get(f"/fiyat/{SLUG}")))
+        worker.start()
+        time.sleep(0.3)  # tarama basladi
+        started = time.time()
+        health = shared.get("/health")
+        health_took = time.time() - started
+        worker.join()
+    assert health.status_code == 200
+    assert health_took < 0.8, f"/health {health_took:.2f}s bekledi -- sunucu kilitli"
+    assert result["page"].status_code == 200

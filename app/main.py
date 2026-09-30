@@ -8287,6 +8287,13 @@ _PRICE_PAGE_HTML_CACHE: dict[str, tuple[float, str]] = {}
 _PRICE_PAGE_HTML_TTL = 3600  # fiyatlar saatlik degisse de sayfa icin yeterince taze
 _PRICE_PAGE_HTML_CACHE_MAX = 2000  # ~50KB/sayfa -> en fazla ~100MB
 _PRICE_PAGE_CACHE_HEADERS = {"Cache-Control": "public, max-age=600"}
+# price_landing_page duz "def" (threadpool'da calisir): "async def" iken
+# icindeki senkron canli tarama (3-10s) event loop'u, yani TUM sunucuyu
+# kilitliyordu -- o sirada Googlebot'un robots.txt/sitemap istegi dahil
+# hicbir istek yanitlanamiyordu. Threadpool'a gecince taramalar paralel
+# kosabilir; scraper'a yigilmasin diye ayni anda en fazla 3 canli tarama.
+_PRICE_PAGE_HTML_CACHE_LOCK = __import__("threading").Lock()
+_PRICE_LIVE_SCRAPE_SLOTS = __import__("threading").BoundedSemaphore(3)
 
 
 def _price_page_cache_key(query: str) -> tuple[str, str]:
@@ -8396,7 +8403,7 @@ def _schedule_price_page_refresh(slug: str, query: str, current_stores: int = 0)
 
 
 @app.get("/fiyat/{slug}", response_class=HTMLResponse)
-async def price_landing_page(slug: str):
+def price_landing_page(slug: str):
     """
     Populer urun terimleri icin gercek, canlı fiyat karsilastirma
     sonuclarini sunucu tarafinda render eden SEO sayfasi (orn. "sut
@@ -8451,7 +8458,8 @@ async def price_landing_page(slug: str):
         stale_age = None
         price_source += ";live"
         try:
-            products = search_products_by_name(query, category="general")
+            with _PRICE_LIVE_SCRAPE_SLOTS:
+                products = search_products_by_name(query, category="general")
         except Exception:
             products = []
 
@@ -8759,10 +8767,11 @@ async def price_landing_page(slug: str):
     # tazelemesi bu satirdan once biterse (cache'i bosaltip) eski sayfa 1 saat
     # yapisip kalirdi. Stale yol zaten Supabase'ten ~0.3s'de ciziliyor.
     if not stale_age:
-        if len(_PRICE_PAGE_HTML_CACHE) >= _PRICE_PAGE_HTML_CACHE_MAX:
-            oldest = min(_PRICE_PAGE_HTML_CACHE, key=lambda k: _PRICE_PAGE_HTML_CACHE[k][0])
-            _PRICE_PAGE_HTML_CACHE.pop(oldest, None)
-        _PRICE_PAGE_HTML_CACHE[cache_key] = (time.time(), page)
+        with _PRICE_PAGE_HTML_CACHE_LOCK:
+            if len(_PRICE_PAGE_HTML_CACHE) >= _PRICE_PAGE_HTML_CACHE_MAX:
+                oldest = min(_PRICE_PAGE_HTML_CACHE, key=lambda k: _PRICE_PAGE_HTML_CACHE[k][0])
+                _PRICE_PAGE_HTML_CACHE.pop(oldest, None)
+            _PRICE_PAGE_HTML_CACHE[cache_key] = (time.time(), page)
     last_refresh = _PRICE_REFRESH_LAST.get(slug.lower())
     if slug.lower() in _PRICE_REFRESH_INFLIGHT:
         stage, since = _PRICE_REFRESH_STAGE.get(slug.lower(), ("?", time.time()))
