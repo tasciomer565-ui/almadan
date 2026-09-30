@@ -1071,17 +1071,28 @@ def search_n11_direct(query: str) -> tuple[list[dict], str]:
     parsed_results = []
     corrected_query = query
     try:
+        # Once DOGRUDAN istek (ucretsiz, ~2-4s), urun cikmazsa proxy.
+        # c31e02c'de "once proxy" yapilmisti: proxy zaman asimi (12+5s) canli
+        # taramanin 13s butcesini asiyor, proxy yavas/kredisiz oldugunda
+        # dogrudan istege sira gelmeden N11 sonucu tamamen kayboluyordu
+        # (2026-09 sonu: cache'te cogu terim sadece Amazon). Ayrica her N11
+        # aramasi bosuna proxy kredisi harciyordu. Iki deneme toplami (6+6s)
+        # butceye sigar.
         html = None
-        if proxy_enabled():
-            html = proxy_get(url, render_js=False, timeout=12)
-        if html is None:
-            r = requests.get(url, headers=headers, timeout=12)
+        items = []
+        try:
+            r = requests.get(url, headers=headers, timeout=6)
             html = r.text if r.status_code == 200 else None
+        except Exception:
+            html = None
+        if html:
+            items = BeautifulSoup(html, "html.parser").select("a.product-item")
+        if not items and proxy_enabled():
+            html = proxy_get(url, render_js=False, timeout=6)
+            items = BeautifulSoup(html, "html.parser").select("a.product-item") if html else []
         if html:
             corrected_query = extract_corrected_query(html, query)
-            soup = BeautifulSoup(html, "html.parser")
-            items = soup.select("a.product-item")
-            
+
             for item in items:
                 href = item.get("href")
                 if not href:

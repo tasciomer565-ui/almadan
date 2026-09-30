@@ -295,6 +295,33 @@ def test_postprocess_brand_query_single_store_keeps_count():
     assert sources == ["n11"] * 5
 
 
+# ── N11: once dogrudan, olmazsa proxy ────────────────────────
+
+_N11_HTML = ('<a class="product-item" href="/urun/x"><h3 class="product-item-title">Sony X Hoparlör</h3>'
+             '<span class="price-currency">1.234,00 TL</span></a>')
+
+
+def test_n11_direct_success_does_not_spend_proxy_credit():
+    from unittest import mock
+    import app.comparator as comparator
+    import app.scraping_proxy as scraping_proxy
+    direct = mock.Mock(status_code=200, text=_N11_HTML)
+    with mock.patch.object(comparator.requests, "get", return_value=direct),          mock.patch.object(scraping_proxy, "proxy_enabled", return_value=True),          mock.patch.object(scraping_proxy, "proxy_get") as proxy_get:
+        products, _ = comparator.search_n11_direct("sony hoparlör")
+    assert len(products) == 1 and products[0]["source"] == "n11"
+    assert proxy_get.call_count == 0
+
+
+def test_n11_falls_back_to_proxy_when_direct_blocked():
+    from unittest import mock
+    import app.comparator as comparator
+    import app.scraping_proxy as scraping_proxy
+    with mock.patch.object(comparator.requests, "get", side_effect=Exception("blocked")),          mock.patch.object(scraping_proxy, "proxy_enabled", return_value=True),          mock.patch.object(scraping_proxy, "proxy_get", return_value=_N11_HTML) as proxy_get:
+        products, _ = comparator.search_n11_direct("sony hoparlör")
+    assert len(products) == 1
+    assert proxy_get.call_count == 1
+
+
 if __name__ == "__main__":
     test_clean_product_title()
     test_extract_yahoo_url()
