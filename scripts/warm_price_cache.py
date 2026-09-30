@@ -9,7 +9,7 @@ IP'sinden proxy'siz n11 + Amazon + Karaca + SOK calisiyor -- cogu terimde
 2+ magaza, yani sayfa indexlenebilir (bkz. app/seo_rules.py).
 
 Secim sirasi (taze kayitlar atlanir):
-  1. GSC'de sayfa 2'de duran terimler (app/seo_boost_slugs.json)
+  1. GSC'de gosterim alan terimler, gosterime gore (app/seo_warm_priority.json)
   2. cache'te hic kaydi olmayan terimler
   3. suresi en once dolmus terimler
 
@@ -42,7 +42,7 @@ import requests  # noqa: E402
 
 from app import cache  # noqa: E402
 from app.comparator import normalize_turkish_search_query  # noqa: E402
-from app.main import _price_page_cache_key, _seo_boost_rank, _seo_price_slug_map  # noqa: E402
+from app.main import _price_page_cache_key, _seo_price_slug_map  # noqa: E402
 from app.search_orchestrator import marketplace_scan  # noqa: E402
 
 CONCURRENCY = 2
@@ -73,9 +73,19 @@ def fetch_cache_expiry() -> dict[str, datetime]:
         offset += 1000
 
 
+def _priority_rank() -> dict[str, int]:
+    """GSC'de gosterim alan /fiyat slug'lari -> sira (0 = en cok gosterim)."""
+    import json
+    try:
+        data = json.loads((ROOT / "app" / "seo_warm_priority.json").read_text(encoding="utf-8"))
+        return {slug: i for i, slug in enumerate(data.get("slugs", []))}
+    except (OSError, ValueError):
+        return {}
+
+
 def pick_terms(expiry: dict[str, datetime], limit: int) -> list[dict]:
     now = datetime.now(timezone.utc)
-    boost = _seo_boost_rank()
+    boost = _priority_rank()
     epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
     candidates = []
     for slug, term in _seo_price_slug_map().items():
