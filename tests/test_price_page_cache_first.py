@@ -81,7 +81,7 @@ def test_stale_refresh_does_not_overwrite_with_fewer_stores():
     amazon_only = [dict(p, source="amazon") for p in _products()]
     _, _, writes = _get((_products(), False, 7.0), _products(), railway=amazon_only)
     assert writes == 0
-    assert main._PRICE_REFRESH_LAST[SLUG].startswith("railway:az-magaza(1<4)")
+    assert main._PRICE_REFRESH_LAST[SLUG].startswith("railway:az-magaza(1<=4)")
 
 
 def test_no_cache_falls_back_to_live_scrape():
@@ -130,3 +130,11 @@ def test_slow_live_scrape_does_not_block_other_requests():
     assert health.status_code == 200
     assert health_took < 0.8, f"/health {health_took:.2f}s bekledi -- sunucu kilitli"
     assert result["page"].status_code == 200
+
+
+def test_stale_refresh_does_not_rewrite_single_store_with_single_store():
+    # Tek magazali kaydi tek magazali sonucla yenilemek, kaydi 6 saat "taze"
+    # gosterip cok magazali isitma isini engelliyordu
+    amazon_only = [dict(p, source="amazon") for p in _products()]
+    _, _, writes = _get((amazon_only, False, 7.0), _products(), railway=amazon_only)
+    assert writes == 0

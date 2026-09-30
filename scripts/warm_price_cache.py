@@ -28,7 +28,7 @@ import os
 import sys
 import time
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # Proxy'siz, dogrudan istek: runner'da anahtar yok ama acikca garanti et.
@@ -47,6 +47,7 @@ from app.search_orchestrator import marketplace_scan  # noqa: E402
 
 CONCURRENCY = 2
 TIME_BUDGET_SECONDS = 20 * 60
+SKIP_IF_FRESH_FOR_HOURS = 6
 
 
 def fetch_cache_expiry() -> dict[str, datetime]:
@@ -92,8 +93,12 @@ def pick_terms(expiry: dict[str, datetime], limit: int) -> list[dict]:
         query = normalize_turkish_search_query(term)
         key, category = _price_page_cache_key(query)
         expires_at = expiry.get(key)
-        if expires_at and expires_at > now:
-            continue  # hala taze
+        # Sadece omru 6 saatten fazla kalan kayitlari atla: bu script 48 saat
+        # TTL ile yazar; 6 saat ve altinda omru kalanlar ya son demlerindeki
+        # kendi kayitlari ya da scraper servisinin (varsayilan TTL 6 saat,
+        # cogu zaman tek magazali) yazdiklaridir -- onlar isitmayi engellemesin.
+        if expires_at and expires_at > now + timedelta(hours=SKIP_IF_FRESH_FOR_HOURS):
+            continue
         priority = (
             0 if slug in boost else 1,
             boost.get(slug, 0),

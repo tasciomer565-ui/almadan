@@ -8374,12 +8374,15 @@ def _schedule_price_page_refresh(slug: str, query: str, current_stores: int = 0)
             _PRICE_REFRESH_STAGE[slug] = ("railway", t0)
             raw = _call_railway_scraper(query, "general")
             new_stores = len({p.get("source") for p in (raw or []) if isinstance(p, dict) and p.get("source")})
-            if raw and new_stores < current_stores:
+            if raw and (new_stores < current_stores or (new_stores < 2 and new_stores == current_stores)):
                 # Taze ama daha az magazali sonuc eski/cok magazali kaydin
-                # ustune yazilmasin: Railway su an bazi magazalarda bos donuyor
-                # (2026-09-29: cogu terimde sadece Amazon), vestel-blender
-                # boyle 2 magazadan 1'e dusup noindex oldu.
-                result = f"railway:az-magaza({new_stores}<{current_stores})"
+                # ustune yazilmasin: scraper servisi su an bazi magazalarda
+                # bos donuyor (2026-09-29: cogu terimde sadece Amazon),
+                # vestel-blender boyle 2 magazadan 1'e dusup noindex oldu.
+                # Tek magazali kaydi tek magazali sonucla "tazelemek" de
+                # yasak: kayit 6 saat taze gorunup scripts/warm_price_cache.py
+                # (cok magazali tarama) tarafindan atlaniyordu.
+                result = f"railway:az-magaza({new_stores}<={current_stores})"
             elif raw:
                 _PRICE_REFRESH_STAGE[slug] = ("cache_set", time.time())
                 key, category = _price_page_cache_key(query)
