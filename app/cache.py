@@ -28,6 +28,8 @@ SUPABASE_KEY = "".join(os.getenv("SUPABASE_SERVICE_KEY", "").strip().strip("\"'"
 
 CACHE_TTL_HOURS = int(os.getenv("CACHE_TTL_HOURS", "6"))
 CACHE_TABLE = "product_cache"
+# cache_set'e verilebilecek en uzun TTL (toplu isitma 48 saat kullanir).
+MAX_TTL_HOURS = 72
 
 # In-memory hot cache (in-process hot cache)
 _HOT_CACHE: dict[str, tuple[list[dict], float]] = {}
@@ -167,9 +169,9 @@ def cache_get_latest(cache_key: str) -> Optional[tuple[list[dict], bool, float]]
     """Tek sorguda en son kayit: (urunler, taze_mi, yas_saat) ya da None.
 
     cache_get + cache_get_stale iki ayri Supabase istegi (canlida 0.7-1.4s)
-    atiyordu. Ayrica cache_set upsert'u created_at'i guncellemiyor, sadece
-    expires_at'i ileri aliyor -- bu yuzden yas created_at'ten degil,
-    expires_at - CACHE_TTL_HOURS'tan (son yazma zamani) hesaplanir."""
+    atiyordu. Yas created_at'ten hesaplanir (cache_set her yazmada gunceller);
+    created_at expires_at'ten sonra/gecersizse (eski kayitlar upsert'te
+    created_at'i guncellemiyordu) expires_at - CACHE_TTL_HOURS kullanilir."""
     global LAST_STALE_DIAG
     if not _enabled():
         return None
@@ -177,7 +179,7 @@ def cache_get_latest(cache_key: str) -> Optional[tuple[list[dict], bool, float]]
         url = (
             f"{SUPABASE_URL}/rest/v1/{CACHE_TABLE}"
             f"?cache_key=eq.{requests.utils.quote(cache_key)}"
-            f"&select=products,expires_at"
+            f"&select=products,expires_at,created_at"
             f"&order=expires_at.desc"
             f"&limit=1"
         )
@@ -189,7 +191,16 @@ def cache_get_latest(cache_key: str) -> Optional[tuple[list[dict], bool, float]]
         from datetime import timedelta
         expires_at = datetime.fromisoformat(rows[0]["expires_at"].replace("Z", "+00:00"))
         now = datetime.now(timezone.utc)
-        written_at = expires_at - timedelta(hours=CACHE_TTL_HOURS)
+        fallback_written = expires_at - timedelta(hours=CACHE_TTL_HOURS)
+        try:
+            written_at = datetime.fromisoformat(rows[0]["created_at"].replace("Z", "+00:00"))
+            # Eski kayitlarda created_at ilk eklenme zamani kalmis olabilir
+            # (upsert guncellemiyordu) -- bitisten MAX_TTL_HOURS'tan daha
+            # eskiyse gercek yazma zamani olamaz, guvenme.
+            if written_at > expires_at or written_at < expires_at - timedelta(hours=MAX_TTL_HOURS):
+                written_at = fallback_written
+        except Exception:
+            written_at = fallback_written
         age_hours = max(0.0, (now - written_at).total_seconds() / 3600)
         return rows[0]["products"], expires_at > now, age_hours
     except Exception as exc:
@@ -198,8 +209,12 @@ def cache_get_latest(cache_key: str) -> Optional[tuple[list[dict], bool, float]]
     return None
 
 
-def cache_set(cache_key: str, query: str, category: str, products: list[dict]) -> None:
-    """Sonuçları cache'e kaydet / varsa güncelle."""
+def cache_set(cache_key: str, query: str, category: str, products: list[dict],
+              ttl_hours: int | None = None) -> None:
+    """Sonuçları cache'e kaydet / varsa güncelle.
+
+    ttl_hours: kaydin kac saat "taze" sayilacagi (varsayilan CACHE_TTL_HOURS).
+    Toplu isitma (scripts/warm_price_cache.py) daha uzun TTL ile yazar."""
     global LAST_SET_DIAG
     import time as _time
 
@@ -220,9 +235,8 @@ def cache_set(cache_key: str, query: str, category: str, products: list[dict]) -
         return
     try:
         from datetime import timedelta
-        expires = (
-            datetime.now(timezone.utc) + timedelta(hours=CACHE_TTL_HOURS)
-        ).isoformat()
+        now = datetime.now(timezone.utc)
+        expires = (now + timedelta(hours=min(ttl_hours or CACHE_TTL_HOURS, MAX_TTL_HOURS))).isoformat()
 
         payload = {
             "cache_key": cache_key,
@@ -231,6 +245,9 @@ def cache_set(cache_key: str, query: str, category: str, products: list[dict]) -
             "products": products,
             "source_count": len(products),
             "expires_at": expires,
+            # Upsert'te created_at kendiliginden guncellenmiyor; acikca
+            # yaziyoruz ki "son guncelleme" yasi TTL'den bagimsiz dogru olsun.
+            "created_at": now.isoformat(),
         }
         # Upsert — aynı key varsa güncelle. on_conflict=cache_key sart: PK
         # "id" (BIGSERIAL), UNIQUE kisit cache_key'de -- parametre olmadan

@@ -1,25 +1,53 @@
 name: Fiyat Sayfaları Önbellek Isıtma
 
-# /fiyat/{terim} SEO sayfalarinin (~795 terim whitelist) her birini en
-# az bir kez tarayip product_cache'e yazar -- boylece bu sayfalar canli
-# istekte (kullanici veya Googlebot) hic taranmamis bir terimle
-# karsilasip gercek 404 vermez. Sadece /cron/warm-price-terms
-# endpoint'ine istek atar, gercek isi backend yapar.
+# /fiyat/{terim} SEO sayfalarinin product_cache'ini DOGRUDAN bu runner'dan
+# tarayarak isitir (bkz. scripts/warm_price_cache.py).
+#
+# Eski akis sadece Render'daki /cron/warm-price-terms endpoint'ini
+# cagiriyordu: calisma basina 2 terim, ve tarama scraper servisinden
+# (ucretli proxy'ye bagimli) geciyordu -- 2026-09 sonunda cogu terimde
+# sadece Amazon donuyordu. Runner IP'sinden proxy'siz n11 + Amazon +
+# Karaca + SOK calistigi scripts/scraper_probe.py ile dogrulandi; depo
+# herkese acik oldugu icin Actions suresi ucretsiz.
 on:
   schedule:
-    # 10dk -> 30dk: Vercel Hobby (ucretsiz) plan Fluid Active CPU limitini
-    # asip hesabin "Paused" duruma dusmesine yol acmisti (11h49m/4h) --
-    # bu cron gunde 144 kez, her seferinde 56s'e kadar gercek tarama
-    # yapabildigi icin tek basina en buyuk tuketiciydi.
-    - cron: "*/30 * * * *"
-  workflow_dispatch: {}
+    # Saat basi (":00") GitHub'in en yogun ani, zamanlanmis isler sik
+    # atlaniyor -- bilerek ":17".
+    - cron: "17 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Bu calismada taranacak en fazla terim"
+        default: "240"
+      dry_run:
+        description: "true ise cache'e yazmaz, sadece ne yazilacagini gosterir"
+        default: "false"
+
+concurrency:
+  group: warm-price-cache
+  cancel-in-progress: false
 
 jobs:
   warm:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Trigger price-term cache warm batch
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Warm price cache
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          LIMIT: ${{ inputs.limit || '240' }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: |
-          curl -sS -f -X GET \
-            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
-            "https://www.almadan.app/cron/warm-price-terms"
+          ARGS="--limit $LIMIT"
+          if [ "$DRY_RUN" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          python scripts/warm_price_cache.py $ARGS

@@ -38,7 +38,7 @@ def _get(latest, live, railway=None):
 
 
 def test_fresh_cache_skips_live_scrape():
-    resp, calls, _ = _get((_products(), True, 1.0), _products())
+    resp, calls, _ = _get((_products(), True, 0.2), _products())
     assert resp.status_code == 200
     assert calls == 0
     assert "önce güncellendi" not in resp.text
@@ -48,10 +48,18 @@ def test_fresh_cache_skips_live_scrape():
 def test_stale_cache_renders_and_refreshes_in_background():
     resp, _, writes = _get((_products(), False, 7.4), _products(), railway=_products())
     assert resp.status_code == 200
-    assert "Fiyatlar 7 saat önce güncellendi" in resp.text
+    assert "Fiyatlar 7 saat önce güncellendi, yenileniyor." in resp.text
     # Railway sonucu arka planda cache'e bu tarafta yazilir
     assert writes == 1
     assert SLUG not in main._PRICE_PAGE_HTML_CACHE
+
+
+def test_fresh_cache_older_than_an_hour_shows_update_time_without_refresh():
+    resp, calls, writes = _get((_products(), True, 20.0), _products(), railway=_products())
+    assert "Fiyatlar 20 saat önce güncellendi." in resp.text
+    assert "yenileniyor" not in resp.text
+    assert calls == 0 and writes == 0
+    assert SLUG in main._PRICE_PAGE_HTML_CACHE
 
 
 def test_stale_age_in_days():

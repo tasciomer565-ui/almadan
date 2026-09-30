@@ -8313,8 +8313,8 @@ def _price_page_cache_key(query: str) -> tuple[str, str]:
 def _price_page_cached_products(query: str) -> tuple[list[dict] | None, str | None, str]:
     """/fiyat sayfasi icin Supabase product_cache'teki ham sonuc (tek sorgu).
 
-    Donus: (urunler, eskilik etiketi, teshis). Taze kayitta etiket None; sure
-    dolmus (stale) kayitta "7 saat" / "2 gün" gibi bir etiket.
+    Donus: (urunler, yas etiketi, teshis). Yas etiketi "7 saat" / "2 gün"
+    gibi (1 saatten yeni taze kayitta None); teshis "stale" ise sure dolmus.
     Teshis X-Price-Source basligina gider: "fresh", "stale", "miss:<sebep>",
     "disabled" (Supabase env yok) ya da "error:<Tip>"."""
     try:
@@ -8325,10 +8325,13 @@ def _price_page_cached_products(query: str) -> tuple[list[dict] | None, str | No
         latest = _cache.cache_get_latest(key)
         if latest:
             products, is_fresh, age_hours = latest
-            if is_fresh:
-                return products, None, "fresh"
-            age = f"{int(age_hours) // 24} gün" if age_hours >= 48 else f"{max(1, int(age_hours))} saat"
-            return products, age, "stale"
+            if age_hours >= 48:
+                age = f"{int(age_hours) // 24} gün"
+            elif age_hours >= 1:
+                age = f"{int(age_hours)} saat"
+            else:
+                age = None if is_fresh else "1 saat"
+            return products, age, "fresh" if is_fresh else "stale"
     except Exception as exc:  # noqa: BLE001
         __import__("logging").getLogger(__name__).warning("fiyat sayfasi cache okuma hatasi (%s): %s", query, exc)
         return None, None, f"error:{type(exc).__name__}"
@@ -8442,7 +8445,8 @@ def price_landing_page(slug: str):
     import copy as _copy
     from app.comparator import postprocess_search_products
     products: list[dict] = []
-    stale_age: str | None = None
+    stale_age: str | None = None  # sure dolmus cache'ten cizildiyse yasi
+    updated_age: str | None = None  # sayfada gosterilen "X once guncellendi"
     _t_cache = time.time()
     cached_raw, cached_age, cache_status = _price_page_cached_products(query)
     # Teshis: hangi yoldan cizildi + cache okumasi kac ms (X-Price-Source).
@@ -8450,12 +8454,15 @@ def price_landing_page(slug: str):
     price_source += f";cache_ms={int((time.time() - _t_cache) * 1000)}"
     if cached_raw:
         products = postprocess_search_products(query, _copy.deepcopy(cached_raw))
-        if len(products) >= 2 and cached_age:
+        if len(products) >= 2:
+            updated_age = cached_age
+        if len(products) >= 2 and cache_status == "stale":
             stale_age = cached_age
             from app.seo_rules import price_page_store_count as _psc
             _schedule_price_page_refresh(slug.lower(), query, _psc(cached_raw))
     if len(products) < 2:
         stale_age = None
+        updated_age = None
         price_source += ";live"
         try:
             with _PRICE_LIVE_SCRAPE_SLOTS:
@@ -8542,12 +8549,13 @@ def price_landing_page(slug: str):
         intro = f"{title_term} için güncel fiyat karşılaştırması."
 
     intro_escaped = _html.escape(intro)
-    # Eski (stale) cache'ten cizildiyse kullaniciya durustce soyle -- fiyatlar
-    # arka planda tazeleniyor, bir sonraki ziyarette guncel olur.
+    # Fiyatlarin ne zaman guncellendigini durustce goster (cache 48 saate
+    # kadar taze sayilabiliyor). Sure dolmussa arka planda tazeleniyor.
     freshness_html = (
         f'<p class="bp-hero-copy" style="font-size:13px;opacity:.75;margin-top:-6px;">'
-        f'Fiyatlar {_html.escape(stale_age)} önce güncellendi, yenileniyor.</p>'
-        if stale_age else ""
+        f'Fiyatlar {_html.escape(updated_age)} önce güncellendi'
+        f'{", yenileniyor" if stale_age else ""}.</p>'
+        if updated_age else ""
     )
 
     # Baslikta somut sayi + fiyat CTR'yi artiriyor. Ama "1 Magaza" bir
