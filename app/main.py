@@ -143,18 +143,39 @@ async def automatic_refresh_loop() -> None:
         await asyncio.to_thread(refresh_all_products)
 
 
+async def self_keep_alive_loop() -> None:
+    """Render ucretsiz plan 15 dk istek almayan servisi uyutuyor. GitHub
+    Actions'taki keep-alive cron'u (*/10) pratikte 3.5-6 saatte bir calisiyor
+    (GitHub sik zamanlamalari atliyor), servis gunun cogunda uykuda kaliyordu:
+    sitemap "Getirilemedi" (ilk istek 22s) ve Search Console'da robots.txt
+    araliklarla 26 baytlik "Disallow: /" olarak okundu (13/21/28 Eylul 2026)
+    -- Google tum siteyi taranamaz saydi. Servis ayaktayken kendi public
+    URL'ini 5 dk'da bir cagirarak uykuya hic girmemesini sagliyoruz; GitHub
+    cron'u yedek (uyursa uyandirir)."""
+    url = os.getenv("KEEP_ALIVE_URL", "https://www.almadan.app/health").strip()
+    while True:
+        await asyncio.sleep(300)
+        try:
+            await asyncio.to_thread(requests.get, url, timeout=20)
+        except Exception:
+            pass
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    refresh_task = None
+    background_tasks = []
     if not os.getenv("VERCEL"):
-        refresh_task = asyncio.create_task(automatic_refresh_loop())
+        background_tasks.append(asyncio.create_task(automatic_refresh_loop()))
+    # RENDER env'i Render'in kendisi set eder; yerelde/testte ping atma.
+    if os.getenv("RENDER"):
+        background_tasks.append(asyncio.create_task(self_keep_alive_loop()))
 
     yield
 
-    if refresh_task:
-        refresh_task.cancel()
+    for task in background_tasks:
+        task.cancel()
         with suppress(asyncio.CancelledError):
-            await refresh_task
+            await task
 
 
 
