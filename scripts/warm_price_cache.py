@@ -18,7 +18,7 @@ magaza varsa yazilmaz (tek magazali taze veri, cok magazali eski veriyi
 ezip sayfayi noindex'e dusurmesin).
 
 Kullanim:
-    python scripts/warm_price_cache.py [--limit 240] [--ttl 48] [--dry-run]
+    python scripts/warm_price_cache.py [--limit 400] [--ttl 48] [--dry-run]
 """
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ from app.main import _price_page_cache_key, _seo_price_slug_map  # noqa: E402
 from app.search_orchestrator import marketplace_scan  # noqa: E402
 
 CONCURRENCY = 2
-TIME_BUDGET_SECONDS = 20 * 60
+TIME_BUDGET_SECONDS = 24 * 60  # is zaman asimi 30 dk; kurulum ~1 dk
 SKIP_IF_FRESH_FOR_HOURS = 6
 
 
@@ -200,7 +200,7 @@ async def main_async(limit: int, ttl_hours: int, dry_run: bool) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit", type=int, default=240)
+    parser.add_argument("--limit", type=int, default=400)
     parser.add_argument("--ttl", type=int, default=48)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

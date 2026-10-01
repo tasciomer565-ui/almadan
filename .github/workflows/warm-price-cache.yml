@@ -12,13 +12,15 @@ name: Fiyat Sayfaları Önbellek Isıtma
 on:
   schedule:
     # Saat basi (":00") GitHub'in en yogun ani, zamanlanmis isler sik
-    # atlaniyor -- bilerek ":17".
-    - cron: "17 */2 * * *"
+    # atlaniyor -- bilerek ":17". "*/2 saat" ayarliyken GitHub pratikte
+    # 4.5-6 saatte bir calistirdi (2026-09-30/10-01); saatlik + calisma
+    # basina 400 terimle ~4000 terim 1-2 gunde dolasilir.
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       limit:
         description: "Bu calismada taranacak en fazla terim"
-        default: "240"
+        default: "400"
       dry_run:
         description: "true ise cache'e yazmaz, sadece ne yazilacagini gosterir"
         default: "false"
@@ -45,7 +47,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          LIMIT: ${{ inputs.limit || '240' }}
+          LIMIT: ${{ inputs.limit || '400' }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: |
           ARGS="--limit $LIMIT"
