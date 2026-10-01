@@ -77,6 +77,9 @@ services:
         sync: false
       - key: ADMIN_DEBUG_SECRET
         sync: false
+      # Hata takibi (sentry.io ucretsiz plan) -- tanimliysa canli hatalar raporlanir
+      - key: SENTRY_DSN
+        sync: false
       - key: GO_UPC_API_KEY
         sync: false
       # Google Sheets senkronizasyonu

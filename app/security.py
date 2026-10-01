@@ -362,8 +362,12 @@ def check_rate_limit(request: Request, bucket: str, limit: int, window_seconds: 
     Kesin/dağıtık bir garanti değildir (bkz. yukarıdaki not) — amaç ScrapingBee
     kredisini tüketen uçlara karşı düşük riskli, basit bir güvenlik ağı eklemek.
     """
-    ip = get_client_ip(request)
-    key = f"{bucket}:{ip}"
+    check_rate_limit_key(f"{bucket}:{get_client_ip(request)}", limit, window_seconds)
+
+
+def check_rate_limit_key(key: str, limit: int, window_seconds: int) -> None:
+    """Rastgele bir anahtar (ör. telefon numarası, e-posta) için sliding-window
+    limit -- IP değiştiren saldırgana karşı (SMS pumping, şifre deneme)."""
     now = time.time()
 
     if len(_RATE_LIMIT_BUCKETS) > _RATE_LIMIT_MAX_KEYS:

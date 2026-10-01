@@ -60,10 +60,12 @@ def sentry_init() -> bool:
         import sentry_sdk
         sentry_sdk.init(
             dsn=_SENTRY_DSN,
-            traces_sample_rate=0.1,   # %10 trace örnekleme
-            profiles_sample_rate=0.05,
-            environment=os.getenv("VERCEL_ENV", "production"),
-            release=os.getenv("VERCEL_GIT_COMMIT_SHA", "unknown"),
+            # Ucretsiz Sentry kotasi icin dusuk: hatalarin hepsi gider, trace %2.
+            traces_sample_rate=0.02,
+            profiles_sample_rate=0.0,
+            send_default_pii=False,   # KVKK: IP/e-posta/cerez Sentry'ye gitmesin
+            environment=os.getenv("RENDER") and "production" or os.getenv("VERCEL_ENV", "development"),
+            release=os.getenv("RENDER_GIT_COMMIT") or os.getenv("VERCEL_GIT_COMMIT_SHA") or "unknown",
         )
         logger.info("Sentry başlatıldı (DSN: %s...)", _SENTRY_DSN[:20])
         return True

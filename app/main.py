@@ -27,7 +27,9 @@ from app.auth import (
     auth_enabled,
     get_user,
     request_password_reset,
+    admin_confirm_phone,
     refresh_session,
+    resend_signup_confirmation,
     sign_in,
     sign_up,
     update_password,
@@ -178,6 +180,12 @@ async def lifespan(_: FastAPI):
             await task
 
 
+
+# Hata takibi: SENTRY_DSN tanimliysa yakalanmamis hatalar Sentry'ye gider.
+# Onceden sentry_init hic cagrilmiyordu ve sentry-sdk bagimliliklarda yoktu
+# -- canlidaki hatalar (bozuk SUPABASE_URL, cache 409...) aylarca gorulmedi.
+from app.observability import sentry_init as _sentry_init  # noqa: E402
+_sentry_init()
 
 app = FastAPI(title="Fırsat Asistanı API", version="0.2.0", lifespan=lifespan)
 
@@ -874,12 +882,26 @@ def auth_session(request: Request) -> dict:
     }
  
  
+def _auth_rate_limit(request: Request, bucket: str, limit: int, window_seconds: int,
+                     extra_key: str | None = None, extra_limit: int | None = None) -> None:
+    """Kimlik uçları için IP (+ isteğe bağlı e-posta/telefon) bazlı hız sınırı.
+    Supabase'in kendi proje geneli sınırları var ama uygulama tarafında yoktu:
+    /auth/otp/send ile SMS pumping (fatura), /auth/login ile şifre deneme."""
+    from app.security import check_rate_limit, check_rate_limit_key
+    check_rate_limit(request, bucket, limit, window_seconds)
+    if extra_key:
+        check_rate_limit_key(f"{bucket}:k:{extra_key.strip().lower()}",
+                             extra_limit or limit, window_seconds)
+
+
 @app.post("/auth/signup")
 def auth_signup(
     payload: AuthCredentials,
+    request: Request,
     response: Response,
     x_device_id: str | None = Header(default=None),
 ) -> dict:
+    _auth_rate_limit(request, "auth_signup", 5, 600, extra_key=payload.email, extra_limit=3)
     # Ad Soyad/telefon artık kayıt formunda İSTENMİYOR -- kullanıcı yorulmasın
     # diye kayıt sadece e-posta+şifre; bu bilgiler ilk girişte "Hesap
     # Bilgilerim" adımında (profile_update) tamamlanıyor.
@@ -891,6 +913,7 @@ def auth_signup(
         payload.phone,
         payload.notification_pref,
         sanitize(payload.full_name, max_length=120) if payload.full_name else None,
+        redirect_to=APP_URL,
     )
     user = session.get("user") or {}
  
@@ -936,10 +959,28 @@ def auth_signup(
 @app.post("/auth/login")
 def auth_login(
     payload: AuthCredentials,
+    request: Request,
     response: Response,
     x_device_id: str | None = Header(default=None),
 ) -> dict:
-    session = sign_in(payload.email, payload.password)
+    _auth_rate_limit(request, "auth_login", 10, 300, extra_key=payload.email, extra_limit=10)
+    try:
+        session = sign_in(payload.email, payload.password)
+    except AuthError as exc:
+        if exc.error_code == "email_not_confirmed" or "not confirmed" in str(exc).lower():
+            # Onay bekleyen hesap: ön yüzde "tekrar gönder" düğmesi yok,
+            # kullanıcı İngilizce hatayla takılı kalıyordu -- maili yeniden
+            # gönder ve Türkçe açıkla.
+            try:
+                resend_signup_confirmation(payload.email, APP_URL)
+            except AuthError:
+                pass
+            raise HTTPException(
+                status_code=403,
+                detail=("E-posta adresin henüz onaylanmamış. Onay bağlantısını "
+                        "tekrar gönderdik; gelen kutunu (ve gereksiz klasörünü) kontrol et."),
+            ) from exc
+        raise
     user = session.get("user") or {}
     set_auth_cookies(response, session)
  
@@ -978,6 +1019,7 @@ def auth_login(
 @app.post("/auth/session/exchange")
 def auth_session_exchange(
     payload: SessionExchangeRequest,
+    request: Request,
     response: Response,
     x_device_id: str | None = Header(default=None),
 ) -> dict:
@@ -988,6 +1030,7 @@ def auth_session_exchange(
     doğrulayıp doğrudan oturum çerezlerini kuruyoruz -- ayrı bir giriş
     adımına gerek kalmıyor.
     """
+    _auth_rate_limit(request, "auth_session_exchange", 20, 300)
     try:
         user = get_user(payload.access_token)
     except AuthError as exc:
@@ -1032,22 +1075,61 @@ def auth_session_exchange(
 
 
 @app.post("/auth/otp/send")
-def auth_otp_send(payload: OtpSendRequest) -> dict:
+def auth_otp_send(payload: OtpSendRequest, request: Request) -> dict:
     normalized_phone = normalize_phone(payload.phone)
+    # Her SMS para: IP başına 5/saat, numara başına 3/saat.
+    _auth_rate_limit(request, "auth_otp_send", 5, 3600, extra_key=normalized_phone, extra_limit=3)
+    if request.state.user_id:
+        # Giriş yapmış kullanıcının telefon doğrulaması: Netgsm ile kendi kodumuz
+        # (Supabase /otp burada yanlış hesaba geçirirdi -- bkz. app/phone_verification.py).
+        from app import phone_verification
+        if not phone_verification.sms_available():
+            raise HTTPException(status_code=503, detail="SMS servisi şu an kullanılamıyor, lütfen daha sonra tekrar dene.")
+        if not phone_verification.send_code(request.state.user_id, normalized_phone):
+            raise HTTPException(status_code=502, detail="Doğrulama SMS'i gönderilemedi, birazdan tekrar dene.")
+        return {"status": "ok", "phone": normalized_phone}
     try:
         send_otp(normalized_phone)
         return {"status": "ok", "phone": normalized_phone}
     except AuthError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.args[0])
+        detail = exc.args[0]
+        if exc.status_code in (400, 422, 500) and any(w in str(detail).lower() for w in ("provider", "sms", "phone signups")):
+            detail = "SMS ile giriş şu an kullanılamıyor. Lütfen e-posta ile giriş yap."
+        raise HTTPException(status_code=exc.status_code, detail=detail)
 
 
 @app.post("/auth/otp/verify")
 def auth_otp_verify(
     payload: OtpVerifyRequest,
+    request: Request,
     response: Response,
     x_device_id: str | None = Header(default=None),
 ) -> dict:
     normalized_phone = normalize_phone(payload.phone)
+    # 6 haneli kodu tahmin etmeye karşı: numara başına 10 deneme / 10 dk.
+    _auth_rate_limit(request, "auth_otp_verify", 20, 600, extra_key=normalized_phone, extra_limit=10)
+    from app import phone_verification
+    if request.state.user_id and phone_verification.has_pending(request.state.user_id, normalized_phone):
+        if not phone_verification.verify_code(request.state.user_id, normalized_phone, payload.code):
+            raise HTTPException(status_code=400, detail="Kod hatalı ya da süresi dolmuş.")
+        try:
+            confirmed = admin_confirm_phone(request.state.user_id, normalized_phone)
+        except AuthError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.args[0])
+        meta = confirmed.get("user_metadata") or request.state.user_metadata or {}
+        return {
+            "authenticated": True,
+            "user": {
+                "id": request.state.user_id,
+                "email": confirmed.get("email") or request.state.user_email or "",
+                "gender": meta.get("gender"),
+                "phone": normalized_phone,
+                "notification_pref": meta.get("notification_pref"),
+                "skin_type": meta.get("skin_type"),
+                "full_name": meta.get("full_name"),
+                "phone_verified": True,
+            },
+        }
     try:
         session = verify_otp(normalized_phone, payload.code)
     except AuthError as exc:
@@ -1162,7 +1244,10 @@ def auth_profile_update(request: Request, payload: ProfileUpdateRequest) -> dict
 
 
 @app.post("/auth/forgot-password")
-def auth_forgot_password(payload: PasswordResetRequest) -> dict:
+def auth_forgot_password(payload: PasswordResetRequest, request: Request) -> dict:
+    # E-posta başına sınır zaten var (password_reset_retry_after); IP sınırı
+    # farklı adreslere toplu e-posta gönderimini engeller.
+    _auth_rate_limit(request, "auth_forgot_password", 5, 600)
     db = load_db()
     retry_after = password_reset_retry_after(db, payload.email)
     if retry_after:
@@ -1188,8 +1273,10 @@ def auth_forgot_password(payload: PasswordResetRequest) -> dict:
 @app.post("/auth/reset-password")
 def auth_reset_password(
     payload: PasswordUpdateRequest,
+    request: Request,
     response: Response,
 ) -> dict:
+    _auth_rate_limit(request, "auth_reset_password", 10, 600)
     user = update_password(payload.access_token, payload.password)
     set_auth_cookies(
         response,

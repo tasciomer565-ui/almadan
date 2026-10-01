@@ -85,6 +85,7 @@ def sign_up(
     phone: str | None = None,
     notification_pref: str | None = None,
     full_name: str | None = None,
+    redirect_to: str | None = None,
 ) -> dict[str, Any]:
     from app.storage import SUPABASE_KEY
 
@@ -135,6 +136,13 @@ def sign_up(
                     )
                     if is_unconfirmed:
                         # Beklenen durum: hesap oluştu ama e-posta onayı bekleniyor.
+                        # Admin API (POST /admin/users) onay e-postasını KENDİSİ
+                        # GÖNDERMEZ -- açıkça gönderiyoruz, yoksa kullanıcı
+                        # hiç mail almadan "onay bekliyor" durumunda kalıyordu.
+                        try:
+                            resend_signup_confirmation(email, redirect_to)
+                        except AuthError as resend_exc:
+                            print(f"Onay e-postası gönderilemedi ({email}): {resend_exc}")
                         return {"user": created_user}
                     raise
             elif response.status_code in {400, 422}:
@@ -170,6 +178,18 @@ def sign_up(
         "signup",
         payload=payload,
     )
+
+
+def resend_signup_confirmation(email: str, redirect_to: str | None = None) -> dict[str, Any]:
+    """Onaylanmamış hesaba kayıt onay e-postasını (yeniden) gönderir.
+
+    Not: Supabase'te özel SMTP tanımlı değilse yerleşik e-posta servisi
+    yalnızca proje ekibindeki adreslere gönderir ("Email address not
+    authorized") -- üretimde Authentication > SMTP Settings şart."""
+    path = "resend"
+    if redirect_to:
+        path += f"?redirect_to={quote(redirect_to, safe=':/')}"
+    return auth_request("POST", path, payload={"type": "signup", "email": email})
 
 
 def sign_in(email: str, password: str) -> dict[str, Any]:
@@ -216,6 +236,38 @@ def update_user_metadata(access_token: str, metadata: dict[str, Any]) -> dict[st
         payload={"data": metadata},
         access_token=access_token,
     )
+
+
+def admin_confirm_phone(user_id: str, phone: str) -> dict[str, Any]:
+    """Telefonu kullanıcının KENDİ Supabase hesabına doğrulanmış olarak yazar
+    (auth.users.phone + phone_confirmed_at). Service key gerekir."""
+    from app.storage import SUPABASE_KEY
+    if not SUPABASE_KEY:
+        raise AuthError("SUPABASE_SERVICE_KEY ayarlanmamış.", 503)
+    try:
+        response = requests.put(
+            f"{supabase_base_url()}/auth/v1/admin/users/{quote(user_id, safe='')}",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json",
+                "User-Agent": "Almadan-Backend/1.0",
+            },
+            json={"phone": phone, "phone_confirm": True},
+            timeout=20,
+        )
+    except requests.RequestException as exc:
+        raise AuthError(f"Kimlik servisine ulaşılamadı: {exc}", 503) from exc
+    if not response.ok:
+        try:
+            body = response.json()
+        except ValueError:
+            body = {}
+        message = body.get("msg") or body.get("message") or "Telefon kaydedilemedi."
+        if response.status_code == 422 and "phone" in message.lower():
+            message = "Bu telefon numarası başka bir hesapta kayıtlı."
+        raise AuthError(message, response.status_code, error_code=body.get("error_code"))
+    return response.json() if response.content else {}
 
 
 def send_otp(phone: str) -> dict[str, Any]:
