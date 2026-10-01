@@ -130,3 +130,10 @@ def test_logged_in_otp_without_sms_service_gives_clear_error():
         resp = _logged_in_client().post("/auth/otp/send", json={"phone": "05551112233"})
     assert resp.status_code == 503
     assert "SMS" in resp.json()["detail"]
+
+
+def test_session_reports_sms_availability():
+    with mock.patch("app.netgsm.netgsm_enabled", return_value=False):
+        assert client.get("/auth/session").json()["sms_available"] is False
+    with mock.patch("app.netgsm.netgsm_enabled", return_value=True):
+        assert client.get("/auth/session").json()["sms_available"] is True

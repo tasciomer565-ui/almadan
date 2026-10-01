@@ -879,7 +879,15 @@ def auth_session(request: Request) -> dict:
             else None
         ),
         "enabled": auth_enabled(),
+        # SMS saglayicisi (Netgsm) tanimli degilse on yuz telefon dogrulama
+        # penceresini hic acmasin -- acarsa "SMS servisi kullanilamiyor" hatasi.
+        "sms_available": _sms_available(),
     }
+
+
+def _sms_available() -> bool:
+    from app.phone_verification import sms_available
+    return sms_available()
  
  
 def _auth_rate_limit(request: Request, bucket: str, limit: int, window_seconds: int,

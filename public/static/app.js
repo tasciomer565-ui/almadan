@@ -948,6 +948,8 @@ async function loadSession() {
 function maybePromptPhoneVerification() {
   const user = state.auth?.user;
   if (!user || !user.phone || user.phone_verified) return;
+  // Sunucuda SMS servisi yoksa pencere hata vermekten baska ise yaramaz.
+  if (state.auth?.sms_available === false) return;
   if (sessionStorage.getItem("almadan_phone_verify_dismissed") === user.phone) return;
   promptPhoneVerification(user.phone);
 }
