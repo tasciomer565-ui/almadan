@@ -3571,15 +3571,51 @@ def search_products_by_name(
     lon: float = None,
     mode: str = "hybrid"
 ) -> list[dict]:
-    # Railway scraper varsa onu kullan (tüm mağazalar, sınırsız süre)
-    railway_products = _call_railway_scraper(query, category)
-    if railway_products is not None:
+    # Once product_cache: scripts/warm_price_cache.py (GitHub runner, proxy'siz)
+    # ~4000 populer terimi cok magazali olarak isitiyor; scraper servisi ise
+    # 2026-09 sonunda cogu aramada sadece Amazon donuyordu. Taze ve 2+
+    # magazali kayit varsa onu kullan (aninda + daha cok magaza).
+    cached = _fresh_multi_store_cache(query) if mode != "local" else None
+    railway_products = None if cached else _call_railway_scraper(query, category)
+    if cached:
+        all_products = cached
+    elif railway_products is not None:
         all_products = railway_products
     else:
         # 1. Lokal orkestratör (sadece N11+Amazon)
         from app.search_orchestrator import master_search
         all_products = run_async(master_search(query, selected_category=category, lat=lat, lon=lon, mode=mode))
     return postprocess_search_products(query, all_products)
+
+
+def _fresh_multi_store_cache(query: str) -> list[dict] | None:
+    """product_cache'te taze (suresi dolmamis) ve en az 2 magazali ham sonuc.
+
+    Anahtar, isitmanin ve master_search'un yazdigi gibi: (sorgu,
+    classify_intent(duzeltilmis sorgu)). Hata/kayit yok/tek magaza -> None
+    (cagiran eskisi gibi canli taramaya gider)."""
+    import copy
+    try:
+        from app import cache as _cache
+        if not _cache._enabled():
+            return None
+        from app.query_intelligence import correct_query
+        from app.search_orchestrator import classify_intent
+        try:
+            corrected = correct_query(query)
+        except Exception:
+            corrected = query
+        latest = _cache.cache_get_latest(_cache.make_cache_key(query, classify_intent(corrected)))
+        if not latest:
+            return None
+        products, is_fresh, _age = latest
+        products = [p for p in products if isinstance(p, dict) and p.get("title") and p.get("url")]
+        stores = {p.get("source") for p in products if p.get("source")}
+        if not is_fresh or len(stores) < 2:
+            return None
+        return copy.deepcopy(products)
+    except Exception:
+        return None
 
 
 def postprocess_search_products(query: str, all_products: list) -> list[dict]:
