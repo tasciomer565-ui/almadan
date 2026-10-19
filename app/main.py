@@ -8413,6 +8413,64 @@ def _seo_boost_rank() -> dict[str, int]:
     return _SEO_BOOST_RANK_CACHE
 
 
+def _price_cluster(term: str, slug: str) -> tuple[str | None, list[str]]:
+    """Konu kumesi: (ust sayfa slug'i, alt sayfa slug'lari).
+
+    "supurge" gibi genel bir urun turu sayfasi ust sayfadir; "bosch supurge",
+    "mor robot supurge" gibi ayni turdeki sayfalar alt sayfalaridir (tur
+    anahtari: _seo_noun_key). Yalnizca indexlenebilir (sitemap'teki) sayfalar.
+    Ust sayfa icin: (None, alt sayfalar). Alt sayfa icin: (ust slug, []).
+    """
+    slug_map = _seo_price_slug_map()
+    indexable = _indexable_price_slugs()
+    noun = _seo_noun_key(term)
+    words = term.lower().translate(_SEO_TR_TO_ASCII).split()
+    if " ".join(words) == noun:
+        boost = _seo_boost_rank()
+        children = [
+            other for other, other_term in slug_map.items()
+            if other != slug and (not indexable or other in indexable)
+            and _seo_noun_key(other_term) == noun
+        ]
+        children.sort(key=lambda c: (boost.get(c, len(boost)), slug_map[c]))
+        return None, children
+    for other, other_term in slug_map.items():
+        if other != slug and " ".join(other_term.lower().translate(_SEO_TR_TO_ASCII).split()) == noun:
+            if not indexable or other in indexable:
+                return other, []
+            break
+    return None, []
+
+
+def _price_cluster_html(term: str, slug: str) -> str:
+    """Ust sayfada tum alt sayfalara, alt sayfada ust sayfaya link (konu kumesi).
+
+    2026-10: "supurge" gibi 147 urun turunun genel sayfasi vardi ama alt
+    sayfalarina sistemli link vermiyordu; Google'a konu butunlugu sinyali
+    yoktu ve 2.075 sayfa dizine alinmayi bekliyordu."""
+    import html as _html
+    parent, children = _price_cluster(term, slug)
+    slug_map = _seo_price_slug_map()
+    if children:
+        noun_title = _seo_display_term(term).capitalize()
+        links = " · ".join(
+            f'<a href="/fiyat/{_html.escape(c)}">{_html.escape(_seo_display_term(slug_map[c]).capitalize())}</a>'
+            for c in children[:80]
+        )
+        return (
+            f'<h2 style="margin-top:32px;"><i data-lucide="layers"></i> Markaya ve Renge Göre '
+            f'{_html.escape(noun_title)} Fiyatları</h2>'
+            f'<p style="line-height:2;">{links}</p>'
+        )
+    if parent:
+        parent_title = _seo_display_term(slug_map[parent]).capitalize()
+        return (
+            f'<p style="margin-top:24px;"><a class="bp-cta" href="/fiyat/{_html.escape(parent)}">'
+            f'<i data-lucide="layers"></i> Tüm {_html.escape(parent_title)} Fiyatları</a></p>'
+        )
+    return ""
+
+
 def _related_price_terms_html(term: str, slug: str) -> str:
     """/fiyat/{terim} sayfalari birbirine hic link vermiyordu -- sadece
     sitemap'ten erisiliyorlardi, bu yuzden site ici link otoritesi
@@ -8694,6 +8752,12 @@ def price_landing_page(slug: str):
     products_html = "".join(rows)
     editorial_html = _price_page_editorial_html(term, products)
     related_terms_html = _related_price_terms_html(term, slug)
+    cluster_html = _price_cluster_html(term, slug)
+    cluster_parent, _cluster_children = _price_cluster(term, slug)
+    cluster_parent_title = (
+        _html.escape(_seo_display_term(_seo_price_slug_map()[cluster_parent]).capitalize())
+        if cluster_parent else ""
+    )
     cheapest = min((p.get("price") or 0 for p in products if p.get("price")), default=0)
 
     # Thin-content riski: tek magazali sayfalar gercek bir karsilastirma
@@ -8842,9 +8906,15 @@ def price_landing_page(slug: str):
             {
                 "@type": "BreadcrumbList",
                 "itemListElement": [
-                    {"@type": "ListItem", "position": 1, "name": "Ana Sayfa", "item": "https://www.almadan.app/"},
-                    {"@type": "ListItem", "position": 2, "name": "Fiyat Rehberi", "item": "https://www.almadan.app/fiyat-rehberi"},
-                    {"@type": "ListItem", "position": 3, "name": f"{title_term} Fiyatları", "item": f"https://www.almadan.app/fiyat/{slug}"},
+                    {"@type": "ListItem", "position": i, "name": name, "item": url}
+                    for i, (name, url) in enumerate(
+                        [("Ana Sayfa", "https://www.almadan.app/"),
+                         ("Fiyat Rehberi", "https://www.almadan.app/fiyat-rehberi")]
+                        + ([(f"{cluster_parent_title} Fiyatları", f"https://www.almadan.app/fiyat/{cluster_parent}")]
+                           if cluster_parent else [])
+                        + [(f"{title_term} Fiyatları", f"https://www.almadan.app/fiyat/{slug}")],
+                        start=1,
+                    )
                 ],
             },
         ],
@@ -8903,6 +8973,7 @@ def price_landing_page(slug: str):
       <span style="color: var(--border);">/</span>
       <a href="/fiyat-rehberi" style="text-decoration: none; color: var(--green); font-weight: 600;">Fiyat Rehberi</a>
       <span style="color: var(--border);">/</span>
+      {f'<a href="/fiyat/{cluster_parent}" style="text-decoration: none; color: var(--green); font-weight: 600;">{cluster_parent_title} Fiyatları</a><span style="color: var(--border);">/</span>' if cluster_parent else ''}
       <span style="color: var(--ink-2); font-weight: 500;">{title_term} Fiyatları</span>
     </div>
 
@@ -8922,6 +8993,7 @@ def price_landing_page(slug: str):
         {products_html}
       </div>
       {editorial_html}
+      {cluster_html}
       {related_terms_html}
       <a class="bp-cta bp-cta-block" href="/"><i data-lucide="arrow-right"></i> Başka Ürün Ara</a>
     </main>

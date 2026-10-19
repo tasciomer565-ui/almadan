@@ -154,3 +154,13 @@ def test_price_page_has_data_derived_sections_and_matching_faq_schema():
     faq = next(n for n in data["@graph"] if n.get("@type") == "FAQPage")
     import html as _h
     assert [q["name"] for q in faq["mainEntity"]] == [_h.unescape(v) for v in visible]
+
+
+def test_topic_cluster_links_parent_and_children():
+    with mock.patch.object(main, "_indexable_price_slugs",
+                           return_value={"supurge", "bosch-supurge", "mor-robot-supurge", "nohut"}):
+        parent, children = main._price_cluster("süpürge", "supurge")
+        assert parent is None and set(children) == {"bosch-supurge", "mor-robot-supurge"}
+        assert main._price_cluster("bosch süpürge", "bosch-supurge") == ("supurge", [])
+        assert "Tüm Süpürge Fiyatları" in main._price_cluster_html("bosch süpürge", "bosch-supurge")
+        assert main._price_cluster_html("nohut", "nohut") == ""
