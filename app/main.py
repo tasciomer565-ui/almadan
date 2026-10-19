@@ -8149,11 +8149,6 @@ def _category_page_editorial_html(display_name: str, store_count: int, stores: l
     """
 
 
-_PRICE_PAGE_GENERIC_TIPS = [
-    "Aynı ürün farklı mağazalarda farklı model/varyant adıyla listelenebilir; en doğru karşılaştırma için ürün adını ve modelini birlikte kontrol edin.",
-    "En düşük fiyat her zaman en iyi teklif olmayabilir — kargo ücreti, teslimat süresi ve satıcı puanı toplam maliyeti etkiler.",
-    "Fiyatlar mağazalarda günlük değişebilir; büyük bir alışverişten önce fiyatı tekrar kontrol etmek avantaj sağlayabilir.",
-]
 
 
 def _tr_price(value: float) -> str:
@@ -8164,79 +8159,169 @@ def _tr_price(value: float) -> str:
     return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def _price_page_editorial_html(term: str, products: list[dict]) -> str:
-    """/fiyat/{terim} sayfalarina, sadece urun listesinden ibaret kalmayip
-    gercek hesaplanmis veriye dayali ozgun bir icerik bloğu (istatistik +
-    rehber ipuclari + SSS) ekler.
+def _nice_price(value: float) -> int:
+    """Fiyat araligi sinirlari icin okunur yuvarlama (1.234 -> 1.200, 12.345 -> 12.000)."""
+    if value <= 0:
+        return 0
+    magnitude = 10 ** max(0, len(str(int(value))) - 2)
+    return int(round(value / magnitude) * magnitude)
 
-    Neden gerekli: bu sayfalar onceden sadece baslik + tek cumle + urun
-    listesinden ibaretti -- AdSense/Google'in "dusuk degerli/ince icerik"
-    olarak isaretleyebilecegi klasik bir sablon-sayfa deseniydi (795 terim,
-    neredeyse ayni yapida). Burada eklenen metin spin/uydurma degil,
-    gercek arama sonucundan hesaplanan sayilara dayaniyor -- bu yuzden
-    her sayfada gercekten farkli ve dogru.
+
+def _price_page_insights(term: str, products: list[dict]) -> dict:
+    """/fiyat sayfasinin urun listesinden hesaplanan, sayfaya OZGU veriler.
+
+    2026-10: GSC'de 2.075 sayfa "kesfedildi - dizine eklenmedi" bekliyordu;
+    sayfalarin cogu ~320 kelime, metnin buyuk kismi binlerce sayfada AYNI
+    genel ipuclariydi (programatik/ince icerik sinyali). Buradaki her sey
+    o sayfanin gercek fiyat verisinden hesaplanir, uydurma/spin degil.
     """
+    priced = sorted(
+        (p for p in products if isinstance(p.get("price"), (int, float)) and p["price"] > 0),
+        key=lambda p: p["price"],
+    )
+    if not priced:
+        return {}
+    name = _seo_display_term(term)
+    title = name.capitalize()
+    prices = [p["price"] for p in priced]
+    n = len(prices)
+    median = prices[n // 2] if n % 2 else (prices[n // 2 - 1] + prices[n // 2]) / 2
+    avg = sum(prices) / n
+    cheapest, priciest = priced[0], priced[-1]
+
+    def store(p: dict) -> str:
+        return _format_store_name(p.get("source", ""))
+
+    by_store: dict[str, list[float]] = {}
+    for p in priced:
+        by_store.setdefault(store(p), []).append(p["price"])
+    store_rows = sorted(
+        ((s, len(v), min(v), max(v), sum(v) / len(v)) for s, v in by_store.items()),
+        key=lambda r: r[2],
+    )
+
+    bands: list[tuple[str, int]] = []
+    if n >= 4 and prices[-1] > prices[0] * 1.5:
+        low = _nice_price(prices[n // 3])
+        high = _nice_price(prices[(2 * n) // 3])
+        if 0 < low < high:
+            lo_s, hi_s = f"{low:,}".replace(",", "."), f"{high:,}".replace(",", ".")
+            bands = [
+                (f"{lo_s} ₺ altı", sum(1 for x in prices if x < low)),
+                (f"{lo_s} – {hi_s} ₺", sum(1 for x in prices if low <= x < high)),
+                (f"{hi_s} ₺ ve üzeri", sum(1 for x in prices if x >= high)),
+            ]
+            bands = [b for b in bands if b[1] > 0]
+
+    picks: list[tuple[str, dict]] = []
+    if n >= 3:
+        picks = [("Bütçe dostu", cheapest), ("Orta segment", priced[n // 2]), ("Üst segment", priciest)]
+
+    faq = [
+        (f"En ucuz {name} nereden alınır?",
+         f"Şu anki karşılaştırmaya göre en uygun fiyat {_tr_price(cheapest['price'])} ₺ ile {store(cheapest)} mağazasında."),
+        (f"{title} fiyatları ne kadar?",
+         f"Güncel fiyatlar {_tr_price(prices[0])} ₺ ile {_tr_price(prices[-1])} ₺ arasında; "
+         f"karşılaştırılan {n} ürünün ortalaması {_tr_price(avg)} ₺, yarısı {_tr_price(median)} ₺ ve altında."),
+    ]
+    if n >= 2:
+        faq.append((f"En pahalı {name} hangisi?",
+                    f"Listedeki en yüksek fiyatlı ürün {(priciest.get('title') or '')[:90]} "
+                    f"({_tr_price(priciest['price'])} ₺, {store(priciest)})."))
+    if len(store_rows) >= 2:
+        best = min(store_rows, key=lambda r: r[4])
+        faq.append((f"{title} için hangi mağaza daha uygun?",
+                    f"Karşılaştırılan {len(store_rows)} mağaza içinde ortalama fiyatı en düşük olan "
+                    f"{best[0]} ({_tr_price(best[4])} ₺); en ucuz tek ürün ise {store(cheapest)} mağazasında."))
+    faq.append((f"{title} fiyatları kaç mağazadan karşılaştırılıyor?",
+                f"Almadan bu arama için {len(store_rows)} farklı mağazadan güncel fiyat verisi topluyor."))
+
+    return {"title": title, "priced": priced, "avg": avg, "median": median, "cheapest": cheapest,
+            "store_rows": store_rows, "bands": bands, "picks": picks, "faq": faq}
+
+
+def _price_page_editorial_html(term: str, products: list[dict]) -> str:
+    """/fiyat/{terim} sayfasina gercek fiyat verisinden hesaplanan ozgun
+    bolumler ekler: ozet, fiyat araliklari, magaza karsilastirmasi, segment
+    onerileri, konuya ozel ipuclari ve SSS (bkz. _price_page_insights)."""
     import html as _html
 
-    priced = [p for p in products if isinstance(p.get("price"), (int, float)) and p["price"] > 0]
-    if not priced:
+    ins = _price_page_insights(term, products)
+    if not ins:
         return ""
+    esc = _html.escape
+    title = ins["title"]
+    cheapest = ins["cheapest"]
 
-    prices = [p["price"] for p in priced]
-    avg_price = sum(prices) / len(prices)
-    cheapest_p = min(priced, key=lambda p: p["price"])
-    store_count = len({p.get("source") for p in priced if p.get("source")})
-    title_term = term.capitalize()
-
-    # Terimin ait oldugu konu grubunu bul (varsa) -- zaten elle yazilmis,
-    # gercek editoryal ipuclarini burada da kullan (tekrar yazmaya gerek yok).
-    # Konunun TÜM ipuçlarını degil, sadece bu terimle alakalı olanları (keywords
-    # eşleşiyorsa) veya her zaman geçerli genel ipuçlarını (keywords: None)
-    # göster -- aksi halde ör. "razer hoparlör" sayfasında powerbank/AirPods
-    # gibi alakasız ipuçları çıkıyordu (topic'in TÜM ipuçları kopyalanıyordu).
+    # Ipuclari: sadece terimin konusuna ozel olanlar. Eskiden eslesme yoksa
+    # binlerce sayfada AYNI genel ipuclari basiliyordu (sablon icerik sinyali).
     normalized_term = term.translate(_SEO_TR_TO_ASCII).casefold()
-    tips = _PRICE_PAGE_GENERIC_TIPS
+    tips: list[str] = []
     for topic in _GSC_TOPIC_PAGES.values():
         topic_terms = {t.translate(_SEO_TR_TO_ASCII).casefold() for t in topic.get("terms", [])}
         if normalized_term in topic_terms:
-            topic_tips = topic.get("tips") or []
-            matched = [
-                tip["text"] for tip in topic_tips
-                if tip.get("keywords") is None
-                or any(kw in normalized_term for kw in tip["keywords"])
+            tips = [
+                tip["text"] for tip in (topic.get("tips") or [])
+                if tip.get("keywords") is None or any(kw in normalized_term for kw in tip["keywords"])
             ]
-            tips = matched or _PRICE_PAGE_GENERIC_TIPS
             break
 
     stats_html = (
-        f"<p>{_html.escape(title_term)} için karşılaştırdığımız {len(priced)} üründe "
-        f"ortalama fiyat <strong>{_tr_price(avg_price)} ₺</strong>, en düşük fiyat "
-        f"<strong>{_tr_price(cheapest_p['price'])} ₺</strong> ile "
-        f"<strong>{_html.escape(_format_store_name(cheapest_p.get('source', '')))}</strong> mağazasında, "
-        f"toplam <strong>{store_count} farklı mağaza</strong> taranarak bulundu.</p>"
+        f"<p>{esc(title)} için karşılaştırdığımız {len(ins['priced'])} üründe "
+        f"ortalama fiyat <strong>{_tr_price(ins['avg'])} ₺</strong>, ortanca fiyat "
+        f"<strong>{_tr_price(ins['median'])} ₺</strong>. En düşük fiyat "
+        f"<strong>{_tr_price(cheapest['price'])} ₺</strong> ile "
+        f"<strong>{esc(_format_store_name(cheapest.get('source', '')))}</strong> mağazasında; "
+        f"toplam <strong>{len(ins['store_rows'])} farklı mağaza</strong> taranarak bulundu.</p>"
     )
 
-    tips_html = "".join(f"<li>{_html.escape(t)}</li>" for t in tips)
+    bands_html = ""
+    if ins["bands"]:
+        bands_html = (
+            f'<h3>Fiyat aralıklarına göre {esc(title.lower())}</h3><ul class="bp-tips">'
+            + "".join(f"<li><strong>{esc(label)}:</strong> {count} ürün</li>" for label, count in ins["bands"])
+            + "</ul>"
+        )
 
-    faq_items = [
-        (f"En ucuz {term} nereden alınır?",
-         f"Şu anki karşılaştırmaya göre en uygun fiyat {_tr_price(cheapest_p['price'])} ₺ ile "
-         f"{_format_store_name(cheapest_p.get('source', ''))} mağazasında."),
-        (f"{title_term} ortalama fiyatı ne kadar?",
-         f"Karşılaştırılan {len(priced)} ürünün ortalama fiyatı {_tr_price(avg_price)} ₺."),
-        (f"{title_term} fiyatları kaç mağazadan karşılaştırılıyor?",
-         f"Almadan bu arama için {store_count} farklı mağazadan güncel fiyat verisi topluyor."),
-    ]
+    stores_html = ""
+    if len(ins["store_rows"]) >= 2:
+        stores_html = (
+            f"<h3>Mağazalara göre {esc(title.lower())} fiyatları</h3>"
+            '<table class="bp-table" style="width:100%;border-collapse:collapse;font-size:14px;">'
+            '<thead><tr><th style="text-align:left">Mağaza</th><th>Ürün</th><th>En düşük</th><th>En yüksek</th></tr></thead><tbody>'
+            + "".join(
+                f'<tr><td>{esc(st)}</td><td style="text-align:center">{c}</td>'
+                f'<td style="text-align:right">{_tr_price(lo)} ₺</td><td style="text-align:right">{_tr_price(hi)} ₺</td></tr>'
+                for st, c, lo, hi, _avg in ins["store_rows"]
+            )
+            + "</tbody></table>"
+        )
+
+    picks_html = ""
+    if ins["picks"]:
+        picks_html = (
+            '<h3>Bütçene göre seçenekler</h3><ul class="bp-tips">'
+            + "".join(
+                f"<li><strong>{esc(label)}:</strong> {esc((p.get('title') or '')[:110])} — "
+                f"{_tr_price(p['price'])} ₺ ({esc(_format_store_name(p.get('source', '')))})</li>"
+                for label, p in ins["picks"]
+            )
+            + "</ul>"
+        )
+
+    tips_html = ('<ul class="bp-tips">' + "".join(f"<li>{esc(t)}</li>" for t in tips) + "</ul>") if tips else ""
     faq_html = "".join(
-        f'<div class="bp-faq-item"><h3>{_html.escape(q)}</h3><p>{_html.escape(a)}</p></div>'
-        for q, a in faq_items
+        f'<div class="bp-faq-item"><h3>{esc(q)}</h3><p>{esc(a)}</p></div>' for q, a in ins["faq"]
     )
 
     return f"""
       <section class="bp-editorial">
-        <h2><i data-lucide="line-chart"></i> {_html.escape(title_term)} Fiyat Analizi</h2>
+        <h2><i data-lucide="line-chart"></i> {esc(title)} Fiyat Analizi</h2>
         {stats_html}
-        <ul class="bp-tips">{tips_html}</ul>
+        {bands_html}
+        {stores_html}
+        {picks_html}
+        {tips_html}
       </section>
       <section class="bp-faq">
         <h2><i data-lucide="help-circle"></i> Sıkça Sorulan Sorular</h2>
@@ -8740,38 +8825,17 @@ def price_landing_page(slug: str):
         if agg_image:
             agg_product["image"] = agg_image
         graph_nodes.append(agg_product)
-        avg_price = sum(p["price"] for p in priced) / len(priced)
-        store_count = len({p.get("source") for p in priced if p.get("source")})
-        cheapest_p = min(priced, key=lambda p: p["price"])
-        graph_nodes.append({
-            "@type": "FAQPage",
-            "mainEntity": [
-                {
-                    "@type": "Question",
-                    "name": f"En ucuz {term} nereden alınır?",
-                    "acceptedAnswer": {
-                        "@type": "Answer",
-                        "text": f"Şu anki karşılaştırmaya göre en uygun fiyat {_tr_price(cheapest_p['price'])} ₺ ile {_format_store_name(cheapest_p.get('source', ''))} mağazasında.",
-                    },
-                },
-                {
-                    "@type": "Question",
-                    "name": f"{title_term} ortalama fiyatı ne kadar?",
-                    "acceptedAnswer": {
-                        "@type": "Answer",
-                        "text": f"Karşılaştırılan {len(priced)} ürünün ortalama fiyatı {_tr_price(avg_price)} ₺.",
-                    },
-                },
-                {
-                    "@type": "Question",
-                    "name": f"{title_term} fiyatları kaç mağazadan karşılaştırılıyor?",
-                    "acceptedAnswer": {
-                        "@type": "Answer",
-                        "text": f"Almadan bu arama için {store_count} farklı mağazadan güncel fiyat verisi topluyor.",
-                    },
-                },
-            ],
-        })
+        # Sayfadaki gorunur SSS ile ayni sorular (tek kaynak).
+        faq_items = (_price_page_insights(term, products) or {}).get("faq") or []
+        if faq_items:
+            graph_nodes.append({
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {"@type": "Question", "name": q,
+                     "acceptedAnswer": {"@type": "Answer", "text": a}}
+                    for q, a in faq_items
+                ],
+            })
     combined_schema = _json.dumps({
         "@context": "https://schema.org",
         "@graph": graph_nodes + [

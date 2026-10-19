@@ -138,3 +138,19 @@ def test_stale_refresh_does_not_rewrite_single_store_with_single_store():
     amazon_only = [dict(p, source="amazon") for p in _products()]
     _, _, writes = _get((amazon_only, False, 7.0), _products(), railway=amazon_only)
     assert writes == 0
+
+
+def test_price_page_has_data_derived_sections_and_matching_faq_schema():
+    import json, re
+    resp, _, _ = _get((_products(), True, 0.2), _products())
+    html = resp.text
+    assert "Fiyat aralıklarına göre" in html
+    assert "Mağazalara göre" in html and "<table" in html
+    assert "Bütçene göre seçenekler" in html
+    assert "En pahalı" in html
+    # Gorunur SSS ile JSON-LD FAQPage ayni sorular
+    visible = re.findall(r'<div class="bp-faq-item"><h3>([^<]+)</h3>', html)
+    data = json.loads(re.search(r'<script type="application/ld\+json">\s*(\{.*?\})\s*</script>', html, re.S).group(1))
+    faq = next(n for n in data["@graph"] if n.get("@type") == "FAQPage")
+    import html as _h
+    assert [q["name"] for q in faq["mainEntity"]] == [_h.unescape(v) for v in visible]

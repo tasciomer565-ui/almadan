@@ -3711,8 +3711,13 @@ def postprocess_search_products(query: str, all_products: list) -> list[dict]:
     out_of_stock = [p for p in filtered_products if p["extra_info"].get("out_of_stock")]
             
     # 7. Generic vs Specific Query details limit
-    has_details = brand is not None or any(x in corrected_query.lower() for x in [" l", "gr", "kg", "gb", "tb", "ml"])
-    limit = 5 if has_details else 20
+    # Model/olcu iceren sorgu ("iphone 15 128gb", "pinar sut 1 l") -> az ve
+    # isabetli sonuc. Sadece marka + urun turu ("bosch supurge") eskiden de 5
+    # ile sinirlaniyordu: /fiyat sayfalari 4-5 urunle ince kaliyordu
+    # (GSC 2026-10: 2.075 sayfa "kesfedildi - dizine eklenmedi").
+    has_model = bool(re.search(r"\d", corrected_query)) or any(
+        x in corrected_query.lower() for x in [" l", "gr", "kg", "gb", "tb", "ml"])
+    limit = 5 if has_model else (12 if brand is not None else 20)
 
     # 8. Sort in-stock by price (cheapest first) if generic query
     if not brand:

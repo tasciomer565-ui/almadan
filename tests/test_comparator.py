@@ -292,7 +292,13 @@ def test_postprocess_brand_query_interleaves_stores():
 
 def test_postprocess_brand_query_single_store_keeps_count():
     sources = [p["source"] for p in postprocess_search_products("sony hoparlör", _sony("n11", 6, 8000, "XB"))]
-    assert sources == ["n11"] * 5
+    assert sources == ["n11"] * 6  # marka sorgusu artik 12'ye kadar
+
+
+def test_postprocess_limits_brand_query_to_12_and_model_query_to_5():
+    many = _sony("n11", 9, 8000, "XB") + _sony("amazon", 9, 7000, "XE")
+    assert len(postprocess_search_products("sony hoparlör", [dict(p) for p in many])) == 12
+    assert len(postprocess_search_products("sony hoparlör 13", [dict(p) for p in many])) <= 5
 
 
 # ── N11: once dogrudan, olmazsa proxy ────────────────────────
