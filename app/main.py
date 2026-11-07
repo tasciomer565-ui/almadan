@@ -189,6 +189,23 @@ _sentry_init()
 
 app = FastAPI(title="Fırsat Asistanı API", version="0.2.0", lifespan=lifespan)
 
+from app.api.v1.endpoints.search import router as search_v1_router  # noqa: E402
+from app.api.v1.endpoints.products import router as products_v1_router  # noqa: E402
+from app.api.v1.endpoints.sync import router as sync_v1_router  # noqa: E402
+from app.api.v1.endpoints.finance import router as finance_v1_router  # noqa: E402
+from app.api.v1.endpoints.alerts import router as alerts_v1_router  # noqa: E402
+from app.api.v1.endpoints.stylist import router as stylist_v1_router  # noqa: E402
+from app.api.v1.endpoints.recommerce import router as recommerce_v1_router  # noqa: E402
+from app.api.v1.endpoints.wardrobe import router as wardrobe_v1_router  # noqa: E402
+app.include_router(search_v1_router)
+app.include_router(products_v1_router)
+app.include_router(sync_v1_router)
+app.include_router(finance_v1_router)
+app.include_router(alerts_v1_router)
+app.include_router(stylist_v1_router)
+app.include_router(recommerce_v1_router)
+app.include_router(wardrobe_v1_router)
+
 
 def find_static_dir() -> Path:
     # TEK KAYNAK: public/static — Vercel /static'i doğrudan public/ klasöründen sunar,
@@ -7590,12 +7607,135 @@ async def category_page(category: str):
     return HTMLResponse(page)
 
 
-# TODO(scope): "Marka sayfaları" (madde 11) bilinçli olarak atlandı --
-# kategori/mağaza modelinin üstüne ayrı bir marka veri modeli (marka<->ürün
-# eşleştirmesi, marka meta verisi) gerektiriyor; kapsam MVP için büyük.
-# TODO(scope): "Aynı ürün farklı isimle eşleştirme" (madde 12) bilinçli
-# olarak atlandı -- güvenilir fuzzy/semantik ürün eşleştirme ayrı bir
-# veri modeli ve doğrulama katmanı gerektiriyor; kapsam MVP için büyük.
+def _brand_page_shell(title: str, desc: str, canonical_path: str, body: str) -> str:
+    """Marka sayfaları için ortak SEO iskeleti (kategori sayfasıyla aynı stil)."""
+    import html as _html
+
+    t, d = _html.escape(title), _html.escape(desc)
+    url = f"https://www.almadan.app{canonical_path}"
+    return f"""<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#121412">
+    <title>{t}</title>
+    <meta name="description" content="{d}">
+    <link rel="canonical" href="{url}">
+    <meta name="robots" content="index, follow">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Almadan">
+    <meta property="og:title" content="{t}">
+    <meta property="og:description" content="{d}">
+    <meta property="og:url" content="{url}">
+    <meta property="og:locale" content="tr_TR">
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+    <link rel="stylesheet" href="/static/brand-pages.css?v=2">
+  </head>
+  <body>
+    <header class="bp-header">
+      <a href="/" class="bp-logo"><span class="bp-logo-mark">A</span>almadan</a>
+      <nav class="bp-nav"><a href="/marka">Markalar</a><a href="/hakkinda">Hakkında</a><a href="/iletisim">İletişim</a></nav>
+    </header>
+    {body}
+    <footer class="bp-footer">
+      <a href="/hakkinda">Hakkında</a> · <a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/iletisim">İletişim</a>
+      <p>© {datetime.now().year} Almadan</p>
+    </footer>
+    <script>window.addEventListener('load', () => {{ if (window.lucide) lucide.createIcons(); }});</script>
+  </body>
+</html>"""
+
+
+@app.get("/marka", response_class=HTMLResponse)
+async def brand_index_page():
+    """Marka dizini -- kategoriye göre gruplanmış tüm marka sayfaları."""
+    import html as _html
+    from app.brands import brands_for_category
+
+    sections = []
+    for category, url_slug in CATEGORY_URL_SLUGS.items():
+        brands = brands_for_category(category)
+        if not brands:
+            continue
+        cat_name = _html.escape(_CATEGORY_DISPLAY.get(category, (category.capitalize(), ""))[0])
+        links = "".join(
+            f'<a class="bp-feature" href="/marka/{b["slug"]}"><h3>{_html.escape(b["name"])}</h3>'
+            f'<p>Fiyatları karşılaştır</p></a>'
+            for b in brands
+        )
+        sections.append(
+            f'<h2><a href="/kategori/{url_slug}" style="text-decoration:none;color:inherit;">{cat_name}</a></h2>'
+            f'<div class="bp-feature-grid">{links}</div>'
+        )
+    body = (
+        '<section class="bp-hero"><div class="bp-hero-inner"><p class="bp-eyebrow">MARKALAR</p>'
+        '<h1>Markalara Göre Fiyat Karşılaştırma</h1>'
+        '<p class="bp-hero-copy">Sevdiğin markanın fiyatlarını tüm mağazalarda tek ekranda karşılaştır.</p>'
+        '</div></section><main class="bp-main">' + "".join(sections) + "</main>"
+    )
+    return HTMLResponse(_brand_page_shell(
+        "Markalar: Fiyat Karşılaştırma — Almadan",
+        "Apple, Samsung, Nike ve daha fazla markanın fiyatlarını mağazalar arasında karşılaştır.",
+        "/marka", body,
+    ))
+
+
+@app.get("/marka/{slug}", response_class=HTMLResponse)
+async def brand_page(slug: str):
+    """Marka bazlı SEO sayfası: marka açıklaması, kategori/mağaza bağlantıları, arama CTA'sı."""
+    import html as _html
+    import json as _json
+    from urllib.parse import quote
+    from app.brands import get_brand
+
+    brand = get_brand(slug)
+    if not brand:
+        return HTMLResponse(
+            _branded_404_page("Marka bulunamadı", "Aradığın marka listemizde yok."),
+            status_code=404,
+        )
+    if slug != brand["slug"]:  # büyük/küçük harf varyantı -> canonical
+        return RedirectResponse(f"/marka/{brand['slug']}", status_code=301)
+
+    name = _html.escape(brand["name"])
+    category = brand["category"]
+    cat_slug = CATEGORY_URL_SLUGS.get(category, "")
+    cat_name = _html.escape(_CATEGORY_DISPLAY.get(category, (category.capitalize(), ""))[0])
+    stores = ALL_STORES_MAP.get(category, [])
+    store_links = "".join(
+        f'<a class="bp-feature" href="/magaza/{s}"><h3>{_html.escape(_format_store_name(s))}</h3>'
+        f'<p>{name} fiyatlarını gör</p></a>'
+        for s in stores
+    )
+    title = f"{brand['name']} Fiyatları: {len(stores)} Mağazada Karşılaştır — Almadan"
+    desc = brand["description"]
+    path = f"/marka/{brand['slug']}"
+    ld = _json.dumps({
+        "@context": "https://schema.org",
+        "@graph": [
+            {"@type": "CollectionPage", "url": f"https://www.almadan.app{path}", "name": title, "description": desc},
+            {"@type": "BreadcrumbList", "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Ana Sayfa", "item": "https://www.almadan.app/"},
+                {"@type": "ListItem", "position": 2, "name": "Markalar", "item": "https://www.almadan.app/marka"},
+                {"@type": "ListItem", "position": 3, "name": brand["name"], "item": f"https://www.almadan.app{path}"},
+            ]},
+        ],
+    }, ensure_ascii=False).replace("</", "<\\/")
+
+    body = f"""<script type="application/ld+json">{ld}</script>
+    <section class="bp-hero"><div class="bp-hero-inner">
+      <p class="bp-eyebrow">MARKA</p>
+      <h1>{name} Fiyat Karşılaştırma</h1>
+      <p class="bp-hero-copy">{_html.escape(desc)}</p>
+      <a class="bp-cta" href="/?q={quote(brand['name'])}"><i data-lucide="scan-search"></i> {name} Ürünlerini Ara</a>
+    </div></section>
+    <main class="bp-main">
+      <h2><i data-lucide="store"></i> {name} İçin Karşılaştırılan Mağazalar</h2>
+      <div class="bp-feature-grid">{store_links}</div>
+      <p style="margin-top:20px;"><a href="/kategori/{cat_slug}">Tüm {cat_name} kategorisi</a> · <a href="/marka">Tüm markalar</a></p>
+    </main>"""
+    return HTMLResponse(_brand_page_shell(title, desc, path, body))
 
 
 def _read_search_terms(max_lines: int = 20000) -> list[tuple[str, int]]:
