@@ -269,3 +269,22 @@ def get_category_price_change(store_slugs: list[str], days: int = 30, sample: in
 
     avg_pct = round(sum(pcts) / len(pcts), 1)
     return {"avg_change_pct": avg_pct, "sample_size": len(pcts), "days": days}
+
+
+def get_recent_price_rows(sample: int = 2000) -> list[dict]:
+    """En yeni `sample` price_history satırı (yeniden eskiye). Veri yoksa/kapalıysa boş liste."""
+    if not _enabled():
+        return []
+    try:
+        url = (
+            f"{SUPABASE_URL}/rest/v1/price_history"
+            f"?select=product_key,title,source,price,url,recorded_at"
+            f"&order=recorded_at.desc"
+            f"&limit={int(sample)}"
+        )
+        resp = requests.get(url, headers=_headers(), timeout=6)
+        rows = resp.json() if resp.ok else []
+        return rows if isinstance(rows, list) else []
+    except Exception as exc:
+        logger.warning("get_recent_price_rows error: %s", exc)
+        return []

@@ -143,6 +143,10 @@ CSRF_EXEMPT_PATHS = {
     "/api/track-share",  # sendBeacon header taşıyamaz; endpoint salt-log, durum değiştirmez
     "/api/find-alternatives",  # salt-okunur arama (DB'ye yazmaz); tarayıcı uzantısı 3. taraf sayfadan çağırır, csrf_token cookie'sine erişimi yok
     "/api/admin/products/",  # çerez değil, ayrı bir paylaşımlı sır (X-Admin-Secret) ile korunuyor -- diğer /api/admin/* endpoint'leri session-çerez tabanlı olduğu için buraya DAHIL EDİLMEDİ, sadece bu yol muaf
+    "/api/v1/sync",  # Mobil B2B/B2C Cloud Sync: Cookie değil, Authorization: Bearer <JWT> ile korunuyor
+    "/api/v1/finance",  # Vision AI Fiş Okuma ve Bütçe API: Multipart & Bearer <JWT> ile çalışır
+    "/api/v1/alerts",  # Otonom Fiyat İzleme (Price Tracker) API: Bearer <JWT> ile korunuyor
+    "/api/v1/wardrobe",  # Konum Tabanlı Kirli Sepeti & Yıkama Asistanı API: Bearer <JWT> ile korunuyor
 }
 CSRF_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
@@ -266,6 +270,130 @@ class RequireRole:
 require_login   = RequireRole("free")
 require_premium = RequireRole("premium")
 require_admin   = RequireRole("admin")
+
+
+# ── Supabase JWT / GoTrue Kimlik Doğrulama (require_auth_user) ─
+
+SUPABASE_JWT_SECRET = (
+    os.getenv("SUPABASE_JWT_SECRET", "").strip()
+    or os.getenv("JWT_SECRET", "").strip()
+    or "almadan_supabase_gotrue_jwt_secret_2026_default_key"
+)
+
+
+def create_access_jwt(
+    user_id: str,
+    email: str = "user@negiysem.app",
+    expires_in: int = 3600,
+) -> str:
+    """Supabase GoTrue uyumlu HS256 JWT üretir."""
+    import jwt as _pyjwt
+
+    now = int(time.time())
+    payload = {
+        "sub": str(user_id),
+        "user_id": str(user_id),
+        "email": email,
+        "role": "authenticated",
+        "aud": "authenticated",
+        "iat": now,
+        "exp": now + expires_in,
+    }
+    return _pyjwt.encode(payload, SUPABASE_JWT_SECRET, algorithm="HS256")
+
+
+async def require_auth_user(request: Request) -> dict[str, Any]:
+    """
+    Supabase JWT / GoTrue Bearer Token doğrulaması yapan FastAPI Dependency.
+    Her kullanıcının yalnızca kendi `user_id`'sine ait veriyi eşitleyebilmesini garanti eder.
+    """
+    import asyncio
+    import jwt as _pyjwt
+
+    # 1. Middleware tarafından çözümlenmiş aktif oturum varsa
+    state_uid = getattr(request.state, "user_id", None)
+    if state_uid:
+        return {
+            "id": str(state_uid),
+            "sub": str(state_uid),
+            "user_id": str(state_uid),
+            "email": getattr(request.state, "user_email", None),
+            "role": "authenticated",
+        }
+
+    # 2. Authorization: Bearer <JWT> başlığı kontrolü
+    auth_header = request.headers.get("authorization", "").strip()
+    if not auth_header or not auth_header.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Yetkilendirme başlığı (Authorization: Bearer <JWT>) eksik.",
+        )
+
+    token = auth_header[7:].strip()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Boş Bearer token gönderildi.",
+        )
+
+    # 3. Yerel HS256 Supabase JWT imza doğrulaması
+    try:
+        decoded = _pyjwt.decode(
+            token,
+            SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            options={"verify_aud": False},
+        )
+        uid = decoded.get("sub") or decoded.get("user_id") or decoded.get("id")
+        if not uid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="JWT içerisinde geçerli kullanıcı kimliği ('sub') bulunamadı.",
+            )
+        request.state.user_id = str(uid)
+        request.state.user_email = decoded.get("email")
+        return {
+            "id": str(uid),
+            "sub": str(uid),
+            "user_id": str(uid),
+            "email": decoded.get("email"),
+            "role": decoded.get("role", "authenticated"),
+        }
+    except _pyjwt.ExpiredSignatureError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Oturum süresi (JWT) dolmuş.",
+        ) from exc
+    except _pyjwt.InvalidTokenError:
+        pass
+
+    # 4. Bulut Supabase GoTrue /auth/v1/user üzerinden doğrulama fallback'i
+    from app.auth import AuthError, auth_enabled, get_user
+
+    if auth_enabled():
+        try:
+            user = await asyncio.to_thread(get_user, token)
+            uid = user.get("id")
+            if uid:
+                request.state.user_id = str(uid)
+                request.state.user_email = user.get("email")
+                return {
+                    "id": str(uid),
+                    "sub": str(uid),
+                    "user_id": str(uid),
+                    "email": user.get("email"),
+                    "role": user.get("role", "authenticated"),
+                }
+        except AuthError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"GoTrue kimlik doğrulaması başarısız: {exc}",
+            ) from exc
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Geçersiz veya doğrulanamayan JWT token.",
+    )
 
 
 # ── Auth-Wall Middleware ─────────────────────────────────────
@@ -392,16 +520,27 @@ def check_rate_limit_key(key: str, limit: int, window_seconds: int) -> None:
     _RATE_LIMIT_BUCKETS[key] = timestamps
 
 
-# ── Genel Geliştirici API Anahtarı ──────────────────────────
-# Basit, ücretsiz, rate-limited salt-okunur API için X-API-Key doğrulaması.
-# Anahtarlar Supabase'deki api_keys tablosunda tutulur (key_hash, label, active).
+# ── Genel Geliştirici & B2B API Anahtarı ────────────────────
+# Basit, ücretsiz, rate-limited salt-okunur API ve Ne Giysem B2B Köprüsü için X-API-Key doğrulaması.
+# Anahtarlar Supabase'deki api_keys tablosunda veya kurumsal B2B anahtar havuzunda (sha256) tutulur.
+
+DEFAULT_B2B_API_KEY = "alm_b2b_ne_giysem_2026_secret"
+
+_B2B_PARTNER_KEYS: dict[str, dict[str, Any]] = {
+    hashlib.sha256(DEFAULT_B2B_API_KEY.encode()).hexdigest(): {
+        "label": "Ne Giysem B2B Partner Bridge",
+        "active": True,
+        "partner": "ne_giysem",
+    },
+}
+
 
 def hash_api_key(raw_key: str) -> str:
     return hashlib.sha256(raw_key.encode()).hexdigest()
 
 
 async def require_api_key(request: Request) -> dict:
-    """X-API-Key header'ını api_keys tablosuna karşı doğrular.
+    """X-API-Key header'ını B2B ortak anahtarlarına ve api_keys tablosuna karşı doğrular.
 
     Ham anahtar hiçbir yerde saklanmaz -- yalnızca sha256 hash'i tutulur.
     Geçersiz/eksik anahtar veya pasif kayıt 401 döner.
@@ -412,21 +551,44 @@ async def require_api_key(request: Request) -> dict:
     if not raw_key:
         raise HTTPException(status_code=401, detail="X-API-Key başlığı eksik.")
 
-    if not supabase_enabled():
-        raise HTTPException(status_code=503, detail="API şu anda kullanılamıyor.")
-
     key_hash = hash_api_key(raw_key)
-    try:
-        url = f"{supabase_base_url()}/rest/v1/api_keys"
-        resp = _req.get(
-            url,
-            headers=supabase_headers(),
-            params={"key_hash": f"eq.{key_hash}", "active": "eq.true", "select": "*"},
-            timeout=5,
-        )
-        rows = resp.json() if resp.ok else []
-    except Exception:
-        rows = []
+
+    # 1. Ortam değişkeni ile tanımlanmış kurumsal B2B anahtarı kontrolü
+    env_b2b_key = (
+        os.getenv("B2B_API_KEY", "").strip()
+        or os.getenv("NE_GIYSEM_API_KEY", "").strip()
+    )
+    if env_b2b_key and hmac.compare_digest(hash_api_key(env_b2b_key), key_hash):
+        key_row = {
+            "key_hash": key_hash,
+            "label": "Ne Giysem B2B (Env)",
+            "active": True,
+            "partner": "ne_giysem",
+        }
+        check_rate_limit(request, f"public_api:{key_hash}", limit=120, window_seconds=60)
+        return key_row
+
+    # 2. Ön tanımlı B2B Partner ("Ne Giysem") anahtar doğrulaması (Timing-attack korumalı)
+    for partner_hash, meta in _B2B_PARTNER_KEYS.items():
+        if hmac.compare_digest(partner_hash, key_hash) and meta.get("active", False):
+            key_row = {"key_hash": key_hash, **meta}
+            check_rate_limit(request, f"public_api:{key_hash}", limit=120, window_seconds=60)
+            return key_row
+
+    # 3. Supabase api_keys tablosu kontrolü
+    rows = []
+    if supabase_enabled():
+        try:
+            url = f"{supabase_base_url()}/rest/v1/api_keys"
+            resp = _req.get(
+                url,
+                headers=supabase_headers(),
+                params={"key_hash": f"eq.{key_hash}", "active": "eq.true", "select": "*"},
+                timeout=5,
+            )
+            rows = resp.json() if resp.ok else []
+        except Exception:
+            rows = []
 
     if not rows:
         raise HTTPException(status_code=401, detail="Geçersiz veya pasif API anahtarı.")

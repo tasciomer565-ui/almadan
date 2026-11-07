@@ -106,6 +106,12 @@ def build_sitemap() -> str:
     for category in ALL_STORES_MAP:
         add(f"kategori/{CATEGORY_URL_SLUGS.get(category, category)}", "weekly", "0.6")
 
+    from app.brands import BRANDS
+
+    add("marka", "weekly", "0.6")
+    for brand_slug in BRANDS:
+        add(f"marka/{brand_slug}", "weekly", "0.5")
+
     seen_slugs: set[str] = set()
     for slugs in ALL_STORES_MAP.values():
         for slug in slugs:
