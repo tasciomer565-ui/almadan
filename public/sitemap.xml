@@ -776,27 +776,12 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/acer-laptop</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/acer-monitor</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/acer-mouse</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/acer-saat</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/acer-tablet</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -1336,17 +1321,7 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/apple-hoparlor</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/apple-kamera</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/apple-kulaklik</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -1542,6 +1517,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/bej-bag</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/bej-banyo</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -4971,11 +4951,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/gumus-hoodie</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/gumus-ic-camasir</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -5162,6 +5137,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/gumus-puf</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/gumus-raf</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -7702,11 +7682,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/koton-ayakkabi</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/koton-elbise</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -11116,22 +11091,7 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/philips-avize</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/philips-blender</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/philips-hali</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/philips-hoparlor</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -11402,26 +11362,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/samsung-hoparlor</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/samsung-kulaklik</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/samsung-monitor</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/samsung-powerbank</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/samsung-saat</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
