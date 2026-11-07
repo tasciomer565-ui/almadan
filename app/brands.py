@@ -256,3 +256,50 @@ def group_same_products(
         if not placed:
             groups.append([item])
     return groups
+
+
+# ── Marka sayfası ürün özeti ─────────────────────────────────
+
+def summarize_brand_products(
+    rows: Iterable[dict[str, Any]],
+    slug: str,
+    limit: int = 8,
+) -> list[dict[str, Any]]:
+    """price_history satırlarından (yeniden eskiye sıralı) marka ürün özeti çıkarır.
+
+    Her ürün anahtarının en güncel fiyatı alınır, markaya ait olanlar süzülür,
+    farklı mağazalardaki aynı ürünler `group_same_products` ile tek satırda
+    toplanır. Dönen her öğe: title, min_price, min_source, store_count, offers
+    (mağaza başına en ucuz teklif). Çok mağazada bulunan ürünler önce gelir.
+    """
+    latest: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        key, price, title = row.get("product_key"), row.get("price"), row.get("title")
+        if not key or not title or price is None or key in latest:
+            continue
+        try:
+            price_f = float(price)
+        except (TypeError, ValueError):
+            continue
+        if price_f <= 0 or extract_brand(title) != slug:
+            continue
+        latest[key] = {"title": title, "price": price_f, "source": row.get("source") or "", "url": row.get("url") or ""}
+
+    result = []
+    for group in group_same_products(latest.values()):
+        by_source: dict[str, dict[str, Any]] = {}
+        for item in group:
+            cur = by_source.get(item["source"])
+            if cur is None or item["price"] < cur["price"]:
+                by_source[item["source"]] = item
+        offers = sorted(by_source.values(), key=lambda o: o["price"])
+        best = offers[0]
+        result.append({
+            "title": best["title"],
+            "min_price": best["price"],
+            "min_source": best["source"],
+            "store_count": len(offers),
+            "offers": offers,
+        })
+    result.sort(key=lambda g: (-g["store_count"], g["min_price"]))
+    return result[:limit]

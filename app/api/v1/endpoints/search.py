@@ -33,6 +33,11 @@ class AggregatedProduct(BaseModel):
     rating_score: float | None = Field(default=None, description="Değerlendirme puanı (0.0 - 5.0)")
     review_count: int | None = Field(default=None, description="Yorum / değerlendirme sayısı")
     has_same_day_delivery: bool = Field(default=False, description="Aynı gün / hızlı teslimat rozeti")
+    match_group_id: int | None = Field(
+        default=None,
+        description="Farklı mağazalardaki aynı ürünleri birleştiren küme kimliği (yalnızca birden fazla teklif varsa dolar)",
+    )
+    is_group_cheapest: bool = Field(default=False, description="Aynı ürün kümesindeki en ucuz teklif mi")
 
 
 class SearchClarificationResponse(BaseModel):
@@ -638,6 +643,26 @@ def _apply_sorting(
 
 # ── GET /api/v1/search Uç Noktası (Union Response) ─────────────
 
+def _annotate_same_product_groups(products: list[AggregatedProduct]) -> None:
+    """Farklı pazar yerlerindeki aynı ürünlere ortak `match_group_id` verir ve
+    küme içindeki en ucuz teklifi işaretler. Tek teklifli ürünlere dokunmaz.
+    Hata durumunda sonuçları bozmaz (eşleştirme yardımcı bir zenginleştirmedir)."""
+    try:
+        from app.brands import group_same_products
+
+        items = [{"title": p.product_name, "p": p} for p in products]
+        for gid, group in enumerate(group_same_products(items), start=1):
+            platforms = {g["p"].platform_name for g in group}
+            if len(platforms) < 2:
+                continue
+            cheapest = min(group, key=lambda g: g["p"].price)["p"]
+            for g in group:
+                g["p"].match_group_id = gid
+            cheapest.is_group_cheapest = True
+    except Exception as exc:  # pragma: no cover - savunmacı
+        logger.warning("Aynı ürün gruplama atlandı: %s", exc)
+
+
 @router.get("/search", response_model=SearchClarificationResponse | SearchResponse)
 async def aggregated_search(
     q: str = Query(..., min_length=2, max_length=150, description="Arama metni"),
@@ -715,6 +740,7 @@ async def aggregated_search(
 
     # 4. Dinamik Sıralama
     sorted_products = _apply_sorting(cleaned_products, sort)
+    _annotate_same_product_groups(sorted_products)
 
     # 5. Önbelleğe Alma
     _SEARCH_CACHE.set(

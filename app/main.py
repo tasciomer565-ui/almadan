@@ -7647,6 +7647,23 @@ def _brand_page_shell(title: str, desc: str, canonical_path: str, body: str) -> 
 </html>"""
 
 
+_BRAND_PRODUCTS_TTL = 600.0
+_brand_rows_cache: dict ={"at": 0.0, "rows": []}
+
+
+def _brand_products_cached(slug: str) -> list[dict]:
+    """Marka için price_history'den ürün özeti. Satırlar 10 dk önbelleklenir; veri yoksa boş liste."""
+    import time as _time
+    from app.brands import summarize_brand_products
+    from app.price_history import get_recent_price_rows
+
+    now = _time.monotonic()
+    if now - _brand_rows_cache["at"] > _BRAND_PRODUCTS_TTL:
+        _brand_rows_cache["rows"] = get_recent_price_rows()
+        _brand_rows_cache["at"] = now
+    return summarize_brand_products(_brand_rows_cache["rows"], slug)
+
+
 @app.get("/marka", response_class=HTMLResponse)
 async def brand_index_page():
     """Marka dizini -- kategoriye göre gruplanmış tüm marka sayfaları."""
@@ -7708,6 +7725,21 @@ async def brand_page(slug: str):
         f'<p>{name} fiyatlarını gör</p></a>'
         for s in stores
     )
+    products_html = ""
+    products = _brand_products_cached(brand["slug"])
+    if products:
+        cards = []
+        for p in products:
+            n = p["store_count"]
+            where = f"{n} mağazada" if n > 1 else _html.escape(_format_store_name(p["min_source"]))
+            cards.append(
+                f'<div class="bp-feature"><h3>{_html.escape(p["title"][:90])}</h3>'
+                f'<p>En düşük {p["min_price"]:,.2f} TL · {where}</p></div>'
+            )
+        products_html = (
+            f'<h2><i data-lucide="tag"></i> {name} Ürünlerinde Güncel Fiyatlar</h2>'
+            f'<div class="bp-feature-grid">{"".join(cards)}</div>'
+        )
     title = f"{brand['name']} Fiyatları: {len(stores)} Mağazada Karşılaştır — Almadan"
     desc = brand["description"]
     path = f"/marka/{brand['slug']}"
@@ -7731,6 +7763,7 @@ async def brand_page(slug: str):
       <a class="bp-cta" href="/?q={quote(brand['name'])}"><i data-lucide="scan-search"></i> {name} Ürünlerini Ara</a>
     </div></section>
     <main class="bp-main">
+      {products_html}
       <h2><i data-lucide="store"></i> {name} İçin Karşılaştırılan Mağazalar</h2>
       <div class="bp-feature-grid">{store_links}</div>
       <p style="margin-top:20px;"><a href="/kategori/{cat_slug}">Tüm {cat_name} kategorisi</a> · <a href="/marka">Tüm markalar</a></p>

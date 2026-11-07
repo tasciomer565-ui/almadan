@@ -108,3 +108,65 @@ def test_brand_page_case_redirect_and_404(client):
     r = client.get("/marka/Samsung", follow_redirects=False)
     assert r.status_code == 301 and r.headers["location"] == "/marka/samsung"
     assert client.get("/marka/yok-boyle-marka").status_code == 404
+
+
+# ── Marka ürün özeti ─────────────────────────────────────────
+
+def _row(key, title, source, price):
+    return {"product_key": key, "title": title, "source": source, "price": price, "url": ""}
+
+
+def test_summarize_brand_products_groups_across_stores():
+    from app.brands import summarize_brand_products
+
+    rows = [  # yeniden eskiye: aynı anahtarın ilk satırı güncel fiyattır
+        _row("k1", "Samsung Galaxy S24 256GB", "trendyol", 40000),
+        _row("k1", "Samsung Galaxy S24 256GB", "trendyol", 45000),
+        _row("k2", "GALAXY S24 256 GB Samsung", "hepsiburada", 39000),
+        _row("k3", "Samsung Galaxy S24 128GB", "n11", 35000),
+        _row("k4", "Apple iPhone 15 128GB", "n11", 50000),
+        _row("k5", "Samsung bozuk fiyat", "n11", None),
+    ]
+    out = summarize_brand_products(rows, "samsung")
+    assert [p["store_count"] for p in out] == [2, 1]
+    top = out[0]
+    assert top["min_price"] == 39000 and top["min_source"] == "hepsiburada"
+    assert [o["price"] for o in top["offers"]] == [39000, 40000]
+
+
+def test_summarize_brand_products_empty():
+    from app.brands import summarize_brand_products
+
+    assert summarize_brand_products([], "samsung") == []
+
+
+def test_brand_page_renders_products(client, monkeypatch):
+    import app.main as m
+
+    monkeypatch.setattr(m, "_brand_products_cached", lambda slug: [
+        {"title": "Samsung Galaxy S24 256GB", "min_price": 39000.0, "min_source": "hepsiburada",
+         "store_count": 2, "offers": []},
+    ])
+    r = client.get("/marka/samsung")
+    assert r.status_code == 200
+    assert "Samsung Galaxy S24 256GB" in r.text and "2 mağazada" in r.text
+
+
+# ── Arama sonuçlarında gruplama ──────────────────────────────
+
+def test_search_results_annotated_with_match_groups():
+    from app.api.v1.endpoints.search import AggregatedProduct, _annotate_same_product_groups
+
+    def prod(name, platform, price):
+        return AggregatedProduct(product_name=name, platform_name=platform, price=price, product_url="https://x")
+
+    items = [
+        prod("Samsung Galaxy S24 256GB", "Trendyol", 40000),
+        prod("GALAXY S24 256 GB Samsung", "Hepsiburada", 39000),
+        prod("Samsung Galaxy S24 128GB", "N11", 35000),
+        prod("Samsung Galaxy S24 256GB", "Trendyol", 41000),  # aynı mağaza tekrarı
+    ]
+    _annotate_same_product_groups(items)
+    assert items[0].match_group_id == items[1].match_group_id == items[3].match_group_id is not None
+    assert items[1].is_group_cheapest and not items[0].is_group_cheapest
+    assert items[2].match_group_id is None and not items[2].is_group_cheapest

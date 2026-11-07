@@ -87,3 +87,17 @@ services:
         sync: false
       - key: GOOGLE_SHEET_ID
         sync: false
+      # Kimlik dogrulama / guvenlik
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: CSRF_SECRET
+        generateValue: true
+      # Bildirim kanallari (opsiyonel)
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      # LLM saglayicilari (stylist, recommerce, fis okuma, sorgu analizi) --
+      # Gemini veya OpenAI anahtarlarindan en az biri gerekir.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
