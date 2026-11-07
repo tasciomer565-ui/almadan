@@ -44,6 +44,7 @@ from app import cache  # noqa: E402
 from app.comparator import normalize_turkish_search_query  # noqa: E402
 from app.main import _price_page_cache_key, _seo_price_slug_map  # noqa: E402
 from app.search_orchestrator import marketplace_scan  # noqa: E402
+from app.warm_extra_terms import extra_warm_terms  # noqa: E402
 
 CONCURRENCY = 2
 TIME_BUDGET_SECONDS = 24 * 60  # is zaman asimi 30 dk; kurulum ~1 dk
@@ -107,6 +108,22 @@ def pick_terms(expiry: dict[str, datetime], limit: int) -> list[dict]:
         )
         candidates.append({"slug": slug, "query": query, "key": key, "category": category,
                            "priority": priority})
+    # SEO whitelist'inde olmayan model/marka sorgulari (ör. "iphone 15"): canli
+    # aramada en cok sorulanlar bunlar; onbellekte yoksa sadece Amazon doner.
+    # En yuksek oncelik: GSC onceliklerinden bile once, cunku sayilari az.
+    seo_keys = {c["key"] for c in candidates}
+    for term in extra_warm_terms():
+        query = normalize_turkish_search_query(term)
+        key, category = _price_page_cache_key(query)
+        if key in seo_keys:  # ayni cache anahtari zaten aday (SEO listesi ya da onceki ek terim)
+            continue
+        expires_at = expiry.get(key)
+        if expires_at and expires_at > now + timedelta(hours=SKIP_IF_FRESH_FOR_HOURS):
+            continue
+        seo_keys.add(key)
+        candidates.append({"slug": "x:" + term.replace(" ", "-"), "query": query, "key": key,
+                           "category": category,
+                           "priority": (0, -1, 0 if expires_at is None else 1, expires_at or epoch)})
     candidates.sort(key=lambda c: c["priority"])
     return candidates[:limit]
 
