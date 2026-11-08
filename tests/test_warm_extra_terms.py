@@ -72,3 +72,21 @@ def test_pick_terms_puts_demand_first_by_count():
     d_items = [c for c in picked if c["slug"].startswith("d:")]
     assert [c["slug"] for c in d_items] == ["d:cok-aranan-ozel-urun-abc", "d:nadir-aranan-ozel-urun-xyz"]
     assert picked[0]["slug"] == d_items[0]["slug"] and picked[1]["slug"] == d_items[1]["slug"]
+
+
+def test_step_summary_written_only_when_env_set(tmp_path, monkeypatch):
+    from collections import Counter
+
+    warm = _load_warm_script()
+    rows = [("x:iphone-15", "yazildi", ["n11", "amazon"]), ("seo-terim", "bos", [])]
+    args = (rows, Counter(yazildi=1, bos=1), Counter(n11=1, amazon=1), 1, 1, {"a": 1}, 7)
+
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    warm._write_step_summary(*args)  # env yok -> hicbir sey yapmaz, hata vermez
+
+    out = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(out))
+    warm._write_step_summary(*args)
+    text = out.read_text(encoding="utf-8")
+    assert "| x:iphone-15 | yazildi | n11, amazon |" in text
+    assert "seo-terim" not in text          # yalnizca ek/talep terimleri listelenir

@@ -209,6 +209,33 @@ async def warm_one(item: dict, ttl_hours: int, dry_run: bool) -> tuple[str, list
     return ("yazildi" if result == "ok" else f"yazma-hatasi:{result}"), sources
 
 
+def _write_step_summary(rows, outcomes, store_hits, multi_store, written, demand, seconds) -> None:
+    """GitHub Actions "Summary" sayfasina ozet yazar (ham gunluk cok buyuk oldugu icin
+    arayuzde kesiliyor). GITHUB_STEP_SUMMARY yoksa (yerel calisma) hicbir sey yapmaz."""
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path:
+        return
+    try:
+        lines = [
+            "## Onbellek isitma ozeti",
+            f"- sure: {seconds}s, yazilan: {written}, 2+ magazali: {multi_store}",
+            "- sonuclar: " + ", ".join(f"{k}={v}" for k, v in outcomes.most_common()),
+            "- magaza dagilimi: " + ", ".join(f"{k}={v}" for k, v in store_hits.most_common()),
+            f"- gercek arama talebi: {len(demand)} benzersiz sorgu",
+            "",
+            "### Ek model/marka (x:) ve gercek arama (d:) terimleri",
+            "| terim | sonuc | magazalar |",
+            "|---|---|---|",
+        ]
+        for slug, outcome, sources in rows:
+            if slug.startswith(("x:", "d:")):
+                lines.append(f"| {slug} | {outcome} | {', '.join(sources) or '-'} |")
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write("\n".join(lines) + "\n")
+    except OSError:
+        pass
+
+
 async def main_async(limit: int, ttl_hours: int, dry_run: bool) -> int:
     if not cache._enabled():
         print("HATA: SUPABASE_URL / SUPABASE_SERVICE_KEY tanimli degil.", file=sys.stderr)
@@ -226,6 +253,7 @@ async def main_async(limit: int, ttl_hours: int, dry_run: bool) -> int:
     store_hits: Counter[str] = Counter()
     multi_store = 0
     sem = asyncio.Semaphore(CONCURRENCY)
+    rows: list[tuple[str, str, list[str]]] = []  # (slug, sonuc, magazalar) -- ozet sayfasi icin
 
     async def _run(item: dict) -> None:
         nonlocal multi_store
@@ -235,6 +263,7 @@ async def main_async(limit: int, ttl_hours: int, dry_run: bool) -> int:
                 return
             outcome, sources = await warm_one(item, ttl_hours, dry_run)
             outcomes[outcome] += 1
+            rows.append((item["slug"], outcome, list(sources)))
             if outcome in ("yazildi", "yazilacakti"):
                 store_hits.update(sources)
                 if len(sources) >= 2:
@@ -247,6 +276,7 @@ async def main_async(limit: int, ttl_hours: int, dry_run: bool) -> int:
     print(f"\nozet ({int(time.time() - started)}s): " + ", ".join(f"{k}={v}" for k, v in outcomes.most_common()))
     print(f"2+ magazali yazilan: {multi_store}/{written}")
     print("magaza dagilimi: " + ", ".join(f"{k}={v}" for k, v in store_hits.most_common()))
+    _write_step_summary(rows, outcomes, store_hits, multi_store, written, demand, int(time.time() - started))
     # Yazma hatasi varsa is basarisiz gorunsun (sessiz bozulma olmasin).
     return 1 if any(k.startswith("yazma-hatasi") for k in outcomes) else 0
 
