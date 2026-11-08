@@ -243,3 +243,23 @@ def test_amazon_fashion_card_title_joins_brand_and_name(monkeypatch):
 def test_generate_search_suggestion(query, expected):
     from app.comparator import generate_search_suggestion
     assert generate_search_suggestion(query) == expected
+
+
+# ── Mağazalar arası aynı ürün korunur ────────────────────────
+
+def test_postprocess_keeps_same_product_from_different_stores():
+    from app.comparator import postprocess_search_products
+
+    def p(source, price, title):
+        return {"title": title, "price": price, "source": source, "url": f"https://{source}/{price}",
+                "image_url": "", "labels": [], "extra_info": {}}
+
+    out = postprocess_search_products("iphone 15", [
+        p("amazon", 56199, "Apple iPhone 15 (128 GB) - Mavi"),
+        p("amazon", 56558, "Apple iPhone 15 (128 GB) - Siyah"),      # ayni magaza renk varyanti -> birlesir
+        p("n11", 56499, "Apple iPhone 15 128 GB (Apple Türkiye Garantili)"),
+        p("mediamarkt", 57999, "APPLE iPhone 15 128 GB Akıllı Telefon Mavi MTP43TU/A"),
+    ])
+    sources = sorted(x["source"] for x in out)
+    assert sources == ["amazon", "mediamarkt", "n11"]          # her magaza gorunur, eskiden sadece en ucuzu kaliyordu
+    assert [x["price"] for x in out if x["source"] == "amazon"] == [56199]

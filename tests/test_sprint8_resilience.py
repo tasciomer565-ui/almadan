@@ -234,7 +234,7 @@ class TestWithTimeout(unittest.TestCase):
         import logging
         with self.assertLogs("app.resilience", level="WARNING") as cm:
             with with_timeout(0.0, "slow_op"):
-                time.sleep(0.01)
+                time.sleep(0.05)  # Windows saat adimi ~15.6 ms; 10 ms bazen yetmiyor
         self.assertTrue(any("slow_op" in m for m in cm.output))
 
     def test_check_timeout_raises(self):

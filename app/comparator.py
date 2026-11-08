@@ -3710,7 +3710,12 @@ def postprocess_search_products(query: str, all_products: list) -> list[dict]:
         title = p.get("title", "")
         match_idx = -1
         for idx, dp in enumerate(deduped_products):
-            if (same_product(title, dp["title"], dedup_ignore)
+            # Yalnizca AYNI magazanin tekrarlari (renk/varyant) birlesir. Farkli
+            # magazalardaki ayni urun KALIR: karsilastirma sitesinde "iphone 15"
+            # icin sadece en ucuz magazayi gostermek diger magazalari gizliyordu
+            # (canlida sonuc hep tek magaza -- Amazon -- gorunuyordu).
+            if (p.get("source") == dp.get("source")
+                and same_product(title, dp["title"], dedup_ignore)
                 and not has_capacity_conflict(title, dp["title"])
                 and not has_physical_conflict(title, dp["title"])
                 and not has_tech_conflict(title, dp["title"])
