@@ -370,8 +370,13 @@ def filter_relevant_products(
     products: list[dict[str, Any]],
     title_key: str = "title",
 ) -> list[dict[str, Any]]:
-    """Sorguya uymayan ürünleri eler. Hiçbiri uymazsa (ör. sorgudaki kod
-    mağazalarda farklı yazılıyor) listeyi olduğu gibi döndürür -- boş sayfa
-    göstermektense mevcut süzgeçlerin davranışı korunur."""
+    """Sorguya uymayan ürünleri eler.
+
+    Spesifik (model/numara içeren) sorguda hiçbir ürün uymazsa boş liste döner:
+    "galaxy s24" için S25/A37 göstermek ve birine "En Ucuz" demek, "bulunamadı"
+    demekten daha kötü. Genel sorguda (marka + tür) hiçbiri uymazsa liste
+    olduğu gibi kalır; orada karar mevcut süzgeçlerindir."""
     kept = [p for p in products if title_matches_query(query, str(p.get(title_key) or ""))]
-    return kept or products
+    if kept:
+        return kept
+    return [] if is_specific_query(query) else products

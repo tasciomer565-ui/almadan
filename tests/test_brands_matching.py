@@ -197,11 +197,13 @@ def test_title_matches_query(query, title, ok):
     assert title_matches_query(query, title) is ok
 
 
-def test_filter_relevant_products_falls_back_when_nothing_matches():
+def test_filter_relevant_products_empty_for_specific_query_without_match():
     from app.brands import filter_relevant_products
 
-    items = [{"title": "PlayStation 5 Konsol"}, {"title": "PS5 Oyun"}]
-    assert filter_relevant_products("ps4 pro 1000", items) == items  # hiçbiri uymaz -> dokunma
+    items = [{"title": "Samsung Galaxy S25 256GB"}, {"title": "Samsung Galaxy A37 5G"}]
+    assert filter_relevant_products("samsung galaxy s24", items) == []      # spesifik: yanlis model gosterme
+    generic = [{"title": "Nike Air Force 1"}, {"title": "Adidas Samba"}]
+    assert filter_relevant_products("ayakkabi", generic) == generic        # genel sorgu: dokunma
     kept = filter_relevant_products("iphone 15", [{"title": "Apple iPhone 15 128 GB"}, {"title": "Apple iPhone 14"}])
     assert [p["title"] for p in kept] == ["Apple iPhone 15 128 GB"]
 
