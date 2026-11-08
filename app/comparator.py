@@ -1491,8 +1491,18 @@ def search_amazon_tr(query: str) -> list[dict]:
                 continue
             results = []
             for item in items[:10]:
-                name_el = item.select_one("h2 span")
-                name = name_el.get_text(strip=True) if name_el else ""
+                # Moda kartlarinda iki h2 var: marka ("Nike") ve urun adi ("Air Max
+                # 90 ..."); sadece ilk span alininca baslik "Nike" kaliyor ve urun
+                # dogrulanamiyordu. Tum h2 metinleri marka + ad olarak birlestirilir.
+                h2_parts: list[str] = []
+                for h2 in item.select("h2"):
+                    part = h2.get_text(" ", strip=True)
+                    if part and part not in h2_parts:
+                        h2_parts.append(part)
+                name = " ".join(h2_parts)
+                if not name:
+                    name_el = item.select_one("h2 span")
+                    name = name_el.get_text(strip=True) if name_el else ""
                 if not name:
                     continue
                 # Try .a-offscreen first (most reliable), then .a-price-whole
@@ -3658,7 +3668,16 @@ def postprocess_search_products(query: str, all_products: list) -> list[dict]:
 
     # 5. Filter out accessory/irrelevant products (like cloth, case, cables)
     filtered_products = [p for p in all_products if is_logical_product(corrected_query, p["title"])]
-    
+
+    # 5b. Model/varyant/olcu uyumu: "iphone 15" aramasinda iPhone 14/17, kilif,
+    # kablo ve "gorunumlu" taklitleri elenir; "En Ucuz" etiketi bunlara dusmesin.
+    # Hicbir urun uymazsa liste degismez (bkz. brands.filter_relevant_products).
+    try:
+        from app.brands import filter_relevant_products
+        filtered_products = filter_relevant_products(corrected_query, filtered_products)
+    except Exception:
+        pass
+
     # 6. Apply brand filter if specified in the query
     # 2026-06-12'den beri brand_filtered hesaplanip HIC kullanilmiyordu --
     # "sony hoparlor" aramasinda JBL de listelenip "En Ucuz" etiketi alabiliyordu.

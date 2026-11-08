@@ -44,6 +44,7 @@ from app import cache  # noqa: E402
 from app.comparator import normalize_turkish_search_query  # noqa: E402
 from app.main import _price_page_cache_key, _seo_price_slug_map  # noqa: E402
 from app.search_orchestrator import marketplace_scan  # noqa: E402
+from app.warm_demand import count_search_terms  # noqa: E402
 from app.warm_extra_terms import extra_warm_terms  # noqa: E402
 
 CONCURRENCY = 2
@@ -75,6 +76,24 @@ def fetch_cache_expiry() -> dict[str, datetime]:
         offset += 1000
 
 
+def fetch_demand_terms(days: int = 14, max_rows: int = 3000) -> dict[str, int]:
+    """Son `days` gunde en cok aranan sorgular (user_events.url_search). Hata -> bos."""
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    try:
+        resp = requests.get(
+            f"{cache.SUPABASE_URL}/rest/v1/user_events",
+            headers=cache._headers(),
+            params={"select": "payload", "event_type": "eq.url_search",
+                    "created_at": f"gt.{since}", "order": "created_at.desc", "limit": max_rows},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return dict(count_search_terms(resp.json()))
+    except Exception as exc:  # noqa: BLE001
+        print(f"uyari: arama talebi okunamadi ({type(exc).__name__}) -- sadece sabit listeler taranacak")
+        return {}
+
+
 def _priority_rank() -> dict[str, int]:
     """GSC'de gosterim alan /fiyat slug'lari -> sira (0 = en cok gosterim)."""
     import json
@@ -85,7 +104,7 @@ def _priority_rank() -> dict[str, int]:
         return {}
 
 
-def pick_terms(expiry: dict[str, datetime], limit: int) -> list[dict]:
+def pick_terms(expiry: dict[str, datetime], limit: int, demand: dict[str, int] | None = None) -> list[dict]:
     now = datetime.now(timezone.utc)
     boost = _priority_rank()
     epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -124,6 +143,21 @@ def pick_terms(expiry: dict[str, datetime], limit: int) -> list[dict]:
         candidates.append({"slug": "x:" + term.replace(" ", "-"), "query": query, "key": key,
                            "category": category,
                            "priority": (0, -1, 0 if expires_at is None else 1, expires_at or epoch)})
+    # Gercek kullanici aramalari (user_events): en yuksek oncelik, cok aranandan aza.
+    # Onbellekte olmayan sorgu canlida tek magaza dondurur; bir kez aranan sorgu
+    # sonraki turda cok magazali hazir olur.
+    for term, count in sorted((demand or {}).items(), key=lambda kv: -kv[1]):
+        query = normalize_turkish_search_query(term)
+        key, category = _price_page_cache_key(query)
+        if key in seo_keys:
+            continue
+        expires_at = expiry.get(key)
+        if expires_at and expires_at > now + timedelta(hours=SKIP_IF_FRESH_FOR_HOURS):
+            continue
+        seo_keys.add(key)
+        candidates.append({"slug": "d:" + term.replace(" ", "-"), "query": query, "key": key,
+                           "category": category,
+                           "priority": (0, -2, -count, expires_at or epoch)})
     candidates.sort(key=lambda c: c["priority"])
     return candidates[:limit]
 
@@ -181,7 +215,9 @@ async def main_async(limit: int, ttl_hours: int, dry_run: bool) -> int:
         return 1
 
     expiry = fetch_cache_expiry()
-    items = pick_terms(expiry, limit)
+    demand = fetch_demand_terms()
+    items = pick_terms(expiry, limit, demand)
+    print(f"gercek arama talebi: {len(demand)} benzersiz sorgu (son 14 gun)")
     print(f"cache'te {len(expiry)} kayit; bu turda {len(items)} terim taranacak "
           f"(ttl={ttl_hours}s, dry_run={dry_run})")
 

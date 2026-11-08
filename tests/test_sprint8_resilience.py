@@ -507,7 +507,9 @@ class TestChaosRunner(unittest.TestCase):
             with mock.patch.object(self.runner, "_persist_start", return_value=1):
                 self.runner.start("auto_exp", "replicate", FaultType.ERROR, duration_sec=0)
         # duration_sec=0 → already expired
-        time.sleep(0.01)
+        # Windows'ta monotonic saat ~15.6 ms adimla ilerler; 10 ms uyku bazen
+        # saati hic ilerletmiyor ve test rastgele kiriliyordu.
+        time.sleep(0.05)
         exp = self.runner.get_active_experiment("replicate")
         self.assertIsNone(exp)
 
