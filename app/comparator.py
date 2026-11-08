@@ -3965,22 +3965,23 @@ def generate_search_suggestion(query: str) -> str | None:
         "kullaklık": "kulaklık"
     }
     
-    for k, v in synonyms.items():
-        if k in query_lower:
-            return query_lower.replace(k, v)
-            
+    # Yalnizca TAM kelime eslesmesi: "samsun" -> "samsung" duzeltmesi zaten dogru
+    # yazilmis "samsung" icinde calisip "samsungg" uretiyordu.
+    tokens = query_lower.split()
+    if any(t in synonyms for t in tokens):
+        return " ".join(synonyms.get(t, t) for t in tokens)
+
     match = re.search(r"(\b[a-zA-Z\s]+)\s+(\d+)\b", query)
     if match:
         name = match.group(1).strip()
         num = int(match.group(2))
-        
-        if name.lower() == "iphone" and num > 16:
-            return f"{name} 16"
-        elif name.lower() == "iphone" and num > 15:
-            return f"{name} 15"
-        elif num > 1:
-            return f"{name} {num - 1}"
-            
+
+        # Yalnizca bilinen "en son model" kisitlari. Eskiden her sayili sorgu
+        # bir eksiltiliyordu ("airpods pro 2" -> "airpods pro 1"): kullaniciya
+        # var olmayan/istemedigi model oneriliyordu.
+        if name.lower() == "iphone" and num > 17:
+            return f"{name} 17"
+
     words = query.split()
     if len(words) > 1:
         return " ".join(words[:-1])

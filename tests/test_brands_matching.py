@@ -228,3 +228,18 @@ def test_amazon_fashion_card_title_joins_brand_and_name(monkeypatch):
     monkeypatch.setattr(cmp.requests, "get", lambda *a, **k: R())
     out = cmp.search_amazon_tr("nike air max")
     assert out and out[0]["title"] == "Nike Air Max 90 Erkek Ayakkabı" and out[0]["price"] == 3089.23
+
+
+# ── Arama önerisi ────────────────────────────────────────────
+
+@pytest.mark.parametrize("query,expected", [
+    ("samsung galaxy s24", "samsung galaxy"),     # model numarasi eksiltilmez, son kelime atilir
+    ("airpods pro 2", "airpods pro"),
+    ("samsun telefon", "samsung telefon"),        # gercek yazim hatasi duzelir
+    ("samsung telefon", "samsung"),               # dogru yazilmis kelime bozulmaz ("samsungg" olmaz)
+    ("iphone 20", "iphone 17"),
+    ("kitap", None),
+])
+def test_generate_search_suggestion(query, expected):
+    from app.comparator import generate_search_suggestion
+    assert generate_search_suggestion(query) == expected
