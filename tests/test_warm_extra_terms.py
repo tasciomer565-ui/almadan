@@ -42,3 +42,33 @@ def test_pick_terms_includes_extras_first_and_skips_fresh():
     fresh = {target["key"]: datetime.now(timezone.utc) + timedelta(hours=40)}
     again = warm.pick_terms(fresh, limit=10_000)
     assert target["key"] not in {c["key"] for c in again}
+
+
+# ── Gerçek arama talebi ──────────────────────────────────────
+
+def test_count_search_terms_normalizes_and_filters():
+    from app.warm_demand import count_search_terms
+
+    events = [
+        {"payload": {"query": "iPhone 15"}},
+        {"payload": {"query": "  iphone   15 "}},
+        {"payload": {"query": "https://www.trendyol.com/x"}},   # URL yapıştırma
+        {"payload": {"query": "ab"}},                            # çok kısa
+        {"payload": {"query": "12345"}},                         # harf yok
+        {"payload": {"query": "x" * 80}},                        # çok uzun
+        {"payload": {}},
+        {"payload": None},
+        {},
+        {"payload": {"query": "pınar süt"}},
+    ]
+    counts = count_search_terms(events)
+    assert counts == {"iphone 15": 2, "pınar süt": 1}
+
+
+def test_pick_terms_puts_demand_first_by_count():
+    warm = _load_warm_script()
+    demand = {"nadir aranan ozel urun xyz": 1, "cok aranan ozel urun abc": 9}
+    picked = warm.pick_terms({}, limit=10_000, demand=demand)
+    d_items = [c for c in picked if c["slug"].startswith("d:")]
+    assert [c["slug"] for c in d_items] == ["d:cok-aranan-ozel-urun-abc", "d:nadir-aranan-ozel-urun-xyz"]
+    assert picked[0]["slug"] == d_items[0]["slug"] and picked[1]["slug"] == d_items[1]["slug"]

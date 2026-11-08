@@ -170,3 +170,59 @@ def test_search_results_annotated_with_match_groups():
     assert items[0].match_group_id == items[1].match_group_id == items[3].match_group_id is not None
     assert items[1].is_group_cheapest and not items[0].is_group_cheapest
     assert items[2].match_group_id is None and not items[2].is_group_cheapest
+
+
+# ── Sorguya göre alaka süzgeci ───────────────────────────────
+
+@pytest.mark.parametrize("query,title,ok", [
+    ("iphone 15", "Apple iPhone 15 128 GB (Apple Türkiye Garantili)", True),
+    ("iphone 15", "Apple iPhone 14 128 GB", False),
+    ("iphone 15", "Apple iPhone 17e 256GB Akıllı Telefon", False),
+    ("iphone 15", "Apple iPhone 15 Pro Max 256 GB", False),
+    ("samsung galaxy s24", "SAMSUNG Galaxy S24 5G 8 GB 256 GB Akıllı Telefon", True),
+    ("samsung galaxy s24", "Samsung Galaxy S25 FE 256GB", False),
+    ("samsung galaxy s24", "Samsung Galaxy S24 Ultra Uyumlu Type-c Kulaklık", False),
+    ("airpods pro 2", "Apple AirPods Pro (2. Nesil)", True),
+    ("airpods pro 2", "AirPods Pro 2. Nesil için 3 Çift Yedek Kulak Uçları", False),
+    ("airpods pro 2", "Pro 2 Airpods Pro 2 Görünümlü Premium Kulaklık", False),
+    ("airpods pro 2", "Apple AirPods 5", False),
+    ("iphone 15 256 gb", "Apple iPhone 15 128 GB", False),
+    ("iphone 15", "Nike", False),
+    ("nike air max", "Nike Air Max 270 Siyah Erkek Sneaker", True),   # genel sorgu: süzgeç karışmaz
+    ("pinar sut 1 lt", "Pınar Süt %1 Yağlı 1 L", True),
+    ("pinar sut 1 lt", "Pınar Süt 500 ml", False),
+])
+def test_title_matches_query(query, title, ok):
+    from app.brands import title_matches_query
+    assert title_matches_query(query, title) is ok
+
+
+def test_filter_relevant_products_falls_back_when_nothing_matches():
+    from app.brands import filter_relevant_products
+
+    items = [{"title": "PlayStation 5 Konsol"}, {"title": "PS5 Oyun"}]
+    assert filter_relevant_products("ps4 pro 1000", items) == items  # hiçbiri uymaz -> dokunma
+    kept = filter_relevant_products("iphone 15", [{"title": "Apple iPhone 15 128 GB"}, {"title": "Apple iPhone 14"}])
+    assert [p["title"] for p in kept] == ["Apple iPhone 15 128 GB"]
+
+
+def test_plus_sign_is_a_variant():
+    from app.brands import title_matches_query
+    assert not title_matches_query("samsung galaxy s24", "SAMSUNG Galaxy S24+ 12 GB 256 GB Akıllı Telefon")
+    assert title_matches_query("samsung galaxy s24 plus", "SAMSUNG Galaxy S24+ 12 GB 256 GB Akıllı Telefon")
+
+
+def test_amazon_fashion_card_title_joins_brand_and_name(monkeypatch):
+    """Amazon moda kartında marka ve ürün adı ayrı h2'lerde; başlık 'Nike' kalmamalı."""
+    import app.comparator as cmp
+
+    html = """<div data-component-type="s-search-result" data-asin="B0TEST">
+      <h2><span>Nike</span></h2><h2 aria-label="x"><span>Air Max 90 Erkek Ayakkabı</span></h2>
+      <span class="a-price"><span class="a-offscreen">3.089,23 TL</span></span></div>"""
+
+    class R:
+        status_code, ok, text = 200, True, html
+
+    monkeypatch.setattr(cmp.requests, "get", lambda *a, **k: R())
+    out = cmp.search_amazon_tr("nike air max")
+    assert out and out[0]["title"] == "Nike Air Max 90 Erkek Ayakkabı" and out[0]["price"] == 3089.23

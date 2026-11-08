@@ -84,7 +84,10 @@ BRANDS: dict[str, dict[str, Any]] = {
 
 
 def _norm(text: str) -> str:
-    return re.sub(r"\s+", " ", normalize_turkish(text or "")).strip()
+    text = normalize_turkish(text or "")
+    # "S24+" / "iPhone 15 +" ayri bir urun (Plus); "+" varyant kelimesine cevrilir.
+    text = re.sub(r"(?<=[a-z0-9])\s?\+", " plus", text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 # Takma ad -> slug; uzun takma adlar önce denensin diye uzunluğa göre sıralı.
@@ -303,3 +306,72 @@ def summarize_brand_products(
         })
     result.sort(key=lambda g: (-g["store_count"], g["min_price"]))
     return result[:limit]
+
+
+# ── Sorguya göre alaka süzgeci ───────────────────────────────
+# Mağaza arama motorları "iphone 15" için iPhone 14/17, kılıf, kablo ve "AirPods
+# görünümlü" taklitleri de döndürüyor; en ucuz etiketi bunlara düşünce kullanıcı
+# güveni bozuluyor. Model/numara içeren (spesifik) sorgularda başlık da aynı
+# modeli, aynı varyantı ve uyumlu ölçüleri taşımalıdır.
+
+_TOKEN_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+_NOISE_TOKENS = frozenset({
+    "uyumlu", "gorunumlu", "benzeri", "muadil", "yedek", "uclari", "ucu",
+    "kilif", "kilifi", "kablo", "kablosu", "adaptor", "koruyucu", "tutucu",
+    "standi", "aparat", "aparati", "sticker", "etiket",
+})
+
+
+def _title_tokens(title: str) -> list[str]:
+    return _TOKEN_RE.findall(_SPEC_RE.sub(" ", _norm(title)))
+
+
+def _query_numbers(query: str) -> set[str]:
+    """Sorguda tek başına duran 1-3 haneli sayılar ("iphone 15" -> {"15"})."""
+    return {t for t in _title_tokens(query) if t.isdigit() and len(t) <= 3}
+
+
+def is_specific_query(query: str) -> bool:
+    sig = product_signature(query)
+    return bool(sig.models or _query_numbers(query))
+
+
+def title_matches_query(query: str, title: str) -> bool:
+    """Başlık, sorgunun istediği model/varyant/ölçüyü taşıyor mu."""
+    q_sig, t_sig = product_signature(query), product_signature(title)
+    q_numbers = _query_numbers(query)
+    tokens = set(_title_tokens(title))
+
+    # Başlık yalnızca marka adından ibaretse (ör. "Nike") doğrulanamaz.
+    if len(tokens) <= 1 and extract_brand(title):
+        return False
+
+    if q_sig.brand and t_sig.brand and q_sig.brand != t_sig.brand:
+        return False
+    if _specs_conflict(q_sig, t_sig):
+        return False
+
+    specific = bool(q_sig.models or q_numbers)
+    if not specific:
+        return True  # genel sorgu ("nike air max"): mevcut süzgeçlere bırak
+
+    if not q_sig.models <= tokens or not q_numbers <= tokens:
+        return False
+    if q_sig.variants != t_sig.variants:
+        return False
+    query_tokens = set(_title_tokens(query))
+    if (tokens & _NOISE_TOKENS) - query_tokens:
+        return False
+    return True
+
+
+def filter_relevant_products(
+    query: str,
+    products: list[dict[str, Any]],
+    title_key: str = "title",
+) -> list[dict[str, Any]]:
+    """Sorguya uymayan ürünleri eler. Hiçbiri uymazsa (ör. sorgudaki kod
+    mağazalarda farklı yazılıyor) listeyi olduğu gibi döndürür -- boş sayfa
+    göstermektense mevcut süzgeçlerin davranışı korunur."""
+    kept = [p for p in products if title_matches_query(query, str(p.get(title_key) or ""))]
+    return kept or products
