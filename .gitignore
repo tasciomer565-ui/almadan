@@ -15,3 +15,8 @@ n11_typo.html
 .env*
 .scratch3/
 app_logs/
+
+# Yerel onbellek isitma (anahtar + sanal ortam)
+.env.warm
+.venv-warm/
+app_logs/warm_local.log
