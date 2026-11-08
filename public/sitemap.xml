@@ -766,22 +766,7 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/acer</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/acer-kulaklik</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/acer-monitor</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/acer-mouse</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -1111,6 +1096,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/altin-ocak</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/altin-pantolon</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -1241,12 +1231,12 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/altin-wok</loc>
+    <loc>https://www.almadan.app/fiyat/altin-yastik</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/altin-yastik</loc>
+    <loc>https://www.almadan.app/fiyat/altin-yatak</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -1327,16 +1317,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/apple-laptop</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/apple-mouse</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/apple-tv</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -1461,11 +1441,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/ayakkabi</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/ayran</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -1557,11 +1532,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/bej-blender</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/bej-blouse</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -1872,11 +1842,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/bej-pantolon</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/bej-parka</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -2576,6 +2541,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/beyaz-sort</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/beyaz-spor-ayakkabi</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -2861,11 +2831,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/bordo-couch</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/bordo-cuzdan</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -2882,11 +2847,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/bordo-dolap</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/bordo-dus</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -2996,11 +2956,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/bordo-kettle</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/bordo-kilim</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -3051,11 +3006,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/bordo-mikrodalga</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/bordo-mikser</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -3092,6 +3042,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/bordo-ocak</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/bordo-overall</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -3176,6 +3131,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/bordo-sock</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/bordo-spor-ayakkabi</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -3197,6 +3157,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/bordo-sweatshirt</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/bordo-t-shirt</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -3242,11 +3207,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/bordo-tuvalet</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/bordo-utu</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -4461,6 +4421,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/gri-kulot</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/gri-lamba</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -4477,6 +4442,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/gri-masa</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/gri-mavi</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -4616,6 +4586,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/gri-sort</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/gri-spor-ayakkabi</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -4637,6 +4612,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/gri-sweatshirt</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/gri-t-shirt</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -5666,6 +5646,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/haki-overall</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/haki-pantolon</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -5682,11 +5667,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/haki-pierre-cardin</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/haki-pike</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -6147,11 +6127,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/kadin-gozluk</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/kadin-hirka</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -6766,6 +6741,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/kahverengi-shoe</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/kahverengi-skirt</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -7091,11 +7071,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/kirmizi-boot</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/kirmizi-bornoz</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -7152,11 +7127,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/kirmizi-cerceve</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/kirmizi-cizme</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -7397,6 +7367,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/kirmizi-pantolon</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/kirmizi-parka</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -7677,11 +7652,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/koton</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/koton-ayakkabi</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -8566,11 +8536,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/lacivert-rug</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/lacivert-saat</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -8586,6 +8551,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/lacivert-sapka</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/lacivert-shirt</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -8597,11 +8567,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/lacivert-spor-ayakkabi</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/lacivert-stor-perde</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -9146,11 +9111,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/mavi-bulasik-makinesi</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/mavi-buzdolabi</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -9177,11 +9137,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/mavi-ceket</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/mavi-cerceve</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -9222,11 +9177,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/mavi-dress</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/mavi-duduklu</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -9551,11 +9501,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/mavi-shoe</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/mavi-sirt-cantasi</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -9632,11 +9577,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/mavi-tisort</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/mavi-toaster</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -9736,6 +9676,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/mobilya</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/monster-hoparlor</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -9807,11 +9752,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/mor-bermuda</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/mor-bicak</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -9981,6 +9921,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/mor-hoodie</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/mor-iron</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -10132,11 +10077,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/mor-paspas</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/mor-perde</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -11366,11 +11306,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/samsung-telefon</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/sandalet</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -11392,6 +11327,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/sari-ayakkabi</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/sari-banyo</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -11502,11 +11442,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/sari-defacto</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/sari-dekorasyon</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -11691,11 +11626,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.almadan.app/fiyat/sari-mont</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://www.almadan.app/fiyat/sari-mop</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -11737,11 +11667,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/sari-pierre-cardin</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/sari-pike</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -12242,11 +12167,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/siyah-fashion</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/siyah-firin</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -13781,6 +13701,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/turuncu-lcw</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/turuncu-led</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -13936,6 +13861,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://www.almadan.app/fiyat/turuncu-sort</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.almadan.app/fiyat/turuncu-spor-ayakkabi</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -13952,6 +13882,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/turuncu-sweatshirt</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/turuncu-t-shirt</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -14052,11 +13987,6 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/under-armour</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://www.almadan.app/fiyat/vakko</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -14617,6 +14547,11 @@
   </url>
   <url>
     <loc>https://www.almadan.app/fiyat/yesil-shirt</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.almadan.app/fiyat/yesil-shoe</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
