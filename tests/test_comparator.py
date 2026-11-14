@@ -295,10 +295,11 @@ def test_postprocess_brand_query_single_store_keeps_count():
     assert sources == ["n11"] * 6  # marka sorgusu artik 12'ye kadar
 
 
-def test_postprocess_limits_brand_query_to_12_and_model_query_to_5():
-    many = _sony("n11", 9, 8000, "XB") + _sony("amazon", 9, 7000, "XE")
-    assert len(postprocess_search_products("sony hoparlör", [dict(p) for p in many])) == 12
-    assert len(postprocess_search_products("sony hoparlör 13", [dict(p) for p in many])) <= 5
+def test_postprocess_limits_brand_query_to_18_and_model_query_to_16():
+    # Limitler 5/12'den 16/18'e cikarildi: /fiyat sayfalari az urunle ince kaliyordu.
+    many = _sony("n11", 12, 8000, "XB") + _sony("amazon", 12, 7000, "XE")
+    assert len(postprocess_search_products("sony hoparlör", [dict(p) for p in many])) == 18
+    assert len(postprocess_search_products("sony hoparlör 13", [dict(p) for p in many])) <= 16
 
 
 # ── N11: once dogrudan, olmazsa proxy ────────────────────────

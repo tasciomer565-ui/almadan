@@ -644,8 +644,8 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         # Kitap/genel
         search_kitapyurdu, search_dr, search_remzi, search_idefix,
         search_muzikdunyasi, search_ufukkirtasiye, search_ofissepeti,
-        # Pazaryeri (uluslararası)
-        search_pazarama, search_aliexpress, search_temu,
+        # Pazaryeri (ek)
+        search_ciceksepeti,
         # Ek: evcil hayvan, takviye
         search_evpet, search_petbis, search_petlebi, search_zopet,
         search_proteinocean, search_supplementler, search_runnutrition,
@@ -659,9 +659,7 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         loop.run_in_executor(_SCAN_EXECUTOR, search_amazon_tr, query),
         loop.run_in_executor(_SCAN_EXECUTOR, search_trendyol_direct, query),
         loop.run_in_executor(_SCAN_EXECUTOR, search_hepsiburada_direct, query),
-        loop.run_in_executor(_SCAN_EXECUTOR, search_pazarama, query),
-        loop.run_in_executor(_SCAN_EXECUTOR, search_aliexpress, query),
-        loop.run_in_executor(_SCAN_EXECUTOR, search_temu, query),
+        loop.run_in_executor(_SCAN_EXECUTOR, search_ciceksepeti, query),
     ]
 
     # Kategoriye göre uzman mağazalar
@@ -746,7 +744,7 @@ async def marketplace_scan(query: str, fallback: bool = False, forced_category: 
         # limiti 60s olduğu için (vercel.json) 13s'e çıkarıldı -- AI doğrulama
         # ve diğer işler için hâlâ bolca pay kalıyor.
         results_raw = await asyncio.wait_for(
-            asyncio.gather(*all_tasks, return_exceptions=True), timeout=13.0
+            asyncio.gather(*all_tasks, return_exceptions=True), timeout=9.5
         )
     except asyncio.TimeoutError:
         # Süre dolduğunda o ana kadar biten task'ların sonucunu kullan, geri kalanı iptal et.

@@ -22,13 +22,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SCRAPER_SECRET = os.getenv("SCRAPER_SECRET", "")
+import hmac
+
+SCRAPER_SECRET = os.getenv("SCRAPER_SECRET", "").strip()
 
 
 def _auth(secret: str) -> bool:
     if not SCRAPER_SECRET:
         return True
-    return secret == SCRAPER_SECRET
+    return bool(secret) and hmac.compare_digest(secret, SCRAPER_SECRET)
 
 
 @app.get("/health")
@@ -53,3 +55,32 @@ async def scrape(
     except Exception as e:
         logger.error("Scrape error: %s", e)
         return {"products": [], "count": 0, "error": str(e)}
+
+
+@app.get("/parse-url")
+def parse_url(
+    url: str = Query(..., min_length=1),
+    secret: str = Query(""),
+):
+    """Tek bir ürün linkini bu servisin ağından parse eder."""
+    if not _auth(secret):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    from app.parser import parse_product_url
+    try:
+        parsed = parse_product_url(url)
+        return {
+            "title": parsed.title,
+            "price": parsed.price,
+            "image_url": parsed.image_url,
+            "source": parsed.source,
+            "canonical_url": parsed.canonical_url,
+            "confidence": parsed.confidence,
+            "warnings": parsed.warnings,
+            "original_price": parsed.original_price,
+            "extra_info": parsed.extra_info,
+        }
+    except Exception as e:
+        logger.error("Parse-url error: %s", e)
+        return {"error": str(e)}

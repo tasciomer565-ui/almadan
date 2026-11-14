@@ -3,11 +3,11 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.security import DEFAULT_B2B_API_KEY
+import os
 
 client = TestClient(app)
 
-VALID_HEADERS = {"X-API-Key": DEFAULT_B2B_API_KEY}
+VALID_HEADERS = {"X-API-Key": os.environ["B2B_API_KEY"]}  # tests/conftest.py tanimlar
 
 
 def test_b2b_lookup_missing_api_key_returns_401():

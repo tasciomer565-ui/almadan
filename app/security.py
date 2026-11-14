@@ -33,7 +33,11 @@ _CSRF_SECRET = (
     or secrets.token_hex(32)
 )
 _ENV = os.getenv("VERCEL_ENV", "development")
-_IS_PROD = _ENV == "production"
+# Uretim ortami: Render (RENDER env'ini Render kendisi set eder) veya Vercel production.
+# Eskiden yalnizca VERCEL_ENV bakiliyordu; Render'a gecince HSTS ve Secure cookie
+# sessizce kapanmisti.
+IS_PRODUCTION = bool(os.getenv("RENDER")) or _ENV == "production"
+_IS_PROD = IS_PRODUCTION
 
 # ── Security Headers ────────────────────────────────────────
 
@@ -274,11 +278,20 @@ require_admin   = RequireRole("admin")
 
 # ── Supabase JWT / GoTrue Kimlik Doğrulama (require_auth_user) ─
 
+# Gomulu varsayilan anahtar KALDIRILDI: depo herkese acik oldugu icin o anahtarla
+# herkes gecerli JWT uretebilirdi. Ortam degiskeni yoksa surec basina rastgele bir
+# anahtar uretilir -- sahte token imzalanamaz; yerelde uretilen token'lar yeniden
+# baslatmaya kadar gecerlidir. Uretimde SUPABASE_JWT_SECRET mutlaka tanimlanmalidir.
 SUPABASE_JWT_SECRET = (
     os.getenv("SUPABASE_JWT_SECRET", "").strip()
     or os.getenv("JWT_SECRET", "").strip()
-    or "almadan_supabase_gotrue_jwt_secret_2026_default_key"
 )
+if not SUPABASE_JWT_SECRET:
+    SUPABASE_JWT_SECRET = secrets.token_urlsafe(48)
+    logger.warning(
+        "SUPABASE_JWT_SECRET tanimli degil -- gecici rastgele anahtar kullaniliyor; "
+        "Supabase oturum token'lari yerel olarak dogrulanamayacak."
+    )
 
 
 def create_access_jwt(
@@ -289,6 +302,7 @@ def create_access_jwt(
     """Supabase GoTrue uyumlu HS256 JWT üretir."""
     import jwt as _pyjwt
 
+    secret = SUPABASE_JWT_SECRET or _CSRF_SECRET
     now = int(time.time())
     payload = {
         "sub": str(user_id),
@@ -299,7 +313,7 @@ def create_access_jwt(
         "iat": now,
         "exp": now + expires_in,
     }
-    return _pyjwt.encode(payload, SUPABASE_JWT_SECRET, algorithm="HS256")
+    return _pyjwt.encode(payload, secret, algorithm="HS256")
 
 
 async def require_auth_user(request: Request) -> dict[str, Any]:
@@ -336,36 +350,38 @@ async def require_auth_user(request: Request) -> dict[str, Any]:
             detail="Boş Bearer token gönderildi.",
         )
 
-    # 3. Yerel HS256 Supabase JWT imza doğrulaması
-    try:
-        decoded = _pyjwt.decode(
-            token,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            options={"verify_aud": False},
-        )
-        uid = decoded.get("sub") or decoded.get("user_id") or decoded.get("id")
-        if not uid:
+    # 3. Yerel HS256 JWT imza doğrulaması — create_access_jwt ile AYNI anahtar
+    _verify_secret = SUPABASE_JWT_SECRET or _CSRF_SECRET
+    if _verify_secret:
+        try:
+            decoded = _pyjwt.decode(
+                token,
+                _verify_secret,
+                algorithms=["HS256"],
+                options={"verify_aud": False},
+            )
+            uid = decoded.get("sub") or decoded.get("user_id") or decoded.get("id")
+            if not uid:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="JWT içerisinde geçerli kullanıcı kimliği ('sub') bulunamadı.",
+                )
+            request.state.user_id = str(uid)
+            request.state.user_email = decoded.get("email")
+            return {
+                "id": str(uid),
+                "sub": str(uid),
+                "user_id": str(uid),
+                "email": decoded.get("email"),
+                "role": decoded.get("role", "authenticated"),
+            }
+        except _pyjwt.ExpiredSignatureError as exc:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="JWT içerisinde geçerli kullanıcı kimliği ('sub') bulunamadı.",
-            )
-        request.state.user_id = str(uid)
-        request.state.user_email = decoded.get("email")
-        return {
-            "id": str(uid),
-            "sub": str(uid),
-            "user_id": str(uid),
-            "email": decoded.get("email"),
-            "role": decoded.get("role", "authenticated"),
-        }
-    except _pyjwt.ExpiredSignatureError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Oturum süresi (JWT) dolmuş.",
-        ) from exc
-    except _pyjwt.InvalidTokenError:
-        pass
+                detail="Oturum süresi (JWT) dolmuş.",
+            ) from exc
+        except _pyjwt.InvalidTokenError:
+            pass
 
     # 4. Bulut Supabase GoTrue /auth/v1/user üzerinden doğrulama fallback'i
     from app.auth import AuthError, auth_enabled, get_user
@@ -426,6 +442,7 @@ _ADMIN_SECRET_BYPASS_PATHS = {
     "/api/admin/system-progress",
     "/api/admin/business-metrics",
     "/api/admin/user-details",
+    "/api/admin/sync-google-sheets",
 }
 _ADMIN_SECRET_BYPASS_PREFIXES = (
     "/api/admin/products/",
@@ -524,15 +541,9 @@ def check_rate_limit_key(key: str, limit: int, window_seconds: int) -> None:
 # Basit, ücretsiz, rate-limited salt-okunur API ve Ne Giysem B2B Köprüsü için X-API-Key doğrulaması.
 # Anahtarlar Supabase'deki api_keys tablosunda veya kurumsal B2B anahtar havuzunda (sha256) tutulur.
 
-DEFAULT_B2B_API_KEY = "alm_b2b_ne_giysem_2026_secret"
-
-_B2B_PARTNER_KEYS: dict[str, dict[str, Any]] = {
-    hashlib.sha256(DEFAULT_B2B_API_KEY.encode()).hexdigest(): {
-        "label": "Ne Giysem B2B Partner Bridge",
-        "active": True,
-        "partner": "ne_giysem",
-    },
-}
+# Gomulu B2B partner anahtari KALDIRILDI (herkese acik depoda duruyordu).
+# Partner anahtari yalnizca B2B_API_KEY / NE_GIYSEM_API_KEY ortam degiskeninden
+# veya Supabase api_keys tablosundan gelir.
 
 
 def hash_api_key(raw_key: str) -> str:
@@ -568,14 +579,7 @@ async def require_api_key(request: Request) -> dict:
         check_rate_limit(request, f"public_api:{key_hash}", limit=120, window_seconds=60)
         return key_row
 
-    # 2. Ön tanımlı B2B Partner ("Ne Giysem") anahtar doğrulaması (Timing-attack korumalı)
-    for partner_hash, meta in _B2B_PARTNER_KEYS.items():
-        if hmac.compare_digest(partner_hash, key_hash) and meta.get("active", False):
-            key_row = {"key_hash": key_hash, **meta}
-            check_rate_limit(request, f"public_api:{key_hash}", limit=120, window_seconds=60)
-            return key_row
-
-    # 3. Supabase api_keys tablosu kontrolü
+    # 2. Supabase api_keys tablosu kontrolü
     rows = []
     if supabase_enabled():
         try:

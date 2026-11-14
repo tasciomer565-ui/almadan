@@ -1827,7 +1827,7 @@ async function renderSavingsCharts() {
 
   const productSavings = state.products
     .map((product) => ({
-      label: product.title.length > 24 ? `${product.title.slice(0, 24)}â€¦` : product.title,
+      label: product.title.length > 24 ? `${product.title.slice(0, 24)}…` : product.title,
       value: Math.max(
         0,
         (product.price_history[0]?.price || product.current_price) - product.current_price,
@@ -1972,7 +1972,7 @@ function renderReceiptHistory() {
         <div class="receipt-history-heading">
           <div>
             <h4>${escapeHtml(receipt.store)}</h4>
-            <p>${formatReceiptDate(receipt.purchased_at)} Â· ${receipt.items?.length || 0} ürün Â·
+            <p>${formatReceiptDate(receipt.purchased_at)} · ${receipt.items?.length || 0} ürün ·
               ${paymentLabels[receipt.payment_method] || "Ödeme belirtilmedi"}</p>
           </div>
           <strong class="receipt-history-total">${currency.format(receipt.total || 0)}</strong>
@@ -2150,6 +2150,12 @@ async function parseProduct(event) {
       }, 1300);
 
       try {
+        // Barkod numarası mı girildi? (8, 12, 13 veya 14 haneli rakam)
+        const digitsOnly = val.replace(/[\s\-]/g, "");
+        if (/^\d{8}$|^\d{12,14}$/.test(digitsOnly)) {
+          await searchByBarcode(digitsOnly);
+          return;
+        }
         if (isUrl(val)) {
           const parsed = await api("/parse-url", {
             method: "POST",
@@ -2170,12 +2176,8 @@ async function parseProduct(event) {
           }
           showSellerSelectionDialog(parsed);
         } else {
-          // URL değil — isimle arama KAPALI (yanlış/yanıltıcı eşleşme riski
-          // yüzünden bilinçli karar, 2026-07-10). Sistem yalnızca ürün linki
-          // ile kesin sonuç verir; kullanıcıya rehberi göster.
-          if (overlay) overlay.style.display = "none";
-          showToast("Lütfen bir ürün linki yapıştır — isimle arama desteklenmiyor.");
-          showLinkGuide(true);
+          // URL değil — doğrudan ürün ismi ile çoklu mağaza araması çalıştır
+          await runTextProductSearch(val, { overlay, progressText });
           return;
         }
       } catch (error) {
@@ -2213,6 +2215,11 @@ async function parseProduct(event) {
 async function runTextProductSearch(query, options = {}) {
   const q = String(query || "").trim();
   if (!q) return;
+  const digitsOnly = q.replace(/[\s\-]/g, "");
+  if (/^\d{8}$|^\d{12,14}$/.test(digitsOnly)) {
+    await searchByBarcode(digitsOnly);
+    return;
+  }
   saveToSearchHistory(q);
 
   const overlay = options.overlay || document.getElementById("quantumScanOverlay");
@@ -2402,11 +2409,105 @@ async function warmSlowStoresAfterSearch(response) {
   }
 }
 
+function renderMarketAnalysisBanner(analysis) {
+  if (!analysis || !analysis.available) return "";
+
+  const palette = {
+    AL:    { bg: "rgba(22, 163, 74, 0.09)", border: "#16a34a", badgeBg: "#16a34a", text: "#15803d", icon: "🟢", label: "ALINIR (GERÇEK FIRSAT)" },
+    MAKUL: { bg: "rgba(37, 99, 235, 0.08)", border: "#2563eb", badgeBg: "#2563eb", text: "#1d4ed8", icon: "🔵", label: "MAKUL FİYAT" },
+    BEKLE: { bg: "rgba(217, 119, 6, 0.09)", border: "#d97706", badgeBg: "#d97706", text: "#b45309", icon: "🟡", label: "BEKLE / RADARA EKLE" },
+    ALMA:  { bg: "rgba(220, 38, 38, 0.09)", border: "#dc2626", badgeBg: "#dc2626", text: "#b91c1c", icon: "🔴", label: "ALMA (ŞİŞİRİLMİŞ FİYAT)" },
+  };
+  const theme = palette[analysis.verdict] || palette.MAKUL;
+
+  const cheapStore = analysis.cheapest_store ? storeDisplayName(analysis.cheapest_store) : "En Ucuz";
+  const highStore = analysis.highest_store ? storeDisplayName(analysis.highest_store) : "En Pahalı";
+
+  const fakeWarningHtml = analysis.fake_discount_count > 0
+    ? `<div style="margin-top:10px;padding:7px 10px;border-radius:6px;background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.28);color:#b91c1c;font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:6px;">
+         <i data-lucide="shield-alert" style="width:14px;height:14px;flex-shrink:0;"></i>
+         <span>Sahte İndirim Denetimi: ${analysis.fake_discount_count} satıcıda şişirilmiş eski fiyat tespit edildi!</span>
+       </div>`
+    : `<div style="margin-top:10px;padding:6px 10px;border-radius:6px;background:rgba(22,163,74,0.08);border:1px solid rgba(22,163,74,0.2);color:#15803d;font-size:11px;font-weight:600;display:flex;align-items:center;gap:6px;">
+         <i data-lucide="shield-check" style="width:14px;height:14px;flex-shrink:0;"></i>
+         <span>Sahte İndirim Denetimi: İncelenen ${analysis.store_count || 1} mağazada aldatıcı fiyat şişirmesi görülmedi.</span>
+       </div>`;
+
+  return `
+    <div class="almadan-verdict-card" style="background:${theme.bg};border:1.5px solid ${theme.border};border-radius:10px;padding:14px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="background:${theme.badgeBg};color:#fff;font-size:11px;font-weight:800;padding:4px 10px;border-radius:6px;letter-spacing:0.4px;">
+            ${theme.icon} KARAR: ${escapeHtml(theme.label)}
+          </span>
+          <span style="font-size:12px;font-weight:800;color:${theme.text};background:rgba(255,255,255,0.75);padding:3px 8px;border-radius:6px;border:1px solid ${theme.border}44;">
+            Fırsat Puanı: ${analysis.score}/100
+          </span>
+        </div>
+        <span style="font-size:11px;font-weight:700;color:var(--muted);">
+          ${analysis.store_count || 1} Mağaza · ${analysis.offer_count || 1} Fiyat Kıyaslandı
+        </span>
+      </div>
+
+      <div style="font-size:13.5px;font-weight:800;color:var(--ink);margin-bottom:4px;">
+        ${escapeHtml(analysis.headline || "")}
+      </div>
+      <p style="font-size:12px;color:var(--ink);opacity:0.88;margin:0 0 12px 0;line-height:1.45;">
+        ${escapeHtml(analysis.summary || "")}
+      </p>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:rgba(255,255,255,0.82);padding:10px;border-radius:8px;border:1px solid rgba(0,0,0,0.07);">
+        <div style="text-align:center;">
+          <div style="font-size:10px;font-weight:700;color:#15803d;text-transform:uppercase;">En Ucuz</div>
+          <div style="font-size:14px;font-weight:800;color:#15803d;margin-top:2px;">${currency.format(analysis.cheapest_price || 0)}</div>
+          <div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(cheapStore)}</div>
+        </div>
+        <div style="text-align:center;border-left:1px solid rgba(0,0,0,0.08);border-right:1px solid rgba(0,0,0,0.08);">
+          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;">Piyasa Medyanı</div>
+          <div style="font-size:14px;font-weight:800;color:var(--ink);margin-top:2px;">${currency.format(analysis.median_price || 0)}</div>
+          <div style="font-size:10px;color:var(--muted);">Adil Değer</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:10px;font-weight:700;color:#b91c1c;text-transform:uppercase;">En Yüksek</div>
+          <div style="font-size:14px;font-weight:800;color:#b91c1c;margin-top:2px;">${currency.format(analysis.highest_price || 0)}</div>
+          <div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(highStore)}</div>
+        </div>
+      </div>
+
+      ${analysis.max_savings_tl >= 5 ? `
+        <div style="margin-top:8px;font-size:12px;font-weight:800;color:#15803d;text-align:center;">
+          💰 En ucuz mağazayı seçerek tam ${currency.format(analysis.max_savings_tl)} (%${Math.round(analysis.max_savings_pct || 0)}) tasarruf edersin!
+        </div>
+      ` : ""}
+      ${fakeWarningHtml}
+    </div>
+  `;
+}
+
 function showSearchResults(response) {
   const dialog = document.getElementById("productDialog");
   const content = document.getElementById("dialogContent");
 
-  const products = response.products || [];
+  window._lastSearchResponse = response;
+  const allProducts = response.products || [];
+  const activeStoreFilter = response._storeFilter || "ALL";
+  const activeSortMode = response._sortMode || "price_asc";
+
+  let products = allProducts.slice();
+  if (activeStoreFilter !== "ALL") {
+    products = products.filter(p => String(p.source || "").toLowerCase() === activeStoreFilter);
+  }
+  if (activeSortMode === "price_asc") {
+    products.sort((a, b) => (a.extra_info?.out_of_stock ? 1 : 0) - (b.extra_info?.out_of_stock ? 1 : 0) || (a.price || 0) - (b.price || 0));
+  } else if (activeSortMode === "discount_desc") {
+    const disc = (item) => (item.original_price && item.original_price > item.price && !item.extra_info?.fake_discount)
+      ? (item.original_price - item.price) / item.original_price
+      : 0;
+    products.sort((a, b) => disc(b) - disc(a) || (a.price || 0) - (b.price || 0));
+  } else if (activeSortMode === "unit_asc") {
+    products.sort((a, b) => (a.extra_info?.unit_price || 999999) - (b.extra_info?.unit_price || 999999) || (a.price || 0) - (b.price || 0));
+  }
+
   warmSlowStoresAfterSearch(response);
   const suggestion = response.suggestion;
   const originalQuery = response.query || "";
@@ -2437,7 +2538,7 @@ function showSearchResults(response) {
     return;
   }
 
-  if (!products || products.length === 0) {
+  if (!allProducts || allProducts.length === 0) {
     let suggestionHtml = "";
     if (suggestion) {
       suggestionHtml = `
@@ -2520,50 +2621,52 @@ function showSearchResults(response) {
     `;
   }
 
-  const queryCategory = getItemCategory(originalQuery);
-  const isFashion = queryCategory === "fashion" || products.some(p => getItemCategory(p.title) === "fashion");
-  const isElectronics = queryCategory === "electronics" || products.some(p => getItemCategory(p.title) === "electronics");
+  let categoryHeaderHtml = renderMarketAnalysisBanner(response.market_analysis);
 
-  let categoryHeaderHtml = "";
-  if (isFashion) {
-    const isShoe = ["ayakkabi", "ayakkabı", "bot", "çizme", "cizme", "terlik", "sneaker"].some(kw => originalQuery.toLowerCase().includes(kw)) ||
-                   products.some(p => ["ayakkabi", "ayakkabı", "bot", "çizme", "cizme", "terlik", "sneaker"].some(kw => p.title.toLowerCase().includes(kw)));
-
-    categoryHeaderHtml = `
-      <div class="fashion-size-selector-container" style="margin-bottom: 16px; background: var(--bg-card); border: 1px solid var(--line); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <i data-lucide="scissors" style="color: var(--green); width: 16px; height: 16px;"></i>
-          <span style="font-size: 13px; font-weight: 700; color: var(--ink);">Beden / Numara Seçimi:</span>
+  // Mağaza filtreleri ve sıralama barı
+  const storeCounts = {};
+  allProducts.forEach(p => {
+    const k = String(p.source || "other").toLowerCase();
+    storeCounts[k] = (storeCounts[k] || 0) + 1;
+  });
+  const storeKeys = Object.keys(storeCounts);
+  const filterToolbarHtml = allProducts.length > 1 ? `
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;background:rgba(0,0,0,0.025);padding:10px;border-radius:8px;border:1px solid var(--line);">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span style="font-size:11px;font-weight:800;color:var(--muted);">SIRALA:</span>
+          <button type="button" onclick="applySearchSortAndFilter('${escapeHtml(activeStoreFilter)}', 'price_asc')"
+            style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer;border:1px solid ${activeSortMode === 'price_asc' ? '#287a50' : 'var(--line)'};background:${activeSortMode === 'price_asc' ? '#287a50' : '#fff'};color:${activeSortMode === 'price_asc' ? '#fff' : 'var(--ink)'};">
+            En Ucuz Fiyat
+          </button>
+          <button type="button" onclick="applySearchSortAndFilter('${escapeHtml(activeStoreFilter)}', 'discount_desc')"
+            style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer;border:1px solid ${activeSortMode === 'discount_desc' ? '#287a50' : 'var(--line)'};background:${activeSortMode === 'discount_desc' ? '#287a50' : '#fff'};color:${activeSortMode === 'discount_desc' ? '#fff' : 'var(--ink)'};">
+            Gerçek İndirim Oranı
+          </button>
+          <button type="button" onclick="applySearchSortAndFilter('${escapeHtml(activeStoreFilter)}', 'unit_asc')"
+            style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer;border:1px solid ${activeSortMode === 'unit_asc' ? '#287a50' : 'var(--line)'};background:${activeSortMode === 'unit_asc' ? '#287a50' : '#fff'};color:${activeSortMode === 'unit_asc' ? '#fff' : 'var(--ink)'};">
+            Birim Fiyat (Lt/Kg)
+          </button>
         </div>
-        <select id="fashionSizeSelect" class="form-input" style="width: auto; padding: 4px 10px; font-size: 12px; height: auto;" onchange="window.updateFashionPrices(this.value)">
-          ${isShoe ? `
-            <option value="39">39 (Standart)</option>
-            <option value="40">40 (+15 TL)</option>
-            <option value="41">41 (+25 TL)</option>
-            <option value="42">42 (+35 TL)</option>
-          ` : `
-            <option value="S">S (Standart)</option>
-            <option value="M">M (%5 Ekstra)</option>
-            <option value="L">L (%10 Ekstra)</option>
-            <option value="XL">XL (%15 Ekstra)</option>
-          `}
-        </select>
       </div>
-    `;
-  } else if (isElectronics) {
-    categoryHeaderHtml = `
-      <div class="electronics-warranty-filter-container" style="margin-bottom: 16px; background: var(--bg-card); border: 1px solid var(--line); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <i data-lucide="shield-check" style="color: var(--green); width: 16px; height: 16px;"></i>
-          <span style="font-size: 13px; font-weight: 700; color: var(--ink);">Garanti Türü Filtresi:</span>
+      ${storeKeys.length > 1 ? `
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span style="font-size:11px;font-weight:800;color:var(--muted);">MAĞAZA:</span>
+          <button type="button" onclick="applySearchSortAndFilter('ALL', '${escapeHtml(activeSortMode)}')"
+            style="font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:12px;cursor:pointer;border:1px solid ${activeStoreFilter === 'ALL' ? '#287a50' : 'var(--line)'};background:${activeStoreFilter === 'ALL' ? 'rgba(40,122,80,0.12)' : '#fff'};color:${activeStoreFilter === 'ALL' ? '#287a50' : 'var(--ink)'};">
+            Tümü (${allProducts.length})
+          </button>
+          ${storeKeys.map(sk => `
+            <button type="button" onclick="applySearchSortAndFilter('${escapeHtml(sk)}', '${escapeHtml(activeSortMode)}')"
+              style="font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:12px;cursor:pointer;border:1px solid ${activeStoreFilter === sk ? '#287a50' : 'var(--line)'};background:${activeStoreFilter === sk ? 'rgba(40,122,80,0.12)' : '#fff'};color:${activeStoreFilter === sk ? '#287a50' : 'var(--ink)'};">
+              ${escapeHtml(storeDisplayName(sk))} (${storeCounts[sk]})
+            </button>
+          `).join("")}
         </div>
-        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 700; color: var(--ink);">
-          <input type="checkbox" id="warrantyFilterCheckbox" style="accent-color: var(--green); width: 16px; height: 16px; cursor: pointer;" onchange="window.updateWarrantyFilter(this.checked)">
-          Sadece Resmi Distribütör
-        </label>
-      </div>
-    `;
-  }
+      ` : ""}
+    </div>
+  ` : "";
+  categoryHeaderHtml += filterToolbarHtml;
 
   // Calculate cheapest valid price for nodes highlighting
   const validPrices = products.filter(p => !p.extra_info?.out_of_stock).map(p => p.price);
@@ -2603,9 +2706,11 @@ function showSearchResults(response) {
             let colorClass = "bg-gray";
             let badgeTitle = "";
             if (lbl === "En Ucuz") colorClass = "bg-green";
+            if (lbl === "Gerçek Fırsat") colorClass = "bg-green";
             if (lbl === "En Yüksek İndirim") colorClass = "bg-red";
             if (lbl === "Hızlı Kargo") colorClass = "bg-blue";
             if (lbl === "En İyi Puan") colorClass = "bg-yellow";
+            if (lbl === "Şişirilmiş İndirim") { colorClass = "bg-red"; badgeTitle = item.extra_info?.fake_discount_note || "Satıcı eski fiyatı piyasa ortalamasının çok üstünde göstermiş."; }
             if (lbl === "Şüpheli Fiyat") { colorClass = "bg-red"; badgeTitle = "Bu fiyat, ürünün geçmiş ortalama fiyatına göre anormal derecede düşük veya son anda yükseltilip indirim gösterilmiş olabilir. Satın almadan önce fiyat geçmişini kontrol et."; }
             if (lbl === "Birim Fiyat Riski") { colorClass = "bg-red"; badgeTitle = "Bu ürünün birim fiyatı (ör. ml/gr başına), aynı kategorideki diğer seçeneklere göre dezavantajlı."; }
             if (lbl === "Birim Fiyat Avantajı") colorClass = "bg-green";
@@ -2651,6 +2756,10 @@ function showSearchResults(response) {
             ? `<div title="Bu fiyat, ürünün geçmiş ortalama fiyatına göre anormal derecede düşük veya yanıltıcı bir indirim olabilir. Satın almadan önce fiyat geçmişini kontrol et." style="display: flex; align-items: center; gap: 4px; color: var(--red); font-size: 11px; margin-top: 6px; font-weight: 700; cursor: help;">
                  <i data-lucide="shield-alert" style="width: 13px; height: 13px; flex-shrink: 0;"></i> Şüpheli Fiyat Uyarısı!
                </div>`
+            : item.extra_info?.fake_discount
+            ? `<div style="display: flex; align-items: center; gap: 4px; color: #b91c1c; font-size: 11px; margin-top: 5px; font-weight: 700;">
+                 <i data-lucide="alert-triangle" style="width: 12px; height: 12px; flex-shrink: 0;"></i> ${escapeHtml(item.extra_info.fake_discount_note || "Şişirilmiş eski fiyat / sözde indirim")}
+               </div>`
             : "";
           const unitPriceHtml = item.extra_info?.unit_price && item.extra_info?.unit
             ? `<div class="unit-price-row ${item.extra_info.best_unit_price ? "best" : ""}">
@@ -2660,12 +2769,6 @@ function showSearchResults(response) {
 
           let warrantyBadgeHtml = "";
           let isImporter = false;
-          if (isElectronics) {
-            isImporter = index % 2 === 1;
-            const warrantyText = isImporter ? "İthalatçı Garantili" : "Resmi Distribütör";
-            const badgeColor = isImporter ? "rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245,158,11,0.2)" : "rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2)";
-            warrantyBadgeHtml = `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: ${badgeColor}; display: inline-block;">${warrantyText}</span>`;
-          }
 
           const isCheapestNode = !isOutOfStock && item.price === cheapestPrice;
           const nodeClasses = `quantum-node-card ${isCheapestNode ? 'cheapest-node-glow' : ''}`;
@@ -2746,18 +2849,64 @@ window.triggerSuggestionSearch = function(query) {
   const input = document.getElementById("productUrl");
   if (input) {
     input.value = query;
-    const form = document.getElementById("urlForm");
-    if (form) {
-      const submitBtn = form.querySelector("button[type='submit']");
-      if (submitBtn) {
-        submitBtn.click();
-      } else {
-        const event = new Event("submit", { cancelable: true });
-        form.dispatchEvent(event);
-      }
-    }
   }
+  const dd = document.getElementById("searchSuggestDropdown");
+  if (dd) dd.classList.add("hidden");
+  runTextProductSearch(query);
 };
+
+window.applySearchSortAndFilter = function(storeFilter, sortMode) {
+  if (!window._lastSearchResponse) return;
+  window._lastSearchResponse._storeFilter = storeFilter;
+  window._lastSearchResponse._sortMode = sortMode;
+  showSearchResults(window._lastSearchResponse);
+};
+
+(function initSearchAutocomplete() {
+  let debounceTimer = null;
+  document.addEventListener("input", (e) => {
+    if (!e.target || e.target.id !== "productUrl") return;
+    const dd = document.getElementById("searchSuggestDropdown");
+    if (!dd) return;
+    const val = e.target.value.trim();
+    clearTimeout(debounceTimer);
+    if (val.length < 2 || val.startsWith("http://") || val.startsWith("https://") || val.startsWith("www.")) {
+      dd.classList.add("hidden");
+      dd.innerHTML = "";
+      return;
+    }
+    debounceTimer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/search/suggest?q=${encodeURIComponent(val)}&limit=7`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const items = data.suggestions || [];
+        if (!items.length || document.getElementById("productUrl")?.value.trim() !== val) {
+          dd.classList.add("hidden");
+          return;
+        }
+        dd.innerHTML = items.map(item => `
+          <button type="button" onclick="triggerSuggestionSearch(${inlineJsArg(item)})"
+            style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.07);color:#f0f4f1;font-size:13px;font-weight:600;cursor:pointer;text-align:left;"
+            onmouseover="this.style.background='rgba(40,122,80,.28)'" onmouseout="this.style.background='transparent'">
+            <span>🔎 ${escapeHtml(item)}</span>
+            <span style="font-size:11px;color:#6ee7b7;font-weight:700;">Fiyatları Gör →</span>
+          </button>
+        `).join("");
+        dd.classList.remove("hidden");
+      } catch {
+        dd.classList.add("hidden");
+      }
+    }, 200);
+  });
+
+  document.addEventListener("click", (e) => {
+    const dd = document.getElementById("searchSuggestDropdown");
+    if (dd && !e.target.closest("#urlForm")) {
+      dd.classList.add("hidden");
+    }
+  });
+})();
 
 
 async function reportWrongMatch(index) {
@@ -2794,27 +2943,7 @@ async function trackSearchResultProduct(button, index) {
 
   const sizeSelect = document.getElementById("fashionSizeSelect");
   if (sizeSelect && sizeSelect.value) {
-    const val = sizeSelect.value;
-    title = `${item.title} (${val})`;
-    if (val === "M") {
-      price = item.price * 1.05;
-      originalPrice = originalPrice ? originalPrice * 1.05 : null;
-    } else if (val === "L") {
-      price = item.price * 1.10;
-      originalPrice = originalPrice ? originalPrice * 1.10 : null;
-    } else if (val === "XL") {
-      price = item.price * 1.15;
-      originalPrice = originalPrice ? originalPrice * 1.15 : null;
-    } else if (val === "40") {
-      price = item.price + 15;
-      originalPrice = originalPrice ? originalPrice + 15 : null;
-    } else if (val === "41") {
-      price = item.price + 25;
-      originalPrice = originalPrice ? originalPrice + 25 : null;
-    } else if (val === "42") {
-      price = item.price + 35;
-      originalPrice = originalPrice ? originalPrice + 35 : null;
-    }
+    title = `${item.title} (${sizeSelect.value})`;
   }
 
   try {
@@ -3079,7 +3208,9 @@ async function findAlternativeSellers(parsed) {
     const minPrice2 = validPrices2.length > 0 ? Math.min(...validPrices2) : -1;
     const maxPrice2 = validPrices2.length > 0 ? Math.max(...validPrices2) : -1;
 
-    let html = fakeDiscountWarning + `
+    const urlAnalysisHtml = data.market_analysis ? renderMarketAnalysisBanner(data.market_analysis) : "";
+
+    let html = urlAnalysisHtml + fakeDiscountWarning + `
       <div style="font-size:11px;font-weight:700;color:var(--ink-2);margin-bottom:8px;letter-spacing:.5px;text-transform:uppercase;">
         ${alts.length} Mağaza Karşılaştırması ${maxPrice2 > minPrice2 + 1 ? `· <span style="color:#287a50;">₺${(maxPrice2-minPrice2).toFixed(2)} tasarruf mümkün</span>` : ""}
       </div>
@@ -3693,7 +3824,7 @@ function openProduct(id) {
               font: { family: "DM Sans", size: 10 },
               color: "#687068",
               callback: function (value) {
-                return "â‚º" + value;
+                return "₺" + value;
               },
             },
           },
@@ -3736,20 +3867,15 @@ window.submitProductReview = async function(productId) {
   if (!comment) return showToast("Lütfen bir yorum yazın.");
 
   try {
-    const res = await fetch(`/api/products/${productId}/reviews`, {
+    await api(`/api/products/${productId}/reviews`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-device-id": deviceId },
-      body: JSON.stringify({ rating: parseInt(ratingInput.value), comment: comment })
+      body: JSON.stringify({ rating: parseInt(ratingInput.value, 10) || 5, comment: comment })
     });
-    if (res.ok) {
-      commentInput.value = "";
-      showToast("Yorumunuz eklendi!");
-      loadProductReviews(productId);
-    } else {
-      showToast("Yorum eklenirken hata oluştu.");
-    }
+    commentInput.value = "";
+    showToast("Yorumunuz eklendi!");
+    loadProductReviews(productId);
   } catch (e) {
-    showToast("Bağlantı hatası.");
+    showToast(e.message || "Yorum eklenirken hata oluştu.");
   }
 };
 
@@ -4604,6 +4730,7 @@ async function lookupAndAddBarcode(code) {
           products: res.results,
           query: res.search_query,
           category: res.suggested_category || "general",
+          market_analysis: res.market_analysis,
         });
       } else {
         showBarcodeCategoryMismatch(res.title, res.search_query, res.suggested_category || "general");
@@ -4942,10 +5069,11 @@ function renderReceiptReview() {
   const panel = document.getElementById("receiptReviewPanel");
   const receipt = state.pendingReceipt;
   if (!panel || !receipt) return;
+  const itemsList = Array.isArray(receipt.items) ? receipt.items : [];
   panel.classList.remove("hidden");
   panel.innerHTML = `
     <div class="receipt-success-card">
-      <strong>Fiş Başarıyla İşlendi ve Kaydedildi!</strong>
+      <strong>Fiş Okundu — Bilgileri Kontrol Edip Kaydedin (${itemsList.length} ürün)</strong>
     </div>
     <div class="receipt-review-meta">
       <label>Mağaza
@@ -4968,6 +5096,19 @@ function renderReceiptReview() {
           value="${Number(receipt.total || calculatePendingReceiptTotal()).toFixed(2)}">
       </label>
     </div>
+    ${itemsList.length > 0 ? `
+      <div class="receipt-history-products" style="margin: 10px 0;">
+        ${itemsList.map((item, idx) => `
+          <div class="receipt-history-product" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <span>${escapeHtml(item.title || "")}${Number(item.quantity || 1) > 1 ? ` × ${item.quantity}` : ""}</span>
+            <span style="display:flex; align-items:center; gap:6px;">
+              <strong>${currency.format(Number(item.price || 0) * Number(item.quantity || 1))}</strong>
+              <button type="button" class="icon-button light" onclick="removePendingReceiptItem(${idx})" title="Kalemi çıkar">✕</button>
+            </span>
+          </div>
+        `).join("")}
+      </div>
+    ` : ""}
     <div class="receipt-review-actions">
       <button type="button" class="secondary-button" onclick="cancelReceiptReview()">Vazgeç</button>
       <button type="button" class="primary-button" onclick="savePendingReceipt()">
@@ -5018,7 +5159,12 @@ function cancelReceiptReview() {
 
 async function savePendingReceipt() {
   if (!state.pendingReceipt) return;
-  const items = [];
+  const items = (state.pendingReceipt.items || []).map((item) => ({
+    title: String(item.title || "").trim(),
+    price: Number(item.price || 0),
+    quantity: Number(item.quantity || 1),
+    category: item.category || "other",
+  })).filter((item) => item.title);
 
   try {
     const savedStore = document.getElementById("receiptReviewStore").value.trim();
@@ -5058,7 +5204,7 @@ function showReceiptSavedConfirmation(store, total, itemCount) {
       <i data-lucide="circle-check-big"></i>
       <div>
         <strong>Fiş harcama geçmişine kaydedildi</strong>
-        <p>${escapeHtml(store)} Â· ${itemCount} ürün Â· ${currency.format(total)}</p>
+        <p>${escapeHtml(store)} · ${itemCount} ürün · ${currency.format(total)}</p>
       </div>
     </div>
     <div class="receipt-review-actions">
@@ -5536,71 +5682,8 @@ async function renderCart() {
           return;
         } catch (error) {
           clearTimeout(timeoutId);
-          console.warn("Sepet optimizasyonu başarısız veya zaman aşımına uğradı, hata kurtarma protokolü devrede:", error);
-
-          if (overlay && progressText) {
-            // overlay.classList.add("recovery-mode");
-            const header = overlay.querySelector("h3");
-            if (header) {
-              header.classList.add("glitch-active");
-              header.innerText = "SİSTEM KURTARMA AKTİF: LOKAL ANALİZ";
-            }
-            progressText.innerText = "Sunucular yanıt vermedi. Alternatif analizler üzerinden sepet optimizasyonu sürdürülüyor...";
-
-            // Wait 1.5 seconds
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            // Build simulated optimizer result
-            const mockOptResult = {
-              available: true,
-              single_store: {
-                store: "gratis",
-                total: uncheckedItems.reduce((acc, item) => acc + (149.90 * item.quantity), 0),
-                savings: 45.00,
-                shipping_fee: 0,
-                items: uncheckedItems.map(item => ({
-                  name: item.name,
-                  quantity: item.quantity,
-                  line_total: 149.90 * item.quantity
-                }))
-              },
-              split_basket: {
-                total: uncheckedItems.reduce((acc, item) => acc + (129.90 * item.quantity), 0),
-                savings: 65.00,
-                stores: [
-                  {
-                    store: "gratis",
-                    total: uncheckedItems.slice(0, Math.ceil(uncheckedItems.length/2)).reduce((acc, item) => acc + (124.90 * item.quantity), 0),
-                    shipping_fee: 0,
-                    items: uncheckedItems.slice(0, Math.ceil(uncheckedItems.length/2)).map(item => ({
-                      name: item.name,
-                      quantity: item.quantity,
-                      line_total: 124.90 * item.quantity
-                    }))
-                  },
-                  {
-                    store: "rossmann",
-                    total: uncheckedItems.slice(Math.ceil(uncheckedItems.length/2)).reduce((acc, item) => acc + (134.90 * item.quantity), 0),
-                    shipping_fee: 0,
-                    items: uncheckedItems.slice(Math.ceil(uncheckedItems.length/2)).map(item => ({
-                      name: item.name,
-                      quantity: item.quantity,
-                      line_total: 134.90 * item.quantity
-                    }))
-                  }
-                ]
-              }
-            };
-            renderBackendOptimization(mockOptResult, state.optimizerMode);
-
-            // overlay.classList.remove("recovery-mode");
-            if (header) {
-              header.classList.remove("glitch-active");
-              header.innerText = "EN İYİ FIRSATLAR ARANIYOR";
-            }
-          } else {
-            resultsDiv.innerHTML = `<p class="empty-text">Canlı fiyat servisine ulaşılamadı. Lokal analiz devreye sokuluyor...</p>`;
-          }
+          console.warn("Sepet optimizasyonu başarısız veya zaman aşımına uğradı:", error);
+          resultsDiv.innerHTML = `<p class="empty-text">Canlı fiyat servisine şu an ulaşılamadı. Lütfen birkaç saniye sonra tekrar deneyin.</p>`;
         } finally {
           clearTimeout(t1);
           if (overlay) overlay.style.display = "none";
@@ -6631,7 +6714,7 @@ function dismissGuide(view) {
 
 function resetGuides() {
   localStorage.removeItem(GUIDE_KEY);
-  toast("Rehberler sıfırlandı — sekmeleri ziyaret et.");
+  showToast("Rehberler sıfırlandı — sekmeleri ziyaret et.");
 }
 
 /* ── Link Kılavuzu Popup ─────────────────────────────────────────────────── */
@@ -6807,27 +6890,133 @@ async function searchByBarcode(code) {
   try {
     const res = await api(`/api/barcode/${code}`);
     if (overlay) overlay.style.display = "none";
-
-    if (res.found && res.results && res.results.length > 0) {
-      switchView("discover");
-      showSearchResults({
-        products: res.results,
-        query: res.search_query || res.title || code,
-        category: res.suggested_category || "general",
-      });
-      showToast("✓ " + escapeHtml(res.title || "Ürün bulundu"));
-    } else if (res.found) {
-      // Ürün bilgisi var ama fiyat karşılaştırma sonucu yok
-      switchView("discover");
-      showToast(res.title + " — fiyat karşılaştırması bulunamadı.");
-      showBarcodeManualEntry && showBarcodeManualEntry(code, res.message || "Sonuç bulunamadı.");
-    } else {
-      if (overlay) overlay.style.display = "none";
-      showToast("Barkod bulunamadı: " + code);
-    }
+    _renderBarcodeResponse(res, code);
   } catch (e) {
     if (overlay) overlay.style.display = "none";
     showToast("Barkod sorgulanamadı: " + (e.message || e));
+  }
+}
+
+function _renderBarcodeResponse(res, code) {
+  if (res && res.found && res.results && res.results.length > 0) {
+    switchView("discover");
+    saveToSearchHistory(res.title || code);
+    showSearchResults({
+      products: res.results,
+      query: res.search_query || res.title || code,
+      category: res.suggested_category || "general",
+      market_analysis: res.market_analysis,
+    });
+    showToast("✓ Barkod tanındı: " + escapeHtml(res.title || code));
+  } else if (res && res.found) {
+    switchView("discover");
+    showToast(escapeHtml(res.title || code) + " — mağazalarda fiyat bulunamadı.");
+    showBarcodeTeachDialog(code, res.title || "");
+  } else {
+    showBarcodeTeachDialog(code, "");
+  }
+}
+
+// Katalogda olmayan barkod: kullanıcı ürün adını 1 kez girer → anında karşılaştırılır
+// ve barkod veritabanına kaydedilir (sonraki herkes için otomatik tanınır).
+function showBarcodeTeachDialog(barcode, prefillTitle) {
+  const dialog = document.getElementById("productDialog");
+  const content = document.getElementById("dialogContent");
+  if (!dialog || !content) { showToast("Barkod bulunamadı: " + barcode); return; }
+  content.innerHTML = `
+    <div class="dialog-body" style="max-width: 440px;">
+      <h3 style="margin:0 0 4px; font-size:17px;">Bu barkodu henüz tanımıyoruz</h3>
+      <p style="margin:0 0 14px; font-size:12px; color:var(--ink-light);">Barkod: <code>${escapeHtml(barcode)}</code></p>
+      <div class="page-guide" style="margin-bottom:14px;">
+        <i data-lucide="info"></i>
+        <span style="font-size:12px;">Etikette yazan ürün adını yaz — fiyatları hemen karşılaştıralım. Bu barkod bir dahakine herkes için otomatik tanınacak.</span>
+      </div>
+      <label style="font-size:12px; font-weight:700; color:var(--ink-light); display:block; margin-bottom:4px;">ÜRÜN ADI *</label>
+      <input id="teachBarcodeTitle" class="form-input" value="${escapeHtml(prefillTitle || "")}" placeholder="örn: Ülker Çikolatalı Gofret 36 g" style="width:100%; margin-bottom:10px;">
+      <label style="font-size:12px; font-weight:700; color:var(--ink-light); display:block; margin-bottom:4px;">MARKA (opsiyonel)</label>
+      <input id="teachBarcodeBrand" class="form-input" placeholder="örn: Ülker" style="width:100%;">
+      <div style="display:flex; gap:10px; margin-top:16px;">
+        <button class="secondary-button" style="flex:1;" onclick="closeDialog()">Vazgeç</button>
+        <button class="primary-button" style="flex:2;" onclick="submitBarcodeTeach(${inlineJsArg(barcode)})">Fiyatları Karşılaştır</button>
+      </div>
+    </div>`;
+  if (!dialog.open) dialog.showModal();
+  lucide.createIcons();
+  setTimeout(() => document.getElementById("teachBarcodeTitle")?.focus(), 100);
+}
+
+async function submitBarcodeTeach(barcode) {
+  const title = document.getElementById("teachBarcodeTitle")?.value.trim();
+  const brand = document.getElementById("teachBarcodeBrand")?.value.trim() || "";
+  if (!title || title.length < 2) {
+    document.getElementById("teachBarcodeTitle")?.focus();
+    return;
+  }
+  closeDialog();
+  const overlay = document.getElementById("quantumScanOverlay");
+  const progressText = document.getElementById("quantumScanProgress");
+  if (overlay) overlay.style.display = "flex";
+  if (progressText) progressText.innerText = "Mağaza fiyatları karşılaştırılıyor...";
+  try {
+    const res = await api("/api/barcode/register", {
+      method: "POST",
+      body: JSON.stringify({ barcode, title, brand }),
+    });
+    if (overlay) overlay.style.display = "none";
+    if (res.results && res.results.length) {
+      _renderBarcodeResponse(res, barcode);
+    } else {
+      await runTextProductSearch(title);
+    }
+  } catch (e) {
+    if (overlay) overlay.style.display = "none";
+    await runTextProductSearch(title);
+  }
+}
+
+// Ana sayfa: fotoğraftan / galeriden barkod okuma (kamera odaklamayanlar için)
+async function scanMainBarcodeImage(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    let code = "";
+    if ("BarcodeDetector" in window) {
+      try {
+        const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e"] });
+        const bitmap = await createImageBitmap(file);
+        const found = await detector.detect(bitmap);
+        bitmap.close && bitmap.close();
+        if (found.length) code = String(found[0].rawValue || "");
+      } catch {}
+    }
+    if (!code) {
+      await ensureHtml5Qrcode();
+      const tmpId = "mainBarcodeFileReader";
+      let tmp = document.getElementById(tmpId);
+      if (!tmp) {
+        tmp = document.createElement("div");
+        tmp.id = tmpId;
+        tmp.style.display = "none";
+        document.body.appendChild(tmp);
+      }
+      const reader = new Html5Qrcode(tmpId, { verbose: false });
+      try {
+        code = String(await reader.scanFile(file, false) || "");
+      } finally {
+        try { reader.clear(); } catch {}
+      }
+    }
+    code = code.replace(/\D/g, "");
+    if (![8, 12, 13].includes(code.length)) {
+      showToast("Fotoğrafta okunabilir barkod bulunamadı. Barkod numarasını arama kutusuna yazabilirsin.");
+      return;
+    }
+    closeMainBarcodeScanner();
+    await searchByBarcode(code);
+  } catch (error) {
+    showToast("Fotoğrafta barkod okunamadı. Numarayı arama kutusuna yazmayı dene.");
+  } finally {
+    event.target.value = "";
   }
 }
 
@@ -7474,3 +7663,5 @@ async function renderPriceHistoryChart(productKey) {
     container.classList.add("hidden");
   }
 }
+
+window.runTextProductSearch = runTextProductSearch;
