@@ -6132,7 +6132,7 @@ async def cron_check_reminders(request: Request):
 
     # reminder_date <= bugün AND notified = false
     # Hesaplanan tarihler DB'de değil — uygulama katmanında filtreleriz
-    resp = requests.get(
+    resp = await asyncio.to_thread(requests.get, 
         f"{supabase_base_url()}/rest/v1/product_reminders",
         headers=supabase_headers(),
         params={"notified": "eq.false", "select": "*"},
@@ -6154,7 +6154,7 @@ async def cron_check_reminders(request: Request):
                 product_url=r["product_url"],
             )
             if any(result.values()):
-                requests.patch(
+                await asyncio.to_thread(requests.patch, 
                     f"{supabase_base_url()}/rest/v1/product_reminders",
                     headers=supabase_headers(),
                     params={"id": f"eq.{r['id']}"},
@@ -9649,7 +9649,7 @@ async def create_campaign(slug: str, request: Request, admin=Depends(require_adm
         "valid_until": body.get("valid_until"),
         "notified":    False,
     }
-    resp = requests.post(
+    resp = await asyncio.to_thread(requests.post, 
         f"{supabase_base_url()}/rest/v1/store_campaigns",
         headers={**supabase_headers(), "Prefer": "return=representation"},
         json=row, timeout=10,
@@ -10046,7 +10046,7 @@ async def cron_store_newsletters(request: Request):
     sb_url = supabase_base_url()
     sb_hdrs = supabase_headers()
 
-    ar = requests.get(
+    ar = await asyncio.to_thread(requests.get, 
         f"{sb_url}/rest/v1/store_newsletters",
         headers=sb_hdrs,
         params={"active": "eq.true", "select": "slug,name"},
@@ -10058,7 +10058,7 @@ async def cron_store_newsletters(request: Request):
     for store in active_stores:
         slug = store["slug"]
 
-        cr = requests.get(
+        cr = await asyncio.to_thread(requests.get, 
             f"{sb_url}/rest/v1/store_campaigns",
             headers=sb_hdrs,
             params={
@@ -10071,7 +10071,7 @@ async def cron_store_newsletters(request: Request):
         if not campaigns:
             continue
 
-        fr = requests.get(
+        fr = await asyncio.to_thread(requests.get, 
             f"{sb_url}/rest/v1/followed_stores",
             headers=sb_hdrs,
             params={"store_slug": f"eq.{slug}", "select": "user_id,email"},
@@ -10105,7 +10105,7 @@ async def cron_store_newsletters(request: Request):
 
             # Uygulama-içi bildirim kaydı
             if uid:
-                requests.post(
+                await asyncio.to_thread(requests.post, 
                     f"{sb_url}/rest/v1/user_notifications",
                     headers=sb_hdrs,
                     json={
@@ -10186,7 +10186,7 @@ async def cron_store_newsletters(request: Request):
         if follower_count > 0 or any(result.values()):
             ids = [c["id"] for c in campaigns]
             for cid in ids:
-                requests.patch(
+                await asyncio.to_thread(requests.patch, 
                     f"{sb_url}/rest/v1/store_campaigns",
                     headers=sb_hdrs,
                     params={"id": f"eq.{cid}"},

@@ -43,3 +43,29 @@ def test_cron_secret_error_does_not_leak_length(monkeypatch):
     monkeypatch.setenv("CRON_SECRET", "a" * 32)
     ok, reason = m._verify_cron_secret("short")
     assert not ok and "uzunlu" not in reason.lower()
+
+
+def test_old_hardcoded_jwt_key_is_rejected():
+    """Eski, depoda gomulu duran varsayilan anahtarla imzalanmis token kabul edilmemeli."""
+    import time
+    import uuid
+
+    import jwt
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    now = int(time.time())
+    leaked = "almadan_supabase_gotrue_jwt_" + "secret_2026_default_key"
+    token = jwt.encode({"sub": str(uuid.uuid4()), "aud": "authenticated", "iat": now, "exp": now + 60},
+                       leaked, algorithm="HS256")
+    r = TestClient(app).get("/api/v1/wardrobe/laundry-basket", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 401
+
+
+def test_no_hardcoded_secrets_in_app_source():
+    import re
+
+    pattern = re.compile(r"alm_b2b_[A-Za-z0-9]{4,}_giysem|gotrue_jwt_secret_2026")
+    offenders = [str(p) for p in (ROOT / "app").rglob("*.py") if pattern.search(p.read_text(encoding="utf-8"))]
+    assert offenders == []
