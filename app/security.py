@@ -33,7 +33,11 @@ _CSRF_SECRET = (
     or secrets.token_hex(32)
 )
 _ENV = os.getenv("VERCEL_ENV", "development")
-_IS_PROD = _ENV == "production"
+# Uretim ortami: Render (RENDER env'ini Render kendisi set eder) veya Vercel production.
+# Eskiden yalnizca VERCEL_ENV bakiliyordu; Render'a gecince HSTS ve Secure cookie
+# sessizce kapanmisti.
+IS_PRODUCTION = bool(os.getenv("RENDER")) or _ENV == "production"
+_IS_PROD = IS_PRODUCTION
 
 # ── Security Headers ────────────────────────────────────────
 
