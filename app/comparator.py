@@ -1241,16 +1241,17 @@ def search_trendyol_direct(query: str) -> list[dict]:
 
     url = f"https://www.trendyol.com/sr?q={urllib.parse.quote_plus(query)}"
     html = None
-    if proxy_enabled():
-        # Trendyol artık doğrudan isteklerde Cloudflare JS zorluğu ("Just a
-        # moment...") gösteriyor; bunu çözmek için render_js=True gerekiyor.
-        html = proxy_get(url, render_js=True, timeout=20)
-    if not html:
-        try:
-            r = requests.get(url, headers=_STD_HEADERS, timeout=8)
-            html = r.text if r.ok else None
-        except Exception:
-            return []
+    # Önce doğrudan hızlı istek (ücretsiz, ~1-3s), engellenirse proxy (render_js=False, sonra True)
+    try:
+        r = requests.get(url, headers=_STD_HEADERS, timeout=6)
+        if r.ok and "Just a moment" not in r.text[:2000] and "__single-search-result__PROPS" in r.text:
+            html = r.text
+    except Exception:
+        html = None
+    if not html and proxy_enabled():
+        html = proxy_get(url, render_js=False, timeout=8)
+        if not html or "Just a moment" in html[:2000] or "__single-search-result__PROPS" not in html:
+            html = proxy_get(url, render_js=True, timeout=12)
     if not html or "Just a moment" in html[:2000]:
         return []
 
@@ -1360,16 +1361,16 @@ def search_hepsiburada_direct(query: str) -> list[dict]:
 
     url = f"https://www.hepsiburada.com/ara?q={urllib.parse.quote_plus(query)}"
     html = None
-    if proxy_enabled():
-        # Doğrudan istekler 403 (bot koruması) alabiliyor; ScrapingBee
-        # render_js=True ile gerçek tarayıcı üzerinden dener.
-        html = proxy_get(url, render_js=True, timeout=20)
-    if not html:
-        try:
-            r = requests.get(url, headers=_STD_HEADERS, timeout=8)
-            html = r.text if r.ok else None
-        except Exception:
-            return []
+    try:
+        r = requests.get(url, headers=_STD_HEADERS, timeout=6)
+        if r.ok and "VERTICALFILTER" in r.text:
+            html = r.text
+    except Exception:
+        html = None
+    if not html and proxy_enabled():
+        html = proxy_get(url, render_js=False, timeout=8)
+        if not html or "VERTICALFILTER" not in html:
+            html = proxy_get(url, render_js=True, timeout=12)
     if not html:
         return []
 
@@ -3733,97 +3734,101 @@ def postprocess_search_products(query: str, all_products: list) -> list[dict]:
     # Separate into in-stock and out-of-stock
     in_stock = [p for p in filtered_products if not p["extra_info"].get("out_of_stock")]
     out_of_stock = [p for p in filtered_products if p["extra_info"].get("out_of_stock")]
-            
+
+    query_is_refurb = is_refurbished_title(corrected_query)
+    for p in in_stock + out_of_stock:
+        if is_refurbished_title(p.get("title", "")):
+            p.setdefault("extra_info", {})["refurbished"] = True
+            p["condition"] = "refurbished"
+
+    def _sort_key(item: dict) -> tuple[int, float]:
+        refurb_pen = 1 if (not query_is_refurb and item.get("extra_info", {}).get("refurbished")) else 0
+        return (refurb_pen, float(item.get("price") or 9999999.0))
+
     # 7. Generic vs Specific Query details limit
-    # Model/olcu iceren sorgu ("iphone 15 128gb", "pinar sut 1 l") -> az ve
-    # isabetli sonuc. Sadece marka + urun turu ("bosch supurge") eskiden de 5
-    # ile sinirlaniyordu: /fiyat sayfalari 4-5 urunle ince kaliyordu
-    # (GSC 2026-10: 2.075 sayfa "kesfedildi - dizine eklenmedi").
     has_model = bool(re.search(r"\d", corrected_query)) or any(
         x in corrected_query.lower() for x in [" l", "gr", "kg", "gb", "tb", "ml"])
-    limit = 5 if has_model else (12 if brand is not None else 20)
+    limit = 16 if has_model else (18 if brand is not None else 20)
 
-    # 8. Sort in-stock by price (cheapest first) if generic query
-    if not brand:
-        in_stock.sort(key=lambda x: x["price"])
+    # 8. Sort in-stock by price (cheapest first) + ensure multi-store diversity
+    in_stock.sort(key=_sort_key)
+    max_per_source = 3
+    by_source: dict[str, list[dict]] = {}
+    for p in in_stock:
+        by_source.setdefault(p.get("source", ""), []).append(p)
 
-        # Magaza cesitliligi: tek bir magazanin ucuz varyantlari (ayni urunun
-        # farkli renk/beden secenekleri gibi) tum listeyi doldurup diger
-        # magazalari (Gratis, Watsons, Boyner...) ekrandan tamamen disarida
-        # birakmasin. Magaza basina en fazla 2 urun alacak sekilde en
-        # ucuzdan baslayip round-robin dagitiyoruz -- boylece hem ucuzluk
-        # onceligi korunuyor hem de kullaniciya birden fazla magaza gosteriliyor.
-        max_per_source = 2
-        by_source: dict[str, list[dict]] = {}
-        for p in in_stock:
-            by_source.setdefault(p.get("source", ""), []).append(p)
-
-        diversified: list[dict] = []
-        while len(diversified) < limit and any(by_source.values()):
-            progressed = False
-            for items in by_source.values():
-                if len(diversified) >= limit:
-                    break
-                taken = sum(1 for d in diversified if d.get("source") == items[0].get("source")) if items else 0
-                if items and taken < max_per_source:
-                    diversified.append(items.pop(0))
-                    progressed = True
-            if not progressed:
+    diversified: list[dict] = []
+    while len(diversified) < limit and any(by_source.values()):
+        progressed = False
+        for items in by_source.values():
+            if len(diversified) >= limit:
                 break
-        diversified.sort(key=lambda x: x["price"])
-        in_stock = diversified
-    else:
-        # Markali aramada liste olduğu gibi kesiliyordu: ilk magaza (genelde
-        # n11) 5 slotun hepsini dolduruyor, Trendyol/Hepsiburada/Amazon
-        # sonuclari hic gorunmuyordu -- /fiyat/sony-hoparlor, vestel-supurge,
-        # apple-powerbank... "1 magaza" yuzunden noindex kaliyordu.
-        # Alaka sirasi korunarak magazalar arasinda sirayla dagit; baska
-        # magaza yoksa kalan slotlari yine ayni magazayla doldur (urun sayisi
-        # dusmesin).
-        by_source_b: dict[str, list[dict]] = {}
-        for p in in_stock:
-            by_source_b.setdefault(p.get("source", ""), []).append(p)
-        interleaved: list[dict] = []
-        queues = list(by_source_b.values())
-        while len(interleaved) < limit and any(queues):
-            for q in queues:
-                if q and len(interleaved) < limit:
-                    interleaved.append(q.pop(0))
-        in_stock = interleaved
+            taken = sum(1 for d in diversified if d.get("source") == items[0].get("source")) if items else 0
+            if items and taken < max_per_source:
+                diversified.append(items.pop(0))
+                progressed = True
+        if not progressed:
+            break
+    # Kalan slot varsa (az mağaza döndüyse) en ucuz kalan ürünlerle tamamla
+    if len(diversified) < limit:
+        remaining = [item for items in by_source.values() for item in items]
+        remaining.sort(key=_sort_key)
+        diversified.extend(remaining[: limit - len(diversified)])
+    diversified.sort(key=_sort_key)
+    in_stock = diversified
 
     output_in_stock = in_stock[:limit]
-    output_out_of_stock = out_of_stock[:2] if limit == 15 else out_of_stock[:1]
+    output_out_of_stock = out_of_stock[:2] if limit >= 15 else out_of_stock[:1]
     
     output = (output_in_stock + output_out_of_stock)[:limit]
     
-    # 9. Suspicious Price Warning Check (extreme low price drop alert)
-    # Not: karisik sonuc listesinde (farkli varyant/boyut/gramaj) dogal fiyat
-    # farki normaldir -- 0.6 esigi "En Ucuz" etiketli gercek urunleri bile
-    # sahte indirim sanip yanlis damgaliyordu. Sadece gercekten anormal
-    # (medyanin 1/4'unden az) ve yeterince genis bir ornek (>=5) varsa uyar.
-    valid_prices = [p["price"] for p in output_in_stock if p["price"] > 0]
-    if len(valid_prices) >= 5:
+    # 9. Piyasa Medyanı, Şüpheli Fiyat ve Sahte İndirim (Şişirilmiş Eski Fiyat) Denetimi
+    valid_prices = [
+        p["price"] for p in output_in_stock
+        if p["price"] > 0 and not p["extra_info"].get("refurbished")
+    ] or [p["price"] for p in output_in_stock if p["price"] > 0]
+
+    median_price = 0.0
+    if valid_prices:
         sorted_prices = sorted(valid_prices)
         n = len(sorted_prices)
         median_price = sorted_prices[n // 2] if n % 2 != 0 else (sorted_prices[n // 2 - 1] + sorted_prices[n // 2]) / 2.0
 
+    if len(valid_prices) >= 3 and median_price > 0:
         for p in output:
             if not p["extra_info"].get("out_of_stock") and p["price"] > 0:
-                if p["price"] < 0.25 * median_price:
+                if len(valid_prices) >= 5 and p["price"] < 0.25 * median_price:
                     p["extra_info"]["suspicious"] = True
-                    p["extra_info"]["suspicious_warning"] = "Güvenlik Uyarısı: Bu fiyat piyasa ortalamasının şüpheli derecede altındadır. Güvenliğiniz için dikkatli olmanızı öneririz."
+                    p["extra_info"]["suspicious_warning"] = "Güvenlik Uyarısı: Bu fiyat piyasa ortalamasının şüpheli derecede altındadır. Yanlış aksesuar veya numune boy olmadığından emin olun."
                     if "Şüpheli Fiyat" not in p["labels"]:
                         p["labels"].append("Şüpheli Fiyat")
-                        
+                else:
+                    # Sahte İndirim Denetimi: Satıcı üstü çizili fiyatı piyasa medyanının %18+ üstüne şişirip
+                    # güncel fiyatı piyasa medyanı veya üstünde satıyorsa uyar!
+                    orig = p.get("original_price")
+                    if orig and orig > p["price"] * 1.05:
+                        if orig > median_price * 1.18 and p["price"] >= median_price * 0.97:
+                            p["extra_info"]["fake_discount"] = True
+                            p["extra_info"]["fake_discount_note"] = (
+                                f"Üstü çizili {orig:,.0f} TL fiyat şişirilmiş görünüyor (Piyasa medyanı: {median_price:,.0f} TL)."
+                            )
+                            if "Şişirilmiş İndirim" not in p["labels"]:
+                                p["labels"].append("Şişirilmiş İndirim")
+                            if "Önerilen" in p["labels"]:
+                                p["labels"].remove("Önerilen")
+                    # Gerçek Fırsat: Piyasa medyanının en az %8 altında ve sıfır ürün
+                    if (
+                        not p["extra_info"].get("refurbished")
+                        and not p["extra_info"].get("suspicious")
+                        and p["price"] <= median_price * 0.92
+                    ):
+                        p["extra_info"]["real_discount"] = True
+                        if "Gerçek Fırsat" not in p["labels"]:
+                            p["labels"].append("Gerçek Fırsat")
+                        if "Önerilen" in p["labels"]:
+                            p["labels"].remove("Önerilen")
+
     # 10. Enrich labels (En Ucuz, En Yüksek İndirim)
-    # Yenilenmis/teshir/outlet urunleri isaretle -- frontend rozet gosterebilsin.
-    # Sorgunun kendisi yenilenmis urun aramiyorsa bu urunler "En Ucuz" /
-    # "En Yuksek Indirim" etiketi ALAMAZ (sifir vs yenilenmis adil kiyas degil).
-    query_is_refurb = is_refurbished_title(corrected_query)
-    for p in output:
-        if is_refurbished_title(p.get("title", "")):
-            p.setdefault("extra_info", {})["refurbished"] = True
-            p["condition"] = "refurbished"
     if output_in_stock:
         non_suspicious_in_stock = [p for p in output_in_stock if not p["extra_info"].get("suspicious")]
         if not query_is_refurb:
@@ -3930,6 +3935,176 @@ def postprocess_search_products(query: str, all_products: list) -> list[dict]:
                             p["labels"].remove("Önerilen")
 
     return output
+
+
+def build_market_analysis(
+    query: str,
+    products: list[dict],
+    reference_price: float | None = None,
+) -> dict:
+    """
+    'Alınır mı? Karar Analizi' ve Piyasa Fiyat Eğrisi motoru.
+    4 durumlu karar sistemi:
+      - AL (80-100 Puan): En ucuz fiyat piyasa medyanının belirgin altında / gerçek indirimde.
+      - MAKUL (65-79 Puan): Fiyat adil, şişirilmiş indirim yok, güvenle alınabilir.
+      - BEKLE (50-64 Puan): Fiyatlar birbirine çok yakın/yüksek veya sahte indirim şüphesi var, radar önerilir.
+      - ALMA (0-49 Puan): Kaynak fiyat veya mevcut fiyatlar aşırı şişirilmiş / şüpheli.
+    """
+    in_stock = [
+        p for p in (products or [])
+        if isinstance(p, dict)
+        and not (p.get("extra_info") or {}).get("out_of_stock")
+        and (p.get("price") or 0) > 0
+        and not (p.get("extra_info") or {}).get("suspicious")
+    ]
+    non_refurb = [
+        p for p in in_stock
+        if not (p.get("extra_info") or {}).get("refurbished")
+        and p.get("condition") != "refurbished"
+    ]
+    pool = non_refurb if non_refurb else in_stock
+    if not pool:
+        return {
+            "available": False,
+            "verdict": "BEKLE",
+            "score": 50,
+            "headline": "Yeterli Piyasa Verisi Yok",
+            "summary": "Karşılaştırma için yeterli stokta mağaza verisi bulunamadı.",
+        }
+
+    sorted_pool = sorted(pool, key=lambda x: float(x.get("price") or 0))
+    prices = [float(p["price"]) for p in sorted_pool]
+    n = len(prices)
+    cheapest_item = sorted_pool[0]
+    highest_item = sorted_pool[-1]
+    cheapest_price = prices[0]
+    highest_price = prices[-1]
+    median_price = (
+        prices[n // 2]
+        if n % 2 == 1
+        else (prices[n // 2 - 1] + prices[n // 2]) / 2.0
+    )
+    avg_price = sum(prices) / n
+
+    stores = {str(p.get("source") or "").lower() for p in pool if p.get("source")}
+    store_count = len(stores)
+    fake_discount_count = sum(
+        1 for p in pool if (p.get("extra_info") or {}).get("fake_discount")
+    )
+    real_discount_count = sum(
+        1 for p in pool if (p.get("extra_info") or {}).get("real_discount")
+    )
+
+    max_savings_tl = round(max(0.0, highest_price - cheapest_price), 2)
+    max_savings_pct = (
+        round((max_savings_tl / highest_price) * 100, 1)
+        if highest_price > cheapest_price and highest_price > 0
+        else 0.0
+    )
+    median_savings_tl = round(max(0.0, median_price - cheapest_price), 2)
+    median_savings_pct = (
+        round((median_savings_tl / median_price) * 100, 1)
+        if median_price > cheapest_price and median_price > 0
+        else 0.0
+    )
+
+    # Eğer bir ürün linki yapıştırıldıysa (reference_price varsa), o linkin fiyatını değerlendir;
+    # isimle arama yapıldıysa en iyi (en ucuz) seçeneğin piyasa medyanına göre fırsat gücünü değerlendir.
+    target_price = float(reference_price) if (reference_price and reference_price > 0) else cheapest_price
+
+    if reference_price and reference_price > 0 and median_price > 0:
+        diff_vs_median = (median_price - target_price) / median_price
+        score = int(round(70 + diff_vs_median * 140))
+        if target_price <= cheapest_price * 1.02:
+            score += 12
+        elif target_price > highest_price * 0.98 and n >= 2:
+            score -= 15
+    else:
+        # İsimle arama: en ucuz mağaza piyasa medyanına göre ne kadar avantajlı?
+        score = 72
+        if n >= 2 and median_price > 0:
+            score += int(round((median_savings_pct / 100.0) * 130))
+        if store_count >= 3:
+            score += 6
+        if cheapest_item.get("original_price") and cheapest_item["original_price"] > cheapest_price * 1.05:
+            if not (cheapest_item.get("extra_info") or {}).get("fake_discount"):
+                score += 6
+        if (cheapest_item.get("extra_info") or {}).get("fake_discount"):
+            score -= 14
+        if n == 1:
+            score = 66
+
+    score = max(18, min(98, score))
+
+    cheapest_store_name = str(cheapest_item.get("source") or "Mağaza").upper()
+    if score >= 80:
+        verdict = "AL"
+        badge_color = "green"
+        headline = "Gerçek Fırsat — Şimdi Alınır!"
+        if max_savings_tl >= 10:
+            summary = (
+                f"En ucuz seçenek ({cheapest_store_name}) piyasa medyanının %{median_savings_pct:.0f} altında. "
+                f"En pahalı satıcı yerine en ucuzunu seçersen tam {max_savings_tl:,.2f} TL (%{max_savings_pct:.0f}) cebinde kalır."
+            )
+        else:
+            summary = (
+                f"{cheapest_store_name} şu an piyasa ortalamasının altında gerçek bir fiyat avantajı sunuyor."
+            )
+    elif score >= 65:
+        verdict = "MAKUL"
+        badge_color = "blue"
+        headline = "Adil Piyasa Fiyatı — Alınabilir"
+        if max_savings_tl >= 10:
+            summary = (
+                f"Fiyatlar piyasa normlarında. {cheapest_store_name} üzerinden alarak en pahalı satıcıya göre "
+                f"{max_savings_tl:,.2f} TL tasarruf edebilirsin."
+            )
+        else:
+            summary = (
+                f"Mağazalar arası fiyatlar dengeli ve şişirilmiş fiyat görünmüyor. İhtiyacın varsa {cheapest_store_name} tercih edilebilir."
+            )
+    elif score >= 50:
+        verdict = "BEKLE"
+        badge_color = "amber"
+        headline = "Fiyatlar Yüksek veya Dalgalı — Radara Ekle"
+        summary = (
+            "Şu an belirgin bir indirim fırsatı yok veya satıcı fiyatları birbirine çok yakın/yüksek. "
+            "Acil değilse 'Radara Ekle' butonuna basıp fiyat düştüğünde bildirim alabilirsin."
+        )
+    else:
+        verdict = "ALMA"
+        badge_color = "red"
+        headline = "Şişirilmiş Fiyat / Sahte İndirim Riski!"
+        summary = (
+            "İncelenen fiyat piyasa ortalamasının üzerinde veya sözde indirim (şişirilmiş eski fiyat) içeriyor. "
+            "Bu fiyattan almak yerine listedeki en ucuz alternatife yönel veya fiyat düşüşünü bekle."
+        )
+
+    return {
+        "available": True,
+        "verdict": verdict,
+        "score": score,
+        "badge_color": badge_color,
+        "headline": headline,
+        "summary": summary,
+        "store_count": store_count,
+        "offer_count": n,
+        "cheapest_price": round(cheapest_price, 2),
+        "cheapest_store": cheapest_item.get("source") or "",
+        "cheapest_url": cheapest_item.get("url") or "",
+        "cheapest_title": cheapest_item.get("title") or "",
+        "median_price": round(median_price, 2),
+        "average_price": round(avg_price, 2),
+        "highest_price": round(highest_price, 2),
+        "highest_store": highest_item.get("source") or "",
+        "max_savings_tl": max_savings_tl,
+        "max_savings_pct": max_savings_pct,
+        "median_savings_tl": median_savings_tl,
+        "median_savings_pct": median_savings_pct,
+        "fake_discount_count": fake_discount_count,
+        "real_discount_count": real_discount_count,
+    }
+
 
 def generate_search_suggestion(query: str) -> str | None:
     query_lower = query.lower().strip()
@@ -4089,38 +4264,14 @@ def extract_volume_info(title: str) -> tuple[float, str] | None:
 
 
 BARCODE_DATABASE = {
-    "8690506390074": {
-        "title": "Yudum Ayçiçek Yağı 5 L",
-        "search_query": "Yudum ayçiçek yağı 5 L"
-    },
-    "8690506390081": {
-        "title": "Yudum Ayçiçek Yağı 2 L",
-        "search_query": "Yudum ayçiçek yağı 2 L"
-    },
-    "8690632034071": {
-        "title": "Hardline Whey 3 Matrix 2300 Gr",
-        "search_query": "Hardline Whey 3 Matrix 2300 Gr"
-    },
-    "8690632034088": {
-        "title": "Hardline Whey 3 Matrix 908 Gr",
-        "search_query": "Hardline Whey 3 Matrix 908 Gr"
-    },
-    "8690506000010": {
-        "title": "Migros Süt 1 L",
-        "search_query": "Migros süt 1 L"
-    },
-    "8690605061033": {
-        "title": "İpana 3D White Diş Macunu 75 ml",
-        "search_query": "İpana 3D White Diş Macunu 75 ml"
-    },
-    "8696001002003": {
-        "title": "Samsung T7 Portable SSD 1 TB",
-        "search_query": "Samsung T7 Portable SSD 1 TB"
-    },
-    "8697001003004": {
-        "title": "Defacto Erkek Çorap 3'lü Paket",
-        "search_query": "Defacto Erkek Çorap 3'lü Paket"
-    }
+    "8690506390074": {"title": "Yudum Ayçiçek Yağı 5 L", "brand": "Yudum", "search_query": "Yudum ayçiçek yağı 5 L"},
+    "8690506390081": {"title": "Yudum Ayçiçek Yağı 2 L", "brand": "Yudum", "search_query": "Yudum ayçiçek yağı 2 L"},
+    "8690632034071": {"title": "Hardline Whey 3 Matrix 2300 Gr", "brand": "Hardline", "search_query": "Hardline Whey 3 Matrix 2300 Gr"},
+    "8690632034088": {"title": "Hardline Whey 3 Matrix 908 Gr", "brand": "Hardline", "search_query": "Hardline Whey 3 Matrix 908 Gr"},
+    "8690506000010": {"title": "Migros Süt 1 L", "brand": "Migros", "search_query": "Migros süt 1 L"},
+    "8690605061033": {"title": "İpana 3D White Diş Macunu 75 ml", "brand": "İpana", "search_query": "İpana 3D White Diş Macunu 75 ml"},
+    "8696001002003": {"title": "Samsung T7 Portable SSD 1 TB", "brand": "Samsung", "search_query": "Samsung T7 Portable SSD 1 TB"},
+    "8697001003004": {"title": "Defacto Erkek Çorap 3'lü Paket", "brand": "DeFacto", "search_query": "Defacto Erkek Çorap 3'lü Paket"},
 }
 
 

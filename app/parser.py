@@ -763,8 +763,49 @@ def estimate_servings_from_title(title: str) -> int | None:
     return servings if servings > 0 else None
 
 
+def extract_identifiers_from_soup(soup: BeautifulSoup) -> dict[str, str]:
+    """Ürün sayfasındaki JSON-LD veya gömülü verilerden barkod (gtin13/gtin12/gtin8) ve model kodu (mpn/sku) çıkarır."""
+    out: dict[str, str] = {}
+    if not soup:
+        return out
+    gtin_keys = ("gtin13", "gtin12", "gtin8", "gtin14", "gtin", "ean", "barcode")
+    for item in iter_json_ld(soup):
+        for k in gtin_keys:
+            val = item.get(k)
+            if isinstance(val, (str, int)):
+                digits = "".join(ch for ch in str(val) if ch.isdigit())
+                if len(digits) in (8, 12, 13, 14):
+                    out["barcode"] = digits[-13:] if len(digits) == 14 and digits.startswith("0") else digits
+                    break
+        if not out.get("mpn") and isinstance(item.get("mpn"), (str, int)):
+            mpn = str(item.get("mpn")).strip()
+            if 3 <= len(mpn) <= 40:
+                out["mpn"] = mpn
+        if not out.get("sku") and isinstance(item.get("sku"), (str, int)):
+            sku = str(item.get("sku")).strip()
+            if 3 <= len(sku) <= 40:
+                out["sku"] = sku
+        brand = item.get("brand")
+        if isinstance(brand, dict):
+            brand = brand.get("name")
+        if not out.get("brand") and isinstance(brand, str) and brand.strip():
+            out["brand"] = brand.strip()
+    if not out.get("barcode"):
+        raw_html = str(soup)[:250_000]
+        m = re.search(r'"(?:gtin13|gtin|barcode|ean)"\s*:\s*"(\d{8}|\d{12}|\d{13})"', raw_html, re.IGNORECASE)
+        if m:
+            out["barcode"] = m.group(1)
+    return out
+
+
 def extract_extra_info(title: str, source: str, soup: BeautifulSoup = None) -> dict:
     info = {}
+    if soup is not None:
+        try:
+            ids = extract_identifiers_from_soup(soup)
+            info.update(ids)
+        except Exception:
+            pass
     if not title:
         return info
     title_lower = title.lower()

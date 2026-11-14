@@ -155,6 +155,7 @@
       <nav class="desktop-nav" aria-label="Ana menü">
         <button class="nav-item active" data-view="discover">Keşfet</button>
         <button class="nav-item" data-view="tracking">Takip</button>
+        <button class="nav-item" data-view="cart">Sepet &amp; Fiş</button>
         <button class="nav-item" data-view="savings">Tasarruf</button>
         <button class="nav-item" data-view="bulletins">B&uuml;lten</button>
       </nav>
@@ -189,19 +190,20 @@
             <div class="receipt-divider" aria-hidden="true"></div>
             <p class="eyebrow receipt-eyebrow">ALIŞVERİŞ KARAR ASİSTANI</p>
             <h1 class="receipt-headline">Satın almadan<br>önce <span class="receipt-stamp">fiyat karşılaştır.</span></h1>
-            <p class="intro-copy receipt-copy">Trendyol, Hepsiburada, Amazon, N11 ve daha fazlası — tek tıkla fiyat karşılaştırması. Link yapıştır, en ucuz mağazayı hemen bul.</p>
+            <p class="intro-copy receipt-copy">Trendyol, Hepsiburada, Amazon, N11 ve daha fazlası — ürün adı yaz veya link yapıştır, en ucuz mağazayı hemen bul.</p>
 
             <div class="receipt-divider receipt-divider-dashed" aria-hidden="true"></div>
 
           <form class="url-form" id="urlForm" style="display:flex;flex-direction:column;gap:10px;">
             <div class="url-actions-row" style="display:flex;gap:10px;width:min(800px,100%);">
-              <div class="url-field" style="flex:1;grid-template-columns:auto minmax(0,1fr) auto;">
-                <i data-lucide="link"></i>
-                <input id="productUrl" type="text" list="productUrlHistory" placeholder="Ürün linkini buraya yapıştır…" autocomplete="off" required>
+              <div class="url-field" style="flex:1;grid-template-columns:auto minmax(0,1fr) auto;position:relative;">
+                <i data-lucide="search"></i>
+                <input id="productUrl" type="text" list="productUrlHistory" placeholder="Ürün adı, barkod numarası veya ürün linki… (Örn: iPhone 15, Airfryer veya 13 haneli barkod)" autocomplete="off" required>
                 <datalist id="productUrlHistory"></datalist>
                 <button type="button" class="paste-button" id="pasteButton" aria-label="Yapıştır" title="Panodan yapıştır">
                   <i data-lucide="clipboard"></i>
                 </button>
+                <div id="searchSuggestDropdown" class="hidden" style="position:absolute;top:calc(100% + 6px);left:0;right:0;background:#18221f;border:1px solid rgba(255,255,255,.16);border-radius:10px;box-shadow:0 12px 28px rgba(0,0,0,.45);z-index:999;overflow:hidden;text-align:left;"></div>
               </div>
               <button class="primary-button" type="submit" style="background:#287a50;color:#fff;border:none;min-height:52px;padding:0 22px;border-radius:10px;font-size:14px;font-weight:700;display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;transition:background .15s;" onmouseover="this.style.background='#1f6040'" onmouseout="this.style.background='#287a50'">
                 <i data-lucide="scan-search"></i> Fiyatları Karşılaştır
@@ -210,9 +212,18 @@
                 <i data-lucide="scan-barcode"></i> Barkod Tara
               </button>
             </div>
-            <button type="button" onclick="showLinkGuide()" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:12px;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:0;margin-top:4px;transition:color .15s;" onmouseover="this.style.color='rgba(255,255,255,.85)'" onmouseout="this.style.color='rgba(255,255,255,.5)'">
-              <i data-lucide="info" style="width:13px;height:13px;"></i> Ürün linki nasıl kopyalanır?
-            </button>
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:4px;">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span style="font-size:11px;color:rgba(255,255,255,.55);font-weight:600;">Popüler:</span>
+                <button type="button" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('iPhone 15 128 GB'))" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.85);border-radius:14px;padding:3px 10px;font-size:11px;cursor:pointer;">iPhone 15</button>
+                <button type="button" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Philips Airfryer'))" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.85);border-radius:14px;padding:3px 10px;font-size:11px;cursor:pointer;">Airfryer</button>
+                <button type="button" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Yudum Ayçiçek Yağı 5 L'))" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.85);border-radius:14px;padding:3px 10px;font-size:11px;cursor:pointer;">Ayçiçek Yağı 5L</button>
+                <button type="button" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('AirPods Pro 2'))" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.85);border-radius:14px;padding:3px 10px;font-size:11px;cursor:pointer;">AirPods Pro</button>
+              </div>
+              <button type="button" onclick="showLinkGuide()" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:12px;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:0;transition:color .15s;" onmouseover="this.style.color='rgba(255,255,255,.85)'" onmouseout="this.style.color='rgba(255,255,255,.5)'">
+                <i data-lucide="info" style="width:13px;height:13px;"></i> Ürün linki nasıl kopyalanır?
+              </button>
+            </div>
           </form>
 
           <!-- Barkod tarayıcı -->
@@ -222,7 +233,13 @@
               <button type="button" onclick="closeMainBarcodeScanner()" class="guide-close" aria-label="Barkod tarayıcıyı kapat">✕</button>
             </div>
             <div id="mainHtml5QrReader" style="width:100%;max-width:420px;margin:0 auto;border-radius:10px;overflow:hidden;"></div>
-            <p style="font-size:11px;color:var(--ink-2);text-align:center;margin-top:8px;">EAN-8 · EAN-13 · UPC-A desteklenir</p>
+            <div style="display:flex;justify-content:center;margin-top:10px;">
+              <label for="mainBarcodeImageInput" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--green,#287a50);border:1px solid rgba(40,122,80,.35);border-radius:8px;padding:8px 14px;">
+                <i data-lucide="image" style="width:15px;height:15px;"></i> Fotoğraftan / Galeriden Barkod Oku
+              </label>
+              <input id="mainBarcodeImageInput" type="file" accept="image/*" style="display:none" onchange="scanMainBarcodeImage(event)">
+            </div>
+            <p style="font-size:11px;color:var(--ink-2);text-align:center;margin-top:8px;">EAN-8 · EAN-13 · UPC-A desteklenir · Barkod numarasını arama kutusuna da yazabilirsin</p>
           </div>
 
           <!-- Gizli — JS uyumluluğu için -->
@@ -705,7 +722,7 @@
       </footer>
     </main>
 
-    <nav class="mobile-nav" aria-label="Mobil menü" style="grid-template-columns: repeat(4, 1fr) !important;">
+    <nav class="mobile-nav" aria-label="Mobil menü" style="grid-template-columns: repeat(5, 1fr) !important;">
       <button class="mobile-nav-item active" data-view="discover">
         <i data-lucide="compass"></i>
         <span>Keşfet</span>
@@ -713,6 +730,10 @@
       <button class="mobile-nav-item" data-view="tracking">
         <i data-lucide="radar"></i>
         <span>Takip</span>
+      </button>
+      <button class="mobile-nav-item" data-view="cart">
+        <i data-lucide="shopping-basket"></i>
+        <span>Sepet</span>
       </button>
       <button class="mobile-nav-item" data-view="savings">
         <i data-lucide="wallet-cards"></i>
@@ -889,235 +910,11 @@
     </dialog>
 
     <script>
-      (()=>{let p;const src="/static/app.min.js?v=20261001-smsflag1";function load(){if(window.__almadanAppScriptLoaded)return Promise.resolve();if(p)return p;p=new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.defer=true;s.onload=()=>res();s.onerror=rej;document.head.appendChild(s)});return p}window.__almadanLoadApp=load;["openMainBarcodeScanner","closeMainBarcodeScanner","showLinkGuide","toggleSupportedStores","updateUserLocation","updateMaxDistance","closeSizeSelectorDialog","goOnboardingStep","onboardingNav","toggleFollow","showParsedProduct"].forEach(n=>{if(!window[n]){const stub=function(...a){load().then(()=>{window[n]!==stub&&typeof window[n]=="function"&&window[n](...a)})};window[n]=stub}});function view(v){document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));document.querySelectorAll(".content-section").forEach(s=>s.classList.toggle("hidden",s.id!==v+"View"));const i=document.querySelector(".intro-band");if(i)i.style.display=v==="discover"?"":"none"}if(/[?&](q|auto|list)=/.test(location.search))load();document.addEventListener("click",e=>{const b=e.target.closest("[data-view]");if(b&&!window.__almadanAppScriptLoaded){view(b.dataset.view);load()}},{capture:true,passive:true});document.addEventListener("submit",e=>{if(e.target&&e.target.id==="urlForm"&&!window.__almadanAppScriptLoaded){e.preventDefault();load().then(()=>window.parseProduct&&window.parseProduct({preventDefault(){},target:e.target}))}},{capture:true});["pointerdown","keydown","touchstart","scroll"].forEach(e=>addEventListener(e,load,{once:true,passive:true}));addEventListener("load",()=>{setTimeout(()=>{const m=document.createElement("link");m.rel="manifest";m.href="/static/manifest.json";document.head.appendChild(m)},3500);setTimeout(load,14000)},{once:true})})();
+      (()=>{let p;const src="/static/app.min.js?v=20261001-smsflag1";function load(){if(window.__almadanAppScriptLoaded)return Promise.resolve();if(p)return p;p=new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.defer=true;s.onload=()=>res();s.onerror=rej;document.head.appendChild(s)});return p}window.__almadanLoadApp=load;["openMainBarcodeScanner","closeMainBarcodeScanner","showLinkGuide","toggleSupportedStores","updateUserLocation","updateMaxDistance","closeSizeSelectorDialog","goOnboardingStep","onboardingNav","toggleFollow","showParsedProduct","runTextProductSearch"].forEach(n=>{if(!window[n]){const stub=function(...a){load().then(()=>{window[n]!==stub&&typeof window[n]=="function"&&window[n](...a)})};window[n]=stub}});function view(v){document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));document.querySelectorAll(".content-section").forEach(s=>s.classList.toggle("hidden",s.id!==v+"View"));const i=document.querySelector(".intro-band");if(i)i.style.display=v==="discover"?"":"none"}if(/[?&](q|auto|list)=/.test(location.search))load();document.addEventListener("click",e=>{const b=e.target.closest("[data-view]");if(b&&!window.__almadanAppScriptLoaded){view(b.dataset.view);load()}},{capture:true,passive:true});document.addEventListener("submit",e=>{if(e.target&&e.target.id==="urlForm"&&!window.__almadanAppScriptLoaded){e.preventDefault();load().then(()=>window.parseProduct&&window.parseProduct({preventDefault(){},target:e.target}))}},{capture:true});["pointerdown","keydown","touchstart","scroll"].forEach(e=>addEventListener(e,load,{once:true,passive:true}));addEventListener("load",()=>{setTimeout(()=>{const m=document.createElement("link");m.rel="manifest";m.href="/static/manifest.json";document.head.appendChild(m)},3500);setTimeout(load,14000)},{once:true})})();
     </script>
     <script>
-      /* Sprint 12 — auth fix: DOMContentLoaded sonrasi state.auth guncelle */
-      document.addEventListener('DOMContentLoaded', function() {
-        /* app.js'in loadSession() cagrisini bekle, sonra auth/session ile patch et */
-        window.setTimeout(function() {
-          (window.scheduleIdleTask || window.setTimeout)(async function() {
-            try {
-              var resp = await fetch('/auth/session', {cache: 'no-store'});
-              var data = await resp.json();
-              if (typeof state !== 'undefined' && data.enabled && !state.auth.enabled) {
-                state.auth = data;
-                if (typeof renderAccountButton === 'function') renderAccountButton();
-              }
-            } catch(e) {}
-          }, 2500);
-        }, 9000);
-      });
-
-      /* Sprint 12 — demo urunleri kaldir (app.js cache bypass) */
       window.addEventListener('load', function() {
-        window.renderFallbackOpportunities = function() {
-          var grid = document.getElementById('dealGrid');
-          if (!grid) return;
-          grid.innerHTML = '<div style="grid-column:1/-1;padding:48px 24px;text-align:center;"><div style="font-size:40px;margin-bottom:12px;">🛒</div><p style="font-size:15px;font-weight:600;color:var(--ink);margin:0 0 6px;">Henüz takip edilen ürün yok</p><p style="font-size:13px;color:var(--ink-2);margin:0;">Üst kısımdan ürün linki yapıştır veya barkod tara — fiyatları karşılaştıralım.</p></div>';
-        };
-
-        /* Bultenler: tum magazalar + marka logosu stili */
-        var _STORES = {
-          genel:[
-            ['trendyol','Trendyol','#F27A1A','Flaş indirimler, süper fırsatlar ve büyük kampanya günlerinde anlık bildirim'],
-            ['hepsiburada','Hepsiburada','#FF6000','11.11, Efsane Cuma ve özel kampanya günlerinde erken uyarı'],
-            ['amazon','Amazon','#FF9900','Prime indirim günleri ve Lightning Deal başlangıçlarında bildirim'],
-            ['n11','n11','#7B00D4','Haftalık özel teklifler ve kategori indirimlerinde otomatik bildirim']
-          ],
-          market:[
-            ['bim','BİM','#E30613','Her Cuma 09:00\'da yeni aktüel ürünler yayınlanır, anında bildirim alırsın'],
-            ['a101','A101','#FF6600','Her Perşembe yeni aktüel kataloğu çıkar, kaçırmadan önce seni haberdar ederiz'],
-            ['sok','ŞOK','#8B0000','Her Çarşamba taze aktüel ürünler — fırsatlar bitmeden bildirim gönderilir'],
-            ['migros','Migros','#E3000F','Haftalık indirimler ve para puan kampanyaları başlar başlamaz bildirim'],
-            ['5mmigros','5M Migros','#c40','Büyük alışveriş fırsatları ve toplu indirim günlerinde bildirim'],
-            ['migrosjet','MigrosJet','#E3000F','Hızlı teslimat kampanyaları ve anlık indirimler için bildirim'],
-            ['carrefoursa','CarrefourSA','#0070AC','Haftalık broşür indirimleri ve market kampanyalarında bildirim'],
-            ['carrefoursagurme','Carrefour Gurme','#0070AC','Premium ürün indirimleri ve gurme kampanyalarında bildirim'],
-            ['hakmarekspres','Hakmar Ekspres','#FF0000','Haftalık aktüel ürün indirimleri için bildirim'],
-            ['hakmar','Hakmar','#FF0000','Aktüel katalog yayınlandığında anlık bildirim alırsın'],
-            ['file','File Market','#1D3D7C','Bölgesel kampanyalar ve haftalık indirimler için bildirim'],
-            ['macrocenter','MacroCenter','#8B0000','Premium market kampanyaları ve özel ürün indirimlerinde bildirim'],
-            ['happycenter','Happy Center','#FF6600','Ev ve mutfak ürünü kampanyaları başladığında bildirim'],
-            ['onurmarket','Onur Market','#006633','Haftalık özel indirimler ve yerel kampanyalarda bildirim'],
-            ['mopas','Mopas','#003087','Büyük alışveriş merkezi kampanyaları için bildirim'],
-            ['cagrimarket','Çağrı Market','#1a6b1a','Yerel indirim günleri ve kampanyalarda bildirim'],
-            ['bizimtoptan','BizimToptan','#E63946','Toplu alım kampanyaları ve üye indirimleri başladığında bildirim'],
-            ['metro','Metro','#003F87','Metro kart kampanyaları ve toplu alım indirimlerinde bildirim'],
-            ['secmarket','SeçMarket','#2d6a4f','Haftalık özel teklifler ve bölgesel kampanyalarda bildirim'],
-            ['tarimkredi','Tarım Kredi','#1B5E20','Mevsimsel tarım ürünü indirimleri ve üretici kampanyalarında bildirim']
-          ],
-          teknoloji:[
-            ['teknosa','Teknosa','#E60026','Teknoloji ürünü indirimleri, haftalık özel fırsatlar ve yeni ürün gelişlerinde bildirim'],
-            ['mediamarkt','MediaMarkt','#CC0000','Red Friday, flaş indirimler ve mağaza özel kampanyalarında anlık bildirim'],
-            ['vatanbilgisayar','Vatan','#003087','Teknik ürün kampanyaları ve stok temizleme indirimlerinde bildirim'],
-            ['evkur','Evkur','#E8232A','Taksit kampanyaları ve sıfır faiz fırsatları başladığında bildirim'],
-            ['samsung','Samsung','#1428A0','Yeni ürün lansmanı ve resmi indirim dönemlerinde öncelikli bildirim'],
-            ['huawei','Huawei','#CF0A2C','Yeni model çıkışı ve özel kampanya dönemlerinde bildirim'],
-            ['mistore','Mi Store','#FF6900','Mi ürünleri kampanyaları ve stok indirimleri için bildirim'],
-            ['itopya','İtopya','#222','Apple ürünleri ve aksesuarlarda indirim başladığında bildirim'],
-            ['troy','TROY','#333','Elektronik kampanyalar ve özel gün indirimleri için bildirim'],
-            ['pozitifteknoloji','Pozitif Tek.','#005F9E','B2B kampanyaları ve toplu alım fırsatlarında bildirim'],
-            ['gurgencer','Gürgencer','#1a1a6e','Beyaz eşya ve büyük ev aleti indirimlerinde bildirim'],
-            ['ozsanal','Özsanal','#004080','Teknoloji ürünü kampanyaları ve stok eritme fırsatlarında bildirim'],
-            ['yigitavm','Yiğit AVM','#8B0000','Yerel elektronik mağaza kampanyaları için bildirim'],
-            ['cetmen','Çetmen','#333','Elektronik ve aksesuar indirim dönemlerinde bildirim']
-          ],
-          moda:[
-            ['lcwaikiki','LC Waikiki','#E4002B','Sezon sonu %70\'e varan indirimler ve aile kampanyaları başladığında bildirim'],
-            ['defacto','DeFacto','#000','Her Cuma yeni koleksiyon ve kampanya başlangıçlarında otomatik bildirim'],
-            ['koton','Koton','#000','Sezon indirimleri, %50 kampanyalar ve yeni koleksiyon gelişlerinde bildirim'],
-            ['mavi','Mavi','#003DA5','Denim kampanyaları ve sezon indirimleri başladığında bildirim'],
-            ['ltb','LTB','#1a1a1a','Kot pantolon ve denim koleksiyon indirimlerinde bildirim'],
-            ['colins','Colin\'s','#8B0000','Sezon kampanyaları ve online özel indirimler için bildirim'],
-            ['boyner','Boyner','#222','Çok markalı kampanyalar ve Boyner kart indirimleri başladığında bildirim'],
-            ['beymen','Beymen','#111','Lüks marka indirimleri ve özel üye kampanyalarında bildirim'],
-            ['vakko','Vakko','#111','Sezon sonu koleksiyon indirimleri ve özel satışlarda bildirim'],
-            ['altinyildiz','Altınyıldız','#8B0000','Erkek giyim kampanyaları ve takım elbise indirimlerinde bildirim'],
-            ['kigili','Kiğılı','#1B2A4A','Erkek giyim özel günleri ve kampanya başlangıçlarında bildirim'],
-            ['sarar','Sarar','#1a1a1a','Kurumsal giyim indirimleri ve özel koleksiyon kampanyalarında bildirim'],
-            ['penti','Penti','#E8003D','İç giyim ve çorap kampanyaları ile sezon indirimlerinde bildirim'],
-            ['ipekyol','İpekyol','#8B6914','Kadın giyim koleksiyon indirimleri ve özel sezon satışlarında bildirim'],
-            ['twist','Twist','#9B59B6','Genç kadın giyim kampanyaları ve sezon indirimlerinde bildirim'],
-            ['machka','Machka','#222','Tasarımcı giyim koleksiyonları ve özel kampanyalarda bildirim'],
-            ['zara','Zara','#111','Sezon sonu satışı ve yeni koleksiyon düşüşlerinde anlık bildirim'],
-            ['hm','H&M','#E50010','H&M üye indirimleri ve sezon kampanyaları başladığında bildirim'],
-            ['mango','Mango','#1a1a1a','Sezon indirimleri ve yeni koleksiyon haber bülteni için bildirim'],
-            ['bershka','Bershka','#000','Genç moda kampanyaları ve sezon satışlarında bildirim'],
-            ['pullandbear','Pull&Bear','#333','Casual kampanyalar ve sezon indirimleri başladığında bildirim'],
-            ['stradivarius','Stradivarius','#8B6914','Kadın giyim koleksiyon indirimleri için bildirim'],
-            ['massimodutti','Massimo Dutti','#1a1a1a','Premium koleksiyon indirimleri ve özel satışlarda bildirim'],
-            ['ozdilek','Özdilek','#8B0000','Çok katlı mağaza kampanyaları ve büyük indirim günlerinde bildirim'],
-            ['flo','FLO','#E8232A','Ayakkabı kampanyaları, 2 al 1 öde fırsatları ve sezon indirimlerinde bildirim'],
-            ['deichmann','Deichmann','#E8003D','Ayakkabı indirimleri ve yeni sezon kampanyalarında bildirim'],
-            ['ayakkabidunyasi','Ayakkabı Dünyası','#003087','Sezon ayakkabı indirimleri ve marka kampanyalarında bildirim'],
-            ['superstep','Superstep','#FF6600','Spor ayakkabı kampanyaları ve yeni sezon çıkışlarında bildirim'],
-            ['sportive','Sportive','#003087','Spor giyim ve ekipman kampanyaları başladığında bildirim'],
-            ['decathlon','Decathlon','#0082C3','Spor ekipmanı indirimleri ve yeni ürün gelişlerinde bildirim'],
-            ['instreet','İnstreet','#333','Sokak modası kampanyaları ve özel koleksiyon indirimlerinde bildirim'],
-            ['suvari','Süvari','#8B0000','Ayakkabı ve deri ürün kampanyalarında bildirim'],
-            ['hatemoglu','Hatemoglu','#1a1a1a','Erkek giyim koleksiyonu indirimleri ve özel günlerde bildirim'],
-            ['tudors','Tudors','#1B2A4A','Klasik erkek giyim kampanyaları ve sezon indirimlerinde bildirim']
-          ],
-          kozmetik:[
-            ['gratis','Gratis','#E91E8C','Kozmetik kampanyaları, 3 al 2 öde fırsatları ve yeni ürün gelişlerinde bildirim'],
-            ['watsons','Watsons','#007B5E','Üye indirimleri, kişisel bakım kampanyaları ve yeni ürünlerde bildirim'],
-            ['rossmann','Rossmann','#E8232A','Kozmetik ve parfüm indirimleri, haftalık özel fırsatlarda bildirim'],
-            ['sephora','Sephora','#000','Lüks kozmetik kampanyaları ve Beauty Insider özel günlerinde bildirim'],
-            ['yvesrocher','Yves Rocher','#2E7D32','Doğal kozmetik kampanyaları ve ücretsiz kargo fırsatlarında bildirim'],
-            ['eveshop','Eve Shop','#C2185B','Kadın bakım ürünleri kampanyaları ve özel indirim günlerinde bildirim'],
-            ['flormar','Flormar','#E91E8C','Makyaj kampanyaları ve yeni koleksiyon ürün gelişlerinde bildirim'],
-            ['goldenrose','Golden Rose','#C62828','Uygun fiyatlı kozmetik kampanyaları ve özel indirimlerinde bildirim'],
-            ['mac','MAC','#111','Profesyonel makyaj ürün lansmanları ve özel koleksiyon kampanyalarında bildirim'],
-            ['kikomilano','Kiko Milano','#C62828','İtalyan kozmetik indirimleri ve yeni koleksiyon gelişlerinde bildirim'],
-            ['sevil','Sevil Parfüm','#8B4513','Parfüm kampanyaları ve orijinal ürün indirimlerinde bildirim']
-          ],
-          saglik:[
-            ['ebebek','ebebek','#E91E8C','Bebek ürünleri kampanyaları, stroller ve mama indirimleri başladığında bildirim'],
-            ['babymall','Baby Mall','#7B1FA2','Anne-bebek ürünleri kampanyaları ve özel indirim günlerinde bildirim'],
-            ['joker','Joker Oyuncak','#FF6600','Oyuncak kampanyaları, yılbaşı ve çocuk bayramı özel indirimlerinde bildirim'],
-            ['atasunoptik','Atasun Optik','#003087','Gözlük, lens kampanyaları ve göz sağlığı haftası indirimlerinde bildirim'],
-            ['opmaroptik','Opmar Optik','#0070AC','Optik ürün kampanyaları ve özel göz bakım indirimlerinde bildirim'],
-            ['eleganceoptik','Elegance Optik','#1565C0','Tasarımcı gözlük indirimleri ve lens kampanyalarında bildirim'],
-            ['mertoptik','Mert Optik','#1B5E20','Gözlük ve optik ürün kampanyalarında bildirim'],
-            ['gnc','GNC','#FF6600','Protein, vitamin ve takviye kampanyaları başladığında anlık bildirim'],
-            ['supplementler','Supplementler','#1B5E20','Spor takviyesi kampanyaları ve stok indirimlerinde bildirim'],
-            ['proteinocean','ProteinOcean','#003087','Whey protein ve spor beslenme ürünleri indirimlerinde bildirim']
-          ],
-          ev:[
-            ['karaca','Karaca','#8B0000','Mutfak ve ev tekstili kampanyaları, yeni sezon koleksiyonlarında bildirim'],
-            ['pasabahce','Paşabahçe','#1565C0','Cam ve kristal ürün kampanyaları ile koleksiyon indirimlerinde bildirim'],
-            ['englishhome','English Home','#2E7D32','Ev tekstili kampanyaları ve yeni sezon koleksiyon gelişlerinde bildirim'],
-            ['madamecoco','Madame Coco','#9C27B0','Dekorasyon ve ev tekstili kampanyaları başladığında bildirim'],
-            ['bellamaison','Bella Maison','#C2185B','Online ev dekorasyon kampanyaları ve flash indirimlerinde bildirim'],
-            ['linens','Linens','#5D4037','Yatak odası ve banyo tekstil kampanyalarında bildirim'],
-            ['karacahome','Karaca Home','#8B0000','Ev ve mutfak koleksiyonu özel kampanyalarında bildirim'],
-            ['jumbo','Jumbo','#c8940a','Oyuncak ve ev ürünleri kampanyaları, çocuk bayramı indirimlerinde bildirim'],
-            ['ikea','IKEA','#0058A3','IKEA Family kampanyaları, stok eritme indirimleri ve yeni ürün gelişlerinde bildirim'],
-            ['koctas','Koçtaş','#E8232A','Yapı market kampanyaları, bahçe sezonu ve ev tadilatı indirimlerinde bildirim'],
-            ['bauhaus','Bauhaus','#E8232A','Profesyonel yapı malzeme kampanyaları ve sezon indirimlerinde bildirim'],
-            ['tekzen','Tekzen','#003087','Yapı market ve hırdavat kampanyaları başladığında bildirim'],
-            ['korkmaz','Korkmaz','#CC0000','Türk mutfak aleti kampanyaları ve yeni ürün lansmanlarında bildirim'],
-            ['porland','Porland','#1a1a1a','Porselen ve mutfak ürünleri koleksiyon indirimlerinde bildirim'],
-            ['bernardo','Bernardo','#5D4037','Deri ve ev aksesuar kampanyalarında bildirim'],
-            ['hisar','Hisar','#1565C0','Metal mutfak ve banyo ürünleri kampanyaları için bildirim'],
-            ['schafer','Schäfer','#333','Alman mutfak aleti kampanyaları ve özel indirim günlerinde bildirim']
-          ]
-        };
-        var _CAT_LABEL = {
-          market:'Marketler',genel:'Pazaryerleri',teknoloji:'Teknoloji',
-          moda:'Moda & Giyim',kozmetik:'Kozmetik & Güzellik',
-          saglik:'Sağlık & Bebek',ev:'Ev & Yaşam'
-        };
-        function _storeLogo(name, color) {
-          var initials = name.replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ0-9&]/g,' ').trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0,2);
-          return '<div style="width:36px;height:36px;border-radius:8px;background:'+color+';display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="color:#fff;font-size:11px;font-weight:800;letter-spacing:-.3px">'+initials+'</span></div>';
-        }
-        window._almadanShowStores = function() {
-          var list = document.getElementById('storeList');
-          if (!list) return;
-          var html='';
-          ['genel','market','teknoloji','moda','kozmetik','saglik','ev'].forEach(function(cat){
-            var arr=_STORES[cat]; if(!arr||!arr.length)return;
-            var seen={};
-            html+='<p style="font-size:11px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em;margin:20px 0 8px 0;">'+_CAT_LABEL[cat]+'</p><div class="store-grid">';
-            arr.forEach(function(s){
-              if(seen[s[0]])return; seen[s[0]]=1;
-              html+='<div class="store-card" id="scard-'+s[0]+'">'
-                +'<div class="store-card-header">'+_storeLogo(s[1],s[2])
-                +'<div class="store-name">'+s[1]+'</div></div>'
-                +(s[3]?'<div class="store-note">'+s[3]+'</div>':'')
-                +'<button type="button" class="btn-follow" id="sfbtn-'+s[0]+'" onclick="toggleFollow(\''+s[0]+'\',\''+s[1]+'\')">+ Takibe Al</button></div>';
-            });
-            html+='</div>';
-          });
-          list.innerHTML=html;
-        };
-        /* toggleFollow — eski app.js'de yok, burda tanimla */
-        if (typeof toggleFollow === 'undefined') {
-          window.storeFollowState = window.storeFollowState || {};
-          window.toggleFollow = async function(slug, name) {
-            var btn  = document.getElementById('sfbtn-' + slug);
-            var card = document.getElementById('scard-' + slug);
-            if (!btn || !card) return;
-            var isFollowed = window.storeFollowState[slug];
-            window.storeFollowState[slug] = !isFollowed;
-            btn.textContent  = isFollowed ? '+ Takibe Al' : '✓ Takip Ediliyor';
-            btn.classList.toggle('active', !isFollowed);
-            card.classList.toggle('followed', !isFollowed);
-            try {
-              var res = await fetch('/api/stores/' + slug + '/follow', { method: isFollowed ? 'DELETE' : 'POST' });
-              if (res.status === 401) {
-                window.storeFollowState[slug] = isFollowed;
-                btn.textContent = isFollowed ? '✓ Takip Ediliyor' : '+ Takibe Al';
-                btn.classList.toggle('active', isFollowed);
-                card.classList.toggle('followed', isFollowed);
-                if (typeof toast === 'function') toast('Takip için giriş yapman gerekiyor.');
-                return;
-              }
-              if (typeof toast === 'function') toast(isFollowed ? (name + ' takipten çıkarıldı.') : (name + ' takibe alındı ✓'));
-            } catch(e) {
-              if (typeof toast === 'function') toast('Bağlantı hatası, tekrar dene.');
-            }
-          };
-        }
-
-        /* showInitialLoadFallback override — kurtarma ekranini markaya uygun yap */
-        window.showInitialLoadFallback = function() {
-          var overlay = document.getElementById('quantumScanOverlay');
-          var progress = document.getElementById('quantumScanProgress');
-          if (!overlay) { window.renderFallbackOpportunities && window.renderFallbackOpportunities(); return; }
-          overlay.style.display = 'flex';
-          var h3 = overlay.querySelector('h3');
-          if (h3) { h3.classList.remove('glitch-active'); h3.innerText = 'Almadan'; }
-          if (progress) progress.innerText = 'Daha akıllıca alışveriş için hazırlanıyor…';
-          setTimeout(function() {
-            overlay.style.display = 'none';
-            window.renderFallbackOpportunities && window.renderFallbackOpportunities();
-          }, 1800);
-        };
-
-        /* Sprint 12 — intro-band sadece Kesfet sekmesinde goster */
+        /* intro-band sadece Keşfet sekmesinde göster */
         var introBand = document.querySelector('.intro-band');
         function updateIntroBand(view) {
           if (!introBand) return;
@@ -1129,309 +926,6 @@
           });
         });
         updateIntroBand('discover');
-
-        /* Takip edilen mağazaları yükle ve UI'yi güncelle */
-        function _loadFollowedStores() {
-          fetch('/api/stores/followed', { credentials: 'same-origin' })
-            .then(function(r){ return r.ok ? r.json() : null; })
-            .then(function(data){
-              if (!data || !data.followed) return;
-              data.followed.forEach(function(slug) {
-                window.storeFollowState = window.storeFollowState || {};
-                window.storeFollowState[slug] = true;
-                var btn  = document.getElementById('sfbtn-' + slug);
-                var card = document.getElementById('scard-' + slug);
-                if (btn)  { btn.textContent = '✓ Takip Ediliyor'; btn.classList.add('active'); }
-                if (card) { card.classList.add('followed'); }
-              });
-            }).catch(function(){});
-        }
-        /* Bildirim paneline mağaza bildirimleri ekle */
-        var _notifBtn = document.getElementById('notificationButton');
-        if (_notifBtn) {
-          _notifBtn.addEventListener('click', function() {
-            var _dialogContent = document.getElementById('dialogContent');
-            if (!_dialogContent) return;
-            var _obs = new MutationObserver(function() {
-              if (!_dialogContent.querySelector('.eyebrow')) return;
-              if (_dialogContent.querySelector('[data-store-notifs]')) return;
-              _obs.disconnect();
-              /* Mağaza bildirimlerini çek ve ekle */
-              fetch('/api/notifications', { credentials: 'same-origin' })
-                .then(function(r){ return r.json(); })
-                .then(function(data){
-                  var notifs = data.notifications || [];
-                  var unread = notifs.filter(function(n){ return !n.is_read; });
-                  var section = document.createElement('div');
-                  section.setAttribute('data-store-notifs', '1');
-                  section.style.cssText = 'margin-top:20px;border-top:1px solid var(--border);padding-top:16px;';
-                  var html = '<p style="font-size:10px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;margin:0 0 10px;">MAĞAZA BİLDİRİMLERİ</p>';
-                  if (notifs.length === 0) {
-                    html += '<p style="font-size:13px;color:var(--ink-2);margin:0;">Henüz mağaza kampanya bildirimi yok.</p>';
-                  } else {
-                    var toShow = notifs.slice(0, 8);
-                    toShow.forEach(function(n){
-                      var dot = n.is_read ? '' : '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#287a50;margin-right:6px;flex-shrink:0;margin-top:3px;"></span>';
-                      html += '<div style="display:flex;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);">'
-                        + dot
-                        + '<div><div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:2px;">'+n.title+'</div>'
-                        + '<div style="font-size:12px;color:var(--ink-2);">'+n.body+'</div>'
-                        + (n.url && n.url!=='/'?'<a href="'+n.url+'" target="_blank" style="font-size:11px;color:#287a50;text-decoration:none;">Kampanyayı İncele →</a>':'')
-                        + '</div></div>';
-                    });
-                    if (unread.length > 0) {
-                      fetch('/api/notifications/read-all', { method:'POST', credentials:'same-origin' });
-                    }
-                  }
-                  section.innerHTML = html;
-                  _dialogContent.querySelector('.dialog-body')?.appendChild(section);
-                  /* Bildirim dot güncelle */
-                  var dot = document.querySelector('.notification-dot');
-                  if (dot) dot.style.display = 'none';
-                }).catch(function(){});
-            });
-            _obs.observe(_dialogContent, { childList: true, subtree: false });
-          });
-        }
-
-        /* Sayfa yüklenince okunmamış bildirim varsa dot göster --
-           /api/notifications hesap gerektirir, girişsizken hep 403 döner
-           (bkz. app/main.py). Anonim ziyaretçilerin (trafiğin çoğu) her
-           sayfa yüklemesinde gereksiz 403 istegi atmasını önlemek için
-           önce giriş durumu kontrol ediliyor. */
-        window.setTimeout(function() {
-          (window.scheduleIdleTask || window.setTimeout)(function() {
-            if (typeof state === 'undefined' || !state.auth || !state.auth.authenticated) return;
-            fetch('/api/notifications', { credentials: 'same-origin' })
-              .then(function(r){ return r.ok ? r.json() : null; })
-              .then(function(data){
-                if (!data) return;
-                var unread = (data.notifications||[]).filter(function(n){ return !n.is_read; });
-                var dot = document.querySelector('.notification-dot');
-                if (dot) dot.style.display = unread.length ? 'block' : 'none';
-              }).catch(function(){});
-          }, 2500);
-        }, 10000);
-
-        /* Service worker kaydi app.js tarafinda ilk render sonrasi erteleniyor. */
-
-        /* ── GOOGLE SHEETS SYNC BUTONU ──────────────────────────────────────
-           Admin paneline "Google Sheets'e Gönder" butonu enjekte eder.
-        ─────────────────────────────────────────────────────────────────────── */
-        window._almadanSheetsSync = async function(btn) {
-          var orig = btn.innerHTML;
-          btn.disabled = true;
-          btn.innerHTML = '<span class="spinner" style="display:inline-block;width:14px;height:14px;border-width:2px;border-color:#fff;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite;"></span> Gönderiliyor...';
-          try {
-            var csrfToken = document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('csrf_token=');});
-            var csrfVal = csrfToken ? csrfToken.split('=')[1] : '';
-            var res = await fetch('/api/admin/sync-google-sheets', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': csrfVal, 'Content-Type': 'application/json' } });
-            var text = await res.text();
-            var data; try { data = JSON.parse(text); } catch(je) { throw new Error('Sunucu hatası: ' + text.slice(0, 120)); }
-            if (!res.ok) throw new Error(data.detail || 'Hata');
-            btn.innerHTML = '✓ Gönderildi';
-            btn.style.background = '#287a50';
-            /* Sonuç linkini göster */
-            var resultDiv = btn.parentElement.querySelector('[data-sheets-result]');
-            if (resultDiv) {
-              resultDiv.innerHTML = '<a href="' + data.sheet_url + '" target="_blank" style="color:#287a50;font-size:12px;font-weight:600;text-decoration:none;">📊 Tabloyu Aç →</a>'
-                + '<span style="font-size:11px;color:var(--ink-2);margin-left:10px;">' + (data.users||0) + ' kullanıcı · ' + (data.links||0) + ' link · ' + (data.products||0) + ' ürün · ' + (data.stores||0) + ' mağaza</span>'
-                + (data.auth_api_snippet ? '<div style="font-size:10px;color:red;margin-top:4px;">Auth err ' + data.auth_api_status + ': ' + data.auth_api_snippet + '</div>' : '<div style="font-size:10px;color:green;margin-top:4px;">Auth OK · ' + (data.emails_found||0) + ' email</div>');
-              resultDiv.style.display = 'block';
-            }
-            setTimeout(function(){ btn.innerHTML = orig; btn.disabled = false; btn.style.background = ''; }, 4000);
-          } catch(e) {
-            btn.innerHTML = '⚠ ' + (e.message || 'Hata');
-            btn.style.background = '#c0392b';
-            setTimeout(function(){ btn.innerHTML = orig; btn.disabled = false; btn.style.background = ''; }, 4000);
-          }
-        };
-
-        /* Admin paneli açılınca butonu enjekte et — MutationObserver ile yakala */
-        function _injectSheetsBtn() {
-          var statsBody = document.getElementById('adminStatsBody');
-          if (!statsBody || statsBody.querySelector('[data-sheets-btn]')) return;
-          /* İçerik henüz yüklenmediyse (spinner varsa) tekrar dene */
-          if (statsBody.querySelector('.spinner') || statsBody.textContent.trim() === 'Yükleniyor...') {
-            setTimeout(_injectSheetsBtn, 400);
-            return;
-          }
-          var wrapper = document.createElement('div');
-          wrapper.style.cssText = 'margin-top:20px;padding-top:16px;border-top:1px solid var(--border);';
-          wrapper.innerHTML = '<p style="font-size:11px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;margin:0 0 10px;">VERİ DIŞA AKTARMA</p>'
-            + '<button type="button" data-sheets-btn="1" onclick="window._almadanSheetsSync(this)" style="background:#1a3d6e;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);">📊 Google Sheets\'e Gönder</button>'
-            + '<div data-sheets-result style="display:none;margin-top:8px;"></div>'
-            + '<p style="font-size:11px;color:var(--ink-2);margin:8px 0 0;">3 sekme: Yapıştırılan Linkler · Takip Edilen Ürünler · Takip Edilen Mağazalar</p>';
-          statsBody.appendChild(wrapper);
-        }
-        /* dialogContent değişimlerini izle */
-        var _adminObs = new MutationObserver(function() {
-          if (document.getElementById('adminStatsBody')) _injectSheetsBtn();
-        });
-        var _dlgContent = document.getElementById('dialogContent');
-        if (_dlgContent) _adminObs.observe(_dlgContent, { childList: true, subtree: true });
-
-        /* ── YENİ SATICI KARŞILAŞTIRMA EKRANI (app.js override) ─────────────
-           URL yapıştırıldıktan sonra 15+ satıcı/ürün listesi gösterir.
-           Kullanıcı seçim yapar → takip sayfasına geçer.
-        ─────────────────────────────────────────────────────────────────────── */
-        window.showSellerSelectionDialog = async function(parsed) {
-          var dialog  = document.getElementById('sellerSelectionDialog');
-          var content = document.getElementById('sellerSelectionContent');
-          if (!dialog || !content) return;
-
-          dialog.showModal();
-          content.innerHTML = '<div style="text-align:center;padding:36px 20px;">'
-            + '<span class="spinner" style="display:inline-block;width:28px;height:28px;border-color:#287a50;border-right-color:transparent;border-width:3px;"></span>'
-            + '<p style="margin-top:16px;font-weight:700;font-size:15px;color:var(--ink);">En İyi Teklifler Karşılaştırılıyor...</p>'
-            + '<p style="font-size:12px;color:var(--ink-2);margin-top:4px;">15+ satıcı ve alternatif tarıyor</p>'
-            + '</div>';
-
-          try {
-            /* find-alternatives'tan relevans sıralı sonuçları çek */
-            var csrfToken = (document.cookie.split('; ').find(function(r){return r.startsWith('csrf_token=');})||'').split('=').slice(1).join('=');
-            csrfToken = csrfToken ? decodeURIComponent(csrfToken) : '';
-            var faResp = await fetch('/api/find-alternatives', {
-              method: 'POST',
-              credentials: 'same-origin',
-              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-              body: JSON.stringify({ title: parsed.title, original_url: parsed.canonical_url, source: parsed.source || null, price: parsed.price || null })
-            }).then(function(r){ return r.json(); });
-
-            var alts = (faResp.alternatives || []);
-            /* alts aynı diziye referans — mutasyonlardan ÖNCE backend sonuç sayısını sakla */
-            var backendAltCount = alts.length;
-
-            /* Trendyol / diğer satıcılar parsed içinden */
-            if (parsed.extra_info && parsed.extra_info.otherMerchants) {
-              var seen = new Set(alts.map(function(a){ return a.url; }));
-              parsed.extra_info.otherMerchants.forEach(function(m){
-                if (!seen.has(m.url)) { alts.push(m); seen.add(m.url); }
-              });
-            }
-
-            /* Asıl ürünü başa ekle (yoksa) */
-            if (parsed.price) {
-              var origFound = alts.find(function(a){
-                return Math.abs((a.price||0) - parsed.price) < 1
-                  && String(a.source||'').toLowerCase().includes(String(parsed.source||'').toLowerCase());
-              });
-              if (!origFound) {
-                alts.unshift({
-                  title: parsed.title, price: parsed.price, source: parsed.source,
-                  url: parsed.canonical_url, image_url: parsed.image_url,
-                  extra_info: parsed.extra_info || {}, _isOriginal: true
-                });
-              } else {
-                origFound._isOriginal = true;
-              }
-            }
-
-            /* Sıralama: backend relevans sırası korunur, sadece 0 fiyatlılar sona */
-            alts.sort(function(a,b){
-              if (!a.price && b.price) return 1;
-              if (a.price && !b.price) return -1;
-              return 0;
-            });
-
-            /* En çok değerlendirme */
-            var maxReviews = 0;
-            alts.forEach(function(a){ if ((a.extra_info||{}).review_count > maxReviews) maxReviews = a.extra_info.review_count; });
-            var maxReviewItem = maxReviews > 0 ? alts.find(function(a){ return (a.extra_info||{}).review_count === maxReviews; }) : null;
-
-            /* En yüksek puanlı */
-            var maxRating = 0;
-            alts.forEach(function(a){ var r = parseFloat((a.extra_info||{}).rating||0); if(r>maxRating) maxRating=r; });
-            var maxRatingItem = maxRating >= 8.5 ? alts.find(function(a){ return parseFloat((a.extra_info||{}).rating||0) === maxRating; }) : null;
-
-            /* Hazır mağaza arama linkleri — kullanıcı asla eli boş dönmesin */
-            var links = (faResp.search_links || []);
-            var linksHtml = '';
-            if (links.length) {
-              linksHtml = '<p style="font-size:13px;color:var(--ink-2);margin:16px 0 10px;">Bu mağazalarda kendin aramaya devam edebilirsin:</p>'
-                + '<div style="display:flex;flex-direction:column;gap:8px;">'
-                + links.map(function(l){
-                    return '<a href="' + l.url.replace(/"/g,'&quot;') + '" target="_blank" rel="noopener" '
-                      + 'style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;text-decoration:none;color:var(--ink);font-weight:600;font-size:14px;">'
-                      + '<span>🔎 ' + l.label + '</span><span style="color:var(--green);">→</span></a>';
-                  }).join('')
-                + '</div>';
-            }
-
-            if (alts.length === 0) {
-              content.innerHTML = '<div style="text-align:center;padding:24px 20px;">'
-                + '<p style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:8px;">Otomatik Eşleşme Bulunamadı</p>'
-                + '<p style="font-size:13px;color:var(--ink-2);margin-bottom:4px;">Bu ürünü diğer mağazalarda otomatik bulamadık.</p>'
-                + '<div style="text-align:left;">' + linksHtml + '</div>'
-                + '<button type="button" class="primary-button" style="width:100%;border-radius:10px;padding:12px;font-weight:700;margin-top:16px;" data-p=\'' + JSON.stringify(parsed).replace(/'/g,'&#39;') + '\' onclick="document.getElementById(\'sellerSelectionDialog\').close(); showParsedProduct(JSON.parse(this.getAttribute(\'data-p\')));"> Mevcut Ürünü Takip Et</button>'
-                + '</div>';
-              return;
-            }
-
-            var cheapestPrice = Math.min.apply(null, alts.filter(function(a){ return a.price > 0; }).map(function(a){ return a.price; }));
-
-            var html = '<div style="position:sticky;top:0;background:var(--bg);padding:0 0 12px;z-index:1;border-bottom:1px solid var(--border);margin-bottom:12px;">'
-              + '<h3 style="margin:0 0 4px;font-size:19px;font-weight:800;color:var(--ink);">🛒 Mağaza Karşılaştırması</h3>'
-              + '<p style="margin:0;font-size:13px;color:var(--ink-2);"><b style="color:var(--green);">' + alts.length + ' satıcı</b> bulundu — en uygununu seç, takibe al</p>'
-              + '</div>'
-              + '<div style="display:flex;flex-direction:column;gap:10px;max-height:58vh;overflow-y:auto;padding-right:4px;">';
-
-            alts.forEach(function(a, idx){
-              var badges = '';
-              if (a._isOriginal) badges += '<span style="background:rgba(25,118,210,.1);color:#1565c0;border:1px solid rgba(25,118,210,.25);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">📌 Sizin Aradığınız</span>';
-              if (a.price > 0 && a.price === cheapestPrice) badges += '<span style="background:#287a50;color:#fff;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">🏷 En Ucuz</span>';
-              if (maxRatingItem && a === maxRatingItem && !a._isOriginal) badges += '<span style="background:rgba(33,150,243,.1);color:#1976d2;border:1px solid rgba(33,150,243,.25);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">⭐ Yüksek Puanlı ('+(a.extra_info.rating)+')</span>';
-              if (maxReviewItem && a === maxReviewItem && !a._isOriginal) badges += '<span style="background:rgba(156,39,176,.1);color:#7b1fa2;border:1px solid rgba(156,39,176,.25);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">💬 En Çok Değerlendirilen</span>';
-              if ((a.extra_info||{}).fast_delivery) badges += '<span style="background:rgba(255,152,0,.1);color:#e65100;border:1px solid rgba(255,152,0,.3);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;">⚡ Hızlı Teslimat</span>';
-
-              var priceStr = a.price ? ('₺' + a.price.toFixed(2)) : '—';
-              var escapedData = JSON.stringify(a).replace(/'/g, '&#39;');
-
-              html += '<div style="border:1.5px solid var(--border);border-radius:10px;padding:13px;cursor:pointer;transition:border-color .15s,transform .1s;background:var(--bg);" '
-                + 'onmouseover="this.style.borderColor=\'#287a50\';this.style.transform=\'translateY(-1px)\';" '
-                + 'onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'none\';" '
-                + 'onclick="window._almadanSelectSeller(this)" data-seller=\'' + escapedData + '\'>'
-                + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
-                +   '<div style="min-width:0;flex:1;">'
-                +     '<div style="font-size:14px;font-weight:700;color:var(--ink);">' + (a.source||'Satıcı') + '</div>'
-                +     '<div style="font-size:11px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">' + (a.title||'').slice(0,70) + '</div>'
-                +     (badges ? '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;">' + badges + '</div>' : '')
-                +   '</div>'
-                +   '<div style="text-align:right;flex-shrink:0;">'
-                +     '<div style="font-size:16px;font-weight:800;color:var(--green-dark);">' + priceStr + '</div>'
-                +     '<div style="font-size:11px;color:var(--green);font-weight:700;margin-top:3px;">Seç →</div>'
-                +   '</div>'
-                + '</div>'
-                + '</div>';
-            });
-
-            html += '</div>';
-            /* Backend hiç alternatif bulamadıysa (sadece orijinal ürün varsa) arama linklerini de göster */
-            if (backendAltCount === 0 && linksHtml) {
-              html += '<div style="margin-top:4px;">' + linksHtml + '</div>';
-            }
-            content.innerHTML = html;
-
-          } catch(err) {
-            console.error('Satıcı ekranı hatası:', err);
-            dialog.close();
-            if (typeof showParsedProduct === 'function') showParsedProduct(parsed);
-          }
-        };
-
-        /* Satıcı seçince takip sayfasına geç */
-        window._almadanSelectSeller = function(el) {
-          var a = JSON.parse(el.getAttribute('data-seller'));
-          document.getElementById('sellerSelectionDialog').close();
-          var newParsed = {
-            title: a.title, price: a.price, source: a.source,
-            canonical_url: a.url, image_url: a.image_url,
-            original_price: a.original_price, extra_info: a.extra_info,
-            warnings: [], confidence: 100
-          };
-          if (typeof showParsedProduct === 'function') showParsedProduct(newParsed);
-          else if (typeof selectSellerAndProceed === 'function') el.setAttribute('data-seller', JSON.stringify({...a, url: a.url})), selectSellerAndProceed(el);
-        };
 
         // Scroll to Top & Keyboard Shortcuts
         (function() {
@@ -1463,7 +957,6 @@
             }
           });
         })();
-
       });
     </script>
     <!-- Scroll to Top & Toast Container -->

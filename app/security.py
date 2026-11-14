@@ -32,8 +32,8 @@ _CSRF_SECRET = (
     or os.getenv("CRON_SECRET", "").strip()
     or secrets.token_hex(32)
 )
-_ENV = os.getenv("VERCEL_ENV", "development")
-_IS_PROD = _ENV == "production"
+_ENV = os.getenv("VERCEL_ENV", "") or os.getenv("ENV", "development")
+_IS_PROD = _ENV == "production" or bool(os.getenv("RENDER")) or bool(os.getenv("VERCEL"))
 
 # ── Security Headers ────────────────────────────────────────
 
@@ -277,7 +277,6 @@ require_admin   = RequireRole("admin")
 SUPABASE_JWT_SECRET = (
     os.getenv("SUPABASE_JWT_SECRET", "").strip()
     or os.getenv("JWT_SECRET", "").strip()
-    or "almadan_supabase_gotrue_jwt_secret_2026_default_key"
 )
 
 
@@ -289,6 +288,7 @@ def create_access_jwt(
     """Supabase GoTrue uyumlu HS256 JWT üretir."""
     import jwt as _pyjwt
 
+    secret = SUPABASE_JWT_SECRET or _CSRF_SECRET
     now = int(time.time())
     payload = {
         "sub": str(user_id),
@@ -299,7 +299,7 @@ def create_access_jwt(
         "iat": now,
         "exp": now + expires_in,
     }
-    return _pyjwt.encode(payload, SUPABASE_JWT_SECRET, algorithm="HS256")
+    return _pyjwt.encode(payload, secret, algorithm="HS256")
 
 
 async def require_auth_user(request: Request) -> dict[str, Any]:
@@ -336,36 +336,38 @@ async def require_auth_user(request: Request) -> dict[str, Any]:
             detail="Boş Bearer token gönderildi.",
         )
 
-    # 3. Yerel HS256 Supabase JWT imza doğrulaması
-    try:
-        decoded = _pyjwt.decode(
-            token,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            options={"verify_aud": False},
-        )
-        uid = decoded.get("sub") or decoded.get("user_id") or decoded.get("id")
-        if not uid:
+    # 3. Yerel HS256 JWT imza doğrulaması — create_access_jwt ile AYNI anahtar
+    _verify_secret = SUPABASE_JWT_SECRET or _CSRF_SECRET
+    if _verify_secret:
+        try:
+            decoded = _pyjwt.decode(
+                token,
+                _verify_secret,
+                algorithms=["HS256"],
+                options={"verify_aud": False},
+            )
+            uid = decoded.get("sub") or decoded.get("user_id") or decoded.get("id")
+            if not uid:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="JWT içerisinde geçerli kullanıcı kimliği ('sub') bulunamadı.",
+                )
+            request.state.user_id = str(uid)
+            request.state.user_email = decoded.get("email")
+            return {
+                "id": str(uid),
+                "sub": str(uid),
+                "user_id": str(uid),
+                "email": decoded.get("email"),
+                "role": decoded.get("role", "authenticated"),
+            }
+        except _pyjwt.ExpiredSignatureError as exc:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="JWT içerisinde geçerli kullanıcı kimliği ('sub') bulunamadı.",
-            )
-        request.state.user_id = str(uid)
-        request.state.user_email = decoded.get("email")
-        return {
-            "id": str(uid),
-            "sub": str(uid),
-            "user_id": str(uid),
-            "email": decoded.get("email"),
-            "role": decoded.get("role", "authenticated"),
-        }
-    except _pyjwt.ExpiredSignatureError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Oturum süresi (JWT) dolmuş.",
-        ) from exc
-    except _pyjwt.InvalidTokenError:
-        pass
+                detail="Oturum süresi (JWT) dolmuş.",
+            ) from exc
+        except _pyjwt.InvalidTokenError:
+            pass
 
     # 4. Bulut Supabase GoTrue /auth/v1/user üzerinden doğrulama fallback'i
     from app.auth import AuthError, auth_enabled, get_user
@@ -426,6 +428,7 @@ _ADMIN_SECRET_BYPASS_PATHS = {
     "/api/admin/system-progress",
     "/api/admin/business-metrics",
     "/api/admin/user-details",
+    "/api/admin/sync-google-sheets",
 }
 _ADMIN_SECRET_BYPASS_PREFIXES = (
     "/api/admin/products/",
@@ -524,15 +527,19 @@ def check_rate_limit_key(key: str, limit: int, window_seconds: int) -> None:
 # Basit, ücretsiz, rate-limited salt-okunur API ve Ne Giysem B2B Köprüsü için X-API-Key doğrulaması.
 # Anahtarlar Supabase'deki api_keys tablosunda veya kurumsal B2B anahtar havuzunda (sha256) tutulur.
 
-DEFAULT_B2B_API_KEY = "alm_b2b_ne_giysem_2026_secret"
+DEFAULT_B2B_API_KEY = os.getenv("B2B_API_KEY", "").strip()
 
-_B2B_PARTNER_KEYS: dict[str, dict[str, Any]] = {
-    hashlib.sha256(DEFAULT_B2B_API_KEY.encode()).hexdigest(): {
-        "label": "Ne Giysem B2B Partner Bridge",
-        "active": True,
-        "partner": "ne_giysem",
-    },
-}
+_B2B_PARTNER_KEYS: dict[str, dict[str, Any]] = (
+    {
+        hashlib.sha256(DEFAULT_B2B_API_KEY.encode()).hexdigest(): {
+            "label": "Ne Giysem B2B Partner Bridge",
+            "active": True,
+            "partner": "ne_giysem",
+        },
+    }
+    if DEFAULT_B2B_API_KEY
+    else {}
+)
 
 
 def hash_api_key(raw_key: str) -> str:

@@ -79,7 +79,7 @@ CRON_SECRET = os.getenv("CRON_SECRET", "")
 APP_URL = os.getenv("ALMADAN_APP_URL", "https://almadan.vercel.app").rstrip("/")
 PASSWORD_RESET_LIMIT = 2
 PASSWORD_RESET_WINDOW = timedelta(minutes=15)
-COOKIE_SECURE = bool(os.getenv("VERCEL")) or os.getenv("VERCEL_ENV") == "production"
+COOKIE_SECURE = bool(os.getenv("VERCEL")) or bool(os.getenv("RENDER")) or os.getenv("VERCEL_ENV") == "production"
 
 
 def cron_request_authorized(request: Request) -> bool:
@@ -1645,9 +1645,14 @@ def store_suggestion_form() -> HTMLResponse:
         msg.style.color = 'var(--ink-2)';
         msg.textContent = 'Gönderiliyor...';
         try {
+          const csrfToken = (document.cookie.split('; ').find(r => r.startsWith('csrf_token=')) || '').split('=').slice(1).join('=');
           const res = await fetch('/api/store-suggestions', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(csrfToken ? { 'X-CSRF-Token': decodeURIComponent(csrfToken) } : {}),
+            },
             body: JSON.stringify({
               store_name: document.getElementById('ssName').value,
               store_url: document.getElementById('ssUrl').value,
@@ -1733,6 +1738,7 @@ def admin_list_store_suggestions(request: Request) -> dict:
 @app.get("/gizlilik", include_in_schema=False)
 @app.get("/kullanim-kosullari", include_in_schema=False)
 @app.get("/iletisim", include_in_schema=False)
+@app.get("/admin", include_in_schema=False)
 def static_page(request: Request) -> Response:
     page_file = STATIC_DIR / f"{request.url.path.strip('/')}.html"
     if page_file.is_file():
@@ -1828,6 +1834,63 @@ def add_product(
     return enrich_product(product)
 
 
+@app.get("/api/search/suggest")
+def suggest_search_queries(q: str = "", limit: int = 8) -> dict:
+    """Arama kutusu için anlık (<15ms) ürün adı otomatik tamamlama önerileri."""
+    raw = (q or "").strip()
+    if len(raw) < 2 or raw.startswith("http"):
+        return {"suggestions": []}
+
+    from app.text_utils import normalize_turkish
+    norm_q = normalize_turkish(raw.lower())
+    cap = max(1, min(limit, 12))
+
+    # Öncelikli popüler arama havuzu
+    curated = [
+        "iPhone 15 128 GB", "iPhone 16 128 GB", "iPhone 13 128 GB",
+        "Samsung Galaxy S24", "Samsung Galaxy A55", "AirPods Pro 2",
+        "Philips Airfryer XXL", "Dyson V15 Detect", "Roborock Q8 Max",
+        "Ayçiçek Yağı 5 L", "Zeytinyağı 2 L", "Çaykur Rize Turist Çayı 1 Kg",
+        "Sütaş Süt 1 L", "Pınar Süzme Peynir 500 gr", "Toz Şeker 5 Kg",
+        "Persil Toz Deterjan 7 Kg", "Fairy Bulaşık Tableti", "Prima Bebek Bezi",
+        "La Roche Posay Güneş Kremi", "Maybelline Sky High Maskara",
+        "Hardline Whey Protein Tozu", "PlayStation 5 Slim", "MacBook Air M3",
+        "Stanley Termos 1.18 L", "Karaca Kahve Makinesi", "Tefal Titanium Tava",
+    ]
+    try:
+        from app.catalog_crawler import _POPULAR_QUERIES
+        for terms in _POPULAR_QUERIES.values():
+            curated.extend(terms)
+    except Exception:
+        pass
+    try:
+        seo_terms = get_seo_price_terms()
+        if seo_terms:
+            curated.extend(seo_terms[:600])
+    except Exception:
+        pass
+
+    prefix_matches: list[str] = []
+    substring_matches: list[str] = []
+    seen: set[str] = set()
+
+    for item in curated:
+        norm_item = normalize_turkish(item.lower())
+        if not norm_item or norm_item in seen:
+            continue
+        if norm_item.startswith(norm_q):
+            seen.add(norm_item)
+            prefix_matches.append(item)
+        elif norm_q in norm_item:
+            seen.add(norm_item)
+            substring_matches.append(item)
+        if len(prefix_matches) >= cap:
+            break
+
+    combined = (prefix_matches + substring_matches)[:cap]
+    return {"suggestions": combined}
+
+
 @app.get("/api/search")
 def search_products(
     request: Request,
@@ -1863,6 +1926,7 @@ def search_products(
         
     from app.comparator import (
         apply_gender_to_query,
+        build_market_analysis,
         generate_search_suggestion,
         normalize_turkish_search_query,
         search_products_by_name,
@@ -1878,6 +1942,7 @@ def search_products(
     fallback_applied = any(p.get("extra_info", {}).get("fallback") for p in products)
     is_stale = any(p.get("stale_cache") for p in products)
     stale_age = next((p.get("stale_age", "") for p in products if p.get("stale_cache")), "")
+    market_analysis = build_market_analysis(gendered_query, products)
 
     suggestion = None
     if not products:
@@ -1902,6 +1967,7 @@ def search_products(
 
     return {
         "products": products,
+        "market_analysis": market_analysis,
         "suggestion": suggestion,
         "query": query,
         "effective_query": gendered_query,
@@ -2014,6 +2080,41 @@ def parse_url(payload: UrlParseRequest, request: Request) -> dict:
             oldest = sorted(_url_cache.items(), key=lambda x: x[1][0])[:100]
             for k, _ in oldest:
                 del _url_cache[k]
+
+    # Otomatik Barkod Öğrenme: Ürün sayfasında gtin13/barkod varsa kendi barkod veritabanımıza kaydet!
+    try:
+        ext_info = result.get("extra_info") or {}
+        found_bc = str(ext_info.get("barcode") or "").strip()
+        if found_bc and len(found_bc) in (8, 12, 13) and result.get("title"):
+            db = load_db()
+            bc_map = db.setdefault("barcode_products", {})
+            if found_bc not in bc_map:
+                brand_str = str(ext_info.get("brand") or "").strip()
+                title_str = str(result["title"]).strip()
+                receipt_cat = category_mapping(f"{brand_str} {title_str}")
+                _cat_map = {
+                    "electronics": "electronics",
+                    "cosmetics": "cosmetics",
+                    "supplement": "general",
+                    "fashion": "fashion",
+                    "home": "home",
+                    "grocery": "grocery",
+                }
+                bc_map[found_bc] = {
+                    "barcode": found_bc,
+                    "title": title_str,
+                    "brand": brand_str,
+                    "quantity": "",
+                    "image_url": str(result.get("image_url") or ""),
+                    "search_query": title_str,
+                    "category": _cat_map.get(receipt_cat, "general"),
+                    "source": f"auto_learned_{result.get('source', 'web')}",
+                    "created_at": utc_now(),
+                    "updated_at": utc_now(),
+                }
+                save_db(db)
+    except Exception:
+        pass
 
     return result
 
@@ -2487,8 +2588,15 @@ async def find_alternatives(payload: AlternativesRequest, request: Request):
             {"source": "google", "label": "Google Shopping'de ara", "url": f"https://www.google.com/search?tbm=shop&q={q_enc}"},
         ]
 
+    from app.comparator import build_market_analysis
+    top_alts = deduped[:20]
+    market_analysis = build_market_analysis(
+        payload.title, top_alts, reference_price=payload.price
+    )
+
     return {
-        "alternatives": deduped[:20],
+        "alternatives": top_alts,
+        "market_analysis": market_analysis,
         "search_links": search_links,
     }
 
@@ -3533,12 +3641,13 @@ def admin_scraper_health_report(request: Request) -> dict:
 
 
 @app.post("/api/admin/sync-google-sheets")
-async def sync_google_sheets(request: Request, user=Depends(require_login)):
+async def sync_google_sheets(request: Request):
     """
     Kullanıcı bazlı verileri Google Sheets'e senkronize eder.
     3 sekme: Yapıştırılan Linkler / Takip Edilen Ürünler / Takip Edilen Mağazalar
     Gerekli env: GOOGLE_SERVICE_ACCOUNT_JSON, GOOGLE_SHEET_ID
     """
+    require_admin_secret(request)
     if not os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON") or not os.getenv("GOOGLE_SHEET_ID"):
         raise HTTPException(
             status_code=503,
@@ -3559,7 +3668,7 @@ async def sync_google_sheets(request: Request, user=Depends(require_login)):
 
 
 @app.delete("/api/cache")
-def clear_search_cache(query: str | None = None, category: str | None = None) -> dict:
+def clear_search_cache(request: Request, query: str | None = None, category: str | None = None) -> dict:
     """Cache'i temizle — query+category verilirse sadece o key'i sil, verilmezse etkisiz.
 
     Onemli: gercek arama akisi (master_search) cache key'ini classify_intent()
@@ -3568,6 +3677,8 @@ def clear_search_cache(query: str | None = None, category: str | None = None) ->
     "cosmetics") kullaniliyordu, bu da farkli bir anahtari siliyordu ve
     "Fiyati Guncelle" butonu gercek cache kaydini hicbir zaman temizlemiyordu.
     """
+    from app.security import check_rate_limit
+    check_rate_limit(request, "clear_search_cache", limit=15, window_seconds=60)
     from app.cache import make_cache_key, cache_invalidate
     if not query:
         return {"deleted": None, "message": "Tüm cache silmek için Supabase'den manuel temizleyin."}
@@ -3592,96 +3703,283 @@ def clear_search_cache(query: str | None = None, category: str | None = None) ->
     return {"deleted": key}
 
 
+def _clean_barcode_title(raw_title: str, barcode: str) -> str:
+    """Barkod aramasından dönen ham başlığı mağaza eklerinden ve barkod rakamlarından temizler."""
+    if not raw_title:
+        return ""
+    text = str(raw_title).strip()
+    # Barkod numarasını başlıktan çıkar
+    text = text.replace(barcode, " ")
+    # Yaygın site soneklerini temizle
+    text = re.split(
+        r"\s*(?:\||-|\u2013|\u2014|::)\s*(?:Trendyol|Hepsiburada|Amazon(?:\.com\.tr)?|Akakçe|Cimri|Migros|CarrefourSA|A101|ŞOK|Gratis|Watsons|Rossmann|N11|Pazarama|Çiçeksepeti|En Ucuz|Fiyatı|Fiyatları|Barkod|Özellikleri).*",
+        text,
+        flags=re.IGNORECASE,
+    )[0]
+    text = re.sub(
+        r"\b(?:en ucuz|fiyatı ve özellikleri|fiyatları ve modelleri|fiyatı|fiyatları|satın al|indirimli|barkod\s*no|barkodu?)\b",
+        " ",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"\(\s*\)", " ", text)
+    text = " ".join(text.split()).strip(" -|–—:,.")
+    return text
+
+
 def _barcode_from_sources(barcode: str) -> dict | None:
     """
-    Çoklu kaynak barkod araması.
-    Kaynak sırası: Open Food Facts → UPCitemdb → N11 ürün arama
-    Her kaynak başarısız olursa sonraki denenir; tümü başarısız olursa None döner.
+    Türkiye + Global Çok Katmanlı Barkod Çözümleyici (EAN-13 / 868-869 / EAN-8 / UPC).
+    Katman 1: Open Food Facts + Open Beauty Facts + Open Products Facts (Gıda, Kozmetik, Ev/Temizlik)
+    Katman 2: Türkiye E-Ticaret & Zincir Market Doğrudan EAN-13 Sorgusu (Amazon TR, Hepsiburada, Trendyol, CarrefourSA, Rossmann)
+    Katman 3: Türkiye Barkod Web İndeksi Çözümleyici (868/869 yerel barkodlar için DuckDuckGo/Yahoo başlık çıkarımı)
+    Katman 4: Go-UPC & UPCitemdb (Global yedek)
     """
     import logging as _log
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     log = _log.getLogger(__name__)
 
-    # ── Kaynak 1: Open Food Facts ──────────────────────────────────────────
-    try:
-        r = requests.get(
-            f"https://world.openfoodfacts.org/api/v2/product/{barcode}.json",
-            params={"fields": "code,product_name,product_name_tr,generic_name,brands,image_front_url,image_url,quantity"},
-            headers={"User-Agent": "Almadan/1.0 (https://almadan.vercel.app)"},
-            timeout=6,
-        )
-        log.info("OFF status %s for barcode %s", r.status_code, barcode)
-        if r.ok:
-            data = r.json()
-            if int(data.get("status") or 0) == 1:
-                p = data.get("product") or {}
-                title = (p.get("product_name_tr") or p.get("product_name") or p.get("generic_name") or "").strip()
-                if title:
-                    brand = str(p.get("brands") or "").split(",", 1)[0].strip()
-                    qty   = str(p.get("quantity") or "").strip()
-                    img   = str(p.get("image_front_url") or p.get("image_url") or "").strip()
-                    return {"title": title, "brand": brand, "quantity": qty,
-                            "image_url": img, "search_query": " ".join(x for x in (brand, title, qty) if x),
-                            "source": "open_food_facts"}
-            log.info("OFF: product not found (status=%s)", data.get("status"))
-        else:
-            log.warning("OFF HTTP %s for barcode %s", r.status_code, barcode)
-    except Exception as exc:
-        log.warning("OFF exception for barcode %s: %s", barcode, exc)
+    # ── Katman 1: Open Food / Beauty / Products Facts (Paralel) ────────────
+    open_apis = [
+        ("open_food_facts", f"https://world.openfoodfacts.org/api/v2/product/{barcode}.json"),
+        ("open_beauty_facts", f"https://world.openbeautyfacts.org/api/v2/product/{barcode}.json"),
+        ("open_products_facts", f"https://world.openproductsfacts.org/api/v2/product/{barcode}.json"),
+    ]
 
-    # ── Kaynak 2: Go-UPC (Türkiye dahil global, ücretsiz tier) ───────────
+    def _check_open_facts(src_name: str, api_url: str) -> dict | None:
+        try:
+            r = requests.get(
+                api_url,
+                params={"fields": "code,product_name,product_name_tr,generic_name,brands,image_front_url,image_url,quantity"},
+                headers={"User-Agent": "Almadan/1.0 (https://almadan.vercel.app)"},
+                timeout=4.5,
+            )
+            if r.ok:
+                data = r.json()
+                if int(data.get("status") or 0) == 1:
+                    p = data.get("product") or {}
+                    title = (p.get("product_name_tr") or p.get("product_name") or p.get("generic_name") or "").strip()
+                    title = _clean_barcode_title(title, barcode)
+                    if title and len(title) >= 3:
+                        brand = str(p.get("brands") or "").split(",", 1)[0].strip()
+                        qty = str(p.get("quantity") or "").strip()
+                        img = str(p.get("image_front_url") or p.get("image_url") or "").strip()
+                        query_parts = [x for x in (brand, title, qty) if x and x.lower() not in title.lower()]
+                        search_q = " ".join([brand, title, qty] if brand and brand.lower() not in title.lower() else [title, qty]).strip()
+                        return {
+                            "title": title,
+                            "brand": brand,
+                            "quantity": qty,
+                            "image_url": img,
+                            "search_query": search_q or title,
+                            "source": src_name,
+                        }
+        except Exception as exc:
+            log.debug("%s exception for barcode %s: %s", src_name, barcode, exc)
+        return None
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futures = {pool.submit(_check_open_facts, s, u): s for s, u in open_apis}
+        for fut in as_completed(futures):
+            res = fut.result()
+            if res:
+                return res
+
+    # ── Katman 2: Türkiye Pazaryeri & Market Doğrudan EAN-13 Taraması ──────
+    # Amazon TR, Hepsiburada, Trendyol, CarrefourSA ve Rossmann kataloglarında
+    # ürünler EAN-13 barkodu ile indekslenir. Paralel sorgulayıp ilk gerçek ürünü yakalarız.
     try:
-        r_goupc = requests.get(
-            "https://go-upc.com/api/v1/code/" + barcode,
-            headers={"Authorization": "Bearer " + (os.getenv("GO_UPC_API_KEY") or "")},
+        from app.comparator import (
+            search_amazon_tr,
+            search_hepsiburada_direct,
+            search_trendyol_direct,
+            search_rossmann,
+        )
+        tr_scanners = [
+            ("amazon_tr_ean", search_amazon_tr),
+            ("hepsiburada_ean", search_hepsiburada_direct),
+            ("trendyol_ean", search_trendyol_direct),
+            ("rossmann_ean", search_rossmann),
+        ]
+        try:
+            from app.search_orchestrator import search_carrefoursa
+            tr_scanners.append(("carrefoursa_ean", search_carrefoursa))
+        except Exception:
+            pass
+
+        def _try_store_ean(label: str, fn):
+            try:
+                items = [it for it in (fn(barcode) or []) if isinstance(it, dict)]
+                valid = []
+                for item in items:
+                    cleaned_t = _clean_barcode_title(str(item.get("title") or ""), barcode)
+                    try:
+                        price = float(item.get("price") or 0)
+                    except (TypeError, ValueError):
+                        price = 0
+                    if cleaned_t and len(cleaned_t) >= 5 and not cleaned_t.isdigit() and price > 0:
+                        valid.append((cleaned_t, item))
+                if not valid:
+                    return None
+                top_title, top_item = valid[0]
+                return {
+                    "title": top_title,
+                    "brand": "",
+                    "quantity": "",
+                    "image_url": str(top_item.get("image_url") or ""),
+                    "search_query": top_title,
+                    "source": label,
+                    # Barkodla tam eşleşmede mağaza 1-4 sonuç döner; çok sonuç = genel/fallback liste
+                    "_precise": len(valid) <= 4,
+                    "initial_results": [it for _, it in valid[:4]],
+                }
+            except Exception:
+                return None
+
+        def _sig_words(t: str) -> set[str]:
+            return {w for w in re.findall(r"[a-zçğıöşü0-9]+", t.casefold()) if len(w) >= 3}
+
+        candidates: list[dict] = []
+        pool = ThreadPoolExecutor(max_workers=len(tr_scanners))
+        try:
+            futs = [pool.submit(_try_store_ean, lbl, fn) for lbl, fn in tr_scanners]
+            try:
+                for fut in as_completed(futs, timeout=7):
+                    try:
+                        r = fut.result()
+                        if r:
+                            candidates.append(r)
+                    except Exception:
+                        pass
+            except Exception:
+                pass  # zaman aşımı: o ana kadar gelenlerle devam et
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+
+        # Güvenilirlik: ya mağaza kesin eşleşme döndürdü (az sonuç), ya da
+        # en az iki mağazanın ilk sonucu aynı ürünü işaret ediyor (≥2 ortak kelime).
+        accepted: dict | None = None
+        for c in candidates:
+            agree = sum(
+                1 for o in candidates
+                if o is not c and len(_sig_words(c["title"]) & _sig_words(o["title"])) >= 2
+            )
+            if agree >= 1 or c.get("_precise"):
+                if accepted is None or agree > accepted.get("_agree", -1):
+                    accepted = {**c, "_agree": agree}
+        if accepted:
+            acc_words = _sig_words(accepted["title"])
+            initial: list[dict] = []
+            for c in candidates:
+                if c is accepted or len(acc_words & _sig_words(c["title"])) >= 2 or c["source"] == accepted["source"]:
+                    initial.extend(c.get("initial_results") or [])
+            accepted.pop("_precise", None)
+            accepted.pop("_agree", None)
+            accepted["initial_results"] = initial
+            return accepted
+    except Exception as exc:
+        log.warning("TR store EAN lookup error for %s: %s", barcode, exc)
+
+    # ── Katman 3: Türkiye Web İndeksi Barkod Çözümleyici (868/869 & Global) ─
+    # Türkiye'deki market/kozmetik/elektronik ürünlerinin barkodu web'de (Akakçe, Cimri,
+    # Migros, Trendyol, e-bakkal, barkodoku vb.) indekslidir.
+    try:
+        ddg_url = "https://html.duckduckgo.com/html/"
+        r_web = requests.post(
+            ddg_url,
+            data={"q": f'"{barcode}"'},
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36",
+                "Accept-Language": "tr-TR,tr;q=0.9",
+            },
             timeout=5,
         )
-        if r_goupc.ok:
-            d = r_goupc.json()
-            prod = d.get("product") or {}
-            title = (prod.get("name") or "").strip()
-            if title:
-                brand = (prod.get("brand") or "").strip()
-                img   = (prod.get("imageUrl") or "").strip()
-                return {"title": title, "brand": brand, "quantity": "",
-                        "image_url": img, "search_query": " ".join(x for x in (brand, title) if x),
-                        "source": "go_upc"}
+        if r_web.ok and barcode in r_web.text:
+            from bs4 import BeautifulSoup as _BS
+            soup = _BS(r_web.text, "html.parser")
+            for a_el in soup.select("a.result__a")[:6]:
+                raw_heading = a_el.get_text(" ", strip=True)
+                cleaned = _clean_barcode_title(raw_heading, barcode)
+                # Anlamlı bir ürün başlığı mı? (en az 2 kelime ve 6 karakter)
+                words = [w for w in cleaned.split() if len(w) >= 2 and not w.isdigit()]
+                if len(words) >= 2 and len(cleaned) >= 6:
+                    bad_phrases = ("barkod", "google search", "duckduckgo", "bulunamadı", "arama sonuç", "sorgula", "ürün bilgisi")
+                    if not any(bp in cleaned.lower() for bp in bad_phrases):
+                        return {
+                            "title": cleaned,
+                            "brand": words[0],
+                            "quantity": "",
+                            "image_url": "",
+                            "search_query": cleaned,
+                            "source": "tr_web_index",
+                        }
     except Exception as exc:
-        log.warning("Go-UPC exception for barcode %s: %s", barcode, exc)
+        log.debug("Web barcode lookup exception for %s: %s", barcode, exc)
 
-    # ── Kaynak 3: UPCitemdb (ücretsiz tier, 100 sorgu/gün) ────────────────
+    # ── Katman 4: Go-UPC & UPCitemdb (Global Yedek) ────────────────────────
+    if os.getenv("GO_UPC_API_KEY"):
+        try:
+            r_goupc = requests.get(
+                "https://go-upc.com/api/v1/code/" + barcode,
+                headers={"Authorization": "Bearer " + (os.getenv("GO_UPC_API_KEY") or "")},
+                timeout=4,
+            )
+            if r_goupc.ok:
+                d = r_goupc.json()
+                prod = d.get("product") or {}
+                title = _clean_barcode_title(prod.get("name") or "", barcode)
+                if title:
+                    brand = (prod.get("brand") or "").strip()
+                    img = (prod.get("imageUrl") or "").strip()
+                    return {
+                        "title": title,
+                        "brand": brand,
+                        "quantity": "",
+                        "image_url": img,
+                        "search_query": " ".join(x for x in (brand, title) if x),
+                        "source": "go_upc",
+                    }
+        except Exception as exc:
+            log.debug("Go-UPC exception for barcode %s: %s", barcode, exc)
+
     try:
         r2 = requests.get(
             "https://api.upcitemdb.com/prod/trial/lookup",
             params={"upc": barcode},
             headers={"Accept": "application/json"},
-            timeout=5,
+            timeout=4,
         )
-        log.info("UPCitemdb status %s for barcode %s", r2.status_code, barcode)
         if r2.ok:
             data2 = r2.json()
             items = data2.get("items") or []
             if items:
                 item = items[0]
-                title = item.get("title", "").strip()
+                title = _clean_barcode_title(item.get("title", ""), barcode)
                 if title:
                     brand = item.get("brand", "").strip()
-                    img   = (item.get("images") or [""])[0]
-                    return {"title": title, "brand": brand, "quantity": "",
-                            "image_url": img, "search_query": " ".join(x for x in (brand, title) if x),
-                            "source": "upcitemdb"}
+                    img = (item.get("images") or [""])[0]
+                    return {
+                        "title": title,
+                        "brand": brand,
+                        "quantity": "",
+                        "image_url": img,
+                        "search_query": " ".join(x for x in (brand, title) if x),
+                        "source": "upcitemdb",
+                    }
     except Exception as exc:
-        log.warning("UPCitemdb exception for barcode %s: %s", barcode, exc)
+        log.debug("UPCitemdb exception for barcode %s: %s", barcode, exc)
 
-    # N11 arama fallback kaldırıldı — barkod numarasını isim gibi aratınca yanlış ürün geliyor.
     return None
 
 
 @app.get("/api/barcode/{code}")
 def api_barcode_lookup(code: str) -> dict:
-    from app.comparator import lookup_barcode, search_products_by_name
+    from app.comparator import lookup_barcode, search_products_by_name, build_market_analysis, postprocess_search_products
     barcode = "".join(ch for ch in code.strip() if ch.isdigit())
+    if len(barcode) == 14 and barcode.startswith("0"):
+        barcode = barcode[1:]
     if len(barcode) not in (8, 12, 13):
-        raise HTTPException(status_code=400, detail="Geçersiz barkod formatı. EAN-8, EAN-13 veya UPC-A olmalıdır.")
+        raise HTTPException(status_code=400, detail="Geçersiz barkod formatı. 8, 12 veya 13 haneli barkod numarası girin.")
 
     db = load_db()
     cached = db.setdefault("barcode_products", {}).get(barcode)
@@ -3690,14 +3988,16 @@ def api_barcode_lookup(code: str) -> dict:
         results = search_products_by_name(cached["search_query"], category=suggested_category)
         return {
             "found": True,
+            "barcode": barcode,
             "title": cached["title"],
             "brand": cached.get("brand", ""),
             "image_url": cached.get("image_url", ""),
             "search_query": cached["search_query"],
             "suggested_category": suggested_category,
-            "source": "cache",
+            "source": cached.get("source", "cache"),
             "cached": True,
             "results": results,
+            "market_analysis": build_market_analysis(cached["search_query"], results),
         }
 
     match = lookup_barcode(barcode)
@@ -3708,9 +4008,11 @@ def api_barcode_lookup(code: str) -> dict:
         return {
             "found": False,
             "barcode": barcode,
-            "message": f"'{barcode}' barkodu hiçbir kaynakta bulunamadı.",
+            "message": f"'{barcode}' barkodlu ürün henüz katalogda bulunamadı. Ürün adını bir kez girerek tanımlayabilirsin.",
             "allow_manual": True,
         }
+
+    initial_results = match.pop("initial_results", None) or []
 
     # local_seed match için eksik alanları tamamla
     match = {
@@ -3723,7 +4025,6 @@ def api_barcode_lookup(code: str) -> dict:
 
     # Ürün adından kategori tahmin et
     receipt_cat = category_mapping(match["title"] + " " + match.get("brand", ""))
-    # receipt kategorisini API kategorisine çevir
     _cat_map = {
         "electronics": "electronics",
         "cosmetics": "cosmetics",
@@ -3744,21 +4045,24 @@ def api_barcode_lookup(code: str) -> dict:
     save_db(db)
 
     results = search_products_by_name(match["search_query"], category=suggested_category)
+    if initial_results:
+        seen_urls = {r.get("url") for r in results if r.get("url")}
+        for ir in initial_results:
+            if ir.get("url") and ir.get("url") not in seen_urls:
+                results.append(ir)
+                seen_urls.add(ir.get("url"))
+        results = postprocess_search_products(match["search_query"], results)
 
-    # ── Fuzzy Match Kapısı (%60 eşik) ──────────────────────────────────────
-    # Barkoddan gelen ürün adı ile market sonuçlarını karşılaştır.
-    # Yeterince eşleşmeyen sonuç varsa kullanıcıya gösterme.
+    # ── Fuzzy Match Kapısı (%40 eşik) ──────────────────────────────────────
     from app.matching_engine import FuzzyMatcher
     _fm = FuzzyMatcher()
     barcode_title = match["title"]
 
-    # Barkod adındaki anlamlı kelimeler sonuçta geçiyor mu?
     barcode_words = [w.lower() for w in barcode_title.split() if len(w) > 2]
     validated_results = []
     for r in results:
         candidate_title = r.get("title") or r.get("name") or ""
         match_score = _fm.score(barcode_title, candidate_title)
-        # Kelime bazlı ek kontrol: barkod kelimelerinin yarısı sonuçta varsa kabul et
         candidate_lower = candidate_title.lower()
         word_hits = sum(1 for w in barcode_words if w in candidate_lower)
         word_ratio = word_hits / len(barcode_words) if barcode_words else 0
@@ -3767,16 +4071,16 @@ def api_barcode_lookup(code: str) -> dict:
             validated_results.append(r)
 
     if not validated_results:
-        # Eşleşme yok ama ürün tanındı → tüm sonuçları göster (kullanıcı seçsin)
-        for r in results[:8]:
+        for r in results[:10]:
             r["_match_score"] = 0
             validated_results.append(r)
 
-    # En yüksek skora göre sırala
-    validated_results.sort(key=lambda x: x.get("_match_score", 0), reverse=True)
+    # En ucuz fiyata göre sıralı tut (kullanıcı en ucuz mağazayı en üstte görsün)
+    validated_results.sort(key=lambda x: float(x.get("price") or 9999999))
 
     return {
         "found": True,
+        "barcode": barcode,
         "title": match["title"],
         "brand": match.get("brand", ""),
         "image_url": match.get("image_url", ""),
@@ -3785,6 +4089,70 @@ def api_barcode_lookup(code: str) -> dict:
         "source": match.get("source", "local_seed"),
         "cached": False,
         "results": validated_results,
+        "market_analysis": build_market_analysis(match["search_query"], validated_results),
+    }
+
+
+class BarcodeRegisterPayload(BaseModel):
+    barcode: str = Field(..., min_length=8, max_length=14)
+    title: str = Field(..., min_length=2, max_length=200)
+    brand: str = Field(default="", max_length=80)
+
+
+@app.post("/api/barcode/register")
+def api_barcode_register(payload: BarcodeRegisterPayload) -> dict:
+    """Kullanıcının katalogda bulunamayan bir barkod için girdiği ürün adını kaydeder ve hemen karşılaştırır."""
+    from app.comparator import search_products_by_name, build_market_analysis
+    barcode = "".join(ch for ch in payload.barcode.strip() if ch.isdigit())
+    if len(barcode) == 14 and barcode.startswith("0"):
+        barcode = barcode[1:]
+    if len(barcode) not in (8, 12, 13):
+        raise HTTPException(status_code=400, detail="Geçersiz barkod numarası.")
+    clean_title = sanitize(payload.title.strip(), max_length=200)
+    clean_brand = sanitize(payload.brand.strip(), max_length=80)
+    if len(clean_title) < 2:
+        raise HTTPException(status_code=400, detail="Lütfen geçerli bir ürün adı girin.")
+
+    search_q = f"{clean_brand} {clean_title}".strip() if clean_brand and clean_brand.lower() not in clean_title.lower() else clean_title
+    receipt_cat = category_mapping(search_q)
+    _cat_map = {
+        "electronics": "electronics",
+        "cosmetics": "cosmetics",
+        "supplement": "general",
+        "fashion": "fashion",
+        "home": "home",
+        "grocery": "grocery",
+    }
+    suggested_category = _cat_map.get(receipt_cat, "general")
+
+    db = load_db()
+    db.setdefault("barcode_products", {})[barcode] = {
+        "barcode": barcode,
+        "title": clean_title,
+        "brand": clean_brand,
+        "quantity": "",
+        "image_url": "",
+        "search_query": search_q,
+        "category": suggested_category,
+        "source": "community_verified",
+        "created_at": utc_now(),
+        "updated_at": utc_now(),
+    }
+    save_db(db)
+
+    results = search_products_by_name(search_q, category=suggested_category)
+    return {
+        "found": True,
+        "barcode": barcode,
+        "title": clean_title,
+        "brand": clean_brand,
+        "image_url": "",
+        "search_query": search_q,
+        "suggested_category": suggested_category,
+        "source": "community_verified",
+        "cached": False,
+        "results": results,
+        "market_analysis": build_market_analysis(search_q, results),
     }
 
 RECEIPT_ITEM_CATEGORIES = (
@@ -5362,12 +5730,12 @@ async def partner_get_prices(
 ):
     """Partner API: ürün fiyatlarını sorgular (scope: read:prices)."""
     await _partner_auth(request, "read:prices")
-    from app.search_orchestrator import search_orchestrator
-    results = await asyncio.to_thread(
-        search_orchestrator.search,
-        sanitize(q, max_length=100),
-        store=store,
-    )
+    from app.comparator import search_products_by_name
+    clean_q = sanitize(q, max_length=100)
+    results = await asyncio.to_thread(search_products_by_name, clean_q)
+    if store:
+        store_norm = store.strip().lower()
+        results = [r for r in results if str(r.get("source", "")).lower() == store_norm]
     return {"query": q, "results": results}
 
 
@@ -5722,7 +6090,7 @@ async def list_chaos_scenarios(request: Request, admin=Depends(require_admin)):
 
 # -- Sistem Saglik Kontrol --
 
-@app.get("/health")
+@app.get("/api/health/detailed")
 async def health_check():
     from app.resilience import get_all_circuit_states
     from app.cache_strategy import get_cache_stats
