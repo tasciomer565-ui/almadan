@@ -32,8 +32,12 @@ _CSRF_SECRET = (
     or os.getenv("CRON_SECRET", "").strip()
     or secrets.token_hex(32)
 )
-_ENV = os.getenv("VERCEL_ENV", "") or os.getenv("ENV", "development")
-_IS_PROD = _ENV == "production" or bool(os.getenv("RENDER")) or bool(os.getenv("VERCEL"))
+_ENV = os.getenv("VERCEL_ENV", "development")
+# Uretim ortami: Render (RENDER env'ini Render kendisi set eder) veya Vercel production.
+# Eskiden yalnizca VERCEL_ENV bakiliyordu; Render'a gecince HSTS ve Secure cookie
+# sessizce kapanmisti.
+IS_PRODUCTION = bool(os.getenv("RENDER")) or _ENV == "production"
+_IS_PROD = IS_PRODUCTION
 
 # ── Security Headers ────────────────────────────────────────
 
@@ -274,10 +278,20 @@ require_admin   = RequireRole("admin")
 
 # ── Supabase JWT / GoTrue Kimlik Doğrulama (require_auth_user) ─
 
+# Gomulu varsayilan anahtar KALDIRILDI: depo herkese acik oldugu icin o anahtarla
+# herkes gecerli JWT uretebilirdi. Ortam degiskeni yoksa surec basina rastgele bir
+# anahtar uretilir -- sahte token imzalanamaz; yerelde uretilen token'lar yeniden
+# baslatmaya kadar gecerlidir. Uretimde SUPABASE_JWT_SECRET mutlaka tanimlanmalidir.
 SUPABASE_JWT_SECRET = (
     os.getenv("SUPABASE_JWT_SECRET", "").strip()
     or os.getenv("JWT_SECRET", "").strip()
 )
+if not SUPABASE_JWT_SECRET:
+    SUPABASE_JWT_SECRET = secrets.token_urlsafe(48)
+    logger.warning(
+        "SUPABASE_JWT_SECRET tanimli degil -- gecici rastgele anahtar kullaniliyor; "
+        "Supabase oturum token'lari yerel olarak dogrulanamayacak."
+    )
 
 
 def create_access_jwt(
@@ -527,19 +541,9 @@ def check_rate_limit_key(key: str, limit: int, window_seconds: int) -> None:
 # Basit, ücretsiz, rate-limited salt-okunur API ve Ne Giysem B2B Köprüsü için X-API-Key doğrulaması.
 # Anahtarlar Supabase'deki api_keys tablosunda veya kurumsal B2B anahtar havuzunda (sha256) tutulur.
 
-DEFAULT_B2B_API_KEY = os.getenv("B2B_API_KEY", "").strip()
-
-_B2B_PARTNER_KEYS: dict[str, dict[str, Any]] = (
-    {
-        hashlib.sha256(DEFAULT_B2B_API_KEY.encode()).hexdigest(): {
-            "label": "Ne Giysem B2B Partner Bridge",
-            "active": True,
-            "partner": "ne_giysem",
-        },
-    }
-    if DEFAULT_B2B_API_KEY
-    else {}
-)
+# Gomulu B2B partner anahtari KALDIRILDI (herkese acik depoda duruyordu).
+# Partner anahtari yalnizca B2B_API_KEY / NE_GIYSEM_API_KEY ortam degiskeninden
+# veya Supabase api_keys tablosundan gelir.
 
 
 def hash_api_key(raw_key: str) -> str:
@@ -575,14 +579,7 @@ async def require_api_key(request: Request) -> dict:
         check_rate_limit(request, f"public_api:{key_hash}", limit=120, window_seconds=60)
         return key_row
 
-    # 2. Ön tanımlı B2B Partner ("Ne Giysem") anahtar doğrulaması (Timing-attack korumalı)
-    for partner_hash, meta in _B2B_PARTNER_KEYS.items():
-        if hmac.compare_digest(partner_hash, key_hash) and meta.get("active", False):
-            key_row = {"key_hash": key_hash, **meta}
-            check_rate_limit(request, f"public_api:{key_hash}", limit=120, window_seconds=60)
-            return key_row
-
-    # 3. Supabase api_keys tablosu kontrolü
+    # 2. Supabase api_keys tablosu kontrolü
     rows = []
     if supabase_enabled():
         try:

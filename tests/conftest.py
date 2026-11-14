@@ -1,9 +1,10 @@
-"""Test ortamı ayarları.
+"""Test ortami ayarlari.
 
-Güvenlik düzeltmesiyle B2B anahtarı artık koda gömülü değil, B2B_API_KEY
-ortam değişkeninden okunuyor. Testler app modülleri import edilmeden ÖNCE
-sahte bir test anahtarı tanımlar (gerçek anahtar asla repoya yazılmaz).
+Gizli anahtarlar koda gomulu degil, ortam degiskeninden okunur. Testler app
+modulleri import edilmeden ONCE yalnizca teste ozel sahte degerler tanimlar
+(gercek anahtar asla repoya yazilmaz).
 """
 import os
 
 os.environ.setdefault("B2B_API_KEY", "alm_b2b_test_only_key")
+os.environ.setdefault("SUPABASE_JWT_SECRET", "test-only-jwt-secret-not-for-production")

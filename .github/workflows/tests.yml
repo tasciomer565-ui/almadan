@@ -1,0 +1,38 @@
+name: Testler
+
+# Her push ve PR'da birim/entegrasyon testlerini calistirir (e2e haric:
+# tarayici ve canli sunucu gerektiriyorlar, --run-e2e ile ayrica kosulur).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        # integration: canli magaza sitelerine gider; yurt disi runner IP'sinden guvenilmez.
+        run: python -m pytest tests -q --ignore=tests/e2e -m "not integration"

@@ -57,6 +57,7 @@ from app.storage import (
 )
 from app.tracker import refresh_all_products, refresh_owner_products, refresh_product
 from app.security import (
+    IS_PRODUCTION,
     apply_embed_security_headers,
     apply_security_headers,
     auth_wall_middleware,
@@ -79,7 +80,7 @@ CRON_SECRET = os.getenv("CRON_SECRET", "")
 APP_URL = os.getenv("ALMADAN_APP_URL", "https://almadan.vercel.app").rstrip("/")
 PASSWORD_RESET_LIMIT = 2
 PASSWORD_RESET_WINDOW = timedelta(minutes=15)
-COOKIE_SECURE = bool(os.getenv("VERCEL")) or bool(os.getenv("RENDER")) or os.getenv("VERCEL_ENV") == "production"
+COOKIE_SECURE = IS_PRODUCTION or bool(os.getenv("VERCEL"))
 
 
 def cron_request_authorized(request: Request) -> bool:
@@ -187,7 +188,17 @@ async def lifespan(_: FastAPI):
 from app.observability import sentry_init as _sentry_init  # noqa: E402
 _sentry_init()
 
-app = FastAPI(title="Fırsat Asistanı API", version="0.2.0", lifespan=lifespan)
+# Uretimde /docs, /redoc, /openapi.json kapali: tum API yuzeyini (admin/cron uclari
+# dahil) herkese listeliyordu. Gerekirse ENABLE_API_DOCS=1 ile acilir.
+_API_DOCS_ENABLED = (not IS_PRODUCTION) or os.getenv("ENABLE_API_DOCS", "").strip() == "1"
+app = FastAPI(
+    title="Fırsat Asistanı API",
+    version="0.2.0",
+    lifespan=lifespan,
+    docs_url="/docs" if _API_DOCS_ENABLED else None,
+    redoc_url="/redoc" if _API_DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if _API_DOCS_ENABLED else None,
+)
 
 from app.api.v1.endpoints.search import router as search_v1_router  # noqa: E402
 from app.api.v1.endpoints.products import router as products_v1_router  # noqa: E402
@@ -6335,8 +6346,6 @@ def _verify_cron_secret(x_cron_secret: str | None) -> tuple[bool, str]:
         return False, "CRON_SECRET env var tanımlı değil"
     if not x_cron_secret:
         return False, "X-Cron-Secret header eksik"
-    if len(x_cron_secret.strip()) != len(env_secret):
-        return False, "Secret uzunluğu eşleşmiyor"
     if not hmac.compare_digest(env_secret, x_cron_secret.strip()):
         return False, "Secret değeri eşleşmiyor"
     return True, "ok"
@@ -6346,7 +6355,7 @@ def _require_cron_or_admin_sync(x_cron_secret: str | None) -> None:
     """Secret doğrulamasını senkron olarak yapar (admin session olmadan)."""
     ok, reason = _verify_cron_secret(x_cron_secret)
     if not ok:
-        _IS_DEV = os.getenv("VERCEL_ENV", "development") != "production"
+        _IS_DEV = not IS_PRODUCTION
         detail = f"Yetkisiz erişim. Sebep: {reason}" if _IS_DEV else "Yetkisiz erişim."
         raise HTTPException(status_code=403, detail=detail)
 
@@ -6422,7 +6431,7 @@ def _calc_reminder_dates(last_purchase_date: str, reorder_days: int, remind_befo
 
 
 @app.post("/api/reminders")
-async def create_reminder(payload: ReminderPayload, request: Request, user=Depends(require_login)):
+def create_reminder(payload: ReminderPayload, request: Request, user=Depends(require_login)):
     """Ürün için tüketim hatırlatıcısı oluşturur."""
     dates = _calc_reminder_dates(
         payload.last_purchase_date, payload.reorder_days, payload.remind_before_days
@@ -6449,7 +6458,7 @@ async def create_reminder(payload: ReminderPayload, request: Request, user=Depen
 
 
 @app.get("/api/reminders")
-async def list_reminders(request: Request, user=Depends(require_login)):
+def list_reminders(request: Request, user=Depends(require_login)):
     """Kullanıcının tüm hatırlatıcılarını listeler, tarih hesaplamalarıyla birlikte."""
     resp = requests.get(
         f"{supabase_base_url()}/rest/v1/product_reminders",
@@ -6466,7 +6475,7 @@ async def list_reminders(request: Request, user=Depends(require_login)):
 
 
 @app.delete("/api/reminders/{reminder_id}")
-async def delete_reminder(reminder_id: str, request: Request, user=Depends(require_login)):
+def delete_reminder(reminder_id: str, request: Request, user=Depends(require_login)):
     """Hatırlatıcıyı siler (sadece kendi kaydı)."""
     requests.delete(
         f"{supabase_base_url()}/rest/v1/product_reminders",
@@ -6491,7 +6500,7 @@ async def cron_check_reminders(request: Request):
 
     # reminder_date <= bugün AND notified = false
     # Hesaplanan tarihler DB'de değil — uygulama katmanında filtreleriz
-    resp = requests.get(
+    resp = await asyncio.to_thread(requests.get, 
         f"{supabase_base_url()}/rest/v1/product_reminders",
         headers=supabase_headers(),
         params={"notified": "eq.false", "select": "*"},
@@ -6513,7 +6522,7 @@ async def cron_check_reminders(request: Request):
                 product_url=r["product_url"],
             )
             if any(result.values()):
-                requests.patch(
+                await asyncio.to_thread(requests.patch, 
                     f"{supabase_base_url()}/rest/v1/product_reminders",
                     headers=supabase_headers(),
                     params={"id": f"eq.{r['id']}"},
@@ -6691,7 +6700,7 @@ for cat, slugs in ALL_STORES_MAP.items():
 
 
 @app.get("/api/stores")
-async def list_stores(request: Request):
+def list_stores(request: Request):
     """
     Tüm aktif mağazaları döndürür.
     Giriş yapan kullanıcı için hangileri takip edildiğini de işaretler.
@@ -6847,7 +6856,7 @@ async def list_stores(request: Request):
 
 
 @app.get("/api/stores/followed")
-async def get_followed_stores(request: Request, user=Depends(require_login)):
+def get_followed_stores(request: Request, user=Depends(require_login)):
     """Kullanıcının takip ettiği mağaza slug listesini döner."""
     r = requests.get(
         f"{supabase_base_url()}/rest/v1/followed_stores",
@@ -6920,7 +6929,7 @@ def validated_store_slug(slug: str) -> str:
 
 
 @app.post("/api/stores/{slug}/follow")
-async def follow_store(slug: str, request: Request, user=Depends(require_login)):
+def follow_store(slug: str, request: Request, user=Depends(require_login)):
     """Mağazayı takip et (idempotent — zaten takip ediliyorsa sessiz döner)."""
     slug = validated_store_slug(slug)
     user_email = getattr(request.state, "user_email", None)
@@ -7029,7 +7038,7 @@ def _notify_follow_confirmation(uid: str, slug: str, store_name: str) -> None:
 # ── Bildirimler ──────────────────────────────────────────────────────────────
 
 @app.get("/api/notifications")
-async def list_notifications(request: Request, user=Depends(require_login)):
+def list_notifications(request: Request, user=Depends(require_login)):
     """Kullanıcının okunmamış + son 30 bildirimini döner."""
     sb_url = supabase_base_url()
     r = requests.get(
@@ -7047,7 +7056,7 @@ async def list_notifications(request: Request, user=Depends(require_login)):
 
 
 @app.patch("/api/notifications/{notif_id}/read")
-async def mark_notification_read(notif_id: str, request: Request, user=Depends(require_login)):
+def mark_notification_read(notif_id: str, request: Request, user=Depends(require_login)):
     """Bildirimi okundu olarak işaretle."""
     sb_url = supabase_base_url()
     requests.patch(
@@ -7061,7 +7070,7 @@ async def mark_notification_read(notif_id: str, request: Request, user=Depends(r
 
 
 @app.post("/api/notifications/read-all")
-async def mark_all_notifications_read(request: Request, user=Depends(require_login)):
+def mark_all_notifications_read(request: Request, user=Depends(require_login)):
     """Tüm bildirimleri okundu işaretle."""
     sb_url = supabase_base_url()
     requests.patch(
@@ -7075,7 +7084,7 @@ async def mark_all_notifications_read(request: Request, user=Depends(require_log
 
 
 @app.delete("/api/stores/{slug}/follow")
-async def unfollow_store(slug: str, request: Request, user=Depends(require_login)):
+def unfollow_store(slug: str, request: Request, user=Depends(require_login)):
     """Mağaza takibini bırak."""
     slug = validated_store_slug(slug)
     uid = user["user_id"]
@@ -7095,7 +7104,7 @@ async def unfollow_store(slug: str, request: Request, user=Depends(require_login
 
 
 @app.get("/api/stores/{slug}/campaigns")
-async def store_campaigns(slug: str):
+def store_campaigns(slug: str):
     """Mağazanın aktif kampanyalarını döndürür (herkes görebilir)."""
     from datetime import date
     today = date.today().isoformat()
@@ -7116,7 +7125,7 @@ async def store_campaigns(slug: str):
 
 
 @app.get("/magaza/{slug}", response_class=HTMLResponse)
-async def store_page(slug: str):
+def store_page(slug: str):
     """
     Her magaza icin sunucu tarafinda render edilen, aramaya acik (SEO)
     statik icerikli sayfa. Google'in indexleyebilecegi tek gercek
@@ -7400,7 +7409,7 @@ async def store_page(slug: str):
 
 
 @app.get("/kuponlar", response_class=HTMLResponse)
-async def coupons_page():
+def coupons_page():
     """
     Kupon/promosyon kodu toplayıcı SEO sayfası. Elimizde gerçek, doğrulanmış
     kupon kodu verisi yok (bu dış API/scraping gerektirir) -- bu yüzden
@@ -7788,7 +7797,7 @@ _CATEGORY_URL_SLUGS_REV = {v: k for k, v in CATEGORY_URL_SLUGS.items()}
 
 
 @app.get("/kategori/{category}", response_class=HTMLResponse)
-async def category_page(category: str):
+def category_page(category: str):
     """Kategori bazli SEO sayfasi -- ilgili tum magazalara link verir.
 
     URL her zaman TR canonical slug'i kullanir (ör. /kategori/teknoloji);
@@ -8067,7 +8076,7 @@ async def brand_index_page():
 
 
 @app.get("/marka/{slug}", response_class=HTMLResponse)
-async def brand_page(slug: str):
+def brand_page(slug: str):
     """Marka bazlı SEO sayfası: marka açıklaması, kategori/mağaza bağlantıları, arama CTA'sı."""
     import html as _html
     import json as _json
@@ -8262,7 +8271,7 @@ def _truncate_title(title: str, max_len: int = 70) -> str:
 
 
 @app.get("/rekortmenler", response_class=HTMLResponse)
-async def price_records_page():
+def price_records_page():
     """Fiyat geçmişi rekortmenleri -- en büyük düşüşler. Gerçek price_history verisinden."""
     import html as _html
     from app.price_history import get_biggest_movers
@@ -9926,7 +9935,7 @@ async def price_guide_topic(topic: str):
 
 
 @app.get("/api/campaigns/latest")
-async def latest_campaigns(limit: int = 12):
+def latest_campaigns(limit: int = 12):
     """
     "Haftanın En Çok Düşenleri" vitrini — tüm mağazalardan en güncel
     kampanyaları (haftalık katalog, büyük indirim, kampanya sayfası
@@ -9968,7 +9977,7 @@ async def latest_campaigns(limit: int = 12):
 
 
 @app.get("/api/editorial-picks")
-async def editorial_picks(limit: int = 8):
+def editorial_picks(limit: int = 8):
     """
     "Almadan Seçti" -- editoryal öne çıkan ürün listesi. Sadece doğrudan
     veritabanından (Supabase 'editorial_picks' tablosu) yönetilir, admin
@@ -10008,7 +10017,7 @@ async def create_campaign(slug: str, request: Request, admin=Depends(require_adm
         "valid_until": body.get("valid_until"),
         "notified":    False,
     }
-    resp = requests.post(
+    resp = await asyncio.to_thread(requests.post, 
         f"{supabase_base_url()}/rest/v1/store_campaigns",
         headers={**supabase_headers(), "Prefer": "return=representation"},
         json=row, timeout=10,
@@ -10405,7 +10414,7 @@ async def cron_store_newsletters(request: Request):
     sb_url = supabase_base_url()
     sb_hdrs = supabase_headers()
 
-    ar = requests.get(
+    ar = await asyncio.to_thread(requests.get, 
         f"{sb_url}/rest/v1/store_newsletters",
         headers=sb_hdrs,
         params={"active": "eq.true", "select": "slug,name"},
@@ -10417,7 +10426,7 @@ async def cron_store_newsletters(request: Request):
     for store in active_stores:
         slug = store["slug"]
 
-        cr = requests.get(
+        cr = await asyncio.to_thread(requests.get, 
             f"{sb_url}/rest/v1/store_campaigns",
             headers=sb_hdrs,
             params={
@@ -10430,7 +10439,7 @@ async def cron_store_newsletters(request: Request):
         if not campaigns:
             continue
 
-        fr = requests.get(
+        fr = await asyncio.to_thread(requests.get, 
             f"{sb_url}/rest/v1/followed_stores",
             headers=sb_hdrs,
             params={"store_slug": f"eq.{slug}", "select": "user_id,email"},
@@ -10464,7 +10473,7 @@ async def cron_store_newsletters(request: Request):
 
             # Uygulama-içi bildirim kaydı
             if uid:
-                requests.post(
+                await asyncio.to_thread(requests.post, 
                     f"{sb_url}/rest/v1/user_notifications",
                     headers=sb_hdrs,
                     json={
@@ -10545,7 +10554,7 @@ async def cron_store_newsletters(request: Request):
         if follower_count > 0 or any(result.values()):
             ids = [c["id"] for c in campaigns]
             for cid in ids:
-                requests.patch(
+                await asyncio.to_thread(requests.patch, 
                     f"{sb_url}/rest/v1/store_campaigns",
                     headers=sb_hdrs,
                     params={"id": f"eq.{cid}"},
