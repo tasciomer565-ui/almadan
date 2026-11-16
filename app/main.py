@@ -2061,6 +2061,10 @@ def parse_url(payload: UrlParseRequest, request: Request) -> dict:
     if result.get("title") and not result.get("price"):
         try:
             fallback_offers = search_products_by_name(result["title"])
+            if not fallback_offers:
+                short_title = " ".join(result["title"].split()[:3])
+                if short_title and short_title != result["title"]:
+                    fallback_offers = search_products_by_name(short_title)
             if fallback_offers:
                 matching_source = next(
                     (o for o in fallback_offers if o.get("source") == result.get("source")),

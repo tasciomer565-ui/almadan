@@ -142,6 +142,138 @@ _CLARIFICATIONS: dict[str, dict] = {
             {"label": "Unisex", "append": "unisex"},
         ],
     },
+    "ruj": {
+        "question": "Hangi marka veya tür ruj arıyorsun?",
+        "facets": [
+            {"label": "Maybelline", "append": "maybelline"},
+            {"label": "MAC", "append": "mac"},
+            {"label": "L'Oréal Paris", "append": "loreal"},
+            {"label": "Flormar", "append": "flormar"},
+            {"label": "Golden Rose", "append": "golden rose"},
+            {"label": "Likit Mat Ruj", "append": "likit mat"},
+        ],
+    },
+    "maskara": {
+        "question": "Hangi marka maskara arıyorsun?",
+        "facets": [
+            {"label": "Maybelline Sky High", "append": "maybelline sky high"},
+            {"label": "L'Oréal Telescopic", "append": "loreal telescopic"},
+            {"label": "Essence", "append": "essence"},
+        ],
+    },
+    "fondoten": {
+        "question": "Hangi marka veya formda fondöten arıyorsun?",
+        "facets": [
+            {"label": "L'Oréal True Match", "append": "loreal true match"},
+            {"label": "Maybelline Fit Me", "append": "maybelline fit me"},
+            {"label": "Estée Lauder", "append": "estee lauder"},
+            {"label": "BB / CC Krem", "append": "bb krem"},
+        ],
+    },
+    "gunes kremi": {
+        "question": "Hangi marka güneş kremi arıyorsun?",
+        "facets": [
+            {"label": "La Roche-Posay", "append": "la roche posay"},
+            {"label": "Bioderma", "append": "bioderma"},
+            {"label": "Garnier", "append": "garnier"},
+            {"label": "Bebek / Çocuk", "append": "bebek"},
+        ],
+    },
+    # MARKET & GIDA
+    "aycicek yagi": {
+        "question": "Hangi ebatta veya markada ayçiçek yağı arıyorsun?",
+        "facets": [
+            {"label": "5 Litre", "append": "5 L"},
+            {"label": "2 Litre", "append": "2 L"},
+            {"label": "1 Litre", "append": "1 L"},
+            {"label": "Yudum 5 L", "append": "yudum 5 L"},
+            {"label": "Komili 5 L", "append": "komili 5 L"},
+        ],
+    },
+    "yag": {
+        "question": "Ne tür ve kaç litre yağ arıyorsun?",
+        "facets": [
+            {"label": "Ayçiçek Yağı 5 L", "append": "ayçiçek 5 L"},
+            {"label": "Ayçiçek Yağı 2 L", "append": "ayçiçek 2 L"},
+            {"label": "Sızma Zeytinyağı 2 L", "append": "zeytinyağı 2 L"},
+        ],
+    },
+    "zeytinyagi": {
+        "question": "Hangi tür ve ebatta zeytinyağı arıyorsun?",
+        "facets": [
+            {"label": "Sızma 2 L", "append": "sızma 2 L"},
+            {"label": "Riviera 2 L", "append": "riviera 2 L"},
+            {"label": "5 Litre Teneke", "append": "5 L"},
+        ],
+    },
+    "sut": {
+        "question": "Nasıl bir süt arıyorsun?",
+        "facets": [
+            {"label": "Tam Yağlı 1 L", "append": "tam yağlı 1 L"},
+            {"label": "Yarım Yağlı 1 L", "append": "yarım yağlı 1 L"},
+            {"label": "Laktozsuz 1 L", "append": "laktozsuz 1 L"},
+            {"label": "Pınar / Sütaş", "append": "sütaş 1 L"},
+        ],
+    },
+    "kahve": {
+        "question": "Ne tür kahve arıyorsun?",
+        "facets": [
+            {"label": "Türk Kahvesi", "append": "türk kahvesi"},
+            {"label": "Filtre Kahve", "append": "filtre"},
+            {"label": "Granül / Nescafe", "append": "nescafe"},
+            {"label": "Çekirdek Kahve", "append": "çekirdek"},
+        ],
+    },
+    "cay": {
+        "question": "Hangi gramaj veya markada çay arıyorsun?",
+        "facets": [
+            {"label": "Çaykur Rize 1 Kg", "append": "çaykur rize 1 kg"},
+            {"label": "Çaykur Tiryaki 1 Kg", "append": "çaykur tiryaki 1 kg"},
+            {"label": "Demlik Poşet", "append": "demlik poşet"},
+        ],
+    },
+    "deterjan": {
+        "question": "Ne tür deterjan arıyorsun?",
+        "facets": [
+            {"label": "Toz Çamaşır Deterjanı", "append": "toz çamaşır"},
+            {"label": "Sıvı Çamaşır Deterjanı", "append": "sıvı çamaşır"},
+            {"label": "Bulaşık Makinesi Tableti", "append": "bulaşık tableti"},
+        ],
+    },
+    "bebek bezi": {
+        "question": "Hangi marka veya beden bebek bezi arıyorsun?",
+        "facets": [
+            {"label": "Prima 4 Beden", "append": "prima 4"},
+            {"label": "Prima 5 Beden", "append": "prima 5"},
+            {"label": "Sleepy 4 Beden", "append": "sleepy 4"},
+            {"label": "Molfix", "append": "molfix"},
+        ],
+    },
+    # EV & TEKNOLOJİ EK
+    "supurge": {
+        "question": "Nasıl bir süpürge arıyorsun?",
+        "facets": [
+            {"label": "Dikey Şarjlı Süpürge", "append": "dikey şarjlı"},
+            {"label": "Robot Süpürge", "append": "robot"},
+            {"label": "Toz Torbasız Süpürge", "append": "toz torbasız"},
+        ],
+    },
+    "televizyon": {
+        "question": "Hangi ekran boyutunda televizyon arıyorsun?",
+        "facets": [
+            {"label": "55 İnç 4K", "append": "55 inç 4k"},
+            {"label": "65 İnç 4K", "append": "65 inç 4k"},
+            {"label": "50 İnç 4K", "append": "50 inç 4k"},
+        ],
+    },
+    "mont": {
+        "question": "Kimin için mont arıyorsun?",
+        "facets": [
+            {"label": "Erkek", "append": "erkek"},
+            {"label": "Kadın", "append": "kadın"},
+            {"label": "Şişme Mont", "append": "şişme"},
+        ],
+    },
 }
 
 

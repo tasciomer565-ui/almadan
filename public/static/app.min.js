@@ -2931,13 +2931,13 @@ function showSearchResults(response) {
         transform: translateY(-2px);
       }
     </style>
-    <div class="dialog-body" style="max-width: 660px; width: 100%;">
-      <div class="search-result-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px;">
+    <div class="dialog-body" style="max-width: 100%; width: 100%;">
+      <div class="search-result-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding-right: 36px; gap: 12px; flex-wrap: wrap;">
         <div>
-          <p class="eyebrow" style="color: var(--green); font-weight: 800; margin-bottom: 4px;">CANLI KARŞILAŞTIRMA SONUÇLARI</p>
-          <h2 style="margin: 0; font-size: 22px;">"${escapeHtml(originalQuery)}" İçin En İyi Teklifler</h2>
+          <p class="eyebrow" style="color: var(--green); font-weight: 700; margin-bottom: 4px;">Karşılaştırma Sonuçları</p>
+          <h2 style="margin: 0; font-size: 20px; padding-right: 0;">"${escapeHtml(originalQuery)}" İçin En İyi Teklifler</h2>
         </div>
-        <button class="secondary-button" id="forceRefreshBtn" style="font-size: 12px; padding: 7px 14px; height: auto; flex-shrink: 0; white-space: nowrap; display: inline-flex; align-items: center; border-radius: 8px;"
+        <button class="secondary-button" id="forceRefreshBtn" style="font-size: 12px; padding: 7px 13px; height: auto; flex-shrink: 0; white-space: nowrap; display: inline-flex; align-items: center; border-radius: 9px;"
           onclick="forceRefreshSearch(${inlineJsArg(originalQuery)}, ${inlineJsArg(cacheKey)})">
           <i data-lucide="refresh-cw" style="width: 13px; height: 13px; margin-right: 5px;"></i>Fiyatı Güncelle
         </button>
@@ -2945,7 +2945,8 @@ function showSearchResults(response) {
       ${sizeChipsHtml}
       ${fallbackNoticeHtml}
       ${categoryHeaderHtml}
-      <div style="display: flex; flex-direction: column; gap: 12px; max-height: 440px; overflow-y: auto; padding-right: 4px; margin-bottom: 20px;">
+      ${buildDynamicBrandFilterHtml(allProducts, originalQuery)}
+      <div id="searchResultsCardsList" style="display: flex; flex-direction: column; gap: 12px; max-height: 460px; overflow-y: auto; padding-right: 4px; margin-bottom: 18px;">
         ${products.map((item, index) => {
           const allLabels = [...(item.labels || [])];
           if (item.extra_info?.real_discount && !allLabels.includes("Gerçek Fırsat")) {
@@ -3031,42 +3032,37 @@ function showSearchResults(response) {
           const brand = getStoreBrand(item.source);
 
           return `
-            <div class="${nodeClasses} search-result-card"
+            <div class="search-result-card"
+                 data-title-lower="${escapeHtml(String(item.title || "").toLowerCase())}"
                  data-base-price="${item.price}"
                  data-base-original-price="${item.original_price || 0}"
-                 data-is-importer="${isImporter}"
-                 style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px; ${borderStyle} border-radius: 12px;">
-              <div style="width: 62px; height: 62px; flex-shrink: 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #f8faf8; display: flex; align-items: center; justify-content: center;">
-                ${item.image_url && item.image_url !== "/static/icon-192.png"
-                  ? `<img src="${escapeHtml(proxiedImageUrl(item.image_url))}" alt="${escapeHtml(item.title)}" loading="lazy" style="width: 100%; height: 100%; object-fit: contain;" onerror="imageFallback(this, '${getStoreIcon(item.source, item.title)}')">`
-                  : `<span style="width:100%; height:100%; display:grid; place-items:center; background:${brand.bg}; color:${brand.color}; font-weight:800; font-size:18px;">${escapeHtml(storeDisplayName(item.source).charAt(0).toUpperCase())}</span>`}
-              </div>
-              <div style="flex: 1; min-width: 0;">
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
-                  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${brand.bg};"></span>
-                  <p class="source-name" style="margin: 0; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--ink-2);">${escapeHtml(storeDisplayName(item.source))} ${whyMatchedHtml}</p>
+                 data-is-importer="false"
+                 style="display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; ${borderStyle} border-radius: 14px;">
+              <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <div style="width: 56px; height: 56px; flex-shrink: 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #f8faf8; display: flex; align-items: center; justify-content: center;">
+                  ${item.image_url && item.image_url !== "/static/icon-192.png"
+                    ? `<img src="${escapeHtml(proxiedImageUrl(item.image_url))}" alt="${escapeHtml(item.title)}" loading="lazy" style="width: 100%; height: 100%; object-fit: contain;" onerror="imageFallback(this, '${getStoreIcon(item.source, item.title)}')">`
+                    : `<span style="width:100%; height:100%; display:grid; place-items:center; background:${brand.bg}; color:${brand.color}; font-weight:800; font-size:17px;">${escapeHtml(storeDisplayName(item.source).charAt(0).toUpperCase())}</span>`}
                 </div>
-                <h4 style="margin: 0 0 7px 0; font-size: 13.5px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</h4>
-                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 5px;">
-                  ${badgesHtml}
+                <div style="flex: 1; min-width: 0;">
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+                    <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${brand.bg};flex-shrink:0;"></span>
+                    <span class="source-name" style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--ink-2);">${escapeHtml(storeDisplayName(item.source))} ${whyMatchedHtml}</span>
+                  </div>
+                  <h4 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 700; line-height: 1.35; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</h4>
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--ink-2);">
+                    <span>${isLocal ? escapeHtml(item.delivery_time || "30-60 Dakika") : escapeHtml(item.delivery_time || "1-2 İş Günü Kargo")}</span>
+                    ${unitPriceHtml}
+                  </div>
+                  ${suspiciousWarningHtml}
                 </div>
-                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                  ${isLocal
-                    ? `<span style="font-size: 10.5px; padding: 2px 7px; border-radius: 5px; font-weight: 700; background: rgba(14,165,233,0.1); color: #0284c7; border: 1px solid rgba(14,165,233,0.2); display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="truck" style="width:11px; height:11px;"></i> ${escapeHtml(item.delivery_time || '30-60 Dakika')} ${item.distance_km ? `(${item.distance_km} km)` : ''}</span>`
-                    : `<span style="font-size: 10.5px; padding: 2px 7px; border-radius: 5px; font-weight: 700; background: rgba(40,122,80,0.08); color: var(--green); border: 1px solid rgba(40,122,80,0.18); display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="package-check" style="width:11px; height:11px;"></i> ${escapeHtml(item.delivery_time || 'Hızlı Kargo · 1-2 İş Günü')}</span>`
-                  }
-                  ${warrantyBadgeHtml}
-                </div>
-                ${suspiciousWarningHtml}
-                ${unitPriceHtml}
-                ${wrongMatchHtml}
-              </div>
-              <div style="text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
-                <div style="display:flex; align-items:center; justify-content:flex-end; gap:4px; flex-wrap:wrap;">
-                  ${favoriteButtonHtml(item)}
+                <div style="text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px;">
+                  <div style="display:flex;align-items:center;gap:4px;">
+                    ${favoriteButtonHtml(item)}
+                    ${priceDisplayHtml}
+                  </div>
                   ${originalPriceHtml}
-                  ${priceDisplayHtml}
-                  <span class="net-card-price-badge" data-raw-price="${Number(item.price || 0)}" style="display:none; font-size:10.5px; font-weight:800; color:#15803d; background:rgba(22,163,74,0.12); padding:2px 6px; border-radius:6px;"></span>
+                  <span class="net-card-price-badge" data-raw-price="${Number(item.price || 0)}" style="display:none; font-size:10.5px; font-weight:700; color:#15803d; background:rgba(22,163,74,0.12); padding:2px 6px; border-radius:6px;"></span>
                   ${(() => {
                     const t = item.price_trend;
                     if (!t) return "";
@@ -3075,7 +3071,13 @@ function showSearchResults(response) {
                     return `<div class="price-trend-flat"><i data-lucide="minus" style="width:11px;height:11px;flex-shrink:0;"></i>Sabit (7g)</div>`;
                   })()}
                 </div>
-                <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: center;">
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 9px; border-top: 1px solid var(--border, #e6e4dd);">
+                <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
+                  ${badgesHtml}
+                  ${wrongMatchHtml}
+                </div>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: center; margin-left: auto;">
                   ${!isOutOfStock && item.price > 0 ? `
                     <button type="button" class="secondary-button" title="Fiyat %10 düşünce hedef alarm kur" style="padding: 5px 8px; font-size: 10.5px; height: auto; width: auto; border-radius: 7px; border-color: rgba(217,119,6,0.35); color: #b45309; background: rgba(245,158,11,0.08);" onclick="event.stopPropagation(); trackSearchResultWithTarget(this, ${index}, 10);">
                       🎯 -%10 Alarm
@@ -3168,6 +3170,66 @@ window.addSearchResultToCart = function(index) {
   saveCartToLocalStorage();
   if (state.sharedListId) syncSharedListWithServer();
   if (state.activeView === "cart") renderCart();
+};
+
+function buildDynamicBrandFilterHtml(products, originalQuery) {
+  if (!Array.isArray(products) || products.length < 2) return "";
+  const stopWords = new Set(
+    String(originalQuery || "")
+      .toLowerCase()
+      .split(/\s+/)
+      .concat(["ve", "ile", "için", "icin", "ml", "gr", "kg", "lt", "l", "adet", "paket", "set", "1", "2", "3", "4", "5", "6"])
+  );
+  const tokenCounts = {};
+  products.forEach((p) => {
+    const firstWord = String(p.title || "")
+      .trim()
+      .split(/\s+/)[0]
+      ?.replace(/[^\wğüşıöçĞÜŞİÖÇ'-]/gi, "");
+    if (!firstWord || firstWord.length < 2) return;
+    const key = firstWord.toLowerCase();
+    if (stopWords.has(key)) return;
+    if (!tokenCounts[key]) tokenCounts[key] = { label: firstWord, count: 0 };
+    tokenCounts[key].count += 1;
+  });
+  const brands = Object.entries(tokenCounts)
+    .filter(([, v]) => v.count >= 1)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 6);
+  if (brands.length < 2) return "";
+
+  return `
+    <div id="dynamicBrandFilterBar" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:8px 10px;border-radius:10px;background:var(--paper,#faf9f6);border:1px solid var(--border,#e6e4dd);">
+      <span style="font-size:11px;font-weight:700;color:var(--ink-2);">Marka Filtresi:</span>
+      <button type="button" class="brand-filter-chip active" data-brand="ALL" onclick="filterSearchResultsByBrand('ALL', this)"
+        style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid #141715;background:#141715;color:#fff;cursor:pointer;">
+        Tümü (${products.length})
+      </button>
+      ${brands.map(([key, info]) => `
+        <button type="button" class="brand-filter-chip" data-brand="${escapeHtml(key)}" onclick="filterSearchResultsByBrand('${escapeHtml(key)}', this)"
+          style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;border:1px solid var(--border,#e6e4dd);background:#fff;color:var(--ink);cursor:pointer;">
+          ${escapeHtml(info.label)} (${info.count})
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+window.filterSearchResultsByBrand = function(brandKey, btnEl) {
+  document.querySelectorAll(".brand-filter-chip").forEach((b) => {
+    const active = b === btnEl;
+    b.style.background = active ? "#141715" : "#fff";
+    b.style.color = active ? "#fff" : "var(--ink)";
+    b.style.borderColor = active ? "#141715" : "var(--border,#e6e4dd)";
+  });
+  document.querySelectorAll("#searchResultsCardsList .search-result-card").forEach((card) => {
+    if (brandKey === "ALL") {
+      card.style.display = "flex";
+      return;
+    }
+    const titleLower = card.getAttribute("data-title-lower") || "";
+    card.style.display = titleLower.includes(brandKey) ? "flex" : "none";
+  });
 };
 
 window.selectCardCampaign = function(cardId) {
@@ -4662,7 +4724,7 @@ function switchView(view) {
     loadStores();
   }
 
-  window.scrollTo({ top: view === "discover" ? 0 : 180, behavior: "smooth" });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 
   // Rehber popup — ilk ziyarette göster
   setTimeout(() => showGuide(view), 150);

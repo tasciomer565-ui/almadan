@@ -140,6 +140,8 @@ CSRF_EXEMPT_PATHS = {
     "/api/auth/",
     "/api/barcode/",
     "/api/search",
+    "/api/warm-slow-stores",  # salt-okunur cache ısıtma; IP rate-limit ile korunur
+    "/api/cart/optimize",  # stateless sepet fiyat optimizasyonu; kullanıcı verisi değiştirmez
     "/api/vton/",
     "/cron/",
     "/parse-url",
@@ -449,6 +451,11 @@ _ADMIN_SECRET_BYPASS_PREFIXES = (
 )
 
 
+_PUBLIC_CART_EXACT_PATHS = {
+    "/api/cart/optimize",
+}
+
+
 async def auth_wall_middleware(request: Request, call_next):
     """
     Korumalı API yollarına oturumsuz erişimi 401 ile engelle.
@@ -472,6 +479,9 @@ async def auth_wall_middleware(request: Request, call_next):
         env_secret = os.getenv("ADMIN_DEBUG_SECRET", "").strip()
         if admin_secret and env_secret and hmac.compare_digest(env_secret, admin_secret):
             return await call_next(request)
+
+    if path in _PUBLIC_CART_EXACT_PATHS:
+        return await call_next(request)
 
     if any(path.startswith(p) for p in _PROTECTED_API_PATHS):
         user_id = getattr(request.state, "user_id", None)
