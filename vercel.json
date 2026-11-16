@@ -14,6 +14,7 @@
   ],
   "rewrites": [
     { "source": "/", "destination": "/static/index.min.html" },
+    { "source": "/ara", "destination": "/static/index.min.html" },
     { "source": "/hakkinda", "destination": "/static/hakkinda.html" },
     { "source": "/gizlilik", "destination": "/static/gizlilik.html" },
     { "source": "/iletisim", "destination": "/static/iletisim.html" },

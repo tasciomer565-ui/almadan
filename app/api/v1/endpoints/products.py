@@ -121,6 +121,58 @@ _INITIAL_CATALOG: list[dict[str, Any]] = [
         "currency": "TL",
         "product_url": "https://www.nike.com/tr/t/air-force-1-07-ayakkab%C4%B1s%C4%B1-WrLlWX/CW2288-111",
     },
+    {
+        "ref_code": "8281/450/800",
+        "barcode": "8436001122334",
+        "product_name": "Zara Water-Repellent Su Geçirmez Siyah Şişme Mont",
+        "brand": "Zara",
+        "category": "Dış Giyim",
+        "image_url": "https://static.zara.net/photos///2026/I/0/2/p/8281/450/800/2/w/850/8281450800_6_1_1.jpg",
+        "fabric_composition": "%100 Geri Dönüştürülmüş Poliamid (Su İtici Membran)",
+        "care_instructions": "30°C makinede hassas yıkama, yumuşatıcı kullanmayınız.",
+        "price": 3490.0,
+        "currency": "TL",
+        "product_url": "https://www.zara.com/tr/tr/su-gecirmez-mont-p08281450.html",
+    },
+    {
+        "ref_code": "5575/401/401",
+        "barcode": "8436002233445",
+        "product_name": "Massimo Dutti Straight Fit Lacivert Denim Pantolon",
+        "brand": "Massimo Dutti",
+        "category": "Alt",
+        "image_url": "https://static.massimodutti.net/3/photos/2026/V/0/2/p/5575/401/401/5575401401_1_1_16.jpg",
+        "fabric_composition": "%99 Organik Pamuk, %1 Elastan",
+        "care_instructions": "30°C ters çevirerek yıkayınız.",
+        "price": 2450.0,
+        "currency": "TL",
+        "product_url": "https://www.massimodutti.com/tr/lacivert-jean-l05575401",
+    },
+    {
+        "ref_code": "1887/300/250",
+        "barcode": "8436003344556",
+        "product_name": "Zara Ağır Gramajlı %100 Pamuk Beyaz Basic Tişört",
+        "brand": "Zara",
+        "category": "Üst",
+        "image_url": "https://static.zara.net/photos///2026/V/0/2/p/1887/300/250/2/w/850/1887300250_6_1_1.jpg",
+        "fabric_composition": "%100 Supima Pamuk",
+        "care_instructions": "30°C makinede yıkama.",
+        "price": 690.0,
+        "currency": "TL",
+        "product_url": "https://www.zara.com/tr/tr/agir-pamuk-tisort-p01887300.html",
+    },
+    {
+        "ref_code": "2045/920/800",
+        "barcode": "8436004455667",
+        "product_name": "Zara Su Geçirmez Siyah Deri Chelsea Yağmur Botu",
+        "brand": "Zara",
+        "category": "Ayakkabı",
+        "image_url": "https://static.zara.net/photos///2026/I/1/2/p/2045/920/800/2/w/850/2045920800_6_1_1.jpg",
+        "fabric_composition": "%100 Su İtici Deri, Termoplastik Taban",
+        "care_instructions": "Nemli bezle siliniz, su itici sprey uygulayınız.",
+        "price": 3290.0,
+        "currency": "TL",
+        "product_url": "https://www.zara.com/tr/tr/deri-chelsea-bot-p12045920.html",
+    },
 ]
 
 # Hızlı erişim için bellek içi indeksler
@@ -610,3 +662,92 @@ async def lookup_b2b_product(
     )
     scraped_product.execution_time_ms = int((time.perf_counter() - start_time) * 1000)
     return scraped_product
+
+
+# ── Ne Giysem × Almadan Eksik Parça Katalog Arama Uç Noktası ──────
+
+_CATEGORY_ALIASES: dict[str, tuple[str, ...]] = {
+    "ust": ("üst", "tişört", "tisort", "gömlek", "gomlek", "top"),
+    "alt": ("alt", "pantolon", "jean", "chino", "şort", "sort", "etek"),
+    "hirkakazak": ("dış giyim", "hırka", "hirka", "kazak", "triko", "üst"),
+    "ceket": ("dış giyim", "ceket", "blazer", "trençkot", "trenckot", "yağmurluk"),
+    "mont": ("dış giyim", "mont", "palto", "kaban", "şişme"),
+    "ayakkabi": ("ayakkabı", "ayakkabi", "bot", "sneaker", "çizme"),
+}
+
+
+@router.get("/search", response_model=list[AlmadanProduct])
+async def search_b2b_products(
+    q: str = Query(default="", description="Arama metni (Örn: mont siyah, lacivert ceket)"),
+    cat: str | None = Query(default=None, description="Ne Giysem kategori kodu (ust, alt, hirkaKazak, ceket, mont, ayakkabi)"),
+    color: str | None = Query(default=None, description="Önerilen renk (siyah, beyaz, lacivert, gri, bej)"),
+    waterproof: str | None = Query(default=None, description="Su geçirmezlik filtresi (1 veya true)"),
+) -> list[AlmadanProduct]:
+    """
+    Ne Giysem Eksik Parça & Kapsül Dolap aramaları için Almadan stüdyo katalog uç noktası.
+    Hem `q` anahtar kelimesini hem de yapılandırılmış `cat`, `color`, `waterproof`
+    parametrelerini değerlendirerek uygun ürünleri döner.
+    """
+    start_time = time.perf_counter()
+    query_tokens = [t for t in re.split(r"\s+", q.lower().strip()) if len(t) >= 2]
+    cat_key = (cat or "").lower().strip()
+    color_key = (color or "").lower().strip()
+    needs_waterproof = waterproof in ("1", "true", "yes")
+
+    seen_refs: set[str] = set()
+    scored_results: list[tuple[int, dict[str, Any]]] = []
+
+    for item in _CATALOG_BY_REF.values():
+        ref_val = item["ref_code"]
+        if ref_val in seen_refs:
+            continue
+        seen_refs.add(ref_val)
+
+        haystack = (
+            f"{item['product_name']} {item['brand']} {item['category']} "
+            f"{item['fabric_composition']} {ref_val}"
+        ).lower()
+
+        score = 0
+        for tok in query_tokens:
+            if tok in haystack:
+                score += 3
+
+        if cat_key and cat_key in _CATEGORY_ALIASES:
+            if any(alias in haystack for alias in _CATEGORY_ALIASES[cat_key]):
+                score += 4
+
+        if color_key and color_key in haystack:
+            score += 2
+
+        if needs_waterproof and ("su geçirmez" in haystack or "su itici" in haystack or "water" in haystack):
+            score += 4
+
+        if score > 0 or (not query_tokens and not cat_key):
+            scored_results.append((score, item))
+
+    scored_results.sort(key=lambda pair: pair[0], reverse=True)
+    elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+
+    if not scored_results:
+        scored_results = [(1, item) for item in _INITIAL_CATALOG[:4]]
+
+    return [
+        AlmadanProduct(
+            ref_code=item["ref_code"],
+            barcode=item.get("barcode"),
+            product_name=item["product_name"],
+            brand=item["brand"],
+            category=item["category"],
+            image_url=item["image_url"],
+            fabric_composition=item["fabric_composition"],
+            care_instructions=item["care_instructions"],
+            price=item.get("price"),
+            currency=item.get("currency", "TL"),
+            product_url=item.get("product_url"),
+            source="almadan_catalog",
+            cached=True,
+            execution_time_ms=elapsed_ms,
+        )
+        for _, item in scored_results[:12]
+    ]

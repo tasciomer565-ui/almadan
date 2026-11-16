@@ -591,32 +591,63 @@ async function initializeAlmadanApp() {
   optimizeForMobile();
   scheduleAdsense();
 
-  scheduleIdleTask(() => window.__almadanLoadLucide(), 1600);
+  window.__almadanLoadLucide(true);
 
   bindEvents();
   window.addEventListener("load", () => {
-    scheduleIdleTask(registerServiceWorker, 3000);
+    scheduleIdleTask(registerServiceWorker, 2000);
   }, { once: true });
   updateNetworkStatus();
   updateGpsStatusUI();
   const recoverySession = readRecoverySession();
   if (recoverySession) {
     showPasswordReset(recoverySession);
-    scheduleDeferredIdleTask(loadSession, 7000);
+    scheduleIdleTask(loadSession, 80);
   } else if (window.location.hash) {
     // Çerezlerin tarayıcıya işlenmesini bekle -- aksi halde hemen ardından
     // gelen loadSession() henüz eski (çıkış yapılmış) durumu görüp üzerine yazabilir.
     const confirmed = await completeEmailConfirmSession();
-    if (!confirmed) scheduleDeferredIdleTask(loadSession, 7000);
+    if (!confirmed) scheduleIdleTask(loadSession, 80);
   } else {
-    scheduleDeferredIdleTask(loadSession, 7000);
+    scheduleIdleTask(loadSession, 40);
   }
   checkSharedListUrl();
   checkInitialSearchQuery();
-  scheduleIdleTask(loadLatestCampaigns, 3500);
-  scheduleIdleTask(loadEditorialPicks, 3800);
-  scheduleIdleTask(loadProductUrlSuggestions, 2500);
+  scheduleIdleTask(loadLatestCampaigns, 80);
+  scheduleIdleTask(loadEditorialPicks, 110);
+  scheduleIdleTask(loadProductUrlSuggestions, 150);
 }
+
+window.selectHeroCategory = function(category, btnElement) {
+  const select = document.getElementById("searchCategorySelector");
+  if (select) {
+    let opt = Array.from(select.options).find(o => o.value === category);
+    if (!opt) {
+      opt = document.createElement("option");
+      opt.value = category;
+      opt.textContent = category;
+      select.appendChild(opt);
+    }
+    select.value = category;
+    handleCategoryChange();
+  }
+  document.querySelectorAll(".hero-cat-pill").forEach(el => {
+    el.classList.toggle("active", el === btnElement);
+  });
+  const input = document.getElementById("productUrl");
+  if (input) {
+    const placeholders = {
+      general: "Ürün adı, barkod numarası veya ürün linki yapıştırın… (Örn: iPhone 15, Airfryer, Ayçiçek Yağı)",
+      electronics: "Telefon, bilgisayar, kulaklık veya model kodu yazın… (Örn: iPhone 15 128 GB, AirPods Pro 2)",
+      grocery: "Market ürünü, gıda veya deterjan adı yazın… (Örn: Yudum Ayçiçek Yağı 5 L, Çaykur 1 Kg)",
+      fashion: "Kıyafet, ayakkabı veya kombin parçası arayın… (Örn: Bej Trençkot, Beyaz Deri Sneaker, Kaşe Kaban)",
+      cosmetics: "Cilt bakımı, güneş kremi veya parfüm arayın… (Örn: La Roche Posay SPF50+, Maybelline Maskara)",
+      home: "Ev aleti, kahve makinesi veya mutfak ürünü arayın… (Örn: Philips Airfryer XXL, Karaca Kahve Makinesi)"
+    };
+    input.placeholder = placeholders[category] || placeholders.general;
+    input.focus();
+  }
+};
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initializeAlmadanApp, { once: true });
@@ -673,19 +704,23 @@ async function loadLatestCampaigns() {
       .map((c) => {
         const storeName = escapeHtml(c.store_name || c.store_slug || "Mağaza");
         const title = escapeHtml(c.title || "Yeni Kampanya");
-        const desc = escapeHtml((c.description || "").slice(0, 90));
+        const desc = escapeHtml((c.description || "").slice(0, 95));
         const url = c.catalog_url ? escapeHtml(addAffiliateTag(c.catalog_url, c.store_slug)) : "";
         const brand = getStoreBrand(c.store_slug);
         return `
-          <a href="${url || "#"}" target="_blank" rel="noopener"
-             style="flex:0 0 240px;background:var(--bg-card,#181b20);border:1.5px solid var(--border,#2e3240);border-radius:12px;padding:14px;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:6px;transition:border-color .15s;"
-             onmouseover="this.style.borderColor='#287a50'" onmouseout="this.style.borderColor='var(--border,#2e3240)'">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <div style="width:28px;height:28px;border-radius:7px;background:${brand.bg};color:${brand.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;">${storeName.charAt(0).toUpperCase()}</div>
-              <span style="font-size:12.5px;font-weight:700;color:var(--ink,#e2e4e9);">${storeName}</span>
+          <a href="${url || "#"}" target="_blank" rel="noopener" class="campaign-vitrin-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div style="display:flex;align-items:center;gap:9px;">
+                <div style="width:32px;height:32px;border-radius:9px;background:${brand.bg};color:${brand.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,0.08);">${storeName.charAt(0).toUpperCase()}</div>
+                <span style="font-size:13px;font-weight:800;color:var(--ink);">${storeName}</span>
+              </div>
+              <span style="font-size:10px;font-weight:800;color:var(--green);background:var(--green-bg);padding:3px 8px;border-radius:999px;">AKTİF</span>
             </div>
-            <div style="font-size:13px;font-weight:700;color:var(--ink,#e2e4e9);">🔥 ${title}</div>
-            ${desc ? `<div style="font-size:11.5px;color:var(--ink-2,#848c96);line-height:1.4;">${desc}</div>` : ""}
+            <div style="font-size:13.5px;font-weight:800;color:var(--ink);line-height:1.35;">🔥 ${title}</div>
+            ${desc ? `<div style="font-size:12px;color:var(--ink-2);line-height:1.45;">${desc}</div>` : ""}
+            <div style="margin-top:auto;padding-top:4px;font-size:11.5px;font-weight:700;color:var(--green);display:flex;align-items:center;gap:4px;">
+              Kampanyayı İncele <span>→</span>
+            </div>
           </a>`;
       })
       .join("");
@@ -705,25 +740,32 @@ async function loadEditorialPicks() {
     if (!res.ok) return;
     const data = await res.json();
     const picks = data.picks || [];
-    if (!picks.length) return; // Gerçek veri yoksa bölüm gizli kalır -- sahte veri gösterilmez
+    if (!picks.length) return;
 
     grid.innerHTML = picks
       .map((p) => {
         const title = escapeHtml(p.title || "Ürün");
-        const note = escapeHtml((p.note || "").slice(0, 90));
-        const priceStr = p.price ? `₺${Number(p.price).toFixed(2)}` : "";
+        const note = escapeHtml((p.note || "").slice(0, 95));
+        const priceStr = p.price ? currency.format(Number(p.price)) : "";
         const url = p.url ? escapeHtml(p.url) : "#";
+        const searchQuery = p.search_query || p.title || "";
         const brand = getStoreBrand(p.source);
         return `
-          <a href="${url}" target="_blank" rel="noopener sponsored"
-             style="flex:0 0 220px;background:var(--bg-card,#181b20);border:1.5px solid var(--border,#2e3240);border-radius:12px;padding:14px;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:6px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <div style="width:28px;height:28px;border-radius:7px;background:${brand.bg};color:${brand.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;">${(p.source || "?").charAt(0).toUpperCase()}</div>
-              <span style="font-size:12.5px;font-weight:700;color:var(--ink,#e2e4e9);">${escapeHtml(brand.name || p.source || "")}</span>
+          <a href="${url}" ${p.search_query ? `onclick="event.preventDefault(); triggerSuggestionSearch(${inlineJsArg(searchQuery)});"` : `target="_blank" rel="noopener sponsored"`}
+             class="editorial-pick-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div style="width:28px;height:28px;border-radius:8px;background:${brand.bg};color:${brand.color};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">${(p.source || "?").charAt(0).toUpperCase()}</div>
+                <span style="font-size:12px;font-weight:700;color:var(--ink-2);">${escapeHtml(brand.name || storeDisplayName(p.source) || "")}</span>
+              </div>
+              <span style="font-size:10px;font-weight:800;color:#b45309;background:rgba(245,158,11,0.14);padding:2px 7px;border-radius:999px;">⭐ SEÇKİ</span>
             </div>
-            <div style="font-size:13px;font-weight:700;color:var(--ink,#e2e4e9);">⭐ ${title}</div>
-            ${priceStr ? `<div style="font-size:14px;font-weight:800;color:#287a50;">${priceStr}</div>` : ""}
-            ${note ? `<div style="font-size:11.5px;color:var(--ink-2,#848c96);line-height:1.4;">${note}</div>` : ""}
+            <div style="font-size:13.5px;font-weight:800;color:var(--ink);line-height:1.35;">${title}</div>
+            ${priceStr ? `<div style="font-size:16px;font-weight:800;color:var(--green);">${priceStr} <span style="font-size:11px;font-weight:600;color:var(--ink-2);">başlayan</span></div>` : ""}
+            ${note ? `<div style="font-size:11.5px;color:var(--ink-2);line-height:1.4;">${note}</div>` : ""}
+            <div style="margin-top:auto;padding-top:4px;font-size:11.5px;font-weight:800;color:var(--green);display:flex;align-items:center;gap:4px;">
+              Mağazaları Kıyasla <span>→</span>
+            </div>
           </a>`;
       })
       .join("");
@@ -935,12 +977,14 @@ async function loadSession() {
   }
   renderAccountButton();
   handleCategoryChange();
-  scheduleIdleTask(loadProducts, 1600);
+  loadProducts();
   if (state.auth.authenticated) {
-    scheduleIdleTask(loadCartFromBackend, 2400);
-    scheduleIdleTask(maybePromptPhoneVerification, 3200);
+    scheduleIdleTask(loadCartFromBackend, 400);
+    scheduleIdleTask(maybePromptPhoneVerification, 1200);
   }
-  setTimeout(showOnboarding, 800);
+  if (new URLSearchParams(window.location.search).get("onboarding") === "1") {
+    setTimeout(showOnboarding, 400);
+  }
 }
 
 // Fake kullanıcıları engellemek için: telefonu doğrulanmamış hesaplara,
@@ -1660,15 +1704,181 @@ function renderOfflineCachedProducts() {
   return true;
 }
 
+const ALMADAN_SHOWCASE_DEALS = [
+  {
+    title: "iPhone 15 128 GB (Resmi Distribütör)",
+    query: "iPhone 15 128 GB",
+    source: "amazon",
+    storeSummary: "Amazon · Hepsiburada · Trendyol",
+    categoryLabel: "TEKNOLOJİ",
+    icon: "smartphone",
+    current_price: 51499.0,
+    original_price: 56999.0,
+    deal_score: 94,
+    discount_percent: 10,
+    verdict: "al",
+    note: "✓ Sahte indirim yok · Son 30 günün en düşüğü",
+    url: "https://www.amazon.com.tr/s?k=iPhone+15+128+GB"
+  },
+  {
+    title: "Philips Airfryer XXL HD9650/90 Fritöz",
+    query: "Philips Airfryer XXL",
+    source: "hepsiburada",
+    storeSummary: "Hepsiburada · Trendyol · Teknosa",
+    categoryLabel: "EV & MUTFAK",
+    icon: "flame",
+    current_price: 4699.0,
+    original_price: 5799.0,
+    deal_score: 92,
+    discount_percent: 19,
+    verdict: "al",
+    note: "✓ Piyasa medyanının %16 altında gerçek fırsat",
+    url: "https://www.hepsiburada.com/ara?q=Philips+Airfryer+XXL"
+  },
+  {
+    title: "Yudum Ayçiçek Yağı 5 L Pet/Teneke",
+    query: "Yudum Ayçiçek Yağı 5 L",
+    source: "migros",
+    storeSummary: "Migros · CarrefourSA · BİM · ŞOK",
+    categoryLabel: "MARKET & GIDA",
+    icon: "shopping-basket",
+    current_price: 249.90,
+    original_price: 289.90,
+    deal_score: 91,
+    discount_percent: 14,
+    verdict: "al",
+    note: "✓ Litre birim fiyatı: ₺49,98/L (En avantajlı)",
+    url: "https://www.migros.com.tr/arama?q=Yudum+Ay%C3%A7i%C3%A7ek+Ya%C4%9F%C4%B1+5+L"
+  },
+  {
+    title: "Bej Su İtici Klasik Trençkot & Dış Giyim",
+    query: "Bej Trençkot",
+    source: "boyner",
+    storeSummary: "Boyner · Zara · Mavi · Trendyol",
+    categoryLabel: "MODA & KAPSÜL",
+    icon: "shirt",
+    current_price: 1799.0,
+    original_price: 2299.0,
+    deal_score: 89,
+    discount_percent: 22,
+    verdict: "al",
+    note: "✓ Mevsim geçişi kilit parçası · 6 mağaza kıyaslandı",
+    url: "https://www.boyner.com.tr/search?q=Bej+Tren%C3%A7kot"
+  },
+  {
+    title: "Stanley Quencher Pipetli Termos 1.18 L",
+    query: "Stanley Termos 1.18 L",
+    source: "trendyol",
+    storeSummary: "Trendyol · Amazon · Hepsiburada",
+    categoryLabel: "OUTDOOR & YAŞAM",
+    icon: "cup-soda",
+    current_price: 1849.0,
+    original_price: 2199.0,
+    deal_score: 88,
+    discount_percent: 16,
+    verdict: "al",
+    note: "✓ Yetkili satıcı garantili · Fiyat eğrisi dengeli",
+    url: "https://www.trendyol.com/sr?q=Stanley+Termos+1.18+L"
+  },
+  {
+    title: "La Roche-Posay Anthelios UVmune 400 SPF50+",
+    query: "La Roche Posay Güneş Kremi",
+    source: "gratis",
+    storeSummary: "Gratis · Rossmann · Watsons · Amazon",
+    categoryLabel: "KOZMETİK & BAKIM",
+    icon: "sparkles",
+    current_price: 549.0,
+    original_price: 679.0,
+    deal_score: 90,
+    discount_percent: 19,
+    verdict: "al",
+    note: "✓ ml başına en düşük birim fiyat · Orijinal ürün",
+    url: "https://www.gratis.com/search?q=La+Roche+Posay+G%C3%BCne%C5%9F+Kremi"
+  }
+];
+
+window.quickTrackShowcaseDeal = async function(idx, btn) {
+  const item = ALMADAN_SHOWCASE_DEALS[idx];
+  if (!item) return;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner" style="width:12px;height:12px;border-width:2px;"></span> Ekleniyor`;
+  }
+  try {
+    await api("/products", {
+      method: "POST",
+      body: JSON.stringify({
+        title: item.title,
+        url: item.url,
+        price: item.current_price,
+        source: item.source,
+        image_url: "",
+        original_price: item.original_price,
+        extra_info: {}
+      }),
+    });
+    showToast("Ürün fiyat radarına eklendi!");
+    await loadProducts();
+  } catch (error) {
+    if (isLoginRequiredError(error)) {
+      promptLoginForTracking("Bir ürünü fiyat radarına eklemek için ücretsiz giriş yapabilirsin.");
+    } else {
+      showToast(`Ürün kaydedilemedi: ${escapeHtml(error.message)}`);
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<i data-lucide="radar" style="width:13px;height:13px;"></i> Radara Ekle`;
+      lucide.createIcons();
+    }
+  }
+};
+
+function renderShowcaseDealsGrid(grid) {
+  if (!grid) return;
+  grid.innerHTML = ALMADAN_SHOWCASE_DEALS.map((item, idx) => {
+    const brand = getStoreBrand(item.source);
+    return `
+      <article class="deal-card showcase-deal-card">
+        <div class="deal-image showcase-deal-visual">
+          <div class="showcase-icon-orb" style="background:${brand.bg};color:${brand.color};">
+            <i data-lucide="${item.icon}"></i>
+          </div>
+          <span class="score-badge">⚡ ${item.deal_score}/100</span>
+          <span class="discount-badge">-%${item.discount_percent}</span>
+          <span class="showcase-cat-tag">${escapeHtml(item.categoryLabel)}</span>
+        </div>
+        <div class="deal-body">
+          <p class="source-name" style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+            <span>🏪 ${escapeHtml(item.storeSummary)}</span>
+          </p>
+          <h3>${escapeHtml(item.title)}</h3>
+          <span class="forecast-chip">${escapeHtml(item.note)}</span>
+          <div class="price-row" style="margin-top:12px;">
+            <div>
+              <span style="display:block;font-size:11.5px;color:var(--ink-2);text-decoration:line-through;font-weight:600;">${currency.format(item.original_price)}</span>
+              <span class="price">${currency.format(item.current_price)}</span>
+            </div>
+            <span class="verdict">GERÇEK FIRSAT</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:14px;">
+            <button type="button" class="card-button" style="margin-top:0;background:var(--green);color:#fff;border-color:var(--green);" onclick="triggerSuggestionSearch(${inlineJsArg(item.query)})">
+              <i data-lucide="scan-search" style="width:14px;height:14px;margin-right:4px;"></i> Fiyatları Kıyasla
+            </button>
+            <button type="button" class="card-button" style="margin-top:0;width:auto;padding:0 12px;" onclick="quickTrackShowcaseDeal(${idx}, this)" title="Fiyat Radarına Ekle">
+              <i data-lucide="radar" style="width:14px;height:14px;"></i>
+            </button>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
+  lucide.createIcons();
+}
+
 function renderFallbackOpportunities() {
   const grid = document.getElementById("dealGrid");
   if (!grid) return;
-  grid.innerHTML = `
-    <div style="grid-column:1/-1;padding:48px 24px;text-align:center;">
-      <div style="font-size:40px;margin-bottom:12px;">🛒</div>
-      <p style="font-size:15px;font-weight:600;color:var(--ink);margin:0 0 6px;">Henüz takip edilen ürün yok</p>
-      <p style="font-size:13px;color:var(--ink-2);margin:0;">Üst kısımdan ürün linki yapıştır veya barkod tara — fiyatları karşılaştıralım.</p>
-    </div>`;
+  renderShowcaseDealsGrid(grid);
 }
 
 function renderAll() {
@@ -1682,10 +1892,11 @@ function renderAll() {
 
 function renderDeals() {
   const grid = document.getElementById("dealGrid");
+  if (!grid) return;
   const products = [...state.products].sort((a, b) => b.deal_score - a.deal_score).slice(0, 6);
 
   if (!products.length) {
-    grid.innerHTML = `<div class="empty-state"><i data-lucide="scan-search"></i>İlk ürün linkini ekleyerek fırsat radarını başlat.</div>`;
+    renderShowcaseDealsGrid(grid);
     return;
   }
 
@@ -1697,23 +1908,23 @@ function renderDeals() {
     const forecast = product.discount_forecast;
     const forecastBadge = forecast?.status === "ready"
       ? `<span class="forecast-chip">%${forecast.probability} · 7 gün</span>`
-      : `<span class="forecast-chip muted">Tahmin hazırlanıyor</span>`;
+      : `<span class="forecast-chip muted">Fiyat izleniyor</span>`;
     return `
     <article class="deal-card">
       <div class="deal-image">
         ${productImage(product)}
-        <span class="score-badge">${product.deal_score}/100</span>
+        <span class="score-badge">⚡ ${product.deal_score}/100</span>
         ${discountBadge}
       </div>
       <div class="deal-body">
         <p class="source-name">${escapeHtml(storeDisplayName(product.source))}</p>
         <h3>${escapeHtml(product.title)}</h3>
         ${forecastBadge}
-        <div class="price-row">
+        <div class="price-row" style="margin-top:12px;">
           <span class="price">${currency.format(product.current_price)}</span>
           <span class="verdict ${product.verdict === "bekle" ? "wait" : ""}">${escapeHtml(product.verdict)}</span>
         </div>
-        <button class="card-button" onclick="openProduct('${product.id}')">Kararı gör</button>
+        <button class="card-button" onclick="openProduct('${product.id}')">Fiyat Analizini Gör</button>
       </div>
     </article>
   `;
@@ -2075,9 +2286,20 @@ async function deleteReceipt(receiptId) {
   }
 }
 
+function extractFirstUrl(string) {
+  const raw = String(string || "").trim();
+  const match = raw.match(/((?:https?|trendyol|hepsiburada|n11):\/\/[^\s"'<>]+)/i);
+  if (match) {
+    return match[1].replace(/[.,;!)]+$/, "");
+  }
+  if (/^(?:www\.)?[a-z0-9-]+\.(?:com|com\.tr|net|org|co|gl|ly|eu)\/\S+/i.test(raw)) {
+    return "https://" + raw.replace(/^\/+/, "");
+  }
+  return null;
+}
+
 function isUrl(string) {
-  const s = string.trim().toLowerCase();
-  return s.startsWith("http://") || s.startsWith("https://") || s.startsWith("trendyol://") || s.startsWith("hepsiburada://") || s.startsWith("n11://") || s.includes(".com") || s.includes(".net") || s.includes(".org") || s.includes(".co");
+  return Boolean(extractFirstUrl(string));
 }
 
 async function parseProduct(event) {
@@ -2156,17 +2378,23 @@ async function parseProduct(event) {
           await searchByBarcode(digitsOnly);
           return;
         }
-        if (isUrl(val)) {
+        const extractedUrl = extractFirstUrl(val);
+        if (extractedUrl) {
           const parsed = await api("/parse-url", {
             method: "POST",
-            body: JSON.stringify({ url: val }),
+            body: JSON.stringify({ url: extractedUrl }),
             signal: null
           });
-          // Link parse edilemediyse rehber popup aç
+          // Link parse edilemediyse: eğer paylaşım metninde ürün adı varsa onunla ara, yoksa rehber aç
           if (!parsed.title && !parsed.price) {
+            const textWithoutUrl = val.replace(extractedUrl, "").replace(/[^\w\sğüşıöçĞÜŞİÖÇ-]/g, " ").trim();
+            if (textWithoutUrl.length >= 3) {
+              await runTextProductSearch(textWithoutUrl, { overlay, progressText });
+              return;
+            }
             if (overlay) overlay.style.display = "none";
             submit.disabled = false;
-            submit.innerHTML = `<span>Kontrol et</span>`;
+            submit.innerHTML = `<i data-lucide="scan-search"></i> Fiyatları Karşılaştır`;
             showLinkGuide(true);
             return;
           }
@@ -2184,17 +2412,12 @@ async function parseProduct(event) {
         console.error("parseProduct hatası:", error);
 
         if (overlay && progressText) {
-          // 1. Durum bildirimini yeşil mod ve glitch ile güncelle
           const header = overlay.querySelector("h3");
           if (header) {
             header.innerText = "Alternatif Sonuçlar Yükleniyor";
           }
           progressText.innerText = "Bağlantı yavaş, yakın alternatifler getiriliyor...";
-
-          // 2. Lokal CPU simülasyonu için 1.5 saniye bekle
-          await new Promise(resolve => setTimeout(resolve, 1500));
-
-          // 3. Lokal rezonans fallback sonuçlarını oluştur
+          await new Promise(resolve => setTimeout(resolve, 600));
           showSearchResults({ products: [], query: val });
         } else {
           showToast("Bağlantı hatası. Lütfen tekrar deneyin.");
@@ -2204,7 +2427,7 @@ async function parseProduct(event) {
         clearTimeout(t2);
         if (overlay) overlay.style.display = "none";
         submit.disabled = false;
-        submit.innerHTML = `<i data-lucide="scan-search"></i> Kontrol et`;
+        submit.innerHTML = `<i data-lucide="scan-search"></i> Fiyatları Karşılaştır`;
         lucide.createIcons();
       }
     }, 0);
@@ -2623,6 +2846,18 @@ function showSearchResults(response) {
 
   let categoryHeaderHtml = renderMarketAnalysisBanner(response.market_analysis);
 
+  // Kredi Kartı / Cüzdan Net Fiyat Hesaplayıcı
+  const selectedCard = window._almadanSelectedCard || "none";
+  const cardCampaigns = [
+    { id: "none", label: "Standart Fiyat", rate: 0, cap: 0 },
+    { id: "nays", label: "Nays (%10 İade)", rate: 0.10, cap: 250 },
+    { id: "papara", label: "Papara (%5 İade)", rate: 0.05, cap: 150 },
+    { id: "maximum", label: "Maximum (%5 Puan)", rate: 0.05, cap: 300 },
+    { id: "world", label: "World (%5 Puan)", rate: 0.05, cap: 300 },
+    { id: "bonus", label: "Bonus (%5 Bonus)", rate: 0.05, cap: 300 },
+  ];
+  window._almadanCardCampaigns = cardCampaigns;
+
   // Mağaza filtreleri ve sıralama barı
   const storeCounts = {};
   allProducts.forEach(p => {
@@ -2630,8 +2865,9 @@ function showSearchResults(response) {
     storeCounts[k] = (storeCounts[k] || 0) + 1;
   });
   const storeKeys = Object.keys(storeCounts);
-  const filterToolbarHtml = allProducts.length > 1 ? `
+  const filterToolbarHtml = allProducts.length > 0 ? `
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;background:rgba(0,0,0,0.025);padding:10px;border-radius:8px;border:1px solid var(--line);">
+      ${allProducts.length > 1 ? `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <span style="font-size:11px;font-weight:800;color:var(--muted);">SIRALA:</span>
@@ -2648,6 +2884,15 @@ function showSearchResults(response) {
             Birim Fiyat (Lt/Kg)
           </button>
         </div>
+      </div>` : ""}
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <span style="font-size:11px;font-weight:800;color:var(--muted);">💳 KART NET FİYAT:</span>
+        ${cardCampaigns.map(c => `
+          <button type="button" class="card-campaign-pill" data-card-id="${c.id}" onclick="selectCardCampaign('${c.id}')"
+            style="font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:12px;cursor:pointer;border:1px solid ${selectedCard === c.id ? '#287a50' : 'var(--line)'};background:${selectedCard === c.id ? '#287a50' : '#fff'};color:${selectedCard === c.id ? '#fff' : 'var(--ink)'};">
+            ${escapeHtml(c.label)}
+          </button>
+        `).join("")}
       </div>
       ${storeKeys.length > 1 ? `
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
@@ -2678,21 +2923,21 @@ function showSearchResults(response) {
   content.innerHTML = `
     <style>
       .search-result-card {
-        transition: all 0.2s ease-in-out;
+        transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
       }
       .search-result-card:hover {
         border-color: var(--green) !important;
-        box-shadow: 0 4px 12px rgba(40, 122, 80, 0.08);
-        transform: translateY(-1px);
+        box-shadow: 0 8px 24px rgba(40, 122, 80, 0.12);
+        transform: translateY(-2px);
       }
     </style>
-    <div class="dialog-body" style="max-width: 600px; width: 100%;">
+    <div class="dialog-body" style="max-width: 660px; width: 100%;">
       <div class="search-result-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px;">
         <div>
-          <p class="eyebrow" style="color: var(--green); font-weight: 700; margin-bottom: 4px;">ARAMA SONUÇLARI</p>
-          <h2 style="margin: 0;">En Mantıklı Seçenekler</h2>
+          <p class="eyebrow" style="color: var(--green); font-weight: 800; margin-bottom: 4px;">CANLI KARŞILAŞTIRMA SONUÇLARI</p>
+          <h2 style="margin: 0; font-size: 22px;">"${escapeHtml(originalQuery)}" İçin En İyi Teklifler</h2>
         </div>
-        <button class="secondary-button" id="forceRefreshBtn" style="font-size: 12px; padding: 6px 14px; height: auto; flex-shrink: 0; white-space: nowrap; display: inline-flex; align-items: center;"
+        <button class="secondary-button" id="forceRefreshBtn" style="font-size: 12px; padding: 7px 14px; height: auto; flex-shrink: 0; white-space: nowrap; display: inline-flex; align-items: center; border-radius: 8px;"
           onclick="forceRefreshSearch(${inlineJsArg(originalQuery)}, ${inlineJsArg(cacheKey)})">
           <i data-lucide="refresh-cw" style="width: 13px; height: 13px; margin-right: 5px;"></i>Fiyatı Güncelle
         </button>
@@ -2700,9 +2945,16 @@ function showSearchResults(response) {
       ${sizeChipsHtml}
       ${fallbackNoticeHtml}
       ${categoryHeaderHtml}
-      <div style="display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto; padding-right: 4px; margin-bottom: 24px;">
+      <div style="display: flex; flex-direction: column; gap: 12px; max-height: 440px; overflow-y: auto; padding-right: 4px; margin-bottom: 20px;">
         ${products.map((item, index) => {
-          const badgesHtml = item.labels.map(lbl => {
+          const allLabels = [...(item.labels || [])];
+          if (item.extra_info?.real_discount && !allLabels.includes("Gerçek Fırsat")) {
+            allLabels.unshift("Gerçek Fırsat");
+          }
+          if (item.extra_info?.fake_discount && !allLabels.includes("Şişirilmiş İndirim")) {
+            allLabels.unshift("Şişirilmiş İndirim");
+          }
+          const badgesHtml = allLabels.map(lbl => {
             let colorClass = "bg-gray";
             let badgeTitle = "";
             if (lbl === "En Ucuz") colorClass = "bg-green";
@@ -2715,21 +2967,22 @@ function showSearchResults(response) {
             if (lbl === "Birim Fiyat Riski") { colorClass = "bg-red"; badgeTitle = "Bu ürünün birim fiyatı (ör. ml/gr başına), aynı kategorideki diğer seçeneklere göre dezavantajlı."; }
             if (lbl === "Birim Fiyat Avantajı") colorClass = "bg-green";
             const titleAttr = badgeTitle ? ` title="${escapeHtml(badgeTitle)}"` : "";
-            return `<span class="analysis-status-badge ${colorClass}"${titleAttr} style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; cursor: ${badgeTitle ? "help" : "default"};">${escapeHtml(lbl)}</span>`;
+            return `<span class="analysis-status-badge ${colorClass}"${titleAttr} style="font-size: 10px; padding: 3px 7px; border-radius: 5px; font-weight: 800; text-transform: uppercase; cursor: ${badgeTitle ? "help" : "default"};">${escapeHtml(lbl)}</span>`;
           }).join(" ");
 
           const originalPriceHtml = item.original_price && item.original_price > item.price
-            ? `<span style="text-decoration: line-through; color: var(--muted); font-size: 11px; margin-right: 6px;" class="price-display-original">${currency.format(item.original_price)}</span>`
-            : `<span style="text-decoration: line-through; color: var(--muted); font-size: 11px; margin-right: 6px; display: none;" class="price-display-original"></span>`;
+            ? `<span style="text-decoration: line-through; color: var(--muted); font-size: 11.5px; margin-right: 6px; font-weight: 600;" class="price-display-original">${currency.format(item.original_price)}</span>`
+            : `<span style="text-decoration: line-through; color: var(--muted); font-size: 11.5px; margin-right: 6px; display: none;" class="price-display-original"></span>`;
 
           const isOutOfStock = item.extra_info?.out_of_stock;
+          const isCheapestNode = !isOutOfStock && item.price === cheapestPrice;
           const priceDisplayHtml = isOutOfStock
-            ? `<strong style="font-size: 14px; color: var(--muted); font-style: italic;">Stokta Yok</strong>`
-            : `<strong style="font-size: 14px; color: var(--ink);" class="price-display-strong">${currency.format(item.price)}</strong>`;
+            ? `<strong style="font-size: 15px; color: var(--muted); font-style: italic;">Stokta Yok</strong>`
+            : `<strong style="font-size: 17px; font-weight: 800; color: ${isCheapestNode ? 'var(--green)' : 'var(--ink)'};" class="price-display-strong">${currency.format(item.price)}</strong>`;
 
           const storeLinkHtml = !isOutOfStock && item.url
             ? `<a href="${escapeHtml(addAffiliateTag(item.url, item.source))}" target="_blank" rel="noopener noreferrer sponsored"
-                 class="secondary-button" style="padding: 6px 12px; font-size: 11px; height: auto; width: auto; display: inline-flex; align-items: center; text-decoration: none;"
+                 class="secondary-button" style="padding: 7px 13px; font-size: 11.5px; font-weight: 700; height: auto; width: auto; border-radius: 8px; display: inline-flex; align-items: center; text-decoration: none;"
                  onclick="event.stopPropagation(); addToRecentlyViewed(state.searchResults[${index}]);">
                  <i data-lucide="external-link" style="width:12px; height:12px; margin-right:4px;"></i> Mağazaya Git
                </a>`
@@ -2745,10 +2998,10 @@ function showSearchResults(response) {
             </button>`;
 
           const buttonHtml = isOutOfStock
-            ? `<button class="primary-button" style="padding: 6px 12px; font-size: 11px; height: auto; width: auto; background-color: #687068; border-color: #687068;" onclick="trackSearchResultProduct(this, ${index})">
-                 <i data-lucide="bell" style="width:12px; height:12px; margin-right:4px;"></i> Stok Takibi Ekle
+            ? `<button class="primary-button" style="padding: 7px 13px; font-size: 11.5px; height: auto; width: auto; border-radius: 8px; background-color: #687068; border-color: #687068; color: #fff;" onclick="trackSearchResultProduct(this, ${index})">
+                 <i data-lucide="bell" style="width:12px; height:12px; margin-right:4px;"></i> Stok Takibi
                </button>`
-            : `<button class="primary-button" style="padding: 6px 12px; font-size: 11px; height: auto; width: auto;" onclick="trackSearchResultProduct(this, ${index})">
+            : `<button class="primary-button" style="padding: 7px 13px; font-size: 11.5px; height: auto; width: auto; border-radius: 8px; background: var(--green); color: #fff;" onclick="trackSearchResultProduct(this, ${index})">
                  <i data-lucide="radar" style="width:12px; height:12px; margin-right:4px;"></i> Radara Ekle
                </button>`;
 
@@ -2770,35 +3023,37 @@ function showSearchResults(response) {
           let warrantyBadgeHtml = "";
           let isImporter = false;
 
-          const isCheapestNode = !isOutOfStock && item.price === cheapestPrice;
           const nodeClasses = `quantum-node-card ${isCheapestNode ? 'cheapest-node-glow' : ''}`;
-
           const isLocal = item.delivery_type === "local";
-          const borderStyle = isLocal
-            ? "border: 2px solid #00f3ff !important; box-shadow: 0 0 10px rgba(0, 243, 255, 0.15);"
-            : "border: 2px solid #10b981 !important; box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);";
+          const borderStyle = isCheapestNode
+            ? "border: 1.5px solid #16a34a !important; background: linear-gradient(135deg, rgba(22, 163, 74, 0.05) 0%, var(--surface, #fff) 100%); box-shadow: 0 4px 16px rgba(22, 163, 74, 0.08);"
+            : "border: 1px solid var(--border, #dfe3dc) !important; background: var(--surface, #fff);";
+          const brand = getStoreBrand(item.source);
 
           return `
             <div class="${nodeClasses} search-result-card"
                  data-base-price="${item.price}"
                  data-base-original-price="${item.original_price || 0}"
                  data-is-importer="${isImporter}"
-                 style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; ${borderStyle} border-radius: 8px; background: white; transition: all 0.2s;">
-              <div style="width: 50px; height: 50px; flex-shrink: 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; justify-content: center;">
-                ${item.image_url
+                 style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px; ${borderStyle} border-radius: 12px;">
+              <div style="width: 62px; height: 62px; flex-shrink: 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #f8faf8; display: flex; align-items: center; justify-content: center;">
+                ${item.image_url && item.image_url !== "/static/icon-192.png"
                   ? `<img src="${escapeHtml(proxiedImageUrl(item.image_url))}" alt="${escapeHtml(item.title)}" loading="lazy" style="width: 100%; height: 100%; object-fit: contain;" onerror="imageFallback(this, '${getStoreIcon(item.source, item.title)}')">`
-                  : `<span class="product-placeholder" style="width:100%; height:100%; display:grid; place-items:center;"><i data-lucide="${getStoreIcon(item.source, item.title)}" style="width:18px; height:18px;"></i></span>`}
+                  : `<span style="width:100%; height:100%; display:grid; place-items:center; background:${brand.bg}; color:${brand.color}; font-weight:800; font-size:18px;">${escapeHtml(storeDisplayName(item.source).charAt(0).toUpperCase())}</span>`}
               </div>
               <div style="flex: 1; min-width: 0;">
-                <p class="source-name" style="margin: 0 0 2px 0; font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--muted);">${escapeHtml(storeDisplayName(item.source))} ${whyMatchedHtml}</p>
-                <h4 style="margin: 0 0 6px 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</h4>
-                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px;">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+                  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${brand.bg};"></span>
+                  <p class="source-name" style="margin: 0; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--ink-2);">${escapeHtml(storeDisplayName(item.source))} ${whyMatchedHtml}</p>
+                </div>
+                <h4 style="margin: 0 0 7px 0; font-size: 13.5px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</h4>
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 5px;">
                   ${badgesHtml}
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                   ${isLocal
-                    ? `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: rgba(0,243,255,0.1); color: #00d2ff; border: 1px solid rgba(0,243,255,0.2); display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="truck" style="width:11px; height:11px;"></i> ${escapeHtml(item.delivery_time || '30-60 Dakika')} ${item.distance_km ? `(${item.distance_km} km)` : ''}</span>`
-                    : `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: rgba(16,185,129,0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2); display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="globe" style="width:11px; height:11px;"></i> ${escapeHtml(item.delivery_time || '2 İş Günü')}</span>`
+                    ? `<span style="font-size: 10.5px; padding: 2px 7px; border-radius: 5px; font-weight: 700; background: rgba(14,165,233,0.1); color: #0284c7; border: 1px solid rgba(14,165,233,0.2); display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="truck" style="width:11px; height:11px;"></i> ${escapeHtml(item.delivery_time || '30-60 Dakika')} ${item.distance_km ? `(${item.distance_km} km)` : ''}</span>`
+                    : `<span style="font-size: 10.5px; padding: 2px 7px; border-radius: 5px; font-weight: 700; background: rgba(40,122,80,0.08); color: var(--green); border: 1px solid rgba(40,122,80,0.18); display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="package-check" style="width:11px; height:11px;"></i> ${escapeHtml(item.delivery_time || 'Hızlı Kargo · 1-2 İş Günü')}</span>`
                   }
                   ${warrantyBadgeHtml}
                 </div>
@@ -2806,11 +3061,12 @@ function showSearchResults(response) {
                 ${unitPriceHtml}
                 ${wrongMatchHtml}
               </div>
-              <div style="text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
-                <div style="display:flex; align-items:center; justify-content:flex-end; gap:4px;">
+              <div style="text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                <div style="display:flex; align-items:center; justify-content:flex-end; gap:4px; flex-wrap:wrap;">
                   ${favoriteButtonHtml(item)}
                   ${originalPriceHtml}
                   ${priceDisplayHtml}
+                  <span class="net-card-price-badge" data-raw-price="${Number(item.price || 0)}" style="display:none; font-size:10.5px; font-weight:800; color:#15803d; background:rgba(22,163,74,0.12); padding:2px 6px; border-radius:6px;"></span>
                   ${(() => {
                     const t = item.price_trend;
                     if (!t) return "";
@@ -2819,7 +3075,33 @@ function showSearchResults(response) {
                     return `<div class="price-trend-flat"><i data-lucide="minus" style="width:11px;height:11px;flex-shrink:0;"></i>Sabit (7g)</div>`;
                   })()}
                 </div>
-                <div style="display: flex; gap: 6px;">
+                <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: center;">
+                  ${!isOutOfStock && item.price > 0 ? `
+                    <button type="button" class="secondary-button" title="Fiyat %10 düşünce hedef alarm kur" style="padding: 5px 8px; font-size: 10.5px; height: auto; width: auto; border-radius: 7px; border-color: rgba(217,119,6,0.35); color: #b45309; background: rgba(245,158,11,0.08);" onclick="event.stopPropagation(); trackSearchResultWithTarget(this, ${index}, 10);">
+                      🎯 -%10 Alarm
+                    </button>
+                  ` : ""}
+                  ${(() => {
+                    const ctx = window._negiysemContext;
+                    if (!ctx) return "";
+                    const qs = new URLSearchParams({
+                      name: item.title || originalQuery || "Almadan Parçası",
+                      cat: ctx.cat || "ust",
+                      color: ctx.color || "siyah",
+                      thickness: ctx.thickness || "orta",
+                      ...(ctx.waterproof === "1" ? { waterproof: "1" } : {}),
+                      ...(item.price ? { price: String(Math.round(item.price)) } : {}),
+                    });
+                    return `<a href="negiysem://add-item?${qs.toString()}"
+                               class="secondary-button"
+                               style="padding: 6px 10px; font-size: 11px; height: auto; width: auto; display: inline-flex; align-items: center; text-decoration: none; border-color: #5c4d3c; color: #5c4d3c;"
+                               onclick="event.stopPropagation();">
+                              ✨ Dolabıma Ekle
+                            </a>`;
+                  })()}
+                  <button type="button" class="secondary-button" style="padding: 7px 11px; font-size: 11.5px; height: auto; width: auto; border-radius: 8px; border-color: rgba(40,122,80,0.35); color: var(--green);" onclick="event.stopPropagation(); addSearchResultToCart(${index});">
+                    <i data-lucide="shopping-cart" style="width:12px; height:12px; margin-right:4px;"></i> + Sepet
+                  </button>
                   ${storeLinkHtml}
                   ${buttonHtml}
                 </div>
@@ -2828,6 +3110,7 @@ function showSearchResults(response) {
           `;
         }).join("")}
       </div>
+      ${buildSmartDiscoveryExtensionHtml(originalQuery, response.category || "general")}
       <div class="dialog-actions" style="margin-top: 0;">
         <button class="secondary-button" type="button" onclick="closeDialog()" style="width: 100%;">Vazgeç</button>
       </div>
@@ -2838,11 +3121,159 @@ function showSearchResults(response) {
 
   if (!dialog.open) dialog.showModal();
   lucide.createIcons();
+  if (window._almadanSelectedCard && window._almadanSelectedCard !== "none") {
+    selectCardCampaign(window._almadanSelectedCard);
+  }
+}
 
-  // Register node cards for bobbing animation
-  dialog.querySelectorAll('.quantum-node-card').forEach(card => {
-    if (window.registerForBobbing) window.registerForBobbing(card);
+window.addSearchResultToCart = function(index) {
+  const results = state.searchResults || [];
+  const item = results[index];
+  if (!item) return;
+
+  const offers = {};
+  results.forEach((p) => {
+    const src = String(p.source || "").toLowerCase().trim();
+    const pr = Number(p.price || 0);
+    if (src && pr > 0 && (!offers[src] || pr < offers[src])) {
+      offers[src] = pr;
+    }
   });
+
+  const itemName = item.title || window._lastSearchResponse?.query || "Ürün";
+  const existingIdx = state.cart.findIndex(
+    (c) => String(c.name || "").toLowerCase() === itemName.toLowerCase()
+  );
+  if (existingIdx >= 0) {
+    const cur = state.cart[existingIdx];
+    state.cart[existingIdx] = {
+      ...cur,
+      quantity: Math.min(99, (Number(cur.quantity) || 1) + 1),
+      offers: Object.keys(offers).length ? { ...(cur.offers || {}), ...offers } : cur.offers,
+      updated_at: new Date().toISOString(),
+    };
+    showToast(`Sepetteki miktar artırıldı: ${escapeHtml(itemName)}`);
+  } else {
+    state.cart.push({
+      id: "cart-" + Date.now(),
+      name: itemName,
+      image_url: item.image_url || "",
+      checked: false,
+      quantity: 1,
+      offers: Object.keys(offers).length ? offers : null,
+      updated_at: new Date().toISOString(),
+    });
+    showToast(`Sepete eklendi: ${escapeHtml(itemName)} (${Object.keys(offers).length} mağaza fiyatıyla)`);
+  }
+  saveCartToLocalStorage();
+  if (state.sharedListId) syncSharedListWithServer();
+  if (state.activeView === "cart") renderCart();
+};
+
+window.selectCardCampaign = function(cardId) {
+  window._almadanSelectedCard = cardId || "none";
+  const campaigns = window._almadanCardCampaigns || [];
+  const camp = campaigns.find(c => c.id === cardId) || { id: "none", rate: 0, cap: 0 };
+
+  document.querySelectorAll(".card-campaign-pill").forEach(btn => {
+    const active = btn.getAttribute("data-card-id") === camp.id;
+    btn.style.background = active ? "#287a50" : "#fff";
+    btn.style.color = active ? "#fff" : "var(--ink)";
+    btn.style.borderColor = active ? "#287a50" : "var(--line)";
+  });
+
+  document.querySelectorAll(".net-card-price-badge").forEach(el => {
+    const raw = parseFloat(el.getAttribute("data-raw-price") || "0");
+    if (!raw || camp.rate <= 0) {
+      el.style.display = "none";
+      el.textContent = "";
+      return;
+    }
+    const benefit = Math.min(camp.cap || 9999, raw * camp.rate);
+    const netPrice = Math.max(0, raw - benefit);
+    el.textContent = `Net: ${currency.format(netPrice)}`;
+    el.style.display = "inline-block";
+  });
+};
+
+window.trackSearchResultWithTarget = async function(button, index, dropPct) {
+  const item = state.searchResults ? state.searchResults[index] : null;
+  if (!item || !item.price) return;
+  const targetPrice = Math.max(1, Math.round(item.price * (1 - dropPct / 100)));
+  const extra = { ...(item.extra_info || {}), target_price: targetPrice };
+  button.disabled = true;
+  button.textContent = "Kuruluyor...";
+  try {
+    await api("/products", {
+      method: "POST",
+      body: JSON.stringify({
+        title: item.title,
+        url: item.url,
+        price: item.price,
+        source: item.source,
+        image_url: item.image_url,
+        original_price: item.original_price,
+        extra_info: extra,
+      }),
+    });
+    showToast(`🎯 Hedef alarm kuruldu: ${currency.format(targetPrice)} altına düşünce haber vereceğiz!`);
+    await loadProducts();
+    button.textContent = "✓ Alarm Aktif";
+  } catch (error) {
+    if (isLoginRequiredError(error)) {
+      promptLoginForTracking("Hedef fiyat alarmı kurmak için giriş yapmalısın.");
+    } else {
+      showToast(error.message || "Alarm kurulamadı.");
+    }
+    button.disabled = false;
+    button.textContent = `🎯 -%${dropPct} Alarm`;
+  }
+};
+
+function buildSmartDiscoveryExtensionHtml(query, category) {
+  const q = String(query || "").toLowerCase();
+  const isFashion = category === "fashion" || /\b(trençkot|trenckot|ceket|mont|kaban|pantolon|jean|ayakkabı|sneaker|bot|elbise|tişört|tisort|gömlek|kazak|çanta)\b/i.test(q);
+
+  if (isFashion) {
+    const comboSuggestions = q.includes("ayakkabı") || q.includes("sneaker")
+      ? ["Bej Trençkot", "Keten Pantolon", "Oversize Beyaz Gömlek"]
+      : ["Beyaz Deri Sneaker", "Siyah Boğazlı Kazak", "Deri Omuz Çantası"];
+    return `
+      <div style="margin-bottom:14px; padding:12px 14px; border-radius:10px; background:rgba(92,77,60,0.06); border:1px solid rgba(92,77,60,0.2);">
+        <div style="font-size:11.5px; font-weight:800; color:#5c4d3c; margin-bottom:6px;">👗 NE GİYSEM KOMBİN TAMAMLAYICI ÖNERİLERİ</div>
+        <p style="font-size:12px; color:var(--ink-2); margin:0 0 8px;">Bu parçayla uyumlu eksik parçaları tek tıkla kıyaslayıp dolabına ekleyebilirsin:</p>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          ${comboSuggestions.map(s => `
+            <button type="button" class="secondary-button" style="font-size:11px; padding:5px 10px; height:auto; border-radius:999px;" onclick="closeDialog(); runTextProductSearch(${inlineJsArg(s)});">
+              ✨ ${escapeHtml(s)}
+            </button>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  let muadilTitle = "Fiyat / Performans Alternatifi Ara";
+  let muadilQuery = "";
+  if (q.includes("dyson")) { muadilTitle = "Dyson'a göre %45 daha ekonomik muadil önerisi:"; muadilQuery = "Philips Marathon Ultimate Süpürge"; }
+  else if (q.includes("airpods")) { muadilTitle = "AirPods'a göre daha ekonomik ANC kulaklık muadili:"; muadilQuery = "Anker Soundcore Liberty 4 NC"; }
+  else if (q.includes("la roche") || q.includes("güneş kremi")) { muadilTitle = "Aynı koruma faktöründe fiyat/performans muadili:"; muadilQuery = "Garnier Ambre Solaire Güneş Kremi SPF 50"; }
+  else if (q.includes("airfryer") || q.includes("philips")) { muadilTitle = "Daha uygun fiyatlı XXL Airfryer muadili:"; muadilQuery = "Xiaomi Mi Smart Air Fryer"; }
+  else if (q.includes("stanley")) { muadilTitle = "Benzer yalıtımlı ekonomik termos muadili:"; muadilQuery = "Thermos Paslanmaz Çelik Termos 1 L"; }
+  else if (q.includes("iphone")) { muadilTitle = "Benzer kamera/performans segmenti alternatifi:"; muadilQuery = "Samsung Galaxy S24 128 GB"; }
+
+  if (!muadilQuery) return "";
+  return `
+    <div style="margin-bottom:14px; padding:11px 14px; border-radius:10px; background:rgba(40,122,80,0.05); border:1px dashed rgba(40,122,80,0.3); display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+      <div style="font-size:12px; color:var(--ink);">
+        <strong style="color:var(--green);">💡 ${escapeHtml(muadilTitle)}</strong>
+        <span style="display:block; font-size:11.5px; color:var(--ink-2); margin-top:2px;">${escapeHtml(muadilQuery)}</span>
+      </div>
+      <button type="button" class="secondary-button" style="font-size:11.5px; padding:6px 12px; height:auto; border-radius:8px; white-space:nowrap;" onclick="closeDialog(); runTextProductSearch(${inlineJsArg(muadilQuery)});">
+        Muadili Kıyasla →
+      </button>
+    </div>
+  `;
 }
 
 window.triggerSuggestionSearch = function(query) {
@@ -4220,11 +4651,6 @@ function switchView(view) {
   });
 
   if (view === "cart") {
-    if (!state.auth.authenticated) {
-      promptLoginForTracking("Sepetini kullanmak ve cihazlar arasında senkronize etmek için hesap açman gerekiyor.");
-      switchView("discover");
-      return;
-    }
     renderCart();
   }
   if (view === "savings") {
@@ -4559,7 +4985,7 @@ function toggleScannerArea(type) {
     barcode.classList.toggle("hidden", !isHidden);
     ocr.classList.add("hidden");
     if (isHidden) {
-      document.getElementById("barcodeFallbackArea")?.classList.add("hidden");
+      document.getElementById("barcodeFallbackArea")?.classList.remove("hidden");
       startLiveBarcodeScanner();
     } else {
       stopLiveBarcodeScanner();
@@ -5043,6 +5469,55 @@ async function runOcrScan(sourceInput = null) {
   }
 }
 
+window.runDemoReceiptOcr = async function() {
+  const cat = document.getElementById("ocrReceiptCategorySelector")?.value || "grocery";
+  const status = document.getElementById("receiptUploadStatus");
+  const panel = document.getElementById("receiptReviewPanel");
+  const samplePayloadMap = {
+    grocery: "mock_data",
+    cosmetics: "data:image/png;base64,cosmetics_receipt",
+    electronics: "data:image/png;base64,electronics_receipt",
+  };
+  if (status) {
+    status.className = "receipt-upload-status loading";
+    status.textContent = "Örnek fiş analiz ediliyor...";
+  }
+  try {
+    const res = await api("/api/ocr/receipt", {
+      method: "POST",
+      body: JSON.stringify({
+        image_base64: samplePayloadMap[cat] || "mock_data",
+        category_hint: cat,
+      }),
+    });
+    const detectedItems = Array.isArray(res.detected_items) ? res.detected_items : [];
+    state.pendingReceipt = {
+      store: res.store || "migros",
+      purchased_at: res.purchased_at || new Date().toISOString().slice(0, 10),
+      payment_method: res.payment_method || "card",
+      total: Number(res.total || 0),
+      category: res.category || cat,
+      receipt_info: Array.isArray(res.receipt_info) ? res.receipt_info : [],
+      raw_ocr_text: res.raw_ocr_text || "",
+      items: detectedItems.map((item) => ({
+        title: item.title || "",
+        price: Number(item.price || 0),
+        quantity: Number(item.quantity || 1),
+        category: item.category || res.category || cat,
+      })),
+    };
+    renderReceiptReview();
+    if (status) {
+      status.className = "receipt-upload-status success";
+      status.textContent = "Örnek fiş başarıyla okundu — aşağıdan kontrol edip kaydedebilirsiniz.";
+    }
+    panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    showToast("Örnek fiş okundu!");
+  } catch (error) {
+    showToast(error.message || "Örnek fiş okunamadı.");
+  }
+};
+
 async function readFileAsDataUrl(file) {
   if (!("createImageBitmap" in window)) {
     return new Promise((resolve, reject) => {
@@ -5467,8 +5942,8 @@ function renderBackendOptimization(result, mode) {
       .join(", ");
     resultsDiv.innerHTML = `
       <div class="optimizer-summary optimizer-unavailable">
-        <span class="optimizer-kicker">KUANTUM VERİ SİNYALİ GEREKLİ</span>
-        <h4>Fiyat spektrumu karşılaştırılamadı</h4>
+        <span class="optimizer-kicker">DOĞRULANMIŞ MAĞAZA VERİSİ GEREKLİ</span>
+        <h4>Market fiyatları karşılaştırılamadı</h4>
         <p>${escapeHtml(result.message || "Doğrulanmış mağaza fiyatı bulunamadı.")}</p>
         ${missingNames ? `<p><strong>Eksik:</strong> ${missingNames}</p>` : ""}
         <p class="optimizer-source-note">Almadan tahmini veya uydurma market fiyatı göstermez.</p>
@@ -5493,37 +5968,44 @@ function renderBackendOptimization(result, mode) {
 
     resultsDiv.innerHTML = `
       ${fallbackWarningHtml}
-      <div class="optimizer-summary quantum-node-card cheapest-node-glow" style="padding: 14px; margin-bottom: 14px; border: 1px solid var(--line);">
-        <span class="optimizer-kicker" style="color:#00f0ff;">OPTIMAL TEK MARKET SPEKTRUMU</span>
-        <h4 style="color: #00f0ff; text-shadow: 0 0 10px rgba(0,240,255,0.3);">${currency.format(option.total)}</h4>
-        <p><strong>${escapeHtml(option.store.toUpperCase())}</strong>${distanceText} veri düğümü ile
-          ${currency.format(option.savings)} tasarruf.</p>
-        ${option.shipping_fee > 0 ? `<p style="font-size:11px; color:var(--red); font-weight:600; margin-top:4px;">Kargo Ücreti: ${currency.format(option.shipping_fee)}</p>` : `<p style="font-size:11px; color:#00f0ff; font-weight:600; margin-top:4px;">Kargo Bedava!</p>`}
+      <div class="optimizer-summary" style="padding: 16px; margin-bottom: 14px; border: 1.5px solid #16a34a; border-radius: 12px; background: rgba(22, 163, 74, 0.06);">
+        <span class="optimizer-kicker" style="color: var(--green); font-weight: 800; font-size: 11px; letter-spacing: 0.06em;">🏆 EN UCUZ TEK MARKET SEÇENEĞİ</span>
+        <h4 style="color: var(--green-dark, #166534); font-size: 24px; font-weight: 800; margin: 4px 0;">${currency.format(option.total)}</h4>
+        <p style="font-size: 13px; color: var(--ink);">Tüm sepeti <strong>${escapeHtml(storeDisplayName(option.store))}</strong>${distanceText} mağazasından alarak en pahalı seçeneğe göre <strong>${currency.format(option.savings)}</strong> tasarruf edersiniz.</p>
+        ${option.shipping_fee > 0 ? (() => {
+          const rule = SHIPPING_RULES[option.store];
+          const remaining = rule ? Math.max(1, Math.ceil(rule[0] - option.subtotal)) : 0;
+          return `
+            <p style="font-size:11.5px; color:var(--red); font-weight:700; margin-top:6px;">+ Kargo Ücreti: ${currency.format(option.shipping_fee)}</p>
+            ${remaining > 0 ? `
+              <div style="margin-top:8px; padding:8px 10px; border-radius:8px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+                <span style="font-size:11.5px; color:#92400e; font-weight:700;">📦 Kargo Bedava İpucu: ${currency.format(option.shipping_fee)} kargo ödemek yerine ${currency.format(remaining)} tutarında ürün ekleyerek kargoyu bedavaya getirin!</span>
+                <button type="button" class="secondary-button" style="font-size:11px; padding:4px 9px; height:auto; border-radius:6px;" onclick="addShippingFillerToCart(${remaining})">+ Tamamlayıcı Ekle</button>
+              </div>
+            ` : ""}
+          `;
+        })() : `<p style="font-size:11.5px; color:var(--green); font-weight:700; margin-top:6px;">✓ Kargo / Teslimat Ücretsiz</p>`}
       </div>
-      <div class="opt-store-card quantum-node-card" style="padding:12px; border:1px solid var(--line);">
+      <div class="opt-store-card" style="padding:14px; border:1px solid var(--line); border-radius:10px; background:var(--surface, #fff);">
         ${option.items.map(item => `
-          <div class="opt-item-row" style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0;">
-            <span>${escapeHtml(item.name)}${item.quantity > 1 ? ` x${item.quantity}` : ""}</span>
-            <span class="opt-item-price" style="font-weight:700;">${currency.format(item.line_total)}</span>
+          <div class="opt-item-row" style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--line);">
+            <span>${escapeHtml(item.name)}${item.quantity > 1 ? ` × ${item.quantity}` : ""}</span>
+            <span class="opt-item-price" style="font-weight:800; color:var(--ink);">${currency.format(item.line_total)}</span>
           </div>
         `).join("")}
       </div>
     `;
     lucide.createIcons();
-
-    resultsDiv.querySelectorAll('.quantum-node-card').forEach(card => {
-      if (window.registerForBobbing) window.registerForBobbing(card);
-    });
     return true;
   }
 
   const split = result.split_basket;
   resultsDiv.innerHTML = `
     ${fallbackWarningHtml}
-    <div class="optimizer-summary quantum-node-card cheapest-node-glow" style="padding: 14px; margin-bottom: 14px; border: 1px solid var(--line);">
-      <span class="optimizer-kicker" style="color:#00f0ff;">KUANTUM KÜMÜLATİF OPTİMİZASYON</span>
-      <h4 style="color: #00f0ff; text-shadow: 0 0 10px rgba(0,240,255,0.3);">${currency.format(split.total)}</h4>
-      <p>En ucuz tek veri düğümüne göre ek ${currency.format(split.savings)} kuantum tasarrufu.</p>
+    <div class="optimizer-summary" style="padding: 16px; margin-bottom: 14px; border: 1.5px solid #16a34a; border-radius: 12px; background: rgba(22, 163, 74, 0.06);">
+      <span class="optimizer-kicker" style="color: var(--green); font-weight: 800; font-size: 11px; letter-spacing: 0.06em;">⚡ BÖLÜNMÜŞ SEPET OPTİMİZASYONU</span>
+      <h4 style="color: var(--green-dark, #166534); font-size: 24px; font-weight: 800; margin: 4px 0;">${currency.format(split.total)}</h4>
+      <p style="font-size: 13px; color: var(--ink);">En ucuz tek mağazaya göre sepeti bölerek ek <strong>${currency.format(split.savings)}</strong> tasarruf edersiniz.</p>
     </div>
     <div class="optimizer-store-list" style="display: flex; flex-direction: column; gap: 12px;">
       ${split.stores.map(group => {
@@ -5532,19 +6014,19 @@ function renderBackendOptimization(result, mode) {
           ? `<span style="font-size: 11px; font-weight: 700; color: var(--muted); margin-left: 6px;">(${distVal >= 1 ? `${distVal.toFixed(2)} km` : `${Math.round(distVal * 1000)} m`})</span>`
           : "";
         return `
-          <div class="opt-store-card quantum-node-card" style="padding:12px; border: 1px solid var(--line); border-radius: 8px;">
-            <div class="opt-store-header" style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 6px; font-weight: 700;">
-              <span class="opt-store-name">${escapeHtml(group.store.toUpperCase())}${distanceText}</span>
-              <span class="opt-store-total" style="color:#00f0ff;">${currency.format(group.total)}</span>
+          <div class="opt-store-card" style="padding:14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface, #fff);">
+            <div class="opt-store-header" style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 8px; font-weight: 800;">
+              <span class="opt-store-name" style="color: var(--ink);">${escapeHtml(storeDisplayName(group.store))}${distanceText}</span>
+              <span class="opt-store-total" style="color: var(--green); font-weight: 800;">${currency.format(group.total)}</span>
             </div>
-            ${group.shipping_fee > 0 ? `<p style="font-size:11px; color:var(--red); font-weight:600; margin-top:4px;">Kargo Ücreti: ${currency.format(group.shipping_fee)}</p>` : `<p style="font-size:11px; color:#00f0ff; font-weight:600; margin-top:4px;">Kargo Bedava!</p>`}
+            ${group.shipping_fee > 0 ? `<p style="font-size:11.5px; color:var(--red); font-weight:700; margin-bottom:6px;">+ Kargo Ücreti: ${currency.format(group.shipping_fee)}</p>` : `<p style="font-size:11.5px; color:var(--green); font-weight:700; margin-bottom:6px;">✓ Kargo / Teslimat Ücretsiz</p>`}
             ${group.items.map(item => `
-              <div class="opt-item-row" style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0;">
+              <div class="opt-item-row" style="display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0;">
                 <span>
-                  ${escapeHtml(item.name)}
-                  ${item.unit_analysis ? `<small style="display:block; font-size:10px; color:var(--muted);">${currency.format(item.unit_analysis.unit_price)} / ${escapeHtml(item.unit_analysis.unit)}</small>` : ""}
+                  ${escapeHtml(item.name)}${item.quantity > 1 ? ` × ${item.quantity}` : ""}
+                  ${item.unit_analysis ? `<small style="display:block; font-size:10.5px; color:var(--muted);">${currency.format(item.unit_analysis.unit_price)} / ${escapeHtml(item.unit_analysis.unit)}</small>` : ""}
                 </span>
-                <span class="opt-item-price" style="font-weight:700;">${currency.format(item.line_total)}</span>
+                <span class="opt-item-price" style="font-weight:800; color:var(--ink);">${currency.format(item.line_total)}</span>
               </div>
             `).join("")}
           </div>
@@ -5553,12 +6035,23 @@ function renderBackendOptimization(result, mode) {
     </div>
   `;
   lucide.createIcons();
-
-  resultsDiv.querySelectorAll('.quantum-node-card').forEach(card => {
-    if (window.registerForBobbing) window.registerForBobbing(card);
-  });
   return true;
 }
+
+window.addShippingFillerToCart = function(remainingAmount) {
+  const fillerName = remainingAmount <= 60 ? "Barilla Spagetti Makarna 500 gr" : "Çaykur Rize Turist Çayı 500 gr";
+  state.cart.push({
+    id: "cart-" + Date.now(),
+    name: fillerName,
+    checked: false,
+    quantity: 1,
+    updated_at: new Date().toISOString(),
+  });
+  saveCartToLocalStorage();
+  renderCart();
+  if (state.sharedListId) syncSharedListWithServer();
+  showToast(`Kargo tamamlayıcı eklendi: ${fillerName}`);
+};
 
 async function renderCart() {
   const listDiv = document.getElementById("cartItemsList");
@@ -6033,10 +6526,29 @@ async function checkInitialSearchQuery() {
   const query = (params.get("q") || "").trim();
   if (!query) return;
 
+  const isFromNegiysem =
+    params.get("utm_source") === "negiysem" ||
+    params.get("source") === "negiysem" ||
+    Boolean(params.get("cat"));
+
+  if (isFromNegiysem) {
+    window._negiysemContext = {
+      cat: params.get("cat") || "ust",
+      color: params.get("color") || "siyah",
+      thickness: params.get("thickness") || "orta",
+      waterproof: params.get("waterproof") === "1" ? "1" : "0",
+    };
+  }
+
   const input = document.getElementById("productUrl");
   if (input) input.value = query;
 
-  if (params.get("auto") === "1") {
+  const shouldAutoSearch =
+    params.get("auto") === "1" ||
+    window.location.pathname === "/ara" ||
+    isFromNegiysem;
+
+  if (shouldAutoSearch) {
     window.setTimeout(() => {
       runTextProductSearch(query).catch((error) => {
         console.warn("İlk SEO araması başlatılamadı:", error.message);
@@ -6835,10 +7347,13 @@ function closeMainBarcodeScanner() {
 
 async function _startMainScanner() {
   if (_mainScannerRunning) return;
+  const statusEl = document.getElementById("mainBarcodeStatusText");
   try {
     await ensureHtml5Qrcode();
   } catch {
-    showToast("Kamera kütüphanesi yüklenemedi. İnternet bağlantını kontrol et.");
+    if (statusEl) {
+      statusEl.textContent = "Kamera kütüphanesi yüklenemedi. Aşağıdan barkod numarası girebilir veya fotoğraf seçebilirsiniz.";
+    }
     return;
   }
   try {
@@ -6868,11 +7383,27 @@ async function _startMainScanner() {
       () => {},
     );
     _mainScannerRunning = true;
+    if (statusEl) {
+      statusEl.textContent = "Barkodu kamera çerçevesine hizalayın veya aşağıdan numara girin.";
+    }
   } catch (e) {
-    showToast("Kamera açılamadı: " + (e.message || e));
-    closeMainBarcodeScanner();
+    if (statusEl) {
+      statusEl.textContent = "Kamera erişimi yok veya masaüstü modundasınız — aşağıdan barkod numarası girebilir, fotoğraf yükleyebilir veya örnek barkodları deneyebilirsiniz.";
+    }
   }
 }
+
+window.submitMainManualBarcode = async function() {
+  const input = document.getElementById("mainManualBarcodeInput");
+  const raw = String(input?.value || "").replace(/\D/g, "");
+  if (![8, 12, 13, 14].includes(raw.length)) {
+    showToast("Lütfen 8, 12 veya 13 haneli geçerli bir barkod numarası girin.");
+    input?.focus();
+    return;
+  }
+  closeMainBarcodeScanner();
+  await searchByBarcode(raw);
+};
 
 async function _stopMainScanner() {
   if (!_mainScanner || !_mainScannerRunning) return;

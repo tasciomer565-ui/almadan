@@ -13,10 +13,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Almadan">
     <link rel="apple-touch-icon" href="/static/icon-192.png">
-    <link rel="icon" href="data:image/x-icon;,">
-    <title>Almadan — Fiyat Karşılaştırma ve Alışveriş Asistanı</title>
-    <meta name="description" content="Trendyol, Hepsiburada, Amazon, N11 ve 100'den fazla mağazada ürün fiyatlarını tek tıkla karşılaştır. Link yapıştır veya barkod tara, en ucuz mağazayı anında bul — ücretsiz.">
-    <meta name="keywords" content="fiyat karşılaştırma, alışveriş asistanı, en ucuz fiyat, trendyol hepsiburada karşılaştırma, barkod tarama, fiyat takip">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
+    <title>Almadan — Fiyat Karşılaştırma ve Akıllı Alışveriş Asistanı</title>
+    <meta name="description" content="Trendyol, Hepsiburada, Amazon, Migros, BİM, A101 ve 100+ mağazada anlık ürün fiyatlarını, birim maliyeti, sahte indirim geçmişini ve kart puanı düşülmüş net fiyatı tek tıkla karşılaştır.">
+    <meta name="keywords" content="fiyat karşılaştırma, alışveriş asistanı, en ucuz fiyat, trendyol hepsiburada karşılaştırma, market sepeti optimizasyonu, barkod tarama, sahte indirim kontrolü, fiyat takip">
     <link rel="canonical" href="https://www.almadan.app/">
     <link rel="alternate" hreflang="tr-TR" href="https://www.almadan.app/">
     <link rel="alternate" hreflang="x-default" href="https://www.almadan.app/">
@@ -37,15 +37,66 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "Almadan",
-      "url": "https://www.almadan.app/",
-      "description": "Türkiye'deki online mağazalarda ürün fiyatlarını karşılaştıran alışveriş karar asistanı.",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://www.almadan.app/?q={search_term_string}",
-        "query-input": "required name=search_term_string"
-      }
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "name": "Almadan",
+          "url": "https://www.almadan.app/",
+          "description": "Türkiye'deki online mağazalarda ve zincir marketlerde ürün fiyatlarını, birim maliyeti ve 90 günlük indirim geçmişini karşılaştıran akıllı alışveriş karar motoru.",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://www.almadan.app/ara?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "Organization",
+          "name": "Almadan",
+          "url": "https://www.almadan.app/",
+          "logo": "https://www.almadan.app/static/icon-512.png"
+        },
+        {
+          "@type": "WebApplication",
+          "name": "Almadan",
+          "url": "https://www.almadan.app/",
+          "applicationCategory": "ShoppingApplication",
+          "operatingSystem": "All",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "TRY"
+          }
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Almadan sahte indirimleri nasıl tespit eder?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Almadan, satıcıların gösterdiği üstü çizili eski fiyatları ürünün 90 günlük piyasa medyanıyla karşılaştırır ve şişirilmiş sahte indirimleri otomatik olarak işaretler."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Market sepeti optimizasyonu nasıl çalışır?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Alışveriş listenizdeki ürünleri BİM, A101, ŞOK, Migros, CarrefourSA, Trendyol ve Hepsiburada gibi mağazalarda kargo ve mesafe kurallarıyla kıyaslayarak en ucuz tek marketi veya bölünmüş sepet planını çıkarır."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Barkod tarama özelliği ücretsiz mi?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Evet, Almadan'da kamera ile barkod tarama, fotoğraftan barkod okuma, link analizi ve fiyat karşılaştırma tamamen ücretsizdir."
+              }
+            }
+          ]
+        }
+      ]
     }
     </script>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=Space+Mono:wght@400;700&family=Archivo+Black&display=swap" media="print" onload="this.onload=null;this.media='all';this.rel='stylesheet'">
@@ -53,7 +104,7 @@
     <!-- chart.js ve html5-qrcode artık app.js'te gerçekten kullanıldıkları anda
          (Tasarrufum grafikleri / Barkod Tara) tembel yükleniyor -- her sayfada
          indirilip 357 KiB "kullanılmayan JS" olarak işaretlenmelerini önler. -->
-    <link rel="stylesheet" href="/static/styles.min.css?v=20260909-notifdot">
+    <link rel="stylesheet" href="/static/styles.min.css?v=20261116-premium">
     <style>
       /* Sprint 12 — eksik CSS degiskenleri (cache bypass) */
       :root {
@@ -151,13 +202,14 @@
       <a class="brand" href="/" aria-label="Almadan ana sayfa">
         <span class="brand-mark">A</span>
         <span>almadan</span>
+        <span class="brand-badge-pill">FİYAT RADARI</span>
       </a>
       <nav class="desktop-nav" aria-label="Ana menü">
         <button class="nav-item active" data-view="discover">Keşfet</button>
-        <button class="nav-item" data-view="tracking">Takip</button>
+        <button class="nav-item" data-view="tracking">Takip Radarı</button>
         <button class="nav-item" data-view="cart">Sepet &amp; Fiş</button>
-        <button class="nav-item" data-view="savings">Tasarruf</button>
-        <button class="nav-item" data-view="bulletins">B&uuml;lten</button>
+        <button class="nav-item" data-view="savings">Tasarrufum</button>
+        <button class="nav-item" data-view="bulletins">B&uuml;ltenler</button>
       </nav>
       <div class="topbar-actions">
         <span class="network-status" id="networkStatus" role="status" aria-live="polite">
@@ -184,43 +236,52 @@
         <div class="receipt-hero">
           <div class="receipt-card" id="receiptCard">
             <div class="receipt-letterhead">
-              <span class="receipt-store-name">ALMADAN</span>
-              <span class="receipt-store-tag">FİYAT FİŞİ</span>
+              <span class="receipt-store-name">🟢 100+ MAĞAZA CANLI TARAMA</span>
+              <span class="receipt-store-tag">SAHTE İNDİRİM KORUMASI AKTİF</span>
             </div>
             <div class="receipt-divider" aria-hidden="true"></div>
-            <p class="eyebrow receipt-eyebrow">ALIŞVERİŞ KARAR ASİSTANI</p>
-            <h1 class="receipt-headline">Satın almadan<br>önce <span class="receipt-stamp">fiyat karşılaştır.</span></h1>
-            <p class="intro-copy receipt-copy">Trendyol, Hepsiburada, Amazon, N11 ve daha fazlası — ürün adı yaz veya link yapıştır, en ucuz mağazayı hemen bul.</p>
+            <p class="eyebrow receipt-eyebrow">AKILLI ALIŞVERİŞ &amp; FİYAT KARAR MOTORU</p>
+            <h1 class="receipt-headline">Satın almadan önce<br><span class="receipt-stamp">gerçek en ucuzu</span> yakala.</h1>
+            <p class="intro-copy receipt-copy">Trendyol, Hepsiburada, Amazon, Migros, Boyner ve 100+ mağazada anlık fiyatları, birim maliyeti ve 90 günlük sahte indirim geçmişini tek ekranda kıyasla.</p>
 
-            <div class="receipt-divider receipt-divider-dashed" aria-hidden="true"></div>
+            <div class="hero-category-bar" role="tablist" aria-label="Hızlı Kategori Seçimi">
+              <button type="button" class="hero-cat-pill active" onclick="selectHeroCategory('general', this)">✨ Tümü</button>
+              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('electronics', this)">📱 Teknoloji</button>
+              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('grocery', this)">🛒 Market &amp; Gıda</button>
+              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('fashion', this)">👗 Moda &amp; Giyim</button>
+              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('cosmetics', this)">💄 Kozmetik</button>
+              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('home', this)">🏠 Ev &amp; Mutfak</button>
+            </div>
 
-          <form class="url-form" id="urlForm" style="display:flex;flex-direction:column;gap:10px;">
-            <div class="url-actions-row" style="display:flex;gap:10px;width:min(800px,100%);">
+          <form class="url-form" id="urlForm" style="display:flex;flex-direction:column;gap:12px;">
+            <div class="url-actions-row" style="display:flex;gap:10px;width:100%;">
               <div class="url-field" style="flex:1;grid-template-columns:auto minmax(0,1fr) auto;position:relative;">
                 <i data-lucide="search"></i>
-                <input id="productUrl" type="text" list="productUrlHistory" placeholder="Ürün adı, barkod numarası veya ürün linki… (Örn: iPhone 15, Airfryer veya 13 haneli barkod)" autocomplete="off" required>
+                <input id="productUrl" type="text" list="productUrlHistory" placeholder="Ürün adı, barkod numarası veya ürün linki yapıştırın… (Örn: iPhone 15, Airfryer, Ayçiçek Yağı)" autocomplete="off" required>
                 <datalist id="productUrlHistory"></datalist>
                 <button type="button" class="paste-button" id="pasteButton" aria-label="Yapıştır" title="Panodan yapıştır">
                   <i data-lucide="clipboard"></i>
                 </button>
-                <div id="searchSuggestDropdown" class="hidden" style="position:absolute;top:calc(100% + 6px);left:0;right:0;background:#18221f;border:1px solid rgba(255,255,255,.16);border-radius:10px;box-shadow:0 12px 28px rgba(0,0,0,.45);z-index:999;overflow:hidden;text-align:left;"></div>
+                <div id="searchSuggestDropdown" class="hidden" style="position:absolute;top:calc(100% + 6px);left:0;right:0;background:#18221f;border:1px solid rgba(255,255,255,.16);border-radius:12px;box-shadow:0 16px 36px rgba(0,0,0,.48);z-index:999;overflow:hidden;text-align:left;"></div>
               </div>
-              <button class="primary-button" type="submit" style="background:#287a50;color:#fff;border:none;min-height:52px;padding:0 22px;border-radius:10px;font-size:14px;font-weight:700;display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;transition:background .15s;" onmouseover="this.style.background='#1f6040'" onmouseout="this.style.background='#287a50'">
+              <button class="primary-button hero-submit-btn" type="submit">
                 <i data-lucide="scan-search"></i> Fiyatları Karşılaştır
               </button>
-              <button type="button" id="mainBarcodeBtn" onclick="openMainBarcodeScanner()" style="background:rgba(255,255,255,.08);color:#fff;border:1.5px solid rgba(255,255,255,.2);min-height:52px;padding:0 20px;border-radius:10px;font-size:14px;font-weight:600;font-family:var(--font);display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0;" onmouseover="this.style.background='rgba(255,255,255,.14)'" onmouseout="this.style.background='rgba(255,255,255,.08)'">
+              <button type="button" id="mainBarcodeBtn" class="hero-barcode-btn" onclick="openMainBarcodeScanner()">
                 <i data-lucide="scan-barcode"></i> Barkod Tara
               </button>
             </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:4px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:2px;">
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                <span style="font-size:11px;color:rgba(255,255,255,.55);font-weight:600;">Popüler:</span>
-                <button type="button" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('iPhone 15 128 GB'))" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.85);border-radius:14px;padding:3px 10px;font-size:11px;cursor:pointer;">iPhone 15</button>
-                <button type="button" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Philips Airfryer'))" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.85);border-radius:14px;padding:3px 10px;font-size:11px;cursor:pointer;">Airfryer</button>
-                <button type="button" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Yudum Ayçiçek Yağı 5 L'))" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.85);border-radius:14px;padding:3px 10px;font-size:11px;cursor:pointer;">Ayçiçek Yağı 5L</button>
-                <button type="button" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('AirPods Pro 2'))" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.85);border-radius:14px;padding:3px 10px;font-size:11px;cursor:pointer;">AirPods Pro</button>
+                <span style="font-size:11.5px;color:rgba(255,255,255,.65);font-weight:700;">🔥 Trend Aramalar:</span>
+                <button type="button" class="hero-quick-chip" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('iPhone 15 128 GB'))">iPhone 15 128 GB</button>
+                <button type="button" class="hero-quick-chip" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Philips Airfryer XXL'))">Philips Airfryer XXL</button>
+                <button type="button" class="hero-quick-chip" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Yudum Ayçiçek Yağı 5 L'))">Ayçiçek Yağı 5L</button>
+                <button type="button" class="hero-quick-chip" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Bej Trençkot'))">Bej Trençkot</button>
+                <button type="button" class="hero-quick-chip" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Stanley Termos 1.18 L'))">Stanley Termos</button>
+                <button type="button" class="hero-quick-chip" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('AirPods Pro 2'))">AirPods Pro 2</button>
               </div>
-              <button type="button" onclick="showLinkGuide()" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:12px;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:0;transition:color .15s;" onmouseover="this.style.color='rgba(255,255,255,.85)'" onmouseout="this.style.color='rgba(255,255,255,.5)'">
+              <button type="button" onclick="showLinkGuide()" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:0;transition:color .15s;" onmouseover="this.style.color='#d9ef57'" onmouseout="this.style.color='rgba(255,255,255,.6)'">
                 <i data-lucide="info" style="width:13px;height:13px;"></i> Ürün linki nasıl kopyalanır?
               </button>
             </div>
@@ -229,73 +290,147 @@
           <!-- Barkod tarayıcı -->
           <div id="mainBarcodeScanArea" class="main-barcode-scan-area hidden">
             <div class="main-barcode-header">
-              <span>📷 Barkodu kameraya göster</span>
+              <span>📷 Barkod Tarayıcı &amp; Hızlı Barkod Sorgu</span>
               <button type="button" onclick="closeMainBarcodeScanner()" class="guide-close" aria-label="Barkod tarayıcıyı kapat">✕</button>
             </div>
             <div id="mainHtml5QrReader" style="width:100%;max-width:420px;margin:0 auto;border-radius:10px;overflow:hidden;"></div>
-            <div style="display:flex;justify-content:center;margin-top:10px;">
-              <label for="mainBarcodeImageInput" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--green,#287a50);border:1px solid rgba(40,122,80,.35);border-radius:8px;padding:8px 14px;">
+            <p id="mainBarcodeStatusText" style="font-size:12px;color:var(--ink-2);text-align:center;margin:8px 0 6px;font-weight:600;">Kamera başlatılıyor… İzin verilmezse aşağıdan fotoğraf yükleyebilir veya barkod numarası girebilirsiniz.</p>
+            <div style="display:flex;gap:8px;max-width:420px;margin:8px auto 0;">
+              <input id="mainManualBarcodeInput" type="text" inputmode="numeric" placeholder="8, 12 veya 13 haneli barkod girin (Örn: 8690632085013)" style="flex:1;min-height:38px;padding:0 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:var(--surface,#fff);color:var(--ink);">
+              <button type="button" class="primary-button" style="min-height:38px;padding:0 14px;font-size:12.5px;border-radius:8px;width:auto;" onclick="submitMainManualBarcode()">Barkodu Ara</button>
+            </div>
+            <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin-top:10px;">
+              <label for="mainBarcodeImageInput" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--green,#287a50);border:1px solid rgba(40,122,80,.35);border-radius:8px;padding:7px 13px;background:rgba(40,122,80,.06);">
                 <i data-lucide="image" style="width:15px;height:15px;"></i> Fotoğraftan / Galeriden Barkod Oku
               </label>
               <input id="mainBarcodeImageInput" type="file" accept="image/*" style="display:none" onchange="scanMainBarcodeImage(event)">
             </div>
-            <p style="font-size:11px;color:var(--ink-2);text-align:center;margin-top:8px;">EAN-8 · EAN-13 · UPC-A desteklenir · Barkod numarasını arama kutusuna da yazabilirsin</p>
+            <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);text-align:center;">
+              <span style="display:block;font-size:11px;font-weight:700;color:var(--ink-2);margin-bottom:6px;">⚡ Tek Tıkla Örnek Barkod Testi:</span>
+              <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;">
+                <button type="button" class="secondary-button" style="min-height:28px;padding:4px 10px;font-size:11px;border-radius:999px;" onclick="closeMainBarcodeScanner();searchByBarcode('8690632085013')">🍫 Ülker Gofret (8690632085013)</button>
+                <button type="button" class="secondary-button" style="min-height:28px;padding:4px 10px;font-size:11px;border-radius:999px;" onclick="closeMainBarcodeScanner();searchByBarcode('8690506390074')">🌻 Yudum 5L (8690506390074)</button>
+                <button type="button" class="secondary-button" style="min-height:28px;padding:4px 10px;font-size:11px;border-radius:999px;" onclick="closeMainBarcodeScanner();searchByBarcode('8690105000015')">🍵 Çaykur 1Kg (8690105000015)</button>
+                <button type="button" class="secondary-button" style="min-height:28px;padding:4px 10px;font-size:11px;border-radius:999px;" onclick="closeMainBarcodeScanner();searchByBarcode('8696001002003')">💾 Samsung SSD (8696001002003)</button>
+              </div>
+            </div>
+            <p style="font-size:11px;color:var(--ink-2);text-align:center;margin-top:8px;">EAN-8 · EAN-13 · UPC-A desteklenir · Barkod numarasını doğrudan üstteki ana arama kutusuna da yazabilirsin</p>
           </div>
 
           <!-- Gizli — JS uyumluluğu için -->
           <input type="checkbox" id="globalModeCheckbox" style="display:none">
-          <select id="searchCategorySelector" style="display:none"><option value="general">Genel</option></select>
+          <select id="searchCategorySelector" style="display:none">
+            <option value="general">Genel</option>
+            <option value="electronics">Teknoloji</option>
+            <option value="grocery">Market</option>
+            <option value="fashion">Moda</option>
+            <option value="cosmetics">Kozmetik</option>
+            <option value="home">Ev</option>
+          </select>
           <span id="gpsStatusIndicator" style="display:none"></span>
-
-            <div class="receipt-barcode" aria-hidden="true"></div>
           </div>
+
+          <!-- Sağ Kolon: Canlı Fiyat İstihbaratı & Karar Önizleme Kartı -->
+          <aside class="hero-intelligence-card" aria-label="Almadan Fiyat İstihbaratı">
+            <div class="intel-card-header">
+              <span class="intel-badge">⚡ CANLI KARAR MOTORU</span>
+              <span class="intel-store-count">118 Mağaza Aktif</span>
+            </div>
+            <div class="intel-preview-box">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+                <span style="font-size:11px;font-weight:800;color:#4ade80;background:rgba(74,222,128,0.14);padding:3px 9px;border-radius:6px;">🟢 KARAR: ALINIR (92/100)</span>
+                <span style="font-size:11px;color:rgba(255,255,255,0.6);font-weight:600;">4 Satıcı Kıyaslandı</span>
+              </div>
+              <div style="font-size:14px;font-weight:800;color:#fff;margin-bottom:4px;">Philips Airfryer XXL HD9650</div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:rgba(0,0,0,0.28);padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,0.08);margin-top:8px;">
+                <div>
+                  <span style="display:block;font-size:9.5px;color:#4ade80;font-weight:700;">EN UCUZ</span>
+                  <strong style="font-size:13.5px;color:#4ade80;">₺4.699</strong>
+                </div>
+                <div style="border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 6px;">
+                  <span style="display:block;font-size:9.5px;color:rgba(255,255,255,0.55);font-weight:700;">MEDYAN</span>
+                  <strong style="font-size:13.5px;color:#fff;">₺5.249</strong>
+                </div>
+                <div>
+                  <span style="display:block;font-size:9.5px;color:#f87171;font-weight:700;">EN YÜKSEK</span>
+                  <strong style="font-size:13.5px;color:#f87171;">₺5.799</strong>
+                </div>
+              </div>
+              <button type="button" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Philips Airfryer XXL'))" class="intel-try-btn">
+                Canlı Karşılaştırmayı Gör →
+              </button>
+            </div>
+            <div class="intel-pillars">
+              <div class="intel-pillar-row">
+                <span class="intel-pillar-icon">🛡️</span>
+                <div>
+                  <strong>Sahte İndirim Denetimi</strong>
+                  <p>Şişirilmiş üstü çizili fiyatları 90 günlük piyasa medyanıyla yakalar.</p>
+                </div>
+              </div>
+              <div class="intel-pillar-row">
+                <span class="intel-pillar-icon">⚖️</span>
+                <div>
+                  <strong>Birim Maliyet (Lt / Kg / Adet)</strong>
+                  <p>Market ve kozmetikte gramaj farklarını hesaplayıp en ekonomik paketi seçer.</p>
+                </div>
+              </div>
+              <div class="intel-pillar-row">
+                <span class="intel-pillar-icon">🔔</span>
+                <div>
+                  <strong>7 Günlük Fiyat Tahmini &amp; Alarm</strong>
+                  <p>Hedef fiyata düştüğü anda bildirim ve e-posta ile haber verir.</p>
+                </div>
+              </div>
+            </div>
+          </aside>
         </div>
 
           <div class="supported-stores-container">
             <button type="button" class="supported-stores-toggle" onclick="toggleSupportedStores()" aria-expanded="false" aria-controls="supportedStoresPanel">
-              <span>Desteklenen 100+ Mağaza & Zincir Market</span>
+              <span>🏪 Desteklenen 100+ Mağaza &amp; Zincir Market Listesini Gör</span>
               <i data-lucide="chevron-down"></i>
             </button>
             <div id="supportedStoresPanel" class="supported-stores-panel">
               <div class="supported-stores-grid">
                 <div class="supported-stores-cat">
-                  <h2>Gıda & Süpermarket</h2>
+                  <h2>Gıda &amp; Süpermarket</h2>
                   <div class="supported-stores-list">
                     <span>BİM</span><span class="store-soon">A101</span><span>ŞOK</span><span>Migros</span><span>5M Migros</span><span>Migros Jet</span><span>CarrefourSA</span><span>CarrefourSA Gurme</span><span>Tarım Kredi</span><span class="store-soon">FİLE</span><span class="store-soon">Macrocenter</span><span class="store-soon">Happy Center</span><span class="store-soon">Onur Market</span><span class="store-soon">Mopaş</span><span class="store-soon">Hakmar</span><span class="store-soon">Çağrı Market</span><span>Bizim Toptan</span><span>Metro</span><span>Seç Market</span><span>Hakmar Ekspres</span>
                   </div>
                 </div>
                 <div class="supported-stores-cat">
-                  <h2>Teknoloji & Elektronik</h2>
+                  <h2>Teknoloji &amp; Elektronik</h2>
                   <div class="supported-stores-list">
                     <span>Teknosa</span><span>MediaMarkt</span><span>Vatan Bilgisayar</span><span class="store-soon">Troy</span><span class="store-soon">Gürgençler</span><span class="store-soon">Pozitif Teknoloji</span><span class="store-soon">Samsung</span><span>Huawei</span><span>Mi Store</span><span class="store-soon">Evkur</span><span class="store-soon">Çetmen</span><span class="store-soon">Yiğit AVM</span><span class="store-soon">Özşanal</span><span>İtopya</span>
                   </div>
                 </div>
                 <div class="supported-stores-cat">
-                  <h2>Kozmetik & Kişisel Bakım</h2>
+                  <h2>Kozmetik &amp; Kişisel Bakım</h2>
                   <div class="supported-stores-list">
                     <span>Gratis</span><span>Watsons</span><span>Rossmann</span><span class="store-soon">Eve Shop</span><span>Sephora</span><span class="store-soon">Sevil</span><span class="store-soon">Yves Rocher</span><span>Flormar</span><span>Golden Rose</span><span class="store-soon">MAC</span><span class="store-soon">Kiko Milano</span>
                   </div>
                 </div>
                 <div class="supported-stores-cat">
-                  <h2>Giyim, Ayakkabı & Moda</h2>
+                  <h2>Giyim, Ayakkabı &amp; Moda</h2>
                   <div class="supported-stores-list">
-                    <span>LC Waikiki</span><span class="store-soon">DeFacto</span><span class="store-soon">Koton</span><span>Mavi</span><span class="store-soon">LTB</span><span class="store-soon">Colin's</span><span>Boyner</span><span class="store-soon">Özdilek</span><span class="store-soon">Beymen</span><span>Vakko</span><span>Altınyıldız</span><span class="store-soon">Kiğılı</span><span>Sarar</span><span class="store-soon">Süvari</span><span class="store-soon">Hatemoğlu</span><span class="store-soon">Tudors</span><span class="store-soon">İpekyol</span><span>Twist</span><span class="store-soon">Machka</span><span>Penti</span><span>Zara</span><span>Bershka</span><span class="store-soon">Pull&Bear</span><span class="store-soon">Stradivarius</span><span class="store-soon">Massimo Dutti</span><span>H&M</span><span>Mango</span><span>FLO</span><span class="store-soon">In Street</span><span class="store-soon">Deichmann</span><span class="store-soon">Ayakkabı Dünyası</span><span class="store-soon">SuperStep</span><span>Sportive</span><span>Decathlon</span>
+                    <span>LC Waikiki</span><span class="store-soon">DeFacto</span><span class="store-soon">Koton</span><span>Mavi</span><span class="store-soon">LTB</span><span class="store-soon">Colin's</span><span>Boyner</span><span class="store-soon">Özdilek</span><span class="store-soon">Beymen</span><span>Vakko</span><span>Altınyıldız</span><span class="store-soon">Kiğılı</span><span>Sarar</span><span class="store-soon">Süvari</span><span class="store-soon">Hatemoğlu</span><span class="store-soon">Tudors</span><span class="store-soon">İpekyol</span><span>Twist</span><span class="store-soon">Machka</span><span>Penti</span><span>Zara</span><span>Bershka</span><span class="store-soon">Pull&amp;Bear</span><span class="store-soon">Stradivarius</span><span class="store-soon">Massimo Dutti</span><span>H&amp;M</span><span>Mango</span><span>FLO</span><span class="store-soon">In Street</span><span class="store-soon">Deichmann</span><span class="store-soon">Ayakkabı Dünyası</span><span class="store-soon">SuperStep</span><span>Sportive</span><span>Decathlon</span>
                   </div>
                 </div>
                 <div class="supported-stores-cat">
-                  <h2>Sağlık & Anne-Bebek</h2>
+                  <h2>Sağlık &amp; Anne-Bebek</h2>
                   <div class="supported-stores-list">
                     <span class="store-soon">Atasun Optik</span><span class="store-soon">Opmar Optik</span><span class="store-soon">Elegance Optik</span><span class="store-soon">Mert Optik</span><span>Ebebek</span><span class="store-soon">Babymall</span><span class="store-soon">Joker</span><span class="store-soon">GNC</span>
                   </div>
                 </div>
                 <div class="supported-stores-cat">
-                  <h2>Züccaciye, Ev & Yapı Market</h2>
+                  <h2>Züccaciye, Ev &amp; Yapı Market</h2>
                   <div class="supported-stores-list">
                     <span>Karaca</span><span class="store-soon">Paşabahçe</span><span class="store-soon">Bernardo</span><span class="store-soon">Jumbo</span><span>Korkmaz</span><span>Schafer</span><span class="store-soon">Porland</span><span class="store-soon">Hisar</span><span>English Home</span><span>Madame Coco</span><span class="store-soon">Linens</span><span class="store-soon">Bella Maison</span><span class="store-soon">Karaca Home</span><span class="store-soon">IKEA</span><span>Koçtaş</span><span class="store-soon">Koçtaş Fix</span><span>Bauhaus</span><span class="store-soon">Tekzen</span>
                   </div>
                 </div>
                 <div class="supported-stores-cat">
-                  <h2>E-Ticaret & Diğerleri</h2>
+                  <h2>E-Ticaret &amp; Diğerleri</h2>
                   <div class="supported-stores-list">
                     <span>Trendyol</span><span>Hepsiburada</span><span>Amazon</span><span>n11</span><span>Supplementler</span><span>ProteinOcean</span>
                   </div>
@@ -307,35 +442,57 @@
         </div>
       </section>
 <section class="content-section" id="discoverView">
-        <div class="page-guide">
-          <i data-lucide="link"></i>
-          <span>Ürün linkini yapıştır veya barkod tara — sistem fiyatları otomatik karşılaştırır.</span>
+        <div class="feature-strip-grid">
+          <button type="button" class="feature-strip-card" onclick="document.getElementById('productUrl')?.focus()">
+            <div class="feature-strip-icon"><i data-lucide="search-check"></i></div>
+            <div>
+              <strong>Çoklu Mağaza &amp; Birim Fiyat</strong>
+              <p>Aynı ürünü 100+ mağazada lt/kg/adet maliyetiyle kıyasla.</p>
+            </div>
+          </button>
+          <button type="button" class="feature-strip-card" onclick="document.querySelector('[data-view=\'cart\']')?.click()">
+            <div class="feature-strip-icon"><i data-lucide="receipt-text"></i></div>
+            <div>
+              <strong>Akıllı Sepet &amp; Fiş Tarayıcı</strong>
+              <p>Market sepetini en ucuz markete göre böl veya fişini tarat.</p>
+            </div>
+          </button>
+          <button type="button" class="feature-strip-card" onclick="document.querySelector('[data-view=\'tracking\']')?.click()">
+            <div class="feature-strip-icon"><i data-lucide="bell-ring"></i></div>
+            <div>
+              <strong>Fiyat Radarı &amp; İndirim Alarmı</strong>
+              <p>Beğendiğin ürünü radara ekle, fiyat düşünce anında haber al.</p>
+            </div>
+          </button>
         </div>
 
-        <div id="latestCampaignsSection" class="hidden" style="margin-bottom:22px;">
-          <div class="section-heading" style="margin-bottom:10px;">
+        <div id="latestCampaignsSection" class="hidden" style="margin-bottom:28px;">
+          <div class="section-heading" style="margin-bottom:14px;">
             <div>
-              <p class="eyebrow">GÜNCEL FIRSATLAR</p>
-              <h2 style="font-size:18px;">Haftanın En Çok Düşenleri</h2>
+              <p class="eyebrow">AKTÜEL KATALOG &amp; KAMPANYALAR</p>
+              <h2 style="font-size:21px;">Haftanın Aktif Mağaza İndirimleri</h2>
             </div>
+            <button type="button" class="text-button" onclick="document.querySelector('[data-view=\'bulletins\']')?.click()">
+              Tüm Bültenler <i data-lucide="arrow-right"></i>
+            </button>
           </div>
-          <div id="latestCampaignsGrid" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;"></div>
+          <div id="latestCampaignsGrid" class="horizontal-vitrin-scroll"></div>
         </div>
 
-        <div id="editorialPicksSection" class="hidden" style="margin-bottom:22px;">
-          <div class="section-heading" style="margin-bottom:10px;">
+        <div id="editorialPicksSection" class="hidden" style="margin-bottom:28px;">
+          <div class="section-heading" style="margin-bottom:14px;">
             <div>
-              <p class="eyebrow">EDİTÖR ÖNERİLERİ</p>
-              <h2 style="font-size:18px;">Almadan Seçti</h2>
+              <p class="eyebrow">EDİTÖR SEÇKİSİ</p>
+              <h2 style="font-size:21px;">Almadan Seçti · En Çok Kıyaslananlar</h2>
             </div>
           </div>
-          <div id="editorialPicksGrid" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;"></div>
+          <div id="editorialPicksGrid" class="horizontal-vitrin-scroll"></div>
         </div>
 
         <div class="section-heading">
           <div>
-            <p class="eyebrow">TAKİP LİSTEN</p>
-            <h2>Fiyat Radarım</h2>
+            <p class="eyebrow">CANLI VİTRİN &amp; TAKİP LİSTEN</p>
+            <h2>Fiyat Radarım &amp; Günün Fırsatları</h2>
           </div>
           <button class="text-button" id="refreshButton">
             <i data-lucide="scan-line"></i>
@@ -583,17 +740,19 @@
                     <span>Kamera veya barkod fotoğrafı seç</span>
                     <input id="barcodeImageInput" type="file" accept="image/*" capture="environment">
                   </label>
-                  <div id="barcodeFallbackArea" class="hidden">
+                  <div id="barcodeFallbackArea">
                     <p class="scanner-divider"><span>Kamera çalışmıyor mu? Örnek üründen seç</span></p>
                     <select id="barcodeSelector" class="form-select">
                       <option value="">-- Barkod Seçin --</option>
+                      <option value="8690632085013">Ülker Çikolatalı Gofret 45 g (8690632085013)</option>
                       <option value="8690506390074">Yudum Ayçiçek Yağı 5 L (8690506390074)</option>
                       <option value="8690506390081">Yudum Ayçiçek Yağı 2 L (8690506390081)</option>
+                      <option value="8690105000015">Çaykur Rize Turist Çayı 1 Kg (8690105000015)</option>
+                      <option value="8690506000010">Migros Tam Yağlı Süt 1 L (8690506000010)</option>
                       <option value="8690632034071">Hardline Whey 3 Matrix 2300 Gr (8690632034071)</option>
-                      <option value="8690506000010">Migros Süt 1 L (8690506000010)</option>
                       <option value="8690605061033">İpana 3D White Diş Macunu 75 ml (8690605061033)</option>
                       <option value="8696001002003">Samsung T7 Portable SSD 1 TB (8696001002003)</option>
-                      <option value="8697001003004">Defacto Erkek Çorap 3'lü Paket (8697001003004)</option>
+                      <option value="8697001003004">DeFacto Erkek Çorap 3'lü Paket (8697001003004)</option>
                     </select>
                     <button class="primary-button" id="runBarcodeScanBtn">Barkodu Sorgula</button>
                   </div>
@@ -621,7 +780,10 @@
                     <option value="cosmetics">Kozmetik Fişi (Gratis)</option>
                     <option value="electronics">Elektronik Fişi (Vatan Bilgisayar)</option>
                   </select>
-                  <button class="primary-button" id="runOcrScanBtn">Fiş Fotoğrafı Yükle</button>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="primary-button" id="runOcrScanBtn" style="flex:1;">Fiş Fotoğrafı Yükle</button>
+                    <button type="button" class="secondary-button" style="flex:1;" onclick="runDemoReceiptOcr()">🧪 Örnek Fiş ile Test Et</button>
+                  </div>
                   <div id="receiptUploadStatus" class="receipt-upload-status hidden" role="status" aria-live="polite"></div>
                   <div id="receiptReviewPanel" class="receipt-review-panel hidden"></div>
                 </div>
@@ -709,6 +871,12 @@
         </div>
         <div style="margin: 20px 0 10px; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;">
           <a href="/fiyat-rehberi" style="color: var(--ink-2); text-decoration: none; font-weight: 600; font-size: 12.5px; transition: color 0.15s;" onmouseover="this.style.color='var(--green)'" onmouseout="this.style.color='var(--ink-2)'">Fiyat Rehberi</a>
+          <span style="color: var(--border); font-size: 12px;">•</span>
+          <a href="/kuponlar" style="color: var(--ink-2); text-decoration: none; font-weight: 600; font-size: 12.5px; transition: color 0.15s;" onmouseover="this.style.color='var(--green)'" onmouseout="this.style.color='var(--ink-2)'">Kuponlar</a>
+          <span style="color: var(--border); font-size: 12px;">•</span>
+          <a href="/trend" style="color: var(--ink-2); text-decoration: none; font-weight: 600; font-size: 12.5px; transition: color 0.15s;" onmouseover="this.style.color='var(--green)'" onmouseout="this.style.color='var(--ink-2)'">Trend Ürünler</a>
+          <span style="color: var(--border); font-size: 12px;">•</span>
+          <a href="/rekortmenler" style="color: var(--ink-2); text-decoration: none; font-weight: 600; font-size: 12.5px; transition: color 0.15s;" onmouseover="this.style.color='var(--green)'" onmouseout="this.style.color='var(--ink-2)'">Fiyat Rekortmenleri</a>
           <span style="color: var(--border); font-size: 12px;">•</span>
           <a href="/hakkinda" style="color: var(--ink-2); text-decoration: none; font-weight: 600; font-size: 12.5px; transition: color 0.15s;" onmouseover="this.style.color='var(--green)'" onmouseout="this.style.color='var(--ink-2)'">Hakkında</a>
           <span style="color: var(--border); font-size: 12px;">•</span>
@@ -910,7 +1078,7 @@
     </dialog>
 
     <script>
-      (()=>{let p;const src="/static/app.min.js?v=20261001-smsflag1";function load(){if(window.__almadanAppScriptLoaded)return Promise.resolve();if(p)return p;p=new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.defer=true;s.onload=()=>res();s.onerror=rej;document.head.appendChild(s)});return p}window.__almadanLoadApp=load;["openMainBarcodeScanner","closeMainBarcodeScanner","showLinkGuide","toggleSupportedStores","updateUserLocation","updateMaxDistance","closeSizeSelectorDialog","goOnboardingStep","onboardingNav","toggleFollow","showParsedProduct","runTextProductSearch"].forEach(n=>{if(!window[n]){const stub=function(...a){load().then(()=>{window[n]!==stub&&typeof window[n]=="function"&&window[n](...a)})};window[n]=stub}});function view(v){document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));document.querySelectorAll(".content-section").forEach(s=>s.classList.toggle("hidden",s.id!==v+"View"));const i=document.querySelector(".intro-band");if(i)i.style.display=v==="discover"?"":"none"}if(/[?&](q|auto|list)=/.test(location.search))load();document.addEventListener("click",e=>{const b=e.target.closest("[data-view]");if(b&&!window.__almadanAppScriptLoaded){view(b.dataset.view);load()}},{capture:true,passive:true});document.addEventListener("submit",e=>{if(e.target&&e.target.id==="urlForm"&&!window.__almadanAppScriptLoaded){e.preventDefault();load().then(()=>window.parseProduct&&window.parseProduct({preventDefault(){},target:e.target}))}},{capture:true});["pointerdown","keydown","touchstart","scroll"].forEach(e=>addEventListener(e,load,{once:true,passive:true}));addEventListener("load",()=>{setTimeout(()=>{const m=document.createElement("link");m.rel="manifest";m.href="/static/manifest.json";document.head.appendChild(m)},3500);setTimeout(load,14000)},{once:true})})();
+      (()=>{let p;const src="/static/app.min.js?v=20261116-premium";function load(){if(window.__almadanAppScriptLoaded)return Promise.resolve();if(p)return p;p=new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.defer=true;s.onload=()=>res();s.onerror=rej;document.head.appendChild(s)});return p}window.__almadanLoadApp=load;["openMainBarcodeScanner","closeMainBarcodeScanner","showLinkGuide","toggleSupportedStores","updateUserLocation","updateMaxDistance","closeSizeSelectorDialog","goOnboardingStep","onboardingNav","toggleFollow","showParsedProduct","runTextProductSearch","selectHeroCategory","quickTrackShowcaseDeal"].forEach(n=>{if(!window[n]){const stub=function(...a){load().then(()=>{window[n]!==stub&&typeof window[n]=="function"&&window[n](...a)})};window[n]=stub}});function view(v){document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));document.querySelectorAll(".content-section").forEach(s=>s.classList.toggle("hidden",s.id!==v+"View"));const i=document.querySelector(".intro-band");if(i)i.style.display=v==="discover"?"":"none"}if(/[?&](q|auto|list)=/.test(location.search))load();document.addEventListener("click",e=>{const b=e.target.closest("[data-view]");if(b&&!window.__almadanAppScriptLoaded){view(b.dataset.view);load()}},{capture:true,passive:true});document.addEventListener("submit",e=>{if(e.target&&e.target.id==="urlForm"&&!window.__almadanAppScriptLoaded){e.preventDefault();load().then(()=>window.parseProduct&&window.parseProduct({preventDefault(){},target:e.target}))}},{capture:true});["pointerdown","keydown","touchstart","scroll"].forEach(e=>addEventListener(e,load,{once:true,passive:true}));addEventListener("load",()=>{setTimeout(()=>{const m=document.createElement("link");m.rel="manifest";m.href="/static/manifest.json";document.head.appendChild(m)},1500);setTimeout(load,30)},{once:true})})();
     </script>
     <script>
       window.addEventListener('load', function() {

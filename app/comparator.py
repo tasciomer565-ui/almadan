@@ -3812,10 +3812,6 @@ def postprocess_search_products(query: str, all_products: list) -> list[dict]:
                             p["extra_info"]["fake_discount_note"] = (
                                 f"Üstü çizili {orig:,.0f} TL fiyat şişirilmiş görünüyor (Piyasa medyanı: {median_price:,.0f} TL)."
                             )
-                            if "Şişirilmiş İndirim" not in p["labels"]:
-                                p["labels"].append("Şişirilmiş İndirim")
-                            if "Önerilen" in p["labels"]:
-                                p["labels"].remove("Önerilen")
                     # Gerçek Fırsat: Piyasa medyanının en az %8 altında ve sıfır ürün
                     if (
                         not p["extra_info"].get("refurbished")
@@ -3823,10 +3819,6 @@ def postprocess_search_products(query: str, all_products: list) -> list[dict]:
                         and p["price"] <= median_price * 0.92
                     ):
                         p["extra_info"]["real_discount"] = True
-                        if "Gerçek Fırsat" not in p["labels"]:
-                            p["labels"].append("Gerçek Fırsat")
-                        if "Önerilen" in p["labels"]:
-                            p["labels"].remove("Önerilen")
 
     # 10. Enrich labels (En Ucuz, En Yüksek İndirim)
     if output_in_stock:
@@ -4266,12 +4258,35 @@ def extract_volume_info(title: str) -> tuple[float, str] | None:
 BARCODE_DATABASE = {
     "8690506390074": {"title": "Yudum Ayçiçek Yağı 5 L", "brand": "Yudum", "search_query": "Yudum ayçiçek yağı 5 L"},
     "8690506390081": {"title": "Yudum Ayçiçek Yağı 2 L", "brand": "Yudum", "search_query": "Yudum ayçiçek yağı 2 L"},
+    "8690632085013": {"title": "Ülker Çikolatalı Gofret 45 g", "brand": "Ülker", "search_query": "Ülker Çikolatalı Gofret 45 g"},
+    "8690504015505": {"title": "Ülker Çikolatalı Gofret 36 g", "brand": "Ülker", "search_query": "Ülker Çikolatalı Gofret 36 g"},
     "8690632034071": {"title": "Hardline Whey 3 Matrix 2300 Gr", "brand": "Hardline", "search_query": "Hardline Whey 3 Matrix 2300 Gr"},
     "8690632034088": {"title": "Hardline Whey 3 Matrix 908 Gr", "brand": "Hardline", "search_query": "Hardline Whey 3 Matrix 908 Gr"},
-    "8690506000010": {"title": "Migros Süt 1 L", "brand": "Migros", "search_query": "Migros süt 1 L"},
+    "8690506000010": {"title": "Migros Tam Yağlı Süt 1 L", "brand": "Migros", "search_query": "Migros süt 1 L"},
+    "8690565000112": {"title": "Sütaş Tam Yağlı Süt 1 L", "brand": "Sütaş", "search_query": "Sütaş Süt 1 L"},
+    "8690572000105": {"title": "Pınar Süzme Peynir 500 gr", "brand": "Pınar", "search_query": "Pınar Süzme Peynir 500 gr"},
+    "8690105000015": {"title": "Çaykur Rize Turist Çayı 1 Kg", "brand": "Çaykur", "search_query": "Çaykur Rize Turist Çayı 1 Kg"},
+    "8690105000022": {"title": "Çaykur Tiryaki Çayı 1 Kg", "brand": "Çaykur", "search_query": "Çaykur Tiryaki Çayı 1 Kg"},
+    "8000500167106": {"title": "Nutella Kakaolu Fındık Kreması 750 gr", "brand": "Nutella", "search_query": "Nutella 750 gr"},
+    "5449000000996": {"title": "Coca-Cola Orijinal Tat 1 L", "brand": "Coca-Cola", "search_query": "Coca Cola 1 L"},
+    "8690632010204": {"title": "Nescafe Gold Çözünebilir Kahve 100 gr", "brand": "Nescafe", "search_query": "Nescafe Gold 100 gr"},
+    "8690637001016": {"title": "Lipton Yellow Label Demlik Poşet Çay 100'lü", "brand": "Lipton", "search_query": "Lipton Yellow Label 100'lü"},
+    "8690526011011": {"title": "Eti Burçak Bisküvi 3'lü Paket 393 gr", "brand": "Eti", "search_query": "Eti Burçak 3'lü"},
+    "8690506012020": {"title": "Komili Riviera Zeytinyağı 2 L", "brand": "Komili", "search_query": "Komili Zeytinyağı 2 L"},
+    "8690544001017": {"title": "Tat Domates Salçası 830 gr", "brand": "Tat", "search_query": "Tat Domates Salçası 830 gr"},
+    "8690579001013": {"title": "Barilla Spagetti Makarna 500 gr", "brand": "Barilla", "search_query": "Barilla Spagetti 500 gr"},
     "8690605061033": {"title": "İpana 3D White Diş Macunu 75 ml", "brand": "İpana", "search_query": "İpana 3D White Diş Macunu 75 ml"},
+    "8001090207012": {"title": "Ariel Dağ Esintisi Toz Çamaşır Deterjanı 6 Kg", "brand": "Ariel", "search_query": "Ariel Toz Deterjan 6 Kg"},
+    "9002875001014": {"title": "Persil Gülün Büyüsü Toz Deterjan 7 Kg", "brand": "Persil", "search_query": "Persil Toz Deterjan 7 Kg"},
+    "8006540090510": {"title": "Fairy Platinum Bulaşık Makinesi Tableti 60'lı", "brand": "Fairy", "search_query": "Fairy Platinum Bulaşık Tableti 60'lı"},
+    "8690637850126": {"title": "Elidor İpeksi Yumuşaklık Şampuan 500 ml", "brand": "Elidor", "search_query": "Elidor Şampuan 500 ml"},
+    "3337875845779": {"title": "La Roche-Posay Anthelios UVmune 400 SPF 50+ 50 ml", "brand": "La Roche-Posay", "search_query": "La Roche Posay Güneş Kremi 50 ml"},
+    "3600531632274": {"title": "Maybelline Lash Sensational Sky High Maskara", "brand": "Maybelline", "search_query": "Maybelline Sky High Maskara"},
     "8696001002003": {"title": "Samsung T7 Portable SSD 1 TB", "brand": "Samsung", "search_query": "Samsung T7 Portable SSD 1 TB"},
-    "8697001003004": {"title": "Defacto Erkek Çorap 3'lü Paket", "brand": "DeFacto", "search_query": "Defacto Erkek Çorap 3'lü Paket"},
+    "0195949036477": {"title": "Apple iPhone 15 128 GB Siyah", "brand": "Apple", "search_query": "iPhone 15 128 GB"},
+    "0194253397168": {"title": "Apple AirPods Pro 2. Nesil USB-C", "brand": "Apple", "search_query": "AirPods Pro 2"},
+    "8710103871095": {"title": "Philips Airfryer XXL HD9650/90", "brand": "Philips", "search_query": "Philips Airfryer XXL"},
+    "8697001003004": {"title": "DeFacto Erkek Pamuklu Çorap 3'lü Paket", "brand": "DeFacto", "search_query": "Defacto Erkek Çorap 3'lü Paket"},
 }
 
 

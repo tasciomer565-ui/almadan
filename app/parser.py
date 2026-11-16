@@ -72,25 +72,37 @@ def title_from_product_url(url: str) -> str | None:
     path = unquote(urlsplit(url).path).strip("/")
     if not path:
         return None
-    slug = path.split("/")[-1]
+    all_parts = [seg for seg in path.split("/") if seg]
+    slug = all_parts[-1]
+    # Amazon /dp/<ASIN> veya /gp/product/<ASIN> yapısında başlık bir önceki segmenttedir
+    if len(all_parts) >= 3 and all_parts[-2].lower() in {"dp", "product"}:
+        prev_seg = all_parts[-3] if all_parts[-2].lower() == "product" and len(all_parts) >= 4 else all_parts[-2]
+        if all_parts[-2].lower() == "dp":
+            prev_seg = all_parts[-3]
+        if prev_seg and "-" in prev_seg:
+            slug = prev_seg
     slug = re.sub(r"\.html?$", "", slug, flags=re.IGNORECASE)  # uzantıyı at
-    slug = re.sub(r"-p-\d+(?:/.*)?$", "", slug, flags=re.IGNORECASE)
+    slug = re.sub(r"-p[m]?-[a-z0-9]+(?:/.*)?$", "", slug, flags=re.IGNORECASE)
     # DR/KitapYurdu: önce ISBN/kod tespiti (sondaki -\d strip'ten ÖNCE)
     # "suc-ve-ceza" (2 tire) > "roman" > "edebiyat" — en bileşik segmenti al
-    _SKIP_SEGS = {"kitap", "urun", "product", "kategori", "category", "p", "tr"}
+    _SKIP_SEGS = {"kitap", "urun", "product", "kategori", "category", "p", "tr", "dp", "gp"}
     if (re.match(r"^(dr|p|urun|product)[-_]\d{5,}", slug, re.IGNORECASE)
             or re.match(r"^\d{5,}$", slug)):
-        all_parts = [seg for seg in path.split("/") if seg]
         candidates = [re.sub(r"\.html?$", "", seg, flags=re.IGNORECASE)
                       for seg in all_parts[:-1]
                       if len(seg) > 2 and seg.lower().split(".")[0] not in _SKIP_SEGS
                       and not re.match(r"^\d+$", seg.split(".")[0])]
         if candidates:
             slug = max(candidates, key=lambda s: s.count("-") * 10 + len(s))
-        slug = re.sub(r"-p-\d+(?:/.*)?$", "", slug, flags=re.IGNORECASE)
+        slug = re.sub(r"-p[m]?-[a-z0-9]+(?:/.*)?$", "", slug, flags=re.IGNORECASE)
     else:
         slug = re.sub(r"-\d{5,}$", "", slug)  # N11/diğer: sondaki ürün ID'sini at
     words = [word for word in slug.replace("_", "-").split("-") if word]
+    # Trendyol /<marka>/<urun-slug>-p-123 yapısında marka ilk segmentteyse ekle
+    if len(all_parts) == 2 and all_parts[0].lower() not in _SKIP_SEGS:
+        brand_words = [w for w in all_parts[0].replace("_", "-").split("-") if w]
+        if brand_words and words and brand_words[0].lower() != words[0].lower():
+            words = brand_words + words
     # Ardışık tekrarları at: "nike-nike-cosmic" → "nike cosmic" (FLO marka tekrarı)
     deduped_words = [w for i, w in enumerate(words) if i == 0 or w.lower() != words[i - 1].lower()]
     if len(deduped_words) < 2:

@@ -116,3 +116,19 @@ def test_b2b_lookup_missing_params_returns_400():
     """Hem ref hem de barcode eksikse 400 Bad Request dönmelidir."""
     response = client.get("/api/v1/products/lookup", headers=VALID_HEADERS)
     assert response.status_code == 400
+
+
+def test_b2b_products_search_and_ara_route():
+    """Ne Giysem eksik parça araması (/api/v1/products/search ve /ara) çalışmalıdır."""
+    resp = client.get(
+        "/api/v1/products/search",
+        params={"q": "mont siyah", "cat": "mont", "color": "siyah", "waterproof": "1"},
+    )
+    assert resp.status_code == 200
+    items = resp.json()
+    assert isinstance(items, list)
+    assert len(items) >= 1
+    assert any("Mont" in i["product_name"] or "Palto" in i["product_name"] for i in items)
+
+    ara_resp = client.get("/ara?q=ceket+lacivert&cat=ceket&utm_source=negiysem")
+    assert ara_resp.status_code == 200

@@ -613,6 +613,45 @@ def _get_catalog_fallback_products(query: str) -> list[AggregatedProduct]:
                 has_same_day_delivery=True,
             ),
         ]
+    elif any(kw in q_norm for kw in ("mont", "kaban", "palto", "ceket", "hırka", "hirka", "kazak", "pantolon", "jean", "tişört", "tisort", "gömlek", "ayakkabı", "ayakkabi", "bot", "sneaker")):
+        return [
+            AggregatedProduct(
+                product_name=f"Zara Yeni Sezon Kapsül Koleksiyon {query.title()}",
+                platform_name="Trendyol",
+                seller_name="Zara Türkiye",
+                price=1890.00,
+                original_price=2290.00,
+                product_url=f"https://www.trendyol.com/sr?q={urllib.parse.quote_plus(query)}",
+                image_url="https://static.zara.net/photos///2026/I/0/1/p/4387/021/800/2/w/850/4387021800_6_1_1.jpg",
+                rating_score=4.8,
+                review_count=320,
+                has_same_day_delivery=True,
+            ),
+            AggregatedProduct(
+                product_name=f"Mango Premium Seçki {query.title()}",
+                platform_name="Hepsiburada",
+                seller_name="Mango Resmi Mağaza",
+                price=1690.00,
+                original_price=1990.00,
+                product_url=f"https://www.hepsiburada.com/ara?q={urllib.parse.quote_plus(query)}",
+                image_url="https://st.mngbcn.com/rcs/pics/static/T3/fotos/S20/31092500_50.jpg",
+                rating_score=4.7,
+                review_count=215,
+                has_same_day_delivery=True,
+            ),
+            AggregatedProduct(
+                product_name=f"Massimo Dutti Studio {query.title()}",
+                platform_name="Amazon TR",
+                seller_name="Moda & Stil Mağazası",
+                price=2450.00,
+                original_price=2890.00,
+                product_url=f"https://www.amazon.com.tr/s?k={urllib.parse.quote_plus(query)}",
+                image_url="https://static.massimodutti.net/3/photos/2026/I/0/1/p/4702/100/712/4702100712_1_1_16.jpg",
+                rating_score=4.9,
+                review_count=140,
+                has_same_day_delivery=False,
+            ),
+        ]
     return []
 
 

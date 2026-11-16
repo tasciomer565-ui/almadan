@@ -26,6 +26,7 @@ STATIC = ROOT / "public" / "static"
 PAIRS = [
     (STATIC / "app.js", STATIC / "app.min.js"),
     (STATIC / "index.html", STATIC / "index.min.html"),
+    (STATIC / "styles.css", STATIC / "styles.min.css"),
 ]
 
 
