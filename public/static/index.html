@@ -99,12 +99,12 @@
       ]
     }
     </script>
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=Space+Mono:wght@400;700&family=Archivo+Black&display=swap" media="print" onload="this.onload=null;this.media='all';this.rel='stylesheet'">
-    <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=Space+Mono:wght@400;700&family=Archivo+Black&display=swap" rel="stylesheet"></noscript>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.onload=null;this.media='all';this.rel='stylesheet'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"></noscript>
     <!-- chart.js ve html5-qrcode artık app.js'te gerçekten kullanıldıkları anda
          (Tasarrufum grafikleri / Barkod Tara) tembel yükleniyor -- her sayfada
          indirilip 357 KiB "kullanılmayan JS" olarak işaretlenmelerini önler. -->
-    <link rel="stylesheet" href="/static/styles.min.css?v=20261116-premium">
+    <link rel="stylesheet" href="/static/styles.min.css?v=20261116-editorial">
     <style>
       /* Sprint 12 — eksik CSS degiskenleri (cache bypass) */
       :root {
@@ -202,7 +202,6 @@
       <a class="brand" href="/" aria-label="Almadan ana sayfa">
         <span class="brand-mark">A</span>
         <span>almadan</span>
-        <span class="brand-badge-pill">FİYAT RADARI</span>
       </a>
       <nav class="desktop-nav" aria-label="Ana menü">
         <button class="nav-item active" data-view="discover">Keşfet</button>
@@ -236,53 +235,50 @@
         <div class="receipt-hero">
           <div class="receipt-card" id="receiptCard">
             <div class="receipt-letterhead">
-              <span class="receipt-store-name">🟢 100+ MAĞAZA CANLI TARAMA</span>
-              <span class="receipt-store-tag">SAHTE İNDİRİM KORUMASI AKTİF</span>
+              <span class="receipt-store-name">100+ Mağaza · Canlı Fiyat Karşılaştırma</span>
+              <span class="receipt-store-tag">Sahte İndirim Koruması</span>
             </div>
-            <div class="receipt-divider" aria-hidden="true"></div>
-            <p class="eyebrow receipt-eyebrow">AKILLI ALIŞVERİŞ &amp; FİYAT KARAR MOTORU</p>
-            <h1 class="receipt-headline">Satın almadan önce<br><span class="receipt-stamp">gerçek en ucuzu</span> yakala.</h1>
-            <p class="intro-copy receipt-copy">Trendyol, Hepsiburada, Amazon, Migros, Boyner ve 100+ mağazada anlık fiyatları, birim maliyeti ve 90 günlük sahte indirim geçmişini tek ekranda kıyasla.</p>
+            <h1 class="receipt-headline">Satın almadan önce<br><span class="receipt-stamp">gerçek fiyatı</span> gör.</h1>
+            <p class="intro-copy receipt-copy">Trendyol, Hepsiburada, Amazon, Migros ve 100'den fazla mağazada anlık fiyatları, birim maliyeti ve son 90 günün indirim geçmişini tek ekranda karşılaştır.</p>
 
             <div class="hero-category-bar" role="tablist" aria-label="Hızlı Kategori Seçimi">
-              <button type="button" class="hero-cat-pill active" onclick="selectHeroCategory('general', this)">✨ Tümü</button>
-              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('electronics', this)">📱 Teknoloji</button>
-              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('grocery', this)">🛒 Market &amp; Gıda</button>
-              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('fashion', this)">👗 Moda &amp; Giyim</button>
-              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('cosmetics', this)">💄 Kozmetik</button>
-              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('home', this)">🏠 Ev &amp; Mutfak</button>
+              <button type="button" class="hero-cat-pill active" onclick="selectHeroCategory('general', this)">Tümü</button>
+              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('electronics', this)">Teknoloji</button>
+              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('grocery', this)">Market &amp; Gıda</button>
+              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('fashion', this)">Moda &amp; Giyim</button>
+              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('cosmetics', this)">Kozmetik</button>
+              <button type="button" class="hero-cat-pill" onclick="selectHeroCategory('home', this)">Ev &amp; Mutfak</button>
             </div>
 
           <form class="url-form" id="urlForm" style="display:flex;flex-direction:column;gap:12px;">
             <div class="url-actions-row" style="display:flex;gap:10px;width:100%;">
               <div class="url-field" style="flex:1;grid-template-columns:auto minmax(0,1fr) auto;position:relative;">
                 <i data-lucide="search"></i>
-                <input id="productUrl" type="text" list="productUrlHistory" placeholder="Ürün adı, barkod numarası veya ürün linki yapıştırın… (Örn: iPhone 15, Airfryer, Ayçiçek Yağı)" autocomplete="off" required>
+                <input id="productUrl" type="text" list="productUrlHistory" placeholder="Ürün adı, barkod veya link yapıştırın (Örn: iPhone 15, Airfryer)" autocomplete="off" required>
                 <datalist id="productUrlHistory"></datalist>
                 <button type="button" class="paste-button" id="pasteButton" aria-label="Yapıştır" title="Panodan yapıştır">
                   <i data-lucide="clipboard"></i>
                 </button>
-                <div id="searchSuggestDropdown" class="hidden" style="position:absolute;top:calc(100% + 6px);left:0;right:0;background:#18221f;border:1px solid rgba(255,255,255,.16);border-radius:12px;box-shadow:0 16px 36px rgba(0,0,0,.48);z-index:999;overflow:hidden;text-align:left;"></div>
+                <div id="searchSuggestDropdown" class="hidden" style="position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--surface,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;box-shadow:0 16px 36px rgba(0,0,0,.12);z-index:999;overflow:hidden;text-align:left;"></div>
               </div>
               <button class="primary-button hero-submit-btn" type="submit">
-                <i data-lucide="scan-search"></i> Fiyatları Karşılaştır
+                <i data-lucide="search"></i> Karşılaştır
               </button>
               <button type="button" id="mainBarcodeBtn" class="hero-barcode-btn" onclick="openMainBarcodeScanner()">
-                <i data-lucide="scan-barcode"></i> Barkod Tara
+                <i data-lucide="scan-barcode"></i> Barkod
               </button>
             </div>
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:2px;">
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                <span style="font-size:11.5px;color:rgba(255,255,255,.65);font-weight:700;">🔥 Trend Aramalar:</span>
-                <button type="button" class="hero-quick-chip" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('iPhone 15 128 GB'))">iPhone 15 128 GB</button>
-                <button type="button" class="hero-quick-chip" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Philips Airfryer XXL'))">Philips Airfryer XXL</button>
+                <span style="font-size:12px;color:var(--ink-2);font-weight:600;">Popüler:</span>
+                <button type="button" class="hero-quick-chip" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('iPhone 15 128 GB'))">iPhone 15</button>
+                <button type="button" class="hero-quick-chip" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Philips Airfryer XXL'))">Philips Airfryer</button>
                 <button type="button" class="hero-quick-chip" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Yudum Ayçiçek Yağı 5 L'))">Ayçiçek Yağı 5L</button>
                 <button type="button" class="hero-quick-chip" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Bej Trençkot'))">Bej Trençkot</button>
                 <button type="button" class="hero-quick-chip" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Stanley Termos 1.18 L'))">Stanley Termos</button>
-                <button type="button" class="hero-quick-chip" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('AirPods Pro 2'))">AirPods Pro 2</button>
               </div>
-              <button type="button" onclick="showLinkGuide()" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:0;transition:color .15s;" onmouseover="this.style.color='#d9ef57'" onmouseout="this.style.color='rgba(255,255,255,.6)'">
-                <i data-lucide="info" style="width:13px;height:13px;"></i> Ürün linki nasıl kopyalanır?
+              <button type="button" onclick="showLinkGuide()" style="background:none;border:none;color:var(--ink-2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:0;transition:color .15s;" onmouseover="this.style.color='var(--green)'" onmouseout="this.style.color='var(--ink-2)'">
+                <i data-lucide="info" style="width:13px;height:13px;"></i> Link nasıl kopyalanır?
               </button>
             </div>
           </form>
@@ -330,56 +326,56 @@
           <span id="gpsStatusIndicator" style="display:none"></span>
           </div>
 
-          <!-- Sağ Kolon: Canlı Fiyat İstihbaratı & Karar Önizleme Kartı -->
-          <aside class="hero-intelligence-card" aria-label="Almadan Fiyat İstihbaratı">
+          <!-- Sağ Kolon: Editoryal Örnek Fiyat Analizi Kartı -->
+          <aside class="hero-intelligence-card" aria-label="Örnek Fiyat Analizi">
             <div class="intel-card-header">
-              <span class="intel-badge">⚡ CANLI KARAR MOTORU</span>
-              <span class="intel-store-count">118 Mağaza Aktif</span>
+              <span class="intel-badge">Örnek Fiyat Analizi</span>
+              <span class="intel-store-count">4 satıcı kıyaslandı</span>
             </div>
             <div class="intel-preview-box">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-                <span style="font-size:11px;font-weight:800;color:#4ade80;background:rgba(74,222,128,0.14);padding:3px 9px;border-radius:6px;">🟢 KARAR: ALINIR (92/100)</span>
-                <span style="font-size:11px;color:rgba(255,255,255,0.6);font-weight:600;">4 Satıcı Kıyaslandı</span>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+                <span style="font-size:11.5px;font-weight:700;color:var(--green);background:var(--green-bg);padding:3px 9px;border-radius:6px;">Gerçek Fırsat · 92/100</span>
+                <span style="font-size:11.5px;color:var(--ink-2);font-weight:500;">90 günün en düşüğü</span>
               </div>
-              <div style="font-size:14px;font-weight:800;color:#fff;margin-bottom:4px;">Philips Airfryer XXL HD9650</div>
-              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:rgba(0,0,0,0.28);padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,0.08);margin-top:8px;">
+              <div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:8px;">Philips Airfryer XXL HD9650</div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:var(--paper);padding:10px;border-radius:10px;border:1px solid var(--border);">
                 <div>
-                  <span style="display:block;font-size:9.5px;color:#4ade80;font-weight:700;">EN UCUZ</span>
-                  <strong style="font-size:13.5px;color:#4ade80;">₺4.699</strong>
+                  <span style="display:block;font-size:10.5px;color:var(--green);font-weight:600;">En Ucuz</span>
+                  <strong style="font-size:14.5px;color:var(--green);font-weight:700;">₺4.699</strong>
                 </div>
-                <div style="border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 6px;">
-                  <span style="display:block;font-size:9.5px;color:rgba(255,255,255,0.55);font-weight:700;">MEDYAN</span>
-                  <strong style="font-size:13.5px;color:#fff;">₺5.249</strong>
+                <div style="border-left:1px solid var(--border);border-right:1px solid var(--border);padding:0 8px;">
+                  <span style="display:block;font-size:10.5px;color:var(--ink-2);font-weight:600;">Medyan</span>
+                  <strong style="font-size:14.5px;color:var(--ink);font-weight:700;">₺5.249</strong>
                 </div>
                 <div>
-                  <span style="display:block;font-size:9.5px;color:#f87171;font-weight:700;">EN YÜKSEK</span>
-                  <strong style="font-size:13.5px;color:#f87171;">₺5.799</strong>
+                  <span style="display:block;font-size:10.5px;color:var(--ink-2);font-weight:600;">En Yüksek</span>
+                  <strong style="font-size:14.5px;color:var(--ink-2);font-weight:600;">₺5.799</strong>
                 </div>
               </div>
               <button type="button" onclick="window.__almadanLoadApp().then(()=>runTextProductSearch('Philips Airfryer XXL'))" class="intel-try-btn">
-                Canlı Karşılaştırmayı Gör →
+                Canlı karşılaştırmayı gör →
               </button>
             </div>
             <div class="intel-pillars">
               <div class="intel-pillar-row">
-                <span class="intel-pillar-icon">🛡️</span>
+                <i data-lucide="shield-check" style="width:16px;height:16px;color:var(--green);flex-shrink:0;margin-top:2px;"></i>
                 <div>
                   <strong>Sahte İndirim Denetimi</strong>
-                  <p>Şişirilmiş üstü çizili fiyatları 90 günlük piyasa medyanıyla yakalar.</p>
+                  <p>Şişirilmiş eski fiyatları 90 günlük piyasa medyanıyla ayırır.</p>
                 </div>
               </div>
               <div class="intel-pillar-row">
-                <span class="intel-pillar-icon">⚖️</span>
+                <i data-lucide="scale" style="width:16px;height:16px;color:var(--green);flex-shrink:0;margin-top:2px;"></i>
                 <div>
-                  <strong>Birim Maliyet (Lt / Kg / Adet)</strong>
-                  <p>Market ve kozmetikte gramaj farklarını hesaplayıp en ekonomik paketi seçer.</p>
+                  <strong>Birim Maliyet &amp; Kart Net Fiyatı</strong>
+                  <p>Gramaj farklarını ve banka/cüzdan iadelerini otomatik düşer.</p>
                 </div>
               </div>
               <div class="intel-pillar-row">
-                <span class="intel-pillar-icon">🔔</span>
+                <i data-lucide="bell" style="width:16px;height:16px;color:var(--green);flex-shrink:0;margin-top:2px;"></i>
                 <div>
-                  <strong>7 Günlük Fiyat Tahmini &amp; Alarm</strong>
-                  <p>Hedef fiyata düştüğü anda bildirim ve e-posta ile haber verir.</p>
+                  <strong>Hedef Fiyat Alarmı</strong>
+                  <p>Belirlediğin fiyat seviyesine düştüğünde anında haber verir.</p>
                 </div>
               </div>
             </div>
@@ -388,7 +384,7 @@
 
           <div class="supported-stores-container">
             <button type="button" class="supported-stores-toggle" onclick="toggleSupportedStores()" aria-expanded="false" aria-controls="supportedStoresPanel">
-              <span>🏪 Desteklenen 100+ Mağaza &amp; Zincir Market Listesini Gör</span>
+              <span>Desteklenen 100+ Mağaza &amp; Zincir Market Listesi</span>
               <i data-lucide="chevron-down"></i>
             </button>
             <div id="supportedStoresPanel" class="supported-stores-panel">
