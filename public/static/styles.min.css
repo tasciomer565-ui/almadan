@@ -586,9 +586,12 @@ h1 {
 }
 
 @media (min-width: 761px) {
+  .url-actions-row {
+    flex-wrap: wrap;
+  }
   .url-actions-row .url-field {
-    min-width: 310px;
-    flex: 1 1 auto;
+    min-width: 340px;
+    flex: 1 1 340px;
   }
 }
 
@@ -2118,8 +2121,8 @@ body.dark-theme .offline-cache-banner {
   }
 
   .product-dialog {
-    width: calc(100% - 20px);
-    max-height: calc(100dvh - 20px);
+    width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - 16px);
     margin: auto;
   }
 
@@ -2128,7 +2131,26 @@ body.dark-theme .offline-cache-banner {
   }
 
   .dialog-body {
-    padding: 18px;
+    padding: 14px;
+  }
+
+  #searchResultsCardsList {
+    overflow-x: hidden !important;
+    padding-right: 0 !important;
+  }
+
+  .search-result-card {
+    padding: 12px !important;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .search-result-card > div:first-child {
+    flex-wrap: wrap !important;
+  }
+
+  .search-result-card .price-display-strong {
+    font-size: 15px !important;
   }
 
   .dialog-body h2 {
