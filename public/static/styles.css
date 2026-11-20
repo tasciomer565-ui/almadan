@@ -4015,7 +4015,7 @@ body.dark-theme .price-chart-container {
 .toast {
   position: fixed;
   right: 24px;
-  bottom: 24px;
+  bottom: 84px;
   z-index: 9999;
   max-width: min(380px, calc(100% - 32px));
   padding: 14px 20px;

@@ -33,17 +33,17 @@ function showAlmadanPopup(cheapestAlt) {
   const div = document.createElement("div");
   div.id = "almadan-popup";
   div.style.cssText = `
-    position: fixed; top: 20px; right: 20px; background: #121412; color: #fff; border: 1px solid #287a50;
-    padding: 16px; border-radius: 12px; z-index: 999999; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    font-family: sans-serif; max-width: 300px;
+    position: fixed; top: 20px; right: 20px; background: #ffffff; color: #141715; border: 1px solid #e6e4dd;
+    padding: 16px 18px; border-radius: 14px; z-index: 999999; box-shadow: 0 14px 36px rgba(20,23,21,0.16);
+    font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif; max-width: 310px;
   `;
   const priceText = cheapestAlt.price.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   div.innerHTML = `
-    <div style="font-weight: bold; color: #c8d94a; margin-bottom: 8px;">🛒 Almadan Uyarıyor!</div>
-    <div style="font-size: 13px; margin-bottom: 12px;">Bu ürünü <b>${cheapestAlt.source}</b> üzerinden <b style="color: #00e676;">₺${priceText}</b> fiyatına alabilirsiniz!</div>
+    <div style="font-weight: 800; color: #1b5e3f; font-size: 13px; margin-bottom: 6px;">Almadan Fiyat Uyarısı</div>
+    <div style="font-size: 13px; line-height: 1.45; margin-bottom: 12px; color: #141715;">Bu ürünü <b>${cheapestAlt.source}</b> üzerinde <b style="color: #1b5e3f;">₺${priceText}</b> fiyatıyla bulduk.</div>
     <div style="display: flex; gap: 8px;">
-      <button id="almadan-popup-close" style="background: transparent; color: #888; border: 1px solid #444; border-radius: 6px; padding: 6px 12px; cursor: pointer;">Kapat</button>
-      <a href="${cheapestAlt.url}" target="_blank" rel="noopener" style="background: #287a50; color: #fff; text-decoration: none; border-radius: 6px; padding: 6px 12px; font-weight: bold;">Oraya Git</a>
+      <button id="almadan-popup-close" style="background: #faf9f6; color: #5e6460; border: 1px solid #e6e4dd; border-radius: 8px; padding: 7px 12px; cursor: pointer; font-weight: 600;">Kapat</button>
+      <a href="${cheapestAlt.url}" target="_blank" rel="noopener" style="background: #1b5e3f; color: #ffffff; text-decoration: none; border-radius: 8px; padding: 7px 14px; font-weight: 700;">Mağazaya Git</a>
     </div>
   `;
   document.body.appendChild(div);

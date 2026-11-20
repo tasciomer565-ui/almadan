@@ -694,10 +694,19 @@ async function loadLatestCampaigns() {
   const grid = document.getElementById("latestCampaignsGrid");
   if (!section || !grid) return;
   try {
-    const res = await fetch("/api/campaigns/latest?limit=10");
+    const res = await fetch("/api/campaigns/latest?limit=20");
     if (!res.ok) return;
     const data = await res.json();
-    const campaigns = data.campaigns || [];
+    const rawCampaigns = data.campaigns || [];
+    const seenStores = new Set();
+    const campaigns = [];
+    for (const c of rawCampaigns) {
+      const slug = String(c.store_slug || c.store_name || "").toLowerCase();
+      if (slug && seenStores.has(slug)) continue;
+      if (slug) seenStores.add(slug);
+      campaigns.push(c);
+      if (campaigns.length >= 8) break;
+    }
     if (!campaigns.length) return;
 
     grid.innerHTML = campaigns
@@ -3387,11 +3396,11 @@ window.applySearchSortAndFilter = function(storeFilter, sortMode) {
           return;
         }
         dd.innerHTML = items.map(item => `
-          <button type="button" onclick="triggerSuggestionSearch(${inlineJsArg(item)})"
-            style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.07);color:#f0f4f1;font-size:13px;font-weight:600;cursor:pointer;text-align:left;"
-            onmouseover="this.style.background='rgba(40,122,80,.28)'" onmouseout="this.style.background='transparent'">
-            <span>🔎 ${escapeHtml(item)}</span>
-            <span style="font-size:11px;color:#6ee7b7;font-weight:700;">Fiyatları Gör →</span>
+          <button type="button" onmousedown="event.preventDefault(); triggerSuggestionSearch(${inlineJsArg(item)})"
+            style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;background:transparent;border:none;border-bottom:1px solid var(--border,#e6e4dd);color:var(--ink,#141715);font-size:13px;font-weight:600;cursor:pointer;text-align:left;"
+            onmouseover="this.style.background='var(--green-bg, rgba(27,94,63,0.08))'" onmouseout="this.style.background='transparent'">
+            <span>${escapeHtml(item)}</span>
+            <span style="font-size:11.5px;color:var(--green,#1b5e3f);font-weight:700;">Fiyatları Gör →</span>
           </button>
         `).join("");
         dd.classList.remove("hidden");
@@ -3399,6 +3408,14 @@ window.applySearchSortAndFilter = function(storeFilter, sortMode) {
         dd.classList.add("hidden");
       }
     }, 200);
+  });
+
+  document.addEventListener("focusout", (e) => {
+    if (e.target && e.target.id === "productUrl") {
+      setTimeout(() => {
+        document.getElementById("searchSuggestDropdown")?.classList.add("hidden");
+      }, 150);
+    }
   });
 
   document.addEventListener("click", (e) => {
@@ -7963,7 +7980,7 @@ async function loadRecommendations() {
       signal: null
     });
 
-    const items = res.recommendations || [];
+    const items = (res.recommendations || []).filter(p => typeof p.price === "number" && p.price > 0);
     if (items.length === 0) {
       container.classList.add("hidden");
       return;
