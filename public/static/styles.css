@@ -2122,8 +2122,10 @@ body.dark-theme .offline-cache-banner {
 
   .product-dialog {
     width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
     max-height: calc(100dvh - 16px);
     margin: auto;
+    box-sizing: border-box !important;
   }
 
   .dialog-product-image {
@@ -2132,21 +2134,52 @@ body.dark-theme .offline-cache-banner {
 
   .dialog-body {
     padding: 14px;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   #searchResultsCardsList {
     overflow-x: hidden !important;
     padding-right: 0 !important;
+    max-width: 100% !important;
   }
 
   .search-result-card {
     padding: 12px !important;
-    max-width: 100%;
+    max-width: 100% !important;
+    min-width: 0 !important;
     overflow: hidden;
+    box-sizing: border-box !important;
+  }
+
+  .search-result-card > div {
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 
   .search-result-card > div:first-child {
     flex-wrap: wrap !important;
+  }
+
+  .search-result-card > div:last-child {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .search-result-card > div:last-child > div:last-child {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    gap: 6px !important;
+  }
+
+  .search-result-card > div:last-child > div:last-child > * {
+    width: 100% !important;
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 7px 6px !important;
+    font-size: 11px !important;
   }
 
   .search-result-card .price-display-strong {
