@@ -2145,7 +2145,11 @@ body.dark-theme .offline-cache-banner {
   }
 
   .search-result-card {
+    display: flex !important;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
     padding: 12px !important;
+    width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
     overflow: hidden;
@@ -3495,13 +3499,19 @@ body.dark-theme .quantum-node-card {
     justify-content: center;
   }
 
-  /* Ürün kartı: fiyat + trend göstergesi taşmasın */
+  /* Ürün kartı: mobilde dikey 2 satır düzeni ve sıfır taşma */
   .search-result-card {
-    flex-wrap: wrap;
-    gap: 8px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    gap: 10px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
   }
   .search-result-card > div:last-child {
-    min-width: 80px;
+    min-width: 0 !important;
+    width: 100% !important;
   }
 
   /* Onboarding modal tam genişlik */
