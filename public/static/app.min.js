@@ -2436,6 +2436,7 @@ async function parseProduct(event) {
 
 // ── Admin Dashboard ─────────────────────────────────────────────────────────
 async function runTextProductSearch(query, options = {}) {
+  document.getElementById("searchSuggestDropdown")?.classList.add("hidden");
   const q = String(query || "").trim();
   if (!q) return;
   const digitsOnly = q.replace(/[\s\-]/g, "");
@@ -3101,7 +3102,7 @@ function showSearchResults(response) {
                               ✨ Dolabıma Ekle
                             </a>`;
                   })()}
-                  <button type="button" class="secondary-button" style="padding: 7px 11px; font-size: 11.5px; height: auto; width: auto; border-radius: 8px; border-color: rgba(40,122,80,0.35); color: var(--green);" onclick="event.stopPropagation(); addSearchResultToCart(${index});">
+                  <button type="button" class="secondary-button" style="padding: 7px 11px; font-size: 11.5px; height: auto; width: auto; border-radius: 8px; border-color: rgba(40,122,80,0.35); color: var(--green);" onclick="event.stopPropagation(); addSearchResultToCart(${index}, this);">
                     <i data-lucide="shopping-cart" style="width:12px; height:12px; margin-right:4px;"></i> + Sepet
                   </button>
                   ${storeLinkHtml}
@@ -3126,9 +3127,10 @@ function showSearchResults(response) {
   if (window._almadanSelectedCard && window._almadanSelectedCard !== "none") {
     selectCardCampaign(window._almadanSelectedCard);
   }
+  document.getElementById("searchSuggestDropdown")?.classList.add("hidden");
 }
 
-window.addSearchResultToCart = function(index) {
+window.addSearchResultToCart = function(index, btnEl) {
   const results = state.searchResults || [];
   const item = results[index];
   if (!item) return;
@@ -3170,6 +3172,12 @@ window.addSearchResultToCart = function(index) {
   saveCartToLocalStorage();
   if (state.sharedListId) syncSharedListWithServer();
   if (state.activeView === "cart") renderCart();
+  if (btnEl) {
+    btnEl.innerHTML = "✓ Sepette";
+    btnEl.style.background = "var(--green-bg, rgba(27,94,63,0.1))";
+    btnEl.style.borderColor = "var(--green, #1b5e3f)";
+    btnEl.style.color = "var(--green, #1b5e3f)";
+  }
 };
 
 function buildDynamicBrandFilterHtml(products, originalQuery) {
@@ -6706,17 +6714,18 @@ function startVoiceSearch() {
   recognition.maxAlternatives = 1;
 
   const micBtn = document.getElementById("micButton");
-  micBtn.classList.add("recording");
+  if (micBtn) micBtn.classList.add("recording");
   showToast("Dinleniyor... Ürün adını söyleyin.");
 
   recognition.start();
 
   recognition.onresult = (event) => {
     const result = event.results[0][0].transcript;
-    document.getElementById("productUrl").value = result;
+    const input = document.getElementById("productUrl");
+    if (input) input.value = result;
     showToast(`Tanımlandı: "${escapeHtml(result)}"`);
     // Automatically submit search
-    document.getElementById("urlForm").dispatchEvent(new Event("submit"));
+    document.getElementById("urlForm")?.dispatchEvent(new Event("submit"));
   };
 
   recognition.onerror = (event) => {
@@ -6724,7 +6733,7 @@ function startVoiceSearch() {
   };
 
   recognition.onend = () => {
-    micBtn.classList.remove("recording");
+    if (micBtn) micBtn.classList.remove("recording");
   };
 }
 

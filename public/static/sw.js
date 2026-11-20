@@ -1,4 +1,4 @@
-const CACHE_VERSION = "almadan-v33";
+const CACHE_VERSION = "almadan-v34";
 
 // Uygulama kabuğu (shell) -- offline'da bile sayfanın açılabilmesi için
 // önceden önbelleğe alınır. Sepet/liste tik atma gibi çekirdek işlevler
@@ -7,8 +7,6 @@ const CACHE_VERSION = "almadan-v33";
 const APP_SHELL = [
   "/",
   "/static/index.min.html",
-  "/static/app.min.js",
-  "/static/styles.min.css",
   "/static/manifest.json",
   "/static/icon-192.png",
   "/static/icon-512.png",

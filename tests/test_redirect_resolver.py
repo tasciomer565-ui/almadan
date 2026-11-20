@@ -76,7 +76,7 @@ def test_url_normalization_and_slug_title_fallback():
         "https://www.trendyol.com/icollagen/kolajen-ve-prebiyotik-tablet-"
         "p-752356123?merchantId=1"
     )
-    assert title_from_product_url(url) == "Kolajen Ve Prebiyotik Tablet"
+    assert title_from_product_url(url) == "Icollagen Kolajen Ve Prebiyotik Tablet"
 
 
 def test_private_network_product_url_is_rejected():

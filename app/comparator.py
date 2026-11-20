@@ -3495,31 +3495,26 @@ def run_async(coro):
     import asyncio
     import threading
     try:
-        loop = asyncio.get_event_loop()
+        asyncio.get_running_loop()
+        loop_running = True
     except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    if loop.is_running():
+        loop_running = False
+
+    if loop_running:
         result = [None]
         err = [None]
         def runner():
             try:
-                new_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(new_loop)
-                result[0] = new_loop.run_until_complete(coro)
+                result[0] = asyncio.run(coro)
             except Exception as e:
                 err[0] = e
-            finally:
-                new_loop.close()
         t = threading.Thread(target=runner)
         t.start()
         t.join()
         if err[0]:
             raise err[0]
         return result[0]
-    else:
-        return loop.run_until_complete(coro)
+    return asyncio.run(coro)
 
 def _call_railway_scraper(query: str, category: str) -> list[dict] | None:
     """Railway scraper API'sini çağır — env var set edilmişse kullan."""
@@ -4165,23 +4160,28 @@ def extract_volume_info(title: str) -> tuple[float, str] | None:
     if not title:
         return None
     title_lower = title.lower()
-    
+
+    # Coklu paket carpani: "4'lü 1 Lt" aslinda 4 L'dir. Carpan olmadan birim
+    # fiyat 4 kat sisiyordu (649,90 TL "1 L" sanilip 649,90 TL/L gibi).
+    from app.brands import extract_pack_count
+    pack = extract_pack_count(title) or 1
+
     # 1. Litre/ML eşlemeleri
     match_l = re.search(r"(\d+(?:[\.,]\d+)?)\s*(?:l|lt|litre)\b", title_lower)
     if match_l:
         try:
             val = float(match_l.group(1).replace(",", "."))
             if val > 0:
-                return val, "L"
+                return val * pack, "L"
         except ValueError:
             pass
-            
+
     match_ml = re.search(r"(\d+(?:[\.,]\d+)?)\s*(?:ml|mililitre)\b", title_lower)
     if match_ml:
         try:
             val = float(match_ml.group(1).replace(",", "."))
             if val > 0:
-                return val / 1000.0, "L"
+                return val * pack / 1000.0, "L"
         except ValueError:
             pass
 
@@ -4191,11 +4191,11 @@ def extract_volume_info(title: str) -> tuple[float, str] | None:
         try:
             val = float(match_kg.group(1).replace(",", "."))
             if val > 0:
-                return val, "kg"
+                return val * pack, "kg"
         except ValueError:
             pass
 
-    match_g = re.search(r"(\d+(?:[\.,]\d+)?)\s*(?:g|gr|gram)\b", title_lower)
+    match_g = re.search(r"(\d+(?:[\.,]\d+)?)\s*(?:g|gr|gram)\b", title_lower)  # pack carpani asagida
     # "5G"/"4G"/"3G" gibi mobil ağ nesli ifadeleri yanlislikla gram olarak
     # eslesip (orn. "Samsung Galaxy A17 5G" -> 5 gram, 0.005 kg gibi
     # anlamsiz bir birim fiyat) telefon/tablet urunlerinde saçma
@@ -4205,7 +4205,7 @@ def extract_volume_info(title: str) -> tuple[float, str] | None:
         try:
             val = float(match_g.group(1).replace(",", "."))
             if val > 0:
-                return val / 1000.0, "kg"
+                return val * pack / 1000.0, "kg"
         except ValueError:
             pass
 

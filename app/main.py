@@ -396,6 +396,10 @@ async def csrf_protection_middleware(request: Request, call_next):
 # find-alternatives'e istek atabilmesi için — en son eklenen middleware en
 # dış katman olduğundan CORS preflight'ı diğer middleware'lerden önce yakalar.
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.middleware.gzip import GZipMiddleware  # noqa: E402
+
+# HTML/JS/CSS/JSON yanıtlarını sıkıştır (Render'da bant genişliğini ~%75 azaltır)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 app.add_middleware(
     CORSMiddleware,
@@ -409,8 +413,8 @@ app.add_middleware(
         "https://www.n11.com",
     ],
     allow_credentials=False,
-    allow_methods=["POST", "GET"],
-    allow_headers=["Content-Type"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-CSRF-Token", "X-Device-ID", "X-API-Key"],
 )
 
 
@@ -3693,7 +3697,7 @@ def admin_scraper_health_report(request: Request) -> dict:
 
 
 @app.post("/api/admin/sync-google-sheets")
-async def sync_google_sheets(request: Request):
+def sync_google_sheets(request: Request):
     """
     Kullanıcı bazlı verileri Google Sheets'e senkronize eder.
     3 sekme: Yapıştırılan Linkler / Takip Edilen Ürünler / Takip Edilen Mağazalar
@@ -5327,7 +5331,7 @@ def _rss_escape(text: str) -> str:
 
 
 @app.get("/rss/{category}.xml", include_in_schema=False)
-async def rss_category_feed(category: str) -> Response:
+def rss_category_feed(category: str) -> Response:
     """Kategori bazlı son fiyat düşüşlerini RSS 2.0 formatında döner.
     Harici kütüphane gerektirmez, basit XML üretimi."""
     from email.utils import format_datetime
@@ -5403,7 +5407,7 @@ def _referral_code_for_user(user_id: str) -> str:
 
 
 @app.get("/api/referral/my-code")
-async def referral_my_code(user=Depends(require_login)) -> dict:
+def referral_my_code(user=Depends(require_login)) -> dict:
     uid = user["user_id"]
     code = _referral_code_for_user(uid)
     # Kod -> kullanıcı eşlemesini lazy olarak kaydet ki yeni kayıtlarda
@@ -6754,14 +6758,14 @@ def list_stores(request: Request):
     _extra_bulletin_categories = {
         "moda": ["colins", "defacto", "damattween", "flo", "kinetix", "twist",
                  "reebok", "sportive", "yargici"],
-        "home": ["bauhaus", "bellona", "dogtas", "englishhome", "evkur",
+        "home": ["arnica", "bauhaus", "bellona", "dogtas", "englishhome", "evkur",
                  "karaca", "kelebek", "madamecoco", "schafer", "istikbal"],
         "tech": ["arzum", "casper", "dsmart", "fakir", "tefal", "vatanbilgisayar"],
         "beauty": ["farmasi"],
         "online": ["idefix", "kitapyurdu", "muzikdunyasi", "ofissepeti",
-                   "ufukkirtasiye", "pazarama", "temu", "namet", "dr"],
+                   "ufukkirtasiye", "pazarama", "temu", "dr"],
         "health": ["bebek", "bigjoy", "toyzz", "petbis", "petlebi"],
-        "market": ["arnica"],
+        "market": ["namet"],
     }
     _extra_store_descriptions = {
         "arnica": "Küçük ev aletlerinde yeni kampanyaları kaçırma.",
@@ -6769,7 +6773,7 @@ def list_stores(request: Request):
         "bauhaus": "Yapı market ve bahçe ürünlerinde güncel fırsatlar.",
         "bebek": "Bebek ürünlerinde kampanya ve indirim fırsatları.",
         "bellona": "Mobilya ve ev tekstilinde sezonluk indirimler.",
-        "bigjoy": "Oyuncak dünyasında yeni kampanya ve indirimler.",
+        "bigjoy": "Sporcu besinleri ve takviyelerde güncel kampanya ve indirimler.",
         "casper": "Bilgisayar ve teknoloji ürünlerinde kampanyalar.",
         "colins": "Yeni sezon giyim kampanyalarını kaçırma.",
         "damattween": "Erkek giyimde yeni sezon fırsatları.",
@@ -7628,7 +7632,7 @@ async def embed_compare_page(terim: str, request: Request):
 
 
 @app.get("/aktuel/{store}", response_class=HTMLResponse)
-async def catalog_page(store: str):
+def catalog_page(store: str):
     """
     Bir marketin (BİM, A101, ŞOK vb.) o haftaki gerçek aktüel/katalog
     içeriğini gösteren sayfa. WhatsApp catalog_alert bildirimindeki
@@ -10442,7 +10446,7 @@ async def _check_campaign_page_changes() -> list[str]:
     return changed
 
 
-async def _auto_generate_campaigns() -> dict:
+def _auto_generate_campaigns() -> dict:
     """
     Elle admin panel olmadığı için kampanya verisini iki kaynaktan otomatik üretir:
       1. Bilinen haftalık aktüel katalog günü olan marketler (BİM/A101/ŞOK).
@@ -10581,7 +10585,7 @@ async def cron_store_newsletters(request: Request):
     from datetime import date
     from app.notifier import notify_store_update
 
-    auto_result = await _auto_generate_campaigns()
+    auto_result = await asyncio.to_thread(_auto_generate_campaigns)
     page_changes = await _check_campaign_page_changes()
 
     today_weekday = date.today().weekday()  # 0=Pzt … 6=Paz
@@ -10750,7 +10754,7 @@ async def cron_store_newsletters(request: Request):
 
 
 @app.get("/cron/sync-sheets")
-async def cron_sync_sheets(request: Request):
+def cron_sync_sheets(request: Request):
     """Vercel Cron: Her gün 02:00'da çalışır — Google Sheets'i günceller."""
     require_cron_request(request)
     if not os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON") or not os.getenv("GOOGLE_SHEET_ID"):

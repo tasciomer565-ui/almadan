@@ -573,15 +573,23 @@ h1 {
 
 .url-field {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   min-height: 52px;
+  min-width: 0;
   padding: 0 10px 0 16px;
   color: var(--ink-2);
   background: var(--paper);
   border: 1.5px solid var(--border);
   border-radius: 12px;
   transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+@media (min-width: 761px) {
+  .url-actions-row .url-field {
+    min-width: 310px;
+    flex: 1 1 auto;
+  }
 }
 
 .url-field:focus-within {
@@ -647,20 +655,22 @@ h1 {
 
 .primary-button {
   display: inline-flex;
-  min-height: 56px;
+  min-height: 50px;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  padding: 0 22px;
-  color: #152115;
-  background: var(--lime);
+  gap: 8px;
+  padding: 0 20px;
+  color: #ffffff;
+  background: var(--green);
   border: 0;
-  border-radius: 7px;
-  font-weight: 800;
+  border-radius: 10px;
+  font-weight: 700;
+  transition: background 0.16s ease, transform 0.16s ease;
 }
 
 .primary-button:hover {
-  background: #e5f871;
+  background: var(--green-dark);
+  color: #ffffff;
 }
 
 .primary-button:disabled {
@@ -1614,7 +1624,7 @@ body.dark-theme .offline-cache-banner {
 }
 
 .product-dialog {
-  width: min(760px, calc(100% - 28px));
+  width: min(760px, calc(100vw - 24px)) !important;
   max-height: calc(100dvh - 28px);
   margin: auto;
   padding: 0;
@@ -1924,6 +1934,12 @@ body.dark-theme .offline-cache-banner {
 
   .url-actions-row > * {
     width: 100% !important;
+  }
+
+  .scroll-to-top-btn {
+    bottom: 84px !important;
+    right: 16px !important;
+    left: auto !important;
   }
 
   .account-button {

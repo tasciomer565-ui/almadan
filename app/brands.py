@@ -155,6 +155,22 @@ _VARIANT_WORDS = frozenset({
 })
 
 
+# Çoklu paket: "4'lü", "2 li", "6 adet" (normalize sonrası ü->u, ı->i).
+# "x" biçimleri bilerek dışarıda: "120x180 cm" gibi boyutlarla karışıyor;
+# gerçek paketlerde neredeyse her zaman "adet" ya da "'lü" da geçiyor.
+_PACK_RE = re.compile(r"(?<![a-z0-9])(\d{1,2})\s*(?:'\s*l[iu]\b|l[iu]\b|adet\b)")
+
+
+def extract_pack_count(title: str) -> int | None:
+    """Başlıktaki çoklu paket adedi (2-48); tekli/belirsizse None."""
+    m = _PACK_RE.search(_norm(title))
+    if m:
+        n = int(m.group(1))
+        if 2 <= n <= 48:
+            return n
+    return None
+
+
 @dataclass(frozen=True)
 class ProductSignature:
     brand: str | None
@@ -173,6 +189,9 @@ def product_signature(title: str) -> ProductSignature:
     for num, unit in _SPEC_RE.findall(text):
         canon, factor = _UNIT_CANON[unit]
         specs.add((canon, round(_parse_number(num) * factor, 3)))
+    pack = extract_pack_count(title)
+    if pack:
+        specs.add(("adet", float(pack)))
     stripped = _SPEC_RE.sub(" ", text)
     models = {
         m for m in _MODEL_RE.findall(stripped) if not _NOT_MODEL_RE.match(m)
@@ -193,7 +212,14 @@ SAME_PRODUCT_THRESHOLD = 0.6
 
 
 def _specs_conflict(a: ProductSignature, b: ProductSignature) -> bool:
-    """Aynı ölçü türü iki tarafta da varsa değerleri birebir uymalı."""
+    """Aynı ölçü türü iki tarafta da varsa değerleri birebir uymalı.
+
+    "adet" (çoklu paket) özel: bir tarafta 4'lü paket varken diğer tarafta
+    paket bilgisi yoksa tekli kabul edilir ve ÇATIŞIR -- 4'lü 1 L süt, tekli
+    1 L sütle aynı ürün değildir ("En Yüksek" istatistiğini ve birim fiyatı
+    bozuyordu)."""
+    if any(k == "adet" for k, _ in a.specs) != any(k == "adet" for k, _ in b.specs):
+        return True
     kinds_a = {kind: set() for kind, _ in a.specs}
     kinds_b = {kind: set() for kind, _ in b.specs}
     for kind, val in a.specs:

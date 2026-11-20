@@ -263,3 +263,33 @@ def test_postprocess_keeps_same_product_from_different_stores():
     sources = sorted(x["source"] for x in out)
     assert sources == ["amazon", "mediamarkt", "n11"]          # her magaza gorunur, eskiden sadece en ucuzu kaliyordu
     assert [x["price"] for x in out if x["source"] == "amazon"] == [56199]
+
+
+# ── Çoklu paket (4'lü / 6 adet) ──────────────────────────────
+
+@pytest.mark.parametrize("title,n", [
+    ("Pınar Süt Yarım Yağlı 4'Lü 1 Lt", 4),
+    ("Pınar %1 Yağlı Süt 1 Lt X 6 Adet", 6),
+    ("Omo Sıvı Deterjan 2 li Paket", 2),
+    ("Pınar Süt %1 Yağlı 1 L", None),
+    ("Halı 120x180 cm", None),            # boyut, paket değil
+    ("Samsung Galaxy S24 128 GB", None),
+])
+def test_extract_pack_count(title, n):
+    from app.brands import extract_pack_count
+    assert extract_pack_count(title) == n
+
+
+def test_multipack_never_matches_single():
+    from app.brands import same_product_score, title_matches_query
+    assert same_product_score("Pınar Süt %1 Yağlı 1 L", "Pınar Süt Yarım Yağlı 4'Lü 1 Lt") == 0.0
+    assert not title_matches_query("pinar sut 1 lt", "Pınar Süt Yarım Yağlı 4'Lü 1 Lt")
+    assert title_matches_query("pinar sut 1 lt 4 lu", "Pınar Süt Yarım Yağlı 4'Lü 1 Lt")
+
+
+def test_unit_price_uses_pack_multiplier():
+    from app.comparator import extract_volume_info
+    assert extract_volume_info("Pınar Süt Yarım Yağlı 4'Lü 1 Lt") == (4.0, "L")
+    assert extract_volume_info("Pınar %1 Yağlı Süt 1 Lt X 6 Adet") == (6.0, "L")
+    assert extract_volume_info("Pınar Süt %1 Yağlı 1 L") == (1.0, "L")
+    assert extract_volume_info("Eti Browni 4'lü 160 g") == (0.64, "kg")
